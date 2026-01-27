@@ -1,0 +1,18 @@
+package com.sshpeaches.app.data.repository
+
+import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.data.model.Identity
+import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.model.Snippet
+import kotlinx.coroutines.flow.Flow
+
+interface AppRepository {
+    val hosts: Flow<List<HostConnection>>
+    val identities: Flow<List<Identity>>
+    val portForwards: Flow<List<PortForward>>
+    val snippets: Flow<List<Snippet>>
+
+    suspend fun toggleFavorite(id: String)
+    suspend fun addHost(host: HostConnection)
+    suspend fun updateHost(host: HostConnection)
+}
