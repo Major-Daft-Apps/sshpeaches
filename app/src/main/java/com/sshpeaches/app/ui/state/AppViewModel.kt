@@ -50,34 +50,85 @@ class AppViewModel(
         )
     }
 
-    val uiState: StateFlow<AppUiState> = combine(
-        baseUiState,
+    private data class PrivacyPrefs(
+        val theme: ThemeMode,
+        val background: Boolean,
+        val biometric: Boolean,
+        val timeout: LockTimeout,
+        val crash: Boolean,
+        val analytics: Boolean,
+        val diagnostics: Boolean
+    )
+
+    private data class PrivacyPartial(
+        val theme: ThemeMode,
+        val background: Boolean,
+        val biometric: Boolean,
+        val timeout: LockTimeout
+    )
+
+    private data class SharePrefs(
+        val includeIds: Boolean,
+        val includeSettings: Boolean,
+        val autoStart: Boolean,
+        val hostKeyPrompt: Boolean,
+        val usage: Boolean
+    )
+
+    private val privacyPartialFlow = combine(
         themeModeFlow,
         backgroundSessionsFlow,
         biometricFlow,
-        lockTimeoutFlow,
+        lockTimeoutFlow
+    ) { theme, background, biometric, timeout ->
+        PrivacyPartial(theme, background, biometric, timeout)
+    }
+
+    private val privacyPrefsFlow = combine(
+        privacyPartialFlow,
         crashReportsFlow,
         analyticsFlow,
-        diagnosticsLoggingFlow,
+        diagnosticsLoggingFlow
+    ) { partial, crash, analytics, diagnostics ->
+        PrivacyPrefs(
+            theme = partial.theme,
+            background = partial.background,
+            biometric = partial.biometric,
+            timeout = partial.timeout,
+            crash = crash,
+            analytics = analytics,
+            diagnostics = diagnostics
+        )
+    }
+
+    private val sharePrefsFlow = combine(
         includeIdentitiesFlow,
         includeSettingsFlow,
         autoStartForwardsFlow,
         hostKeyPromptFlow,
         usageReportsFlow
-    ) { state, theme, background, biometric, timeout, crash, analytics, diagnostics, includeIds, includeSettings, autoStart, hostKeyPrompt, usage ->
+    ) { includeIds, includeSettings, autoStart, hostKeyPrompt, usage ->
+        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, usage)
+    }
+
+    val uiState: StateFlow<AppUiState> = combine(
+        baseUiState,
+        privacyPrefsFlow,
+        sharePrefsFlow
+    ) { state, privacy, share ->
         state.copy(
-            themeMode = theme,
-            allowBackgroundSessions = background,
-            biometricLockEnabled = biometric,
-            lockTimeout = timeout,
-            crashReportsEnabled = crash,
-            analyticsEnabled = analytics,
-            diagnosticsLoggingEnabled = diagnostics,
-            includeIdentitiesInQr = includeIds,
-            includeSettingsInQr = includeSettings,
-            autoStartForwards = autoStart,
-            hostKeyPromptEnabled = hostKeyPrompt,
-            usageReportsEnabled = usage
+            themeMode = privacy.theme,
+            allowBackgroundSessions = privacy.background,
+            biometricLockEnabled = privacy.biometric,
+            lockTimeout = privacy.timeout,
+            crashReportsEnabled = privacy.crash,
+            analyticsEnabled = privacy.analytics,
+            diagnosticsLoggingEnabled = privacy.diagnostics,
+            includeIdentitiesInQr = share.includeIds,
+            includeSettingsInQr = share.includeSettings,
+            autoStartForwards = share.autoStart,
+            hostKeyPromptEnabled = share.hostKeyPrompt,
+            usageReportsEnabled = share.usage
         )
     }.stateIn(
         scope = viewModelScope,
