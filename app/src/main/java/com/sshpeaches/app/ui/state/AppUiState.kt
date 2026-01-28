@@ -10,7 +10,9 @@ data class AppUiState(
     val hosts: List<HostConnection> = emptyList(),
     val identities: List<Identity> = emptyList(),
     val portForwards: List<PortForward> = emptyList(),
-    val snippets: List<Snippet> = emptyList()
+    val snippets: List<Snippet> = emptyList(),
+    val sortMode: SortMode = SortMode.LAST_USED,
+    val useDarkTheme: Boolean = true
 )
 
 data class FavoritesSection(
@@ -18,3 +20,5 @@ data class FavoritesSection(
     val identityFavorites: List<Identity> = emptyList(),
     val portFavorites: List<PortForward> = emptyList()
 )
+
+enum class SortMode { LAST_USED, ALPHABETICAL }

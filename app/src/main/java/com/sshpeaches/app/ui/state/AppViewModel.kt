@@ -15,16 +15,18 @@ class AppViewModel(
     private val repository: AppRepository = InMemoryAppRepository()
 ) : ViewModel() {
 
-    private val sortsByAlphabet = MutableStateFlow(false)
+    private val sortMode = MutableStateFlow(SortMode.LAST_USED)
+    private val darkThemeEnabled = MutableStateFlow(true)
 
     val uiState: StateFlow<AppUiState> = combine(
         repository.hosts,
         repository.identities,
         repository.portForwards,
         repository.snippets,
-        sortsByAlphabet
-    ) { hosts, identities, forwards, snippets, alpha ->
-        val hostList = hosts.sortedWith(if (alpha) byName else byLastUsed)
+        sortMode,
+        darkThemeEnabled
+    ) { hosts, identities, forwards, snippets, mode, dark ->
+        val hostList = hosts.sortedWith(if (mode == SortMode.ALPHABETICAL) byName else byLastUsed)
         val favoriteHosts = hostList.filter { it.favorite }
         val favoriteIdentities = identities.filter { it.favorite }
         val favoritePorts = forwards.filter { it.favorite }
@@ -33,7 +35,9 @@ class AppViewModel(
             hosts = hostList,
             identities = identities,
             portForwards = forwards,
-            snippets = snippets
+            snippets = snippets,
+            sortMode = mode,
+            useDarkTheme = dark
         )
     }.stateIn(
         scope = viewModelScope,
@@ -41,8 +45,12 @@ class AppViewModel(
         initialValue = AppUiState()
     )
 
-    fun toggleSortMode() {
-        sortsByAlphabet.value = !sortsByAlphabet.value
+    fun setSortMode(mode: SortMode) {
+        sortMode.value = mode
+    }
+
+    fun setDarkTheme(enabled: Boolean) {
+        darkThemeEnabled.value = enabled
     }
 
     companion object {

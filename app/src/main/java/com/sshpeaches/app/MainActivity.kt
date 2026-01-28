@@ -16,10 +16,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SSHPeachesTheme {
-                val viewModel: AppViewModel = viewModel()
-                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-                SSHPeachesRoot(uiState = uiState, onToggleSortMode = viewModel::toggleSortMode)
+            val viewModel: AppViewModel = viewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            SSHPeachesTheme(useDarkTheme = uiState.useDarkTheme) {
+                SSHPeachesRoot(
+                    uiState = uiState,
+                    onSortModeChange = viewModel::setSortMode,
+                    onDarkThemeChange = viewModel::setDarkTheme
+                )
             }
         }
     }

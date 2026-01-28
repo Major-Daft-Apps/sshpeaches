@@ -6,6 +6,7 @@ object Routes {
     const val IDENTITIES = "identities"
     const val FORWARDS = "forwards"
     const val SNIPPETS = "snippets"
+    const val KEYBOARD = "keyboard"
     const val SETTINGS = "settings"
     const val HELP = "help"
     const val QUICK_CONNECT = "quick_connect"

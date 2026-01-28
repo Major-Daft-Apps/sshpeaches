@@ -4,13 +4,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
-
 data class DrawerDestination(
     val route: String,
     val label: String,
@@ -23,6 +23,7 @@ val drawerDestinations = listOf(
     DrawerDestination(Routes.IDENTITIES, "Identities", Icons.Default.Key),
     DrawerDestination(Routes.FORWARDS, "Port Forwards", Icons.Default.Bolt),
     DrawerDestination(Routes.SNIPPETS, "Snippets", Icons.Default.Code),
+    DrawerDestination(Routes.KEYBOARD, "Keyboard Editor", Icons.Default.Keyboard),
     DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings),
     DrawerDestination(Routes.HELP, "Help", Icons.Default.Help),
     DrawerDestination(Routes.ABOUT, "About", Icons.Default.Info)

@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,13 +23,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.ui.components.HostCard
+import com.sshpeaches.app.ui.state.SortMode
 
 @Composable
-fun HostsScreen(hosts: List<HostConnection>) {
+fun HostsScreen(
+    hosts: List<HostConnection>,
+    sortMode: SortMode,
+    onSortModeChange: (SortMode) -> Unit
+) {
     val search = remember { mutableStateOf("") }
+    val showMenu = remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -40,10 +49,28 @@ fun HostsScreen(hosts: List<HostConnection>) {
                 value = search.value,
                 onValueChange = { search.value = it },
                 placeholder = { Text("Search hosts") },
-                trailingIcon = { Icon(Icons.Default.FilterList, contentDescription = null) }
+                trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
             )
-            IconButton(onClick = { /* show sort menu */ }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Sort")
+            Column {
+                IconButton(onClick = { showMenu.value = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Sort")
+                }
+                DropdownMenu(expanded = showMenu.value, onDismissRequest = { showMenu.value = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Last Used", fontWeight = if (sortMode == SortMode.LAST_USED) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = {
+                            showMenu.value = false
+                            onSortModeChange(SortMode.LAST_USED)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Alphabetical", fontWeight = if (sortMode == SortMode.ALPHABETICAL) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = {
+                            showMenu.value = false
+                            onSortModeChange(SortMode.ALPHABETICAL)
+                        }
+                    )
+                }
             }
         }
         Divider()
