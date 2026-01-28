@@ -1,9 +1,12 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Increased inset to avoid any edge clipping or colored ring -->
+    <!-- Solid backdrop to prevent launcher tint/halo from showing through -->
+    <item android:drawable="@color/color_carbon_black" />
+
+    <!-- Inset the artwork heavily to avoid cropping and ring artifacts -->
     <item
         android:drawable="@drawable/sshpeaches"
-        android:insetLeft="24dp"
-        android:insetTop="24dp"
-        android:insetRight="24dp"
-        android:insetBottom="24dp" />
+        android:insetLeft="28dp"
+        android:insetTop="28dp"
+        android:insetRight="28dp"
+        android:insetBottom="28dp" />
 </layer-list>
