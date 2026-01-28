@@ -52,6 +52,7 @@ import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.SortMode
+import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
 import kotlinx.coroutines.launch
 
