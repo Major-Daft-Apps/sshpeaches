@@ -78,6 +78,7 @@ private fun OsMetadata.label(): String = when (this) {
     OsMetadata.Undetected -> "?"
 }
 
+@Composable
 private fun OsMetadata.toColor(): Color = when (this) {
     is OsMetadata.Known -> Color(android.graphics.Color.parseColor(family.colorHex))
     else -> MaterialTheme.colorScheme.primary
