@@ -3,4 +3,5 @@
     <color name="color_carbon_black">#191919</color>
     <color name="color_blazing_flame">#F15025</color>
     <color name="color_vanilla">#F6F1EB</color>
+    <color name="ic_launcher_background">#000000</color>
 </resources>
