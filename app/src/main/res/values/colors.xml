@@ -1,4 +1,5 @@
 <resources>
+    <color name="color_hard_black">#000000</color>
     <color name="color_carbon_black">#191919</color>
     <color name="color_blazing_flame">#F15025</color>
     <color name="color_vanilla">#F6F1EB</color>

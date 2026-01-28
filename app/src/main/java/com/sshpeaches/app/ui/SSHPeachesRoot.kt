@@ -52,6 +52,7 @@ import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.SortMode
+import com.sshpeaches.app.ui.theme.CarbonBlack
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,7 +74,7 @@ fun SSHPeachesRoot(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerContainerColor = CarbonBlack,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 AppDrawer(
