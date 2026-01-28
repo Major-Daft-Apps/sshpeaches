@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -66,6 +69,7 @@ fun KeyboardEditorScreen() {
         rows.forEachIndexed { index, row ->
             KeyRowCard(index = index + 1, keys = row)
         }
+        PhoneOutlineDecoration()
     }
 }
 
@@ -132,7 +136,7 @@ private fun KeyRowCard(index: Int, keys: List<String>) {
 @Composable
 private fun KeyDropdown(label: String, keys: List<String>) {
     val expanded = remember { mutableStateOf(false) }
-    androidx.compose.foundation.layout.Box {
+    Box {
         TextButton(onClick = { expanded.value = true }) {
             Text(label)
         }
@@ -141,6 +145,62 @@ private fun KeyDropdown(label: String, keys: List<String>) {
                 DropdownMenuItem(
                     text = { Text(option) },
                     onClick = { expanded.value = false }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhoneOutlineDecoration() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .padding(horizontal = 32.dp)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.Center)
+        ) {
+            val width = size.width * 0.8f
+            val left = (size.width - width) / 2
+            val right = left + width
+            val top = size.height * 0.4f
+            val bottom = size.height * 0.8f
+            val color = Color(0xFFB8B8B8)
+            val stroke = Stroke(width = 4f)
+
+            drawRoundRect(
+                color = color,
+                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(width, bottom - top),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(40f, 40f),
+                style = stroke
+            )
+
+            val rows = 12
+            val cols = 3
+            val cellWidth = width / cols
+            val cellHeight = (bottom - top) / rows
+
+            for (row in 1 until rows) {
+                val y = top + row * cellHeight
+                drawLine(
+                    color = color,
+                    start = androidx.compose.ui.geometry.Offset(left, y),
+                    end = androidx.compose.ui.geometry.Offset(right, y),
+                    strokeWidth = 2f
+                )
+            }
+            for (col in 1 until cols) {
+                val x = left + col * cellWidth
+                drawLine(
+                    color = color,
+                    start = androidx.compose.ui.geometry.Offset(x, top),
+                    end = androidx.compose.ui.geometry.Offset(x, bottom),
+                    strokeWidth = 2f
                 )
             }
         }
