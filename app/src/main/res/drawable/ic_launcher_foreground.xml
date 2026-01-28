@@ -1,9 +1,9 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Add inset padding so the bitmap fits safely inside the adaptive icon mask -->
+    <!-- Increased inset to avoid any edge clipping or colored ring -->
     <item
         android:drawable="@drawable/sshpeaches"
-        android:insetLeft="12dp"
-        android:insetTop="12dp"
-        android:insetRight="12dp"
-        android:insetBottom="12dp" />
+        android:insetLeft="24dp"
+        android:insetTop="24dp"
+        android:insetRight="24dp"
+        android:insetBottom="24dp" />
 </layer-list>
