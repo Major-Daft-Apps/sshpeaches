@@ -16,7 +16,7 @@ class AppViewModel(
 ) : ViewModel() {
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
-    private val darkThemeEnabled = MutableStateFlow(true)
+    private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
 
     private val baseUiState = combine(
         repository.hosts,
@@ -39,8 +39,8 @@ class AppViewModel(
         )
     }
 
-    val uiState: StateFlow<AppUiState> = combine(baseUiState, darkThemeEnabled) { state, dark ->
-        state.copy(useDarkTheme = dark)
+    val uiState: StateFlow<AppUiState> = combine(baseUiState, themeModeFlow) { state, theme ->
+        state.copy(themeMode = theme)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -51,8 +51,8 @@ class AppViewModel(
         sortMode.value = mode
     }
 
-    fun setDarkTheme(enabled: Boolean) {
-        darkThemeEnabled.value = enabled
+    fun setThemeMode(mode: ThemeMode) {
+        themeModeFlow.value = mode
     }
 
     companion object {

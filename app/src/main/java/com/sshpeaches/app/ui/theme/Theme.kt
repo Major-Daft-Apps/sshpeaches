@@ -1,11 +1,11 @@
 package com.sshpeaches.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.sshpeaches.app.ui.state.ThemeMode
 
 private val DarkColors = darkColorScheme(
     primary = BlazingFlame,
@@ -31,10 +31,15 @@ private val LightColors = lightColorScheme(
 
 @Composable
 fun SSHPeachesTheme(
-    useDarkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode,
     content: @Composable () -> Unit
 ) {
-    val scheme = if (useDarkTheme) DarkColors else LightColors
+    val useDark = when (themeMode) {
+        ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+    val scheme = if (useDark) DarkColors else LightColors
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography,

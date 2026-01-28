@@ -18,11 +18,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: AppViewModel = viewModel()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            SSHPeachesTheme(useDarkTheme = uiState.useDarkTheme) {
+            SSHPeachesTheme(themeMode = uiState.themeMode) {
                 SSHPeachesRoot(
                     uiState = uiState,
                     onSortModeChange = viewModel::setSortMode,
-                    onDarkThemeChange = viewModel::setDarkTheme
+                    onThemeModeChange = viewModel::setThemeMode
                 )
             }
         }

@@ -60,7 +60,7 @@ import kotlinx.coroutines.launch
 fun SSHPeachesRoot(
     uiState: AppUiState,
     onSortModeChange: (SortMode) -> Unit,
-    onDarkThemeChange: (Boolean) -> Unit
+    onThemeModeChange: (ThemeMode) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -153,8 +153,8 @@ fun SSHPeachesRoot(
                     }
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
-                            useDarkTheme = uiState.useDarkTheme,
-                            onThemeToggle = onDarkThemeChange
+                            currentTheme = uiState.themeMode,
+                            onThemeChange = onThemeModeChange
                         )
                     }
                 }

@@ -12,7 +12,7 @@ data class AppUiState(
     val portForwards: List<PortForward> = emptyList(),
     val snippets: List<Snippet> = emptyList(),
     val sortMode: SortMode = SortMode.LAST_USED,
-    val useDarkTheme: Boolean = true
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 data class FavoritesSection(
@@ -22,3 +22,5 @@ data class FavoritesSection(
 )
 
 enum class SortMode { LAST_USED, ALPHABETICAL }
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
