@@ -18,14 +18,13 @@ class AppViewModel(
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
     private val darkThemeEnabled = MutableStateFlow(true)
 
-    val uiState: StateFlow<AppUiState> = combine(
+    private val baseUiState = combine(
         repository.hosts,
         repository.identities,
         repository.portForwards,
         repository.snippets,
-        sortMode,
-        darkThemeEnabled
-    ) { hosts, identities, forwards, snippets, mode, dark ->
+        sortMode
+    ) { hosts, identities, forwards, snippets, mode ->
         val hostList = hosts.sortedWith(if (mode == SortMode.ALPHABETICAL) byName else byLastUsed)
         val favoriteHosts = hostList.filter { it.favorite }
         val favoriteIdentities = identities.filter { it.favorite }
@@ -36,9 +35,12 @@ class AppViewModel(
             identities = identities,
             portForwards = forwards,
             snippets = snippets,
-            sortMode = mode,
-            useDarkTheme = dark
+            sortMode = mode
         )
+    }
+
+    val uiState: StateFlow<AppUiState> = combine(baseUiState, darkThemeEnabled) { state, dark ->
+        state.copy(useDarkTheme = dark)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
