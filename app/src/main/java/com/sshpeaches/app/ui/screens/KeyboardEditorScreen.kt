@@ -3,22 +3,26 @@ package com.sshpeaches.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,28 +69,39 @@ fun KeyboardEditorScreen() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeyPalette() {
-    val groups = listOf(
-        "Fn" to listOf("F1", "F2", "F3", "F4"),
-        "a" to listOf("a", "b", "c"),
-        "A" to listOf("A", "B", "C"),
-        "1" to listOf("1", "2", "3"),
-        "#" to listOf("#", "@", "&")
+    val dropdownGroups = listOf(
+        "Fn" to listOf("F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"),
+        "a" to ('a'..'z').map { it.toString() },
+        "A" to ('A'..'Z').map { it.toString() },
+        "1" to listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
+        "#" to listOf("#", "@", "&", "%", "!", "?", "+", "=")
     )
+    val quickKeys = listOf("Esc", "Tab", "Ctrl", "Alt", "Shift", "Swipe→Arrow", "Swipe→Scroll", "Editor")
     Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Palette", style = MaterialTheme.typography.titleMedium)
-            groups.forEach { (label, keys) ->
-                Text(label, style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    keys.forEach { key ->
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(key) },
-                            colors = AssistChipDefaults.assistChipColors()
-                        )
-                    }
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                quickKeys.forEach { key ->
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(key) },
+                        colors = AssistChipDefaults.assistChipColors()
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                dropdownGroups.forEach { (label, keys) ->
+                    KeyDropdown(label = label, keys = keys)
                 }
             }
         }
@@ -109,6 +124,24 @@ private fun KeyRowCard(index: Int, keys: List<String>) {
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeyDropdown(label: String, keys: List<String>) {
+    val expanded = remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
+        TextButton(onClick = { expanded.value = true }) {
+            Text(label)
+        }
+        DropdownMenu(expanded = expanded.value, onDismissRequest = { expanded.value = false }) {
+            keys.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = { expanded.value = false }
+                )
             }
         }
     }
