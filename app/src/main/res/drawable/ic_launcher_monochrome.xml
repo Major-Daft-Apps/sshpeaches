@@ -1,0 +1,10 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Keep same inset as foreground, tinting to pure white for monochrome/themed icons -->
+    <item
+        android:drawable="@drawable/sshpeaches"
+        android:insetLeft="28dp"
+        android:insetTop="28dp"
+        android:insetRight="28dp"
+        android:insetBottom="28dp"
+        android:tint="#FFFFFFFF" />
+</layer-list>
