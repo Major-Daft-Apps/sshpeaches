@@ -69,7 +69,7 @@ fun KeyboardEditorScreen() {
         rows.forEachIndexed { index, row ->
             KeyRowCard(index = index + 1, keys = row)
         }
-        PhoneOutlineDecoration()
+        PhoneOutlineDecoration(modifier = Modifier.weight(1f))
     }
 }
 
@@ -152,11 +152,10 @@ private fun KeyDropdown(label: String, keys: List<String>) {
 }
 
 @Composable
-private fun PhoneOutlineDecoration() {
+private fun PhoneOutlineDecoration(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .weight(1f)
             .padding(horizontal = 32.dp)
     ) {
         Canvas(
