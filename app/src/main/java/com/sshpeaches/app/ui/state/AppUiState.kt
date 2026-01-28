@@ -12,7 +12,9 @@ data class AppUiState(
     val portForwards: List<PortForward> = emptyList(),
     val snippets: List<Snippet> = emptyList(),
     val sortMode: SortMode = SortMode.LAST_USED,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val allowBackgroundSessions: Boolean = true,
+    val biometricLockEnabled: Boolean = false
 )
 
 data class FavoritesSection(

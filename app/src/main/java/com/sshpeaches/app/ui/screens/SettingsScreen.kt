@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -27,7 +28,11 @@ import com.sshpeaches.app.ui.state.ThemeMode
 @Composable
 fun SettingsScreen(
     currentTheme: ThemeMode,
-    onThemeChange: (ThemeMode) -> Unit
+    onThemeChange: (ThemeMode) -> Unit,
+    allowBackgroundSessions: Boolean,
+    onBackgroundToggle: (Boolean) -> Unit,
+    biometricEnabled: Boolean,
+    onBiometricToggle: (Boolean) -> Unit
 ) {
     val expanded = remember { mutableStateOf(false) }
     val themeOptions = listOf(
@@ -79,8 +84,36 @@ fun SettingsScreen(
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Run shells in background")
+                        Text(
+                            "Keep SSH/Mosh sessions alive while app is backgrounded",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(checked = allowBackgroundSessions, onCheckedChange = onBackgroundToggle)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Security", style = MaterialTheme.typography.titleMedium)
-                Text("Biometric lock settings coming soon.")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Biometric lock")
+                        Text("Require fingerprint/face after inactivity", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
+                }
+                Text("Lock screen prompt coming soon.", style = MaterialTheme.typography.labelSmall)
             }
         }
     }

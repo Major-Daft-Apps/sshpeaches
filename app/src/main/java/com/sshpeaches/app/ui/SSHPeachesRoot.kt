@@ -61,7 +61,9 @@ import kotlinx.coroutines.launch
 fun SSHPeachesRoot(
     uiState: AppUiState,
     onSortModeChange: (SortMode) -> Unit,
-    onThemeModeChange: (ThemeMode) -> Unit
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onBackgroundModeChange: (Boolean) -> Unit,
+    onBiometricToggle: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -156,7 +158,11 @@ fun SSHPeachesRoot(
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
                             currentTheme = uiState.themeMode,
-                            onThemeChange = onThemeModeChange
+                            onThemeChange = onThemeModeChange,
+                            allowBackgroundSessions = uiState.allowBackgroundSessions,
+                            onBackgroundToggle = onBackgroundModeChange,
+                            biometricEnabled = uiState.biometricLockEnabled,
+                            onBiometricToggle = onBiometricToggle
                         )
                     }
                 }

@@ -17,6 +17,8 @@ class AppViewModel(
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
+    private val backgroundSessionsFlow = MutableStateFlow(true)
+    private val biometricFlow = MutableStateFlow(false)
 
     private val baseUiState = combine(
         repository.hosts,
@@ -39,8 +41,12 @@ class AppViewModel(
         )
     }
 
-    val uiState: StateFlow<AppUiState> = combine(baseUiState, themeModeFlow) { state, theme ->
-        state.copy(themeMode = theme)
+    val uiState: StateFlow<AppUiState> = combine(baseUiState, themeModeFlow, backgroundSessionsFlow, biometricFlow) { state, theme, background, biometric ->
+        state.copy(
+            themeMode = theme,
+            allowBackgroundSessions = background,
+            biometricLockEnabled = biometric
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -53,6 +59,14 @@ class AppViewModel(
 
     fun setThemeMode(mode: ThemeMode) {
         themeModeFlow.value = mode
+    }
+
+    fun setBackgroundSessions(enabled: Boolean) {
+        backgroundSessionsFlow.value = enabled
+    }
+
+    fun setBiometricLock(enabled: Boolean) {
+        biometricFlow.value = enabled
     }
 
     companion object {

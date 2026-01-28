@@ -22,7 +22,9 @@ class MainActivity : ComponentActivity() {
                 SSHPeachesRoot(
                     uiState = uiState,
                     onSortModeChange = viewModel::setSortMode,
-                    onThemeModeChange = viewModel::setThemeMode
+                    onThemeModeChange = viewModel::setThemeMode,
+                    onBackgroundModeChange = viewModel::setBackgroundSessions,
+                    onBiometricToggle = viewModel::setBiometricLock
                 )
             }
         }
