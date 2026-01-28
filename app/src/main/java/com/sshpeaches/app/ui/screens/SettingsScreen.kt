@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,13 +33,39 @@ fun SettingsScreen(
     allowBackgroundSessions: Boolean,
     onBackgroundToggle: (Boolean) -> Unit,
     biometricEnabled: Boolean,
-    onBiometricToggle: (Boolean) -> Unit
+    onBiometricToggle: (Boolean) -> Unit,
+    lockTimeout: LockTimeout,
+    onLockTimeoutChange: (LockTimeout) -> Unit,
+    crashReportsEnabled: Boolean,
+    onCrashReportsToggle: (Boolean) -> Unit,
+    analyticsEnabled: Boolean,
+    onAnalyticsToggle: (Boolean) -> Unit,
+    diagnosticsLoggingEnabled: Boolean,
+    onDiagnosticsToggle: (Boolean) -> Unit,
+    includeIdentities: Boolean,
+    onIncludeIdentitiesToggle: (Boolean) -> Unit,
+    includeSettings: Boolean,
+    onIncludeSettingsToggle: (Boolean) -> Unit,
+    autoStartForwards: Boolean,
+    onAutoStartForwardsToggle: (Boolean) -> Unit,
+    hostKeyPromptEnabled: Boolean,
+    onHostKeyPromptToggle: (Boolean) -> Unit,
+    usageReportsEnabled: Boolean,
+    onUsageReportsToggle: (Boolean) -> Unit
 ) {
     val expanded = remember { mutableStateOf(false) }
+    val lockExpanded = remember { mutableStateOf(false) }
     val themeOptions = listOf(
         ThemeMode.SYSTEM to "System",
         ThemeMode.LIGHT to "Light",
         ThemeMode.DARK to "Dark"
+    )
+    val timeoutOptions = listOf(
+        LockTimeout.IMMEDIATE,
+        LockTimeout.ONE_MIN,
+        LockTimeout.FIVE_MIN,
+        LockTimeout.FIFTEEN_MIN,
+        LockTimeout.CUSTOM
     )
     Column(
         modifier = Modifier
@@ -113,7 +140,130 @@ fun SettingsScreen(
                     }
                     Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
                 }
-                Text("Lock screen prompt coming soon.", style = MaterialTheme.typography.labelSmall)
+                ExposedDropdownMenuBox(
+                    expanded = lockExpanded.value,
+                    onExpandedChange = { lockExpanded.value = !lockExpanded.value }
+                ) {
+                    TextField(
+                        value = lockTimeout.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Lock timeout") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lockExpanded.value) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = lockExpanded.value,
+                        onDismissRequest = { lockExpanded.value = false }
+                    ) {
+                        timeoutOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    lockExpanded.value = false
+                                    onLockTimeoutChange(option)
+                                }
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Host key prompts")
+                        Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = hostKeyPromptEnabled, onCheckedChange = onHostKeyPromptToggle)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("QR Sync Defaults", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Include identities")
+                        Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = includeIdentities, onCheckedChange = onIncludeIdentitiesToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Include settings")
+                        Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = includeSettings, onCheckedChange = onIncludeSettingsToggle)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Auto-start associated forwards")
+                        Text("Start linked tunnels when connecting", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = autoStartForwards, onCheckedChange = onAutoStartForwardsToggle)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Crash reports")
+                        Text("Send anonymous crash details", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = crashReportsEnabled, onCheckedChange = onCrashReportsToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Usage analytics")
+                        Text("Help improve SSHPeaches by sharing usage stats", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = analyticsEnabled, onCheckedChange = onAnalyticsToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Session diagnostics")
+                        Text("Capture anonymized session logs", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = diagnosticsLoggingEnabled, onCheckedChange = onDiagnosticsToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Send usage reports (Advanced)")
+                        Text("Periodically send diagnostics bundle", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = usageReportsEnabled, onCheckedChange = onUsageReportsToggle)
+                }
             }
         }
     }

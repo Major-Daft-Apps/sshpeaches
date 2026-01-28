@@ -19,6 +19,15 @@ class AppViewModel(
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
     private val backgroundSessionsFlow = MutableStateFlow(true)
     private val biometricFlow = MutableStateFlow(false)
+    private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
+    private val crashReportsFlow = MutableStateFlow(false)
+    private val analyticsFlow = MutableStateFlow(false)
+    private val diagnosticsLoggingFlow = MutableStateFlow(false)
+    private val includeIdentitiesFlow = MutableStateFlow(true)
+    private val includeSettingsFlow = MutableStateFlow(true)
+    private val autoStartForwardsFlow = MutableStateFlow(true)
+    private val hostKeyPromptFlow = MutableStateFlow(true)
+    private val usageReportsFlow = MutableStateFlow(false)
 
     private val baseUiState = combine(
         repository.hosts,
@@ -41,11 +50,34 @@ class AppViewModel(
         )
     }
 
-    val uiState: StateFlow<AppUiState> = combine(baseUiState, themeModeFlow, backgroundSessionsFlow, biometricFlow) { state, theme, background, biometric ->
+    val uiState: StateFlow<AppUiState> = combine(
+        baseUiState,
+        themeModeFlow,
+        backgroundSessionsFlow,
+        biometricFlow,
+        lockTimeoutFlow,
+        crashReportsFlow,
+        analyticsFlow,
+        diagnosticsLoggingFlow,
+        includeIdentitiesFlow,
+        includeSettingsFlow,
+        autoStartForwardsFlow,
+        hostKeyPromptFlow,
+        usageReportsFlow
+    ) { state, theme, background, biometric, timeout, crash, analytics, diagnostics, includeIds, includeSettings, autoStart, hostKeyPrompt, usage ->
         state.copy(
             themeMode = theme,
             allowBackgroundSessions = background,
-            biometricLockEnabled = biometric
+            biometricLockEnabled = biometric,
+            lockTimeout = timeout,
+            crashReportsEnabled = crash,
+            analyticsEnabled = analytics,
+            diagnosticsLoggingEnabled = diagnostics,
+            includeIdentitiesInQr = includeIds,
+            includeSettingsInQr = includeSettings,
+            autoStartForwards = autoStart,
+            hostKeyPromptEnabled = hostKeyPrompt,
+            usageReportsEnabled = usage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -67,6 +99,42 @@ class AppViewModel(
 
     fun setBiometricLock(enabled: Boolean) {
         biometricFlow.value = enabled
+    }
+
+    fun setLockTimeout(timeout: LockTimeout) {
+        lockTimeoutFlow.value = timeout
+    }
+
+    fun setCrashReports(enabled: Boolean) {
+        crashReportsFlow.value = enabled
+    }
+
+    fun setAnalytics(enabled: Boolean) {
+        analyticsFlow.value = enabled
+    }
+
+    fun setDiagnosticsLogging(enabled: Boolean) {
+        diagnosticsLoggingFlow.value = enabled
+    }
+
+    fun setIncludeIdentities(enabled: Boolean) {
+        includeIdentitiesFlow.value = enabled
+    }
+
+    fun setIncludeSettings(enabled: Boolean) {
+        includeSettingsFlow.value = enabled
+    }
+
+    fun setAutoStartForwards(enabled: Boolean) {
+        autoStartForwardsFlow.value = enabled
+    }
+
+    fun setHostKeyPrompt(enabled: Boolean) {
+        hostKeyPromptFlow.value = enabled
+    }
+
+    fun setUsageReports(enabled: Boolean) {
+        usageReportsFlow.value = enabled
     }
 
     companion object {

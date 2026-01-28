@@ -24,7 +24,16 @@ class MainActivity : ComponentActivity() {
                     onSortModeChange = viewModel::setSortMode,
                     onThemeModeChange = viewModel::setThemeMode,
                     onBackgroundModeChange = viewModel::setBackgroundSessions,
-                    onBiometricToggle = viewModel::setBiometricLock
+                    onBiometricToggle = viewModel::setBiometricLock,
+                    onLockTimeoutChange = viewModel::setLockTimeout,
+                    onCrashReportsToggle = viewModel::setCrashReports,
+                    onAnalyticsToggle = viewModel::setAnalytics,
+                    onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
+                    onIncludeIdentitiesToggle = viewModel::setIncludeIdentities,
+                    onIncludeSettingsToggle = viewModel::setIncludeSettings,
+                    onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
+                    onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
+                    onUsageReportsToggle = viewModel::setUsageReports
                 )
             }
         }

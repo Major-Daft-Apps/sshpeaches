@@ -51,6 +51,7 @@ import com.sshpeaches.app.ui.screens.PortForwardScreen
 import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.sshpeaches.app.ui.state.AppUiState
+import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
@@ -63,7 +64,16 @@ fun SSHPeachesRoot(
     onSortModeChange: (SortMode) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onBackgroundModeChange: (Boolean) -> Unit,
-    onBiometricToggle: (Boolean) -> Unit
+    onBiometricToggle: (Boolean) -> Unit,
+    onLockTimeoutChange: (LockTimeout) -> Unit,
+    onCrashReportsToggle: (Boolean) -> Unit,
+    onAnalyticsToggle: (Boolean) -> Unit,
+    onDiagnosticsToggle: (Boolean) -> Unit,
+    onIncludeIdentitiesToggle: (Boolean) -> Unit,
+    onIncludeSettingsToggle: (Boolean) -> Unit,
+    onAutoStartForwardsToggle: (Boolean) -> Unit,
+    onHostKeyPromptToggle: (Boolean) -> Unit,
+    onUsageReportsToggle: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -162,7 +172,25 @@ fun SSHPeachesRoot(
                             allowBackgroundSessions = uiState.allowBackgroundSessions,
                             onBackgroundToggle = onBackgroundModeChange,
                             biometricEnabled = uiState.biometricLockEnabled,
-                            onBiometricToggle = onBiometricToggle
+                            onBiometricToggle = onBiometricToggle,
+                            lockTimeout = uiState.lockTimeout,
+                            onLockTimeoutChange = onLockTimeoutChange,
+                            crashReportsEnabled = uiState.crashReportsEnabled,
+                            onCrashReportsToggle = onCrashReportsToggle,
+                            analyticsEnabled = uiState.analyticsEnabled,
+                            onAnalyticsToggle = onAnalyticsToggle,
+                            diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
+                            onDiagnosticsToggle = onDiagnosticsToggle,
+                            includeIdentities = uiState.includeIdentitiesInQr,
+                            onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
+                            includeSettings = uiState.includeSettingsInQr,
+                            onIncludeSettingsToggle = onIncludeSettingsToggle,
+                            autoStartForwards = uiState.autoStartForwards,
+                            onAutoStartForwardsToggle = onAutoStartForwardsToggle,
+                            hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
+                            onHostKeyPromptToggle = onHostKeyPromptToggle,
+                            usageReportsEnabled = uiState.usageReportsEnabled,
+                            onUsageReportsToggle = onUsageReportsToggle
                         )
                     }
                 }
