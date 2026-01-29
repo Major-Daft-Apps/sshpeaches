@@ -23,9 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
@@ -46,10 +51,15 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                         .background(color = color, shape = CircleShape)
                         .padding(12.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(id = host.osMetadata.iconRes()),
+                    val context = LocalContext.current
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(host.osMetadata.iconRes())
+                            .decoderFactory(SvgDecoder.Factory())
+                            .build(),
                         contentDescription = host.osMetadata.label(),
-                        tint = Color.White,
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(Color.White),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -95,15 +105,16 @@ private fun OsMetadata.toColor(): Color = when (this) {
 
 private fun OsMetadata.iconRes(): Int = when (this) {
     is OsMetadata.Known -> when (family) {
-        OsFamily.UBUNTU -> R.drawable.ic_os_ubuntu
-        OsFamily.DEBIAN -> R.drawable.ic_os_debian
-        OsFamily.FEDORA -> R.drawable.ic_os_fedora
-        OsFamily.MINT -> R.drawable.ic_os_mint
-        OsFamily.ARCH -> R.drawable.ic_os_arch
-        OsFamily.SUSE -> R.drawable.ic_os_suse
-        OsFamily.MAC -> R.drawable.ic_os_apple
-        OsFamily.BSD -> R.drawable.ic_os_bsd
-        else -> R.drawable.ic_os_linux
+        OsFamily.UBUNTU -> R.raw.ubuntu
+        OsFamily.DEBIAN -> R.raw.debian
+        OsFamily.FEDORA -> R.raw.fedora
+        OsFamily.MINT -> R.raw.linux_mint
+        OsFamily.ARCH -> R.raw.arch
+        OsFamily.SUSE -> R.raw.suse
+        OsFamily.MAC -> R.raw.apple
+        OsFamily.BSD -> R.raw.bsd
+        OsFamily.GENERIC -> R.raw.linux
+        else -> R.raw.linux
     }
-    else -> R.drawable.ic_os_linux
+    else -> R.raw.linux
 }
