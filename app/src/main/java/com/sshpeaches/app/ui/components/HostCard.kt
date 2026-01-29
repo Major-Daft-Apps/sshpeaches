@@ -49,7 +49,7 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                 Box(
                     modifier = Modifier
                         .background(color = color, shape = CircleShape)
-                        .padding(12.dp)
+                        .padding(10.dp)
                 ) {
                     val context = LocalContext.current
                     AsyncImage(
@@ -60,7 +60,7 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                         contentDescription = host.osMetadata.label(),
                         contentScale = ContentScale.Fit,
                         colorFilter = ColorFilter.tint(Color.White),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
