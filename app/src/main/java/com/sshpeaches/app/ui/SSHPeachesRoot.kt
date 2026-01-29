@@ -38,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -124,22 +123,7 @@ fun SSHPeachesRoot(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Image(
-                                    painter = painterResource(id = com.sshpeaches.app.R.drawable.sshpeaches),
-                                    contentDescription = "SSHPeaches logo",
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Text("SSHPeaches")
-                            }
-                        },
+                        title = { Text("SSHPeaches") },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu")
@@ -275,10 +259,23 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         },
         title = { Text("About SSHPeaches") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Version 0.1.0")
-                Text("Carbon Black + Blazing Flame theme")
-                Text("Built with Jetpack Compose")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = com.sshpeaches.app.R.drawable.sshpeaches),
+                    contentDescription = "SSHPeaches logo",
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Text("Version 0.1.0", style = MaterialTheme.typography.titleMedium)
+                Text("Website: https://sshpeaches.app")
+                Text("License: Apache-2.0 (draft)")
+                Text("Support: support@sshpeaches.app")
+                Text("Built with Jetpack Compose", style = MaterialTheme.typography.bodySmall)
             }
         }
     )
