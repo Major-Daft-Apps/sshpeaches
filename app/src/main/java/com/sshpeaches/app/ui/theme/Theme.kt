@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import com.sshpeaches.app.ui.state.ThemeMode
 
 private val DarkColors = darkColorScheme(
-    primary = BlazingFlame,
+    primary = PeachyOrange,
     onPrimary = Color.Black,
     secondary = VanillaCream,
     onSecondary = Color.Black,
@@ -19,7 +19,7 @@ private val DarkColors = darkColorScheme(
 )
 
 private val LightColors = lightColorScheme(
-    primary = BlazingFlame,
+    primary = PeachyOrange,
     onPrimary = Color.White,
     secondary = CarbonBlack,
     onSecondary = Color.White,
