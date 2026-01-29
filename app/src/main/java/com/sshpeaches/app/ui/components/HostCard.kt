@@ -24,9 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.OsMetadata
+import com.sshpeaches.app.data.model.OsFamily
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
@@ -42,7 +45,11 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                         .background(color = color, shape = CircleShape)
                         .padding(12.dp)
                 ) {
-                    Text(text = host.osMetadata.label(), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    Icon(
+                        painter = painterResource(id = host.osMetadata.iconRes()),
+                        contentDescription = host.osMetadata.label(),
+                        tint = Color.White
+                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(host.name, style = MaterialTheme.typography.titleMedium)
@@ -82,4 +89,14 @@ private fun OsMetadata.label(): String = when (this) {
 private fun OsMetadata.toColor(): Color = when (this) {
     is OsMetadata.Known -> Color(android.graphics.Color.parseColor(family.colorHex))
     else -> MaterialTheme.colorScheme.primary
+}
+
+private fun OsMetadata.iconRes(): Int = when (this) {
+    is OsMetadata.Known -> when (family) {
+        OsFamily.UBUNTU -> R.drawable.ic_os_ubuntu
+        OsFamily.MAC -> R.drawable.ic_os_apple
+        OsFamily.BSD -> R.drawable.ic_os_bsd
+        else -> R.drawable.ic_os_penguin
+    }
+    else -> R.drawable.ic_os_penguin
 }
