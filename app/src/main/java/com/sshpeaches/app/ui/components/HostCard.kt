@@ -156,7 +156,7 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
 }
 
 private fun generateQr(host: HostConnection): Bitmap? {
-    val payload = buildString {
+    val json = buildString {
         append("{")
         append("\"id\":\"${host.id}\",")
         append("\"name\":\"${host.name}\",")
@@ -165,6 +165,7 @@ private fun generateQr(host: HostConnection): Bitmap? {
         append("\"user\":\"${host.username}\"")
         append("}")
     }
+    val payload = android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
     return runCatching {
         val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
         val bmp = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
