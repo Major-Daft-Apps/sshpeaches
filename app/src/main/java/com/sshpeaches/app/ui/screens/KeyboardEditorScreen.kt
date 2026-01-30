@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
@@ -33,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -66,10 +70,38 @@ fun KeyboardEditorScreen() {
                 }
             }
         }
-        rows.forEachIndexed { index, row ->
-            KeyRowCard(index = index + 1, keys = row)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            // Top content (0% - 40%)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.4f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rows.forEachIndexed { index, row ->
+                    KeyRowCard(index = index + 1, keys = row)
+                }
+            }
+            // Keyboard image anchored between 40% and 80%
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = com.sshpeaches.app.R.drawable.keyboard),
+                    contentDescription = "Keyboard illustration",
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.4f) // occupies roughly 40% of height (from 40% to 80% band)
+                )
+            }
         }
-        PhoneOutlineDecoration(modifier = Modifier.weight(1f))
     }
 }
 
