@@ -85,10 +85,10 @@ fun KeyboardEditorScreen() {
                 Image(
                     painter = painterResource(id = R.drawable.keyboard),
                     contentDescription = "Keyboard illustration",
-                    contentScale = ContentScale.FillWidth,
+                    contentScale = ContentScale.FillBounds, // stretch; no cropping
                     modifier = Modifier
-                        .fillMaxWidth(0.6f)
-                        .fillMaxHeight(0.35f)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.5f)
                 )
             }
         }
