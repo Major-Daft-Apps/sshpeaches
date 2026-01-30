@@ -165,7 +165,7 @@ fun SSHPeachesRoot(
                         IdentitiesScreen(items = uiState.identities)
                     }
                     composable(Routes.FORWARDS) {
-                        PortForwardScreen(items = uiState.portForwards)
+                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts)
                     }
                     composable(Routes.SNIPPETS) {
                         SnippetManagerScreen(snippets = uiState.snippets)
@@ -281,7 +281,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Website: https://sshpeaches.app")
                 Text("License: Apache-2.0 (draft)")
                 Text("Support: support@sshpeaches.app")
-                Text("Built with Jetpack Compose", style = MaterialTheme.typography.bodySmall)
+                Text("Created by Ali Sherief", style = MaterialTheme.typography.bodySmall)
             }
         }
     )

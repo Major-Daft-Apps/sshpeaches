@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -26,7 +27,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
 import java.util.UUID
@@ -34,8 +37,9 @@ import java.util.UUID
 @Composable
 fun PortForwardScreen(
     items: List<PortForward>,
-    onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
-    onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    hosts: List<HostConnection> = emptyList(),
+    onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
@@ -49,6 +53,8 @@ fun PortForwardScreen(
     val dstPortState = remember { mutableStateOf("0") }
     val enabledState = remember { mutableStateOf(true) }
     val exitOnFailureState = remember { mutableStateOf(true) }
+    val selectedHostsState = remember { mutableStateOf<List<String>>(emptyList()) }
+    val hostSearchState = remember { mutableStateOf(TextFieldValue("")) }
 
     fun openDialog(forward: PortForward?) {
         editingId.value = forward?.id
@@ -61,6 +67,8 @@ fun PortForwardScreen(
         dstPortState.value = forward?.destinationPort?.toString() ?: "0"
         enabledState.value = forward?.enabled ?: true
         exitOnFailureState.value = true
+        selectedHostsState.value = forward?.associatedHosts ?: emptyList()
+        hostSearchState.value = TextFieldValue("")
         showDialog.value = true
     }
 
@@ -87,24 +95,32 @@ fun PortForwardScreen(
                     Text(forward.label, style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = when (forward.type) {
-                            PortForwardType.LOCAL -> "Local ${forward.sourceHost}:${forward.sourcePort} → ${forward.destinationHost}:${forward.destinationPort}"
-                            PortForwardType.REMOTE -> "Remote ${forward.destinationHost}:${forward.destinationPort} ← ${forward.sourceHost}:${forward.sourcePort}"
+                            PortForwardType.LOCAL -> "Local ${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.destinationHost}:${forward.destinationPort}"
+                            PortForwardType.REMOTE -> "Remote ${forward.destinationHost}:${forward.destinationPort} \u2190 ${forward.sourceHost}:${forward.sourcePort}"
                             PortForwardType.DYNAMIC -> "Dynamic SOCKS on ${forward.sourceHost}:${forward.sourcePort}"
                         },
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    if (forward.associatedHosts.isNotEmpty()) {
+                        val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
+                        Text(
+                            text = "Hosts: ${names.joinToString()}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Switch(checked = forward.enabled, onCheckedChange = {
                             onUpdate(
                                 forward.id,
                                 forward.label,
                                 forward.type,
-                                bindState.value,
+                                forward.sourceHost,
                                 forward.sourcePort,
                                 forward.destinationHost,
                                 forward.destinationPort,
                                 it,
-                                exitOnFailureState.value
+                                exitOnFailureState.value,
+                                forward.associatedHosts
                             )
                         })
                         Icon(
@@ -179,6 +195,48 @@ fun PortForwardScreen(
                         Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
                         Text("Enable now")
                     }
+                    OutlinedTextField(
+                        value = hostSearchState.value,
+                        onValueChange = { hostSearchState.value = it },
+                        label = { Text("Filter hosts") },
+                        singleLine = true
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val filtered = hosts.filter {
+                            it.name.contains(hostSearchState.value.text, ignoreCase = true) ||
+                                    it.host.contains(hostSearchState.value.text, ignoreCase = true)
+                        }
+                        filtered.forEach { host ->
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val list = selectedHostsState.value.toMutableList()
+                                        if (list.contains(host.id)) list.remove(host.id) else list.add(host.id)
+                                        selectedHostsState.value = list
+                                    }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Column {
+                                    Text(host.name, style = MaterialTheme.typography.bodyLarge)
+                                    Text("${host.host}:${host.port}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Checkbox(
+                                    checked = selectedHostsState.value.contains(host.id),
+                                    onCheckedChange = {
+                                        val list = selectedHostsState.value.toMutableList()
+                                        if (it == true && !list.contains(host.id)) list.add(host.id)
+                                        if (it == false && list.contains(host.id)) list.remove(host.id)
+                                        selectedHostsState.value = list
+                                    }
+                                )
+                            }
+                        }
+                        if (filtered.isEmpty()) {
+                            Text("No hosts match your search", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Switch(checked = exitOnFailureState.value, onCheckedChange = { exitOnFailureState.value = it })
                         Text("Fail if bind/forward can't start")
@@ -199,7 +257,8 @@ fun PortForwardScreen(
                             dstHostState.value.ifBlank { "" },
                             dstPort,
                             enabledState.value,
-                            exitOnFailureState.value
+                            exitOnFailureState.value,
+                            selectedHostsState.value
                         )
                     } else {
                         onAdd(
@@ -209,7 +268,8 @@ fun PortForwardScreen(
                             srcPort,
                             dstHostState.value.ifBlank { "" },
                             dstPort,
-                            exitOnFailureState.value
+                            exitOnFailureState.value,
+                            selectedHostsState.value
                         )
                     }
                     closeDialog()
