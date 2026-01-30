@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -181,30 +184,58 @@ fun SettingsScreen(
                 }
             }
         }
+        val showTransferDialog = remember { mutableStateOf(false) }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("QR Sync Defaults", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Include identities")
-                        Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = includeIdentities, onCheckedChange = onIncludeIdentitiesToggle)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Include settings")
-                        Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = includeSettings, onCheckedChange = onIncludeSettingsToggle)
+                Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Export hosts, identities, and settings via QR code.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Button(onClick = { showTransferDialog.value = true }) {
+                    Text("Export via QR")
                 }
             }
+        }
+        if (showTransferDialog.value) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showTransferDialog.value = false },
+                title = { Text("Export data") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("Include identities")
+                                Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Switch(checked = includeIdentities, onCheckedChange = onIncludeIdentitiesToggle)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("Include settings")
+                                Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Switch(checked = includeSettings, onCheckedChange = onIncludeSettingsToggle)
+                        }
+                        Text("Next: generate a QR code that bundles your selections.")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        // TODO: trigger QR generation flow
+                        showTransferDialog.value = false
+                    }) { Text("Generate QR") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTransferDialog.value = false }) { Text("Cancel") }
+                }
+            )
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
