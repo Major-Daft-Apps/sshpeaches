@@ -62,6 +62,10 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 └───────────────────────────────────────────┘
 ```
 
+## 4. Snippet Manager
+- List shows snippet title/description/command with Run / Edit / Delete actions.
+- “Add snippet” button opens dialog for Title, Description, Command. Edit reuses the same dialog; Delete available when editing.
+
 ## 4. New Connection Flow
 - Modal or dedicated screen with tabs **Basic** / **Advanced**.
 - **Basic**: Name, Host, Username, Password field, Identity picker (allow both). “Add to Group” button.
