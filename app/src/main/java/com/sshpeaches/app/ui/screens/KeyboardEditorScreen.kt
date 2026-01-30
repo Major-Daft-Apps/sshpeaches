@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,9 @@ fun KeyboardEditorScreen() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.4f),
+                .fillMaxHeight(0.4f)
+                .border(1.dp, Color(0xFFB8B8B8), RectangleShape)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -117,10 +120,9 @@ private fun KeySlot(label: String, onClick: () -> Unit, modifier: Modifier = Mod
         onClick = onClick,
         modifier = modifier
             .height(56.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(8.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(6.dp)),
+        shape = RoundedCornerShape(6.dp)
     ) {
         Text(if (isEmpty) "+" else label)
     }
