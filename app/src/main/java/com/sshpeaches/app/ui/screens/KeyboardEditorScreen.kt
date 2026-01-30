@@ -4,8 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +12,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -41,11 +40,11 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.R
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
 fun KeyboardEditorScreen() {
     val slotCount = 12
     val keysState = remember { mutableStateOf(List(slotCount) { "" }) }
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -56,14 +55,15 @@ fun KeyboardEditorScreen() {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
         Text("Tap a slot to add, replace, or remove a special key.")
 
-        // Compact flow row that wraps if it doesn't fit; target ~12 buttons visible
-        FlowRow(
+        // Force a single horizontal row; allow scrolling if it overflows
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(scrollState)
                 .border(1.dp, Color(0xFFB8B8B8), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             keysState.value.forEachIndexed { index, key ->
                 KeySlot(
@@ -119,8 +119,8 @@ private fun KeySlot(label: String, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier
-            .height(48.dp)
-            .defaultMinSize(minWidth = 64.dp)
+            .height(44.dp)
+            .defaultMinSize(minWidth = 56.dp)
             .clip(RoundedCornerShape(6.dp)),
         shape = RoundedCornerShape(6.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
