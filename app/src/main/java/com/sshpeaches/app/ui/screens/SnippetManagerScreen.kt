@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Snippet
 import java.util.UUID
@@ -109,7 +110,11 @@ fun SnippetManagerScreen(
                     OutlinedTextField(
                         value = commandState.value,
                         onValueChange = { commandState.value = it },
-                        label = { Text("Command") }
+                        label = { Text("Command") },
+                        singleLine = false,
+                        minLines = 4,
+                        maxLines = 12,
+                        textStyle = androidx.compose.material3.LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
                     )
                 }
             },
