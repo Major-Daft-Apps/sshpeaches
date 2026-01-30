@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -43,11 +45,14 @@ import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.OsFamily
 import com.sshpeaches.app.data.model.OsMetadata
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 
 @Composable
 fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
+    val showQr = remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -97,12 +102,7 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                     Icons.Default.QrCode,
                     contentDescription = "Share",
                     modifier = Modifier.clickable {
-                        val shareText = "${host.username}@${host.host}:${host.port} (${host.name})"
-                        val intent = Intent(ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share host"))
+                        showQr.value = true
                     }
                 )
             }
@@ -125,6 +125,56 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
             }
         )
     }
+
+    if (showQr.value) {
+        val qrBitmap = remember(host) { generateQr(host) }
+        AlertDialog(
+            onDismissRequest = { showQr.value = false },
+            confirmButton = { TextButton(onClick = { showQr.value = false }) { Text("Close") } },
+            title = { Text("Share ${host.name}") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    qrBitmap?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = "Host QR",
+                            modifier = Modifier
+                                .size(220.dp)
+                        )
+                    } ?: Text("Unable to generate QR")
+                    Text(
+                        "${host.username}@${host.host}:${host.port}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        )
+    }
+}
+
+private fun generateQr(host: HostConnection): Bitmap? {
+    val payload = buildString {
+        append("{")
+        append("\"id\":\"${host.id}\",")
+        append("\"name\":\"${host.name}\",")
+        append("\"host\":\"${host.host}\",")
+        append("\"port\":${host.port},")
+        append("\"user\":\"${host.username}\"")
+        append("}")
+    }
+    return runCatching {
+        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
+        val bmp = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
+        for (x in 0 until matrix.width) {
+            for (y in 0 until matrix.height) {
+                bmp.setPixel(x, y, if (matrix[x, y]) AndroidColor.BLACK else AndroidColor.WHITE)
+            }
+        }
+        bmp
+    }.getOrNull()
 }
 
 @Composable
