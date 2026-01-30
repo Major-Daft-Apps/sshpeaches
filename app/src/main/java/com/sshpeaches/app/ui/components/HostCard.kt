@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -88,7 +88,7 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
 @Composable
 private fun HostActionButton(label: String, selected: Boolean) {
     TextButton(onClick = { /* TODO */ }) {
-        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }

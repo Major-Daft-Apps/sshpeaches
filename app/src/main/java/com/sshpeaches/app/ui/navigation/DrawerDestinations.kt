@@ -2,7 +2,7 @@ package com.sshpeaches.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Code
@@ -25,6 +25,6 @@ val drawerDestinations = listOf(
     DrawerDestination(Routes.SNIPPETS, "Snippets", Icons.Default.Code),
     DrawerDestination(Routes.KEYBOARD, "Keyboard Editor", Icons.Default.Keyboard),
     DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings),
-    DrawerDestination(Routes.HELP, "Help", Icons.Default.Help),
+    DrawerDestination(Routes.HELP, "Help", Icons.AutoMirrored.Filled.Help),
     DrawerDestination(Routes.ABOUT, "About", Icons.Default.Info)
 )
