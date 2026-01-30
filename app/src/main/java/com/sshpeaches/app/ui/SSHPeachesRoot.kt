@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
@@ -72,6 +73,7 @@ import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
 import com.sshpeaches.app.R
+import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
 
@@ -251,6 +253,7 @@ fun SSHPeachesRoot(
 @Composable
 private fun QuickConnectSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        val context = LocalContext.current
         val host = remember { mutableStateOf("") }
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }

@@ -14,7 +14,7 @@ import androidx.room.TypeConverters
         SnippetEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class SshPeachesDatabase : RoomDatabase() {
