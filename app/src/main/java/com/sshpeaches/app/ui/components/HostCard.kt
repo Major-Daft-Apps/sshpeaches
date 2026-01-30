@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -20,6 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +31,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.content.Intent.ACTION_SEND
+import android.content.Intent.EXTRA_TEXT
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -39,6 +45,9 @@ import com.sshpeaches.app.data.model.OsMetadata
 
 @Composable
 fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val showInfo = remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -78,10 +87,42 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                 HostActionButton(label = "SSH", selected = host.defaultMode == ConnectionMode.SSH)
                 HostActionButton(label = "SFTP", selected = host.defaultMode == ConnectionMode.SFTP)
                 HostActionButton(label = "SCP", selected = host.defaultMode == ConnectionMode.SCP)
-                Icon(Icons.Default.Info, contentDescription = "Info")
-                Icon(Icons.Default.QrCode, contentDescription = "Share")
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "Info",
+                    modifier = Modifier.clickable { showInfo.value = true }
+                )
+                Icon(
+                    Icons.Default.QrCode,
+                    contentDescription = "Share",
+                    modifier = Modifier.clickable {
+                        val shareText = "${host.username}@${host.host}:${host.port} (${host.name})"
+                        val intent = Intent(ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share host"))
+                    }
+                )
             }
         }
+    }
+
+    if (showInfo.value) {
+        AlertDialog(
+            onDismissRequest = { showInfo.value = false },
+            confirmButton = { TextButton(onClick = { showInfo.value = false }) { Text("Close") } },
+            title = { Text(host.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Address: ${host.host}:${host.port}")
+                    Text("User: ${host.username}")
+                    host.group?.let { Text("Group: $it") }
+                    Text("Auth: ${host.preferredAuth}")
+                    Text("Default: ${host.defaultMode}")
+                }
+            }
+        )
     }
 }
 
