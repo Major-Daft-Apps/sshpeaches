@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -142,7 +145,8 @@ private fun KeySlotDialog(
     onDismiss: () -> Unit
 ) {
     val categories = listOf(
-        "Letters" to ('A'..'Z').map { it.toString() },
+        "Uppercase" to ('A'..'Z').map { it.toString() },
+        "Lowercase" to ('a'..'z').map { it.toString() },
         "Numbers" to (0..9).map { it.toString() },
         "Symbols" to listOf("/", "-", "_", "|", "~", "@", "#", "%", "&", "+", "=")
     )
@@ -186,16 +190,19 @@ private fun KeySlotDialog(
                 }
             } else {
                 val items = categories.firstOrNull { it.first == currentCategory.value }?.second.orEmpty()
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val scroll = rememberScrollState()
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.verticalScroll(scroll)
+                ) {
                     TextButton(onClick = { currentCategory.value = null }) { Text("<- Back") }
                     Text(currentCategory.value ?: "", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items.chunked(6).forEach { chunk ->
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                chunk.forEach { key ->
-                                    TextButton(onClick = { onSelect(key) }) { Text(key) }
-                                }
-                            }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items.forEach { key ->
+                            TextButton(onClick = { onSelect(key) }) { Text(key) }
                         }
                     }
                 }
