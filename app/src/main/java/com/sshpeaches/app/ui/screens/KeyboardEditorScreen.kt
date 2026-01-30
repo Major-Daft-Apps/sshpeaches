@@ -140,12 +140,11 @@ private fun KeySlotDialog(
     onDismiss: () -> Unit
 ) {
     val categories = listOf(
-        "Navigation" to listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn"),
         "Letters" to ('A'..'Z').map { it.toString() },
         "Numbers" to (0..9).map { it.toString() },
         "Symbols" to listOf("/", "-", "_", "|", "~", "@", "#", "%", "&", "+", "=")
     )
-    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super")
+    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super") + listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn")
     val currentCategory = remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -154,7 +153,6 @@ private fun KeySlotDialog(
         text = {
             if (currentCategory.value == null) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Meta keys", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         metaKeys.forEach { key ->
                             TextButton(onClick = { onSelect(key) }) { Text(key) }
