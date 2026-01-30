@@ -27,6 +27,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -136,17 +138,20 @@ fun SSHPeachesRoot(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            IconButton(onClick = { editMode.value = !editMode.value }) {
-                                Icon(
-                                    imageVector = if (editMode.value) Icons.Default.Done else Icons.Default.Edit,
-                                    contentDescription = if (editMode.value) "Done editing" else "Edit"
-                                )
-                            }
-                        },
+                        title = { Text("SSHPeaches") },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu")
+                            }
+                        },
+                        actions = {
+                            AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                IconButton(onClick = { editMode.value = !editMode.value }) {
+                                    Icon(
+                                        imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                        contentDescription = if (editing) "Done editing" else "Edit"
+                                    )
+                                }
                             }
                         }
                     )
