@@ -1,5 +1,7 @@
 # SSHPeaches UI Design Notes
 
+> **Last updated:** 2026-01-30 · Pair this with `docs/blueprint.md` for product context.
+
 This document captures first-pass layouts for key SSHPeaches screens. Use it as a blueprint when building mockups (Figma/Penpot) and implementing Compose UI.
 
 ---

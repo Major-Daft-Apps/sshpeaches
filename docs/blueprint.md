@@ -1,5 +1,7 @@
 # SSHPeaches Product Blueprint
 
+> **Last updated:** 2026-01-30 · See `docs/design.md` for corresponding UI layouts.
+
 ## Vision & Goals
 - Provide a trustworthy, modern Android-phone/tablet SSH/Mosh client that feels tailored for touch interaction yet powerful enough for professional administrators.
 - Ship a Play Store-ready app within 6–8 months, launching as *SSHPeaches* with all features available for free at launch.
