@@ -38,6 +38,7 @@ import java.util.UUID
 fun PortForwardScreen(
     items: List<PortForward>,
     hosts: List<HostConnection> = emptyList(),
+    editMode: Boolean = false,
     onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {}
@@ -109,34 +110,40 @@ fun PortForwardScreen(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Switch(checked = forward.enabled, onCheckedChange = {
-                            onUpdate(
-                                forward.id,
-                                forward.label,
-                                forward.type,
-                                forward.sourceHost,
-                                forward.sourcePort,
-                                forward.destinationHost,
-                                forward.destinationPort,
-                                it,
-                                exitOnFailureState.value,
-                                forward.associatedHosts
+                        Switch(
+                            checked = forward.enabled,
+                            onCheckedChange = {
+                                onUpdate(
+                                    forward.id,
+                                    forward.label,
+                                    forward.type,
+                                    forward.sourceHost,
+                                    forward.sourcePort,
+                                    forward.destinationHost,
+                                    forward.destinationPort,
+                                    it,
+                                    exitOnFailureState.value,
+                                    forward.associatedHosts
+                                )
+                            },
+                            enabled = editMode
+                        )
+                        if (editMode) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit",
+                                modifier = Modifier
+                                    .clickable { openDialog(forward) }
+                                    .padding(4.dp)
                             )
-                        })
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier
-                                .clickable { openDialog(forward) }
-                                .padding(4.dp)
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier
-                                .clickable { onDelete(forward.id) }
-                                .padding(4.dp)
-                        )
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier
+                                    .clickable { onDelete(forward.id) }
+                                    .padding(4.dp)
+                            )
+                        }
                     }
                 }
             }

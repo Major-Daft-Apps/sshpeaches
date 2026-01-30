@@ -19,6 +19,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,7 +34,10 @@ import com.sshpeaches.app.ui.state.SortMode
 fun HostsScreen(
     hosts: List<HostConnection>,
     sortMode: SortMode,
-    onSortModeChange: (SortMode) -> Unit
+    onSortModeChange: (SortMode) -> Unit,
+    editMode: Boolean = false,
+    onDelete: (String) -> Unit = {},
+    onEdit: (HostConnection) -> Unit = {}
 ) {
     val search = remember { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
@@ -80,7 +84,15 @@ fun HostsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
-                HostCard(host = host)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HostCard(host = host)
+                    if (editMode) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TextButton(onClick = { onEdit(host) }) { Text("Edit") }
+                            TextButton(onClick = { onDelete(host.id) }) { Text("Delete") }
+                        }
+                    }
+                }
             }
         }
     }

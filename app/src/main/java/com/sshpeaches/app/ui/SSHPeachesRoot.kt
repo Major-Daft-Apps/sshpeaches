@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -62,6 +64,7 @@ import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
+import com.sshpeaches.app.R
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,6 +90,7 @@ fun SSHPeachesRoot(
     val scope = rememberCoroutineScope()
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
+    val editMode = rememberSaveable { mutableStateOf(false) }
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
         ?: Routes.FAVORITES
 
@@ -129,7 +133,14 @@ fun SSHPeachesRoot(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text("SSHPeaches") },
+                        title = {
+                            IconButton(onClick = { editMode.value = !editMode.value }) {
+                                Icon(
+                                    imageVector = if (editMode.value) Icons.Default.Done else Icons.Default.Edit,
+                                    contentDescription = if (editMode.value) "Done editing" else "Edit"
+                                )
+                            }
+                        },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu")
@@ -158,14 +169,15 @@ fun SSHPeachesRoot(
                         HostsScreen(
                             hosts = uiState.hosts,
                             sortMode = uiState.sortMode,
-                            onSortModeChange = onSortModeChange
+                            onSortModeChange = onSortModeChange,
+                            editMode = editMode.value
                         )
                     }
                     composable(Routes.IDENTITIES) {
-                        IdentitiesScreen(items = uiState.identities)
+                        IdentitiesScreen(items = uiState.identities, editMode = editMode.value)
                     }
                     composable(Routes.FORWARDS) {
-                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts)
+                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value)
                     }
                     composable(Routes.SNIPPETS) {
                         SnippetManagerScreen(snippets = uiState.snippets)

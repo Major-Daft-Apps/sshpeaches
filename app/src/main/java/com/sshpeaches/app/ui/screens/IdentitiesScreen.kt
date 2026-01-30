@@ -35,7 +35,8 @@ fun IdentitiesScreen(
     items: List<Identity>,
     onAdd: (label: String, fingerprint: String, username: String?) -> Unit = { _, _, _ -> },
     onUpdate: (id: String, label: String, fingerprint: String, username: String?) -> Unit = { _, _, _, _ -> },
-    onDelete: (id: String) -> Unit = {}
+    onDelete: (id: String) -> Unit = {},
+    editMode: Boolean = false
 ) {
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
@@ -82,21 +83,23 @@ fun IdentitiesScreen(
                         if (identity.favorite) {
                             Icon(Icons.Default.Star, contentDescription = null)
                         }
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(start = 8.dp)
-                                .clickable { openDialog(identity) }
-                        )
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable { onDelete(identity.id) }
-                        )
+                        if (editMode) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .padding(start = 8.dp)
+                                    .clickable { openDialog(identity) }
+                            )
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { onDelete(identity.id) }
+                            )
+                        }
                     }
                 }
             }
