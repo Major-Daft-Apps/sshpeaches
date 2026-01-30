@@ -33,6 +33,19 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
   - Search bar with filter pill for Groups and triple-dot menu for sorting (Last Used / A→Z).
 - Card layout mirrors Favorites view. OS icon: white glyph on colored background tied to distro (e.g., Ubuntu orange, Debian red, Fedora blue, SUSE green, Mint teal, macOS gray, BSD maroon, Arch cyan). Default desktop icon used until detection runs.
 
+### Port Forwarding UI ↔ SSH flags
+- Each forward is a card with type badge (Local / Remote / Dynamic), label, summary of bind/destination, enable toggle, edit/delete icons.
+- “Add port forward” dialog fields:
+  - Type (Local / Remote / Dynamic/SOCKS) → `-L` / `-R` / `-D`
+  - Bind address + Port (local bind for Local/Dynamic; remote bind for Remote) → `[bind_address:]port`
+  - Destination host + port (skipped for Dynamic) → `dstHost:dstPort`
+  - Toggle “Fail if bind can’t start” → `-o ExitOnForwardFailure=yes`
+  - Enabled switch (applies immediately when wired to backend)
+- Notes shown in dialog:
+  - Dynamic creates a SOCKS5 proxy on the local bind/port.
+  - Remote forwarding may require `AllowTcpForwarding` / `GatewayPorts` on the server.
+  - These are SSH TCP forwards, not VPN; only apps pointed at the bind port use them.
+
 ## 3. Quick Connect Sheet
 ```
 ┌────────────── Quick Connect ──────────────┐

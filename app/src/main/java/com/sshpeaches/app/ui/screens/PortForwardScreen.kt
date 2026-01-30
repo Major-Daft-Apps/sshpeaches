@@ -34,29 +34,33 @@ import java.util.UUID
 @Composable
 fun PortForwardScreen(
     items: List<PortForward>,
-    onAdd: (label: String, type: PortForwardType, srcHost: String, srcPort: Int, dstHost: String, dstPort: Int) -> Unit = { _, _, _, _, _, _ -> },
-    onUpdate: (id: String, label: String, type: PortForwardType, srcHost: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean) -> Unit = { _, _, _, _, _, _, _ -> },
+    onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
     val typeState = remember { mutableStateOf(PortForwardType.LOCAL) }
+    val bindState = remember { mutableStateOf("127.0.0.1") }
     val srcHostState = remember { mutableStateOf("127.0.0.1") }
     val srcPortState = remember { mutableStateOf("22") }
     val dstHostState = remember { mutableStateOf("") }
     val dstPortState = remember { mutableStateOf("0") }
     val enabledState = remember { mutableStateOf(true) }
+    val exitOnFailureState = remember { mutableStateOf(true) }
 
     fun openDialog(forward: PortForward?) {
         editingId.value = forward?.id
         labelState.value = forward?.label ?: ""
         typeState.value = forward?.type ?: PortForwardType.LOCAL
+        bindState.value = forward?.sourceHost ?: "127.0.0.1"
         srcHostState.value = forward?.sourceHost ?: "127.0.0.1"
-        srcPortState.value = forward?.sourcePort?.toString() ?: "22"
+        srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
         dstHostState.value = forward?.destinationHost ?: ""
         dstPortState.value = forward?.destinationPort?.toString() ?: "0"
         enabledState.value = forward?.enabled ?: true
+        exitOnFailureState.value = true
         showDialog.value = true
     }
 
@@ -95,11 +99,12 @@ fun PortForwardScreen(
                                 forward.id,
                                 forward.label,
                                 forward.type,
-                                forward.sourceHost,
+                                bindState.value,
                                 forward.sourcePort,
                                 forward.destinationHost,
                                 forward.destinationPort,
-                                it
+                                it,
+                                exitOnFailureState.value
                             )
                         })
                         Icon(
@@ -143,15 +148,15 @@ fun PortForwardScreen(
                         }
                     }
                     OutlinedTextField(
-                        value = srcHostState.value,
-                        onValueChange = { srcHostState.value = it },
-                        label = { Text("Source host") },
+                        value = bindState.value,
+                        onValueChange = { bindState.value = it },
+                        label = { Text(if (typeState.value == PortForwardType.REMOTE) "Remote bind address" else "Local bind address") },
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = srcPortState.value,
                         onValueChange = { srcPortState.value = it },
-                        label = { Text("Source port") },
+                        label = { Text(if (typeState.value == PortForwardType.REMOTE) "Remote listen port" else "Local port") },
                         singleLine = true
                     )
                     if (typeState.value != PortForwardType.DYNAMIC) {
@@ -167,6 +172,16 @@ fun PortForwardScreen(
                             label = { Text("Destination port") },
                             singleLine = true
                         )
+                    } else {
+                        Text("SOCKS proxy will be created on the local port above.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
+                        Text("Enable now")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Switch(checked = exitOnFailureState.value, onCheckedChange = { exitOnFailureState.value = it })
+                        Text("Fail if bind/forward can't start")
                     }
                 }
             },
@@ -179,20 +194,22 @@ fun PortForwardScreen(
                             editingId.value!!,
                             labelState.value.ifBlank { "Forward" },
                             typeState.value,
-                            srcHostState.value.ifBlank { "127.0.0.1" },
+                            bindState.value.ifBlank { "127.0.0.1" },
                             srcPort,
                             dstHostState.value.ifBlank { "" },
                             dstPort,
-                            enabledState.value
+                            enabledState.value,
+                            exitOnFailureState.value
                         )
                     } else {
                         onAdd(
                             labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" },
                             typeState.value,
-                            srcHostState.value.ifBlank { "127.0.0.1" },
+                            bindState.value.ifBlank { "127.0.0.1" },
                             srcPort,
                             dstHostState.value.ifBlank { "" },
-                            dstPort
+                            dstPort,
+                            exitOnFailureState.value
                         )
                     }
                     closeDialog()
