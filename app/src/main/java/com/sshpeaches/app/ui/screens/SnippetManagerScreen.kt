@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Snippet
+import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
 
 @Composable
@@ -68,7 +69,10 @@ fun SnippetManagerScreen(
                 Text("Add snippet")
             }
         }
-        items(snippets, key = { it.id }) { snippet ->
+        if (snippets.isEmpty()) {
+            item { EmptyState(itemLabel = "snippet") }
+        } else {
+            items(snippets, key = { it.id }) { snippet ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -86,6 +90,7 @@ fun SnippetManagerScreen(
                     )
                 }
             }
+        }
         }
     }
 

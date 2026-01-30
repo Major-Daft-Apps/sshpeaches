@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
+import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
 
 @Composable
@@ -87,7 +88,10 @@ fun PortForwardScreen(
                 Text("Add port forward")
             }
         }
-        items(items, key = { it.id }) { forward ->
+        if (items.isEmpty()) {
+            item { EmptyState(itemLabel = "port forward") }
+        } else {
+            items(items, key = { it.id }) { forward ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -147,6 +151,7 @@ fun PortForwardScreen(
                     }
                 }
             }
+        }
         }
     }
 

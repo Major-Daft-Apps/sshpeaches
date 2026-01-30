@@ -16,15 +16,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.ui.components.HostCard
+import com.sshpeaches.app.ui.components.EmptyState
 import com.sshpeaches.app.ui.state.FavoritesSection
 
 @Composable
 fun FavoritesScreen(section: FavoritesSection) {
+    val hasFavorites = section.hostFavorites.isNotEmpty() ||
+        section.identityFavorites.isNotEmpty() ||
+        section.portFavorites.isNotEmpty()
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (!hasFavorites) {
+            item { EmptyState(itemLabel = "favorite") }
+            return@LazyColumn
+        }
         if (section.hostFavorites.isNotEmpty()) {
             item { SectionHeader("Hosts") }
             items(section.hostFavorites, key = { it.id }) { host ->

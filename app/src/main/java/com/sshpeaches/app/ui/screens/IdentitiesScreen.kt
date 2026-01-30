@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Identity
+import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
 
 @Composable
@@ -66,7 +67,10 @@ fun IdentitiesScreen(
                 Text("Add identity")
             }
         }
-        items(items, key = { it.id }) { identity ->
+        if (items.isEmpty()) {
+            item { EmptyState(itemLabel = "identity") }
+        } else {
+            items(items, key = { it.id }) { identity ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
@@ -103,6 +107,7 @@ fun IdentitiesScreen(
                     }
                 }
             }
+        }
         }
     }
 

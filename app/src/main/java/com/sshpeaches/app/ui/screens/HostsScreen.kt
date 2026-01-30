@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.ui.components.EmptyState
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.state.SortMode
 
@@ -78,12 +79,18 @@ fun HostsScreen(
             }
         }
         Divider()
+        val filtered = hosts.filter { it.name.contains(search.value, ignoreCase = true) }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
+            if (filtered.isEmpty()) {
+                item {
+                    EmptyState(itemLabel = "host")
+                }
+            } else {
+                items(filtered, key = { it.id }) { host ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HostCard(host = host)
                     if (editMode) {
@@ -93,6 +100,7 @@ fun HostsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
