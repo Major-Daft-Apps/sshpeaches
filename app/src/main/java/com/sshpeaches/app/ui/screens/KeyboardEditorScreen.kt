@@ -4,7 +4,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalLayoutApi
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,11 +42,11 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.R
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun KeyboardEditorScreen() {
-    val slotCount = 10
+    val slotCount = 12
     val keysState = remember { mutableStateOf(List(slotCount) { "" }) }
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
-    val rowScroll = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -53,17 +55,16 @@ fun KeyboardEditorScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to add, replace, or remove a special key. One row, uniform tap targets.")
+        Text("Tap a slot to add, replace, or remove a special key.")
 
-        // Scrollable horizontal row with border frame
-        Row(
+        // Compact flow row that wraps if it doesn't fit; target ~12 buttons visible
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rowScroll)
                 .border(1.dp, Color(0xFFB8B8B8), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             keysState.value.forEachIndexed { index, key ->
                 KeySlot(
@@ -119,7 +120,8 @@ private fun KeySlot(label: String, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier
-            .height(56.dp)
+            .height(48.dp)
+            .defaultMinSize(minWidth = 64.dp)
             .clip(RoundedCornerShape(6.dp)),
         shape = RoundedCornerShape(6.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
