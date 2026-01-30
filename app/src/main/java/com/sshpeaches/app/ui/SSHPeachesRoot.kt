@@ -43,10 +43,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import android.content.Intent
+import android.net.Uri
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.navigation.Routes
 import com.sshpeaches.app.ui.navigation.drawerDestinations
@@ -90,6 +93,7 @@ fun SSHPeachesRoot(
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val editMode = rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
         ?: Routes.FAVORITES
 
@@ -108,9 +112,9 @@ fun SSHPeachesRoot(
                         scope.launch { drawerState.close() }
                         when (destination.route) {
                             Routes.HELP -> {
-                                navController.navigate(Routes.HELP) {
-                                    popUpTo(Routes.FAVORITES)
-                                }
+                                val url = stringResource(id = R.string.project_website)
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
                             }
                             Routes.ABOUT -> showAbout.value = true
                             else -> {
@@ -178,9 +182,6 @@ fun SSHPeachesRoot(
                     }
                     composable(Routes.KEYBOARD) {
                         KeyboardEditorScreen()
-                    }
-                    composable(Routes.HELP) {
-                        HelpScreen(url = stringResource(id = R.string.project_website))
                     }
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
