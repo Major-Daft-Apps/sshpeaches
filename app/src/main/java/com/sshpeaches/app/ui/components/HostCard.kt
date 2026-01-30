@@ -50,6 +50,8 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .background(color = color, shape = CircleShape)
                         .padding(10.dp)
+                        .size(40.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     val context = LocalContext.current
                     AsyncImage(
