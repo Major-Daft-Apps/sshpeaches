@@ -70,9 +70,10 @@ enum class OsFamily(val displayName: String, val colorHex: String) {
     DEBIAN("Debian", "#A81D33"),
     FEDORA("Fedora", "#294172"),
     CENTOS("CentOS", "#9C1A8C"),
-    SUSE("SUSE", "#00A86B"),
+    SUSE("SUSE", "#73BA25"),
     MINT("Linux Mint", "#87CF3E"),
-    ARCH("Arch Linux", "#0F94D2"),
+    ARCH("Arch Linux", "#1793D1"),
+    REDHAT("Red Hat", "#EE0000"),
     GENTOO("Gentoo", "#54487A"),
     POP_OS("Pop!_OS", "#48B9C7"),
     MANJARO("Manjaro", "#35BF5C"),
@@ -85,6 +86,8 @@ enum class OsFamily(val displayName: String, val colorHex: String) {
     ASAHI("Asahi", "#ED6A5A"),
     NIXOS("NixOS", "#5277C3"),
     MAC("macOS", "#A3AAAE"),
-    BSD("BSD", "#AA1111"),
-    GENERIC("Linux", "#546E7A")
+    WINDOWS("Windows", "#0078D4"),
+    BSD("BSD", "#AB2B28"),
+    GENERIC("Linux", "#000000"),
+    UNKNOWN("Unknown", "#888888")
 }
