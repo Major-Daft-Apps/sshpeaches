@@ -1,7 +1,7 @@
 package com.sshpeaches.app.data.ssh
 
-import com.hierynomus.sshj.SSHClient
-import com.hierynomus.sshj.transport.verification.PromiscuousVerifier
+import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import com.sshpeaches.app.data.model.HostConnection
 
 /**

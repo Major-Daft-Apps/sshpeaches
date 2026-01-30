@@ -137,6 +137,7 @@ private fun KeySlot(label: String, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeySlotDialog(
     current: String,
