@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
@@ -55,6 +56,7 @@ import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
 import com.sshpeaches.app.ui.screens.PortForwardScreen
 import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.sshpeaches.app.ui.screens.HelpScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
@@ -102,7 +104,11 @@ fun SSHPeachesRoot(
                     onDestinationSelected = { destination ->
                         scope.launch { drawerState.close() }
                         when (destination.route) {
-                            Routes.HELP -> { /* TODO open support site */ }
+                            Routes.HELP -> {
+                                navController.navigate(Routes.HELP) {
+                                    popUpTo(Routes.FAVORITES)
+                                }
+                            }
                             Routes.ABOUT -> showAbout.value = true
                             else -> {
                                 if (destination.route != currentRoute) {
@@ -166,6 +172,9 @@ fun SSHPeachesRoot(
                     }
                     composable(Routes.KEYBOARD) {
                         KeyboardEditorScreen()
+                    }
+                    composable(Routes.HELP) {
+                        HelpScreen(url = stringResource(id = R.string.project_website))
                     }
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
