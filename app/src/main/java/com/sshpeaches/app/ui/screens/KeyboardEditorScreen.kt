@@ -73,22 +73,22 @@ fun KeyboardEditorScreen() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(),
+                .fillMaxHeight(0.6f),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.TopCenter
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.keyboard),
                     contentDescription = "Keyboard illustration",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
-                        .fillMaxWidth(0.5f)
-                        .fillMaxHeight(0.4f)
+                        .fillMaxWidth(0.6f)
+                        .fillMaxHeight(0.35f)
                 )
             }
         }
