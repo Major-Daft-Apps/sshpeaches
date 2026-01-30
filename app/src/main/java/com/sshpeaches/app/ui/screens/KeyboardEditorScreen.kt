@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -120,7 +121,7 @@ private fun KeySlot(label: String, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .height(44.dp)
-            .defaultMinSize(minWidth = 56.dp)
+            .sizeIn(minWidth = 56.dp)
             .clip(RoundedCornerShape(6.dp)),
         shape = RoundedCornerShape(6.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
@@ -145,7 +146,8 @@ private fun KeySlotDialog(
         "Numbers" to (0..9).map { it.toString() },
         "Symbols" to listOf("/", "-", "_", "|", "~", "@", "#", "%", "&", "+", "=")
     )
-    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super") + listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn")
+    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super")
+    val navigationKeys = listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn")
     val currentCategory = remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -154,9 +156,16 @@ private fun KeySlotDialog(
         text = {
             if (currentCategory.value == null) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        metaKeys.forEach { key ->
-                            TextButton(onClick = { onSelect(key) }) { Text(key) }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            metaKeys.forEach { key ->
+                                TextButton(onClick = { onSelect(key) }) { Text(key) }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            navigationKeys.forEach { key ->
+                                TextButton(onClick = { onSelect(key) }) { Text(key) }
+                            }
                         }
                     }
                     categories.forEach { (cat, _) ->
