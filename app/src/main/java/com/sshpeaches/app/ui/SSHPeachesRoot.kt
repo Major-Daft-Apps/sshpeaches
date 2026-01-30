@@ -97,8 +97,18 @@ fun SSHPeachesRoot(
     val editMode = rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.project_website)
-    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-        ?: Routes.FAVORITES
+    val backStackEntry = navController.currentBackStackEntryAsState().value
+    val currentRoute = backStackEntry?.destination?.route ?: Routes.FAVORITES
+    val currentTitle = when (currentRoute) {
+        Routes.FAVORITES -> "Favorites"
+        Routes.HOSTS -> "Hosts"
+        Routes.IDENTITIES -> "Identities"
+        Routes.FORWARDS -> "Port Forwards"
+        Routes.SNIPPETS -> "Snippets"
+        Routes.KEYBOARD -> "Keyboard"
+        Routes.SETTINGS -> "Settings"
+        else -> "SSHPeaches"
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -138,7 +148,7 @@ fun SSHPeachesRoot(
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text("SSHPeaches") },
+                        title = { Text(currentTitle) },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu")
