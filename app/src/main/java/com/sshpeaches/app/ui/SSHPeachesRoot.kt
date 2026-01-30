@@ -94,6 +94,7 @@ fun SSHPeachesRoot(
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val helpUrl = context.getString(R.string.project_website)
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
         ?: Routes.FAVORITES
 
@@ -112,8 +113,7 @@ fun SSHPeachesRoot(
                         scope.launch { drawerState.close() }
                         when (destination.route) {
                             Routes.HELP -> {
-                                val url = stringResource(id = R.string.project_website)
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
                                 context.startActivity(intent)
                             }
                             Routes.ABOUT -> showAbout.value = true
