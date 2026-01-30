@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,16 +14,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ fun KeyboardEditorScreen() {
     val slotCount = 10
     val keysState = remember { mutableStateOf(List(slotCount) { "" }) }
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
+    val rowScroll = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -53,26 +55,24 @@ fun KeyboardEditorScreen() {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
         Text("Tap a slot to add, replace, or remove a special key. One row, uniform tap targets.")
 
-        // Single row (0%–40% vertical)
+        // Scrollable horizontal row with border frame
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.4f)
-                .border(1.dp, Color(0xFFB8B8B8), RectangleShape)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .horizontalScroll(rowScroll)
+                .border(1.dp, Color(0xFFB8B8B8), RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             keysState.value.forEachIndexed { index, key ->
                 KeySlot(
                     label = key,
-                    onClick = { dialogIndex.value = index },
-                    modifier = Modifier.weight(1f)
+                    onClick = { dialogIndex.value = index }
                 )
             }
         }
 
-        // Keyboard image centered horizontally, middle band (about 40%–80%)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -88,7 +88,7 @@ fun KeyboardEditorScreen() {
                 Image(
                     painter = painterResource(id = R.drawable.keyboard),
                     contentDescription = "Keyboard illustration",
-                    contentScale = ContentScale.FillBounds, // stretch; no cropping
+                    contentScale = ContentScale.FillBounds,
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight(0.5f)
@@ -114,15 +114,19 @@ fun KeyboardEditorScreen() {
 }
 
 @Composable
-private fun KeySlot(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun KeySlot(label: String, onClick: () -> Unit) {
     val isEmpty = label.isBlank()
-    Button(
+    OutlinedButton(
         onClick = onClick,
-        modifier = modifier
+        modifier = Modifier
             .height(56.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(6.dp)),
-        shape = RoundedCornerShape(6.dp)
+            .clip(RoundedCornerShape(6.dp)),
+        shape = RoundedCornerShape(6.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = Color(0xFFFA992A)
+        )
     ) {
         Text(if (isEmpty) "+" else label)
     }
@@ -143,24 +147,22 @@ private fun KeySlotDialog(
     )
     val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super")
     val currentCategory = remember { mutableStateOf<String?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (current.isBlank()) "Add key" else "Edit key") },
         text = {
             if (currentCategory.value == null) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Meta keys shown directly
                     Text("Meta keys", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         metaKeys.forEach { key ->
                             TextButton(onClick = { onSelect(key) }) { Text(key) }
                         }
                     }
-                    // Category rows with arrows
                     categories.forEach { (cat, _) ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -169,16 +171,7 @@ private fun KeySlotDialog(
                                 imageVector = Icons.Default.KeyboardArrowRight,
                                 contentDescription = "Open $cat",
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color.Transparent)
-                                    .padding(2.dp)
-                                    .let {
-                                        Modifier
-                                    }
-                                    .clickable {
-                                        currentCategory.value = cat
-                                    }
+                                    .clickable { currentCategory.value = cat }
                             )
                         }
                     }
@@ -186,10 +179,10 @@ private fun KeySlotDialog(
             } else {
                 val items = categories.firstOrNull { it.first == currentCategory.value }?.second.orEmpty()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = { currentCategory.value = null }) { Text("← Back") }
+                    TextButton(onClick = { currentCategory.value = null }) { Text("<- Back") }
                     Text(currentCategory.value ?: "", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items.chunked(4).forEach { chunk ->
+                        items.chunked(6).forEach { chunk ->
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 chunk.forEach { key ->
                                     TextButton(onClick = { onSelect(key) }) { Text(key) }
