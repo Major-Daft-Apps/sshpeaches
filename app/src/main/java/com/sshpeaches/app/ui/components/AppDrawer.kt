@@ -74,8 +74,8 @@ fun AppDrawer(
         }
         destinations.forEach { dest ->
             val selected = currentRoute == dest.route
-            val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-            val foreground = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+            val background = if (selected) Color(0xFFFA992A).copy(alpha = 0.18f) else Color.Transparent
+            val foreground = if (selected) Color(0xFFFA992A) else MaterialTheme.colorScheme.onSurface
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
