@@ -53,6 +53,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.navigation.Routes
@@ -70,7 +72,7 @@ import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
 import com.sshpeaches.app.R
-import kotlinx.coroutines.launch
+import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -251,7 +253,11 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
         val host = remember { mutableStateOf("") }
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }
+        val password = remember { mutableStateOf("") }
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
+        val status = remember { mutableStateOf<String?>(null) }
+        val isConnecting = remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
 
         Column(
             modifier = Modifier
@@ -281,12 +287,63 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AuthChoice("Password", AuthMethod.PASSWORD, auth.value) { auth.value = it }
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
                 AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
             }
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            status.value?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            Button(
+                onClick = {
+                    val hostValue = host.value.trim()
+                    val userValue = username.value.trim()
+                    val portValue = port.value.toIntOrNull() ?: 22
+                    if (hostValue.isBlank() || userValue.isBlank()) {
+                        status.value = "Host and username required"
+                        return@Button
+                    }
+                    scope.launch(Dispatchers.IO) {
+                        isConnecting.value = true
+                        status.value = "Connecting..."
+                        runCatching {
+                            val client = SshClientProvider.createClient(
+                                HostConnection(
+                                    id = "quick",
+                                    name = hostValue,
+                                    host = hostValue,
+                                    port = portValue,
+                                    username = userValue,
+                                    preferredAuth = AuthMethod.PASSWORD
+                                )
+                            )
+                            client.connect(hostValue, portValue)
+                            when (auth.value) {
+                                AuthMethod.PASSWORD -> client.authPassword(userValue, password.value)
+                                AuthMethod.IDENTITY -> client.authPublickey(userValue)
+                                AuthMethod.PASSWORD_AND_IDENTITY -> {
+                                    runCatching { client.authPublickey(userValue) }
+                                    client.authPassword(userValue, password.value)
+                                }
+                            }
+                            client.disconnect()
+                        }.onSuccess {
+                            status.value = "Connected successfully"
+                        }.onFailure { e ->
+                            status.value = "Failed: ${e.message}"
+                        }
+                        isConnecting.value = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isConnecting.value
+            ) {
                 Text("Connect")
             }
         }
