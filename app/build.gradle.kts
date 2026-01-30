@@ -79,6 +79,7 @@ dependencies {
     implementation("com.hierynomus:sshj:0.37.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")

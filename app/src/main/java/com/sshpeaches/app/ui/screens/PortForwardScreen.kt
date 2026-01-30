@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -42,7 +43,8 @@ fun PortForwardScreen(
     editMode: Boolean = false,
     onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onDelete: (id: String) -> Unit = {}
+    onDelete: (id: String) -> Unit = {},
+    onImportFromQr: () -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
@@ -86,6 +88,10 @@ fun PortForwardScreen(
         item {
             Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add port forward")
+            }
+            Button(onClick = onImportFromQr, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Text("Import QR")
             }
         }
         if (items.isEmpty()) {

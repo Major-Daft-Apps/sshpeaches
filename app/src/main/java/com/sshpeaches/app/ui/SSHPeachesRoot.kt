@@ -187,14 +187,15 @@ fun SSHPeachesRoot(
                             hosts = uiState.hosts,
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
-                            editMode = editMode.value
+                            editMode = editMode.value,
+                            onImportFromQr = { /* TODO: implement QR decode + save host */ }
                         )
                     }
                     composable(Routes.IDENTITIES) {
-                        IdentitiesScreen(items = uiState.identities, editMode = editMode.value)
+                        IdentitiesScreen(items = uiState.identities, editMode = editMode.value, onImportFromQr = { /* TODO */ })
                     }
                     composable(Routes.FORWARDS) {
-                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value)
+                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })
                     }
                     composable(Routes.SNIPPETS) {
                         SnippetManagerScreen(snippets = uiState.snippets)
@@ -314,6 +315,7 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                         status.value = "Connecting..."
                         runCatching {
                             val client = SshClientProvider.createClient(
+                                context,
                                 HostConnection(
                                     id = "quick",
                                     name = hostValue,
@@ -384,9 +386,19 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                     contentScale = ContentScale.Crop
                 )
                 Text("Version 0.1.0", style = MaterialTheme.typography.titleMedium)
+                val privacy = stringResource(id = R.string.privacy_policy_url)
+                val context = LocalContext.current
                 Text("Website: https://sshpeaches.app")
                 Text("License: Apache-2.0 (draft)")
                 Text("Support: support@sshpeaches.app")
+                Text(
+                    "Privacy Policy",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(privacy))
+                        context.startActivity(intent)
+                    }
+                )
                 Text("Created by Ali Sherief", style = MaterialTheme.typography.bodySmall)
             }
         }

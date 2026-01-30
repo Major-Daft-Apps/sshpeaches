@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -37,7 +38,8 @@ fun IdentitiesScreen(
     onAdd: (label: String, fingerprint: String, username: String?) -> Unit = { _, _, _ -> },
     onUpdate: (id: String, label: String, fingerprint: String, username: String?) -> Unit = { _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
-    editMode: Boolean = false
+    editMode: Boolean = false,
+    onImportFromQr: () -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
@@ -65,6 +67,10 @@ fun IdentitiesScreen(
         item {
             Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add identity")
+            }
+            Button(onClick = onImportFromQr, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Text("Import QR")
             }
         }
         if (items.isEmpty()) {

@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">SSHPeaches</string>
     <string name="project_website">https://sshpeaches.app</string>
+    <string name="privacy_policy_url">https://sshpeaches.app/privacy</string>
 </resources>
