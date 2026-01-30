@@ -58,6 +58,7 @@ fun KeyboardEditorScreen() {
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
         Text("Tap a slot to add, replace, or remove a special key.")
+        Text("The keys will be resized to fit on the screen.")
 
         // Force a single horizontal row; allow scrolling if it overflows
         Row(
@@ -159,15 +160,27 @@ private fun KeySlotDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (current.isBlank()) "Add key" else "Edit key") },
         text = {
+            val outerScroll = rememberScrollState()
             if (currentCategory.value == null) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .verticalScroll(outerScroll)
+                        .sizeIn(maxHeight = 420.dp)
+                ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             metaKeys.forEach { key ->
                                 TextButton(onClick = { onSelect(key) }) { Text(key) }
                             }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             navigationKeys.forEach { key ->
                                 TextButton(onClick = { onSelect(key) }) { Text(key) }
                             }
@@ -194,7 +207,9 @@ private fun KeySlotDialog(
                 val scroll = rememberScrollState()
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.verticalScroll(scroll)
+                    modifier = Modifier
+                        .verticalScroll(scroll)
+                        .sizeIn(maxHeight = 420.dp)
                 ) {
                     TextButton(onClick = { currentCategory.value = null }) { Text("<- Back") }
                     Text(currentCategory.value ?: "", style = MaterialTheme.typography.labelLarge)
