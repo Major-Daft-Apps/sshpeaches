@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +36,7 @@ fun HostsScreen(
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
+    onAdd: () -> Unit = {},
     onDelete: (String) -> Unit = {},
     onEdit: (HostConnection) -> Unit = {}
 ) {
@@ -82,6 +84,11 @@ fun HostsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+                    Text("Add host")
+                }
+            }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HostCard(host = host)
