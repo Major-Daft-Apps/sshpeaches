@@ -11,12 +11,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
@@ -27,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.ui.components.EmptyState
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.state.SortMode
 
@@ -78,19 +76,13 @@ fun HostsScreen(
                 }
             }
         }
-        Divider()
-        val filtered = hosts.filter { it.name.contains(search.value, ignoreCase = true) }
+        HorizontalDivider()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (filtered.isEmpty()) {
-                item {
-                    EmptyState(itemLabel = "host")
-                }
-            } else {
-                items(filtered, key = { it.id }) { host ->
+            items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HostCard(host = host)
                     if (editMode) {
@@ -100,7 +92,6 @@ fun HostsScreen(
                         }
                     }
                 }
-            }
             }
         }
     }
