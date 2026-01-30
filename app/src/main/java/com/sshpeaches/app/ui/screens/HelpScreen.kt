@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * Simple in-app help screen that loads the project website.
@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.toArgb
  */
 @Composable
 fun HelpScreen(url: String) {
+    val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -25,7 +26,7 @@ fun HelpScreen(url: String) {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     webViewClient = WebViewClient()
-                    setBackgroundColor(MaterialTheme.colorScheme.background.toArgb())
+                    setBackgroundColor(backgroundColor)
                     loadUrl(url)
                 }
             },
