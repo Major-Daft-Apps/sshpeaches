@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -37,6 +38,7 @@ fun HostsScreen(
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
     onAdd: () -> Unit = {},
+    onImportFromQr: () -> Unit = {},
     onDelete: (String) -> Unit = {},
     onEdit: (HostConnection) -> Unit = {}
 ) {
@@ -85,8 +87,14 @@ fun HostsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
-                    Text("Add host")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
+                        Text("Add host")
+                    }
+                    Button(onClick = onImportFromQr, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Text("Import QR")
+                    }
                 }
             }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
