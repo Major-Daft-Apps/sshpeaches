@@ -1,46 +1,214 @@
 package com.sshpeaches.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.model.PortForwardType
+import java.util.UUID
 
 @Composable
-fun PortForwardScreen(items: List<PortForward>) {
+fun PortForwardScreen(
+    items: List<PortForward>,
+    onAdd: (label: String, type: PortForwardType, srcHost: String, srcPort: Int, dstHost: String, dstPort: Int) -> Unit = { _, _, _, _, _, _ -> },
+    onUpdate: (id: String, label: String, type: PortForwardType, srcHost: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onDelete: (id: String) -> Unit = {}
+) {
+    val showDialog = remember { mutableStateOf(false) }
+    val editingId = remember { mutableStateOf<String?>(null) }
+    val labelState = remember { mutableStateOf("") }
+    val typeState = remember { mutableStateOf(PortForwardType.LOCAL) }
+    val srcHostState = remember { mutableStateOf("127.0.0.1") }
+    val srcPortState = remember { mutableStateOf("22") }
+    val dstHostState = remember { mutableStateOf("") }
+    val dstPortState = remember { mutableStateOf("0") }
+    val enabledState = remember { mutableStateOf(true) }
+
+    fun openDialog(forward: PortForward?) {
+        editingId.value = forward?.id
+        labelState.value = forward?.label ?: ""
+        typeState.value = forward?.type ?: PortForwardType.LOCAL
+        srcHostState.value = forward?.sourceHost ?: "127.0.0.1"
+        srcPortState.value = forward?.sourcePort?.toString() ?: "22"
+        dstHostState.value = forward?.destinationHost ?: ""
+        dstPortState.value = forward?.destinationPort?.toString() ?: "0"
+        enabledState.value = forward?.enabled ?: true
+        showDialog.value = true
+    }
+
+    fun closeDialog() {
+        showDialog.value = false
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add port forward")
+            }
+        }
         items(items, key = { it.id }) { forward ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(forward.label, style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = when (forward.type) {
-                            com.sshpeaches.app.data.model.PortForwardType.LOCAL -> "Local ${forward.sourceHost}:${forward.sourcePort} → ${forward.destinationHost}:${forward.destinationPort}"
-                            com.sshpeaches.app.data.model.PortForwardType.REMOTE -> "Remote ${forward.destinationHost}:${forward.destinationPort} ← ${forward.sourceHost}:${forward.sourcePort}"
-                            com.sshpeaches.app.data.model.PortForwardType.DYNAMIC -> "Dynamic SOCKS on ${forward.sourceHost}:${forward.sourcePort}"
+                            PortForwardType.LOCAL -> "Local ${forward.sourceHost}:${forward.sourcePort} → ${forward.destinationHost}:${forward.destinationPort}"
+                            PortForwardType.REMOTE -> "Remote ${forward.destinationHost}:${forward.destinationPort} ← ${forward.sourceHost}:${forward.sourcePort}"
+                            PortForwardType.DYNAMIC -> "Dynamic SOCKS on ${forward.sourceHost}:${forward.sourcePort}"
                         },
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    val checked = remember { mutableStateOf(forward.enabled) }
-                    Switch(checked = checked.value, onCheckedChange = { checked.value = it })
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Switch(checked = forward.enabled, onCheckedChange = {
+                            onUpdate(
+                                forward.id,
+                                forward.label,
+                                forward.type,
+                                forward.sourceHost,
+                                forward.sourcePort,
+                                forward.destinationHost,
+                                forward.destinationPort,
+                                it
+                            )
+                        })
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            modifier = Modifier
+                                .clickable { openDialog(forward) }
+                                .padding(4.dp)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            modifier = Modifier
+                                .clickable { onDelete(forward.id) }
+                                .padding(4.dp)
+                        )
+                    }
                 }
             }
         }
+    }
+
+    if (showDialog.value) {
+        val isEdit = editingId.value != null
+        AlertDialog(
+            onDismissRequest = { closeDialog() },
+            title = { Text(if (isEdit) "Edit port forward" else "Add port forward") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = labelState.value,
+                        onValueChange = { labelState.value = it },
+                        label = { Text("Label") },
+                        singleLine = true
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(PortForwardType.LOCAL, PortForwardType.REMOTE, PortForwardType.DYNAMIC).forEach { type ->
+                            TextButton(onClick = { typeState.value = type }) {
+                                Text(type.name.lowercase().replaceFirstChar { it.uppercase() })
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = srcHostState.value,
+                        onValueChange = { srcHostState.value = it },
+                        label = { Text("Source host") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = srcPortState.value,
+                        onValueChange = { srcPortState.value = it },
+                        label = { Text("Source port") },
+                        singleLine = true
+                    )
+                    if (typeState.value != PortForwardType.DYNAMIC) {
+                        OutlinedTextField(
+                            value = dstHostState.value,
+                            onValueChange = { dstHostState.value = it },
+                            label = { Text("Destination host") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = dstPortState.value,
+                            onValueChange = { dstPortState.value = it },
+                            label = { Text("Destination port") },
+                            singleLine = true
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val srcPort = srcPortState.value.toIntOrNull() ?: 0
+                    val dstPort = dstPortState.value.toIntOrNull() ?: 0
+                    if (isEdit) {
+                        onUpdate(
+                            editingId.value!!,
+                            labelState.value.ifBlank { "Forward" },
+                            typeState.value,
+                            srcHostState.value.ifBlank { "127.0.0.1" },
+                            srcPort,
+                            dstHostState.value.ifBlank { "" },
+                            dstPort,
+                            enabledState.value
+                        )
+                    } else {
+                        onAdd(
+                            labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" },
+                            typeState.value,
+                            srcHostState.value.ifBlank { "127.0.0.1" },
+                            srcPort,
+                            dstHostState.value.ifBlank { "" },
+                            dstPort
+                        )
+                    }
+                    closeDialog()
+                }) { Text(if (isEdit) "Save" else "Add") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isEdit) {
+                        TextButton(onClick = {
+                            onDelete(editingId.value!!)
+                            closeDialog()
+                        }) { Text("Delete") }
+                    }
+                    TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                }
+            }
+        )
     }
 }
