@@ -97,7 +97,7 @@ fun SSHPeachesRoot(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = CarbonBlack,
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,
                 drawerTonalElevation = 0.dp
             ) {

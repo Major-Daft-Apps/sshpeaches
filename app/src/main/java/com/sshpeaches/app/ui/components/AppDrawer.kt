@@ -23,7 +23,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.ui.navigation.DrawerDestination
-import com.sshpeaches.app.ui.theme.CarbonBlack
 
 @Composable
 fun AppDrawer(
@@ -34,7 +33,7 @@ fun AppDrawer(
 ) {
     Column(
         modifier = Modifier
-            .background(CarbonBlack)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -75,7 +74,8 @@ fun AppDrawer(
         }
         destinations.forEach { dest ->
             val selected = currentRoute == dest.route
-            val background = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent
+            val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+            val foreground = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -88,12 +88,12 @@ fun AppDrawer(
                 androidx.compose.material3.Icon(
                     dest.icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = foreground
                 )
                 Text(
                     dest.label,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = foreground
                 )
             }
         }
