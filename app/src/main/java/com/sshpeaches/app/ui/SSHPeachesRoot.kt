@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +54,7 @@ import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
 import com.sshpeaches.app.ui.components.AppDrawer
+import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.navigation.Routes
 import com.sshpeaches.app.ui.navigation.drawerDestinations
 import com.sshpeaches.app.ui.screens.FavoritesScreen
@@ -62,7 +64,6 @@ import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
 import com.sshpeaches.app.ui.screens.PortForwardScreen
 import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
-import com.sshpeaches.app.ui.screens.HelpScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
@@ -70,6 +71,7 @@ import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.theme.CarbonBlack
 import com.sshpeaches.app.R
 import kotlinx.coroutines.launch
+import com.sshpeaches.app.data.model.AuthMethod
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,7 +234,9 @@ fun SSHPeachesRoot(
     }
 
     if (showQuickConnect.value) {
-        QuickConnectSheet(onDismiss = { showQuickConnect.value = false })
+        QuickConnectSheet(
+            onDismiss = { showQuickConnect.value = false }
+        )
     }
 
     if (showAbout.value) {
@@ -244,6 +248,11 @@ fun SSHPeachesRoot(
 @Composable
 private fun QuickConnectSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        val host = remember { mutableStateOf("") }
+        val port = remember { mutableStateOf("22") }
+        val username = remember { mutableStateOf("") }
+        val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -251,13 +260,31 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Quick Connect", style = MaterialTheme.typography.titleLarge)
-            PlaceholderField(label = "Host / IP")
-            PlaceholderField(label = "Port", value = "22")
-            PlaceholderField(label = "Username")
+            OutlinedTextField(
+                value = host.value,
+                onValueChange = { host.value = it },
+                label = { Text("Host / IP") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = port.value,
+                onValueChange = { port.value = it },
+                label = { Text("Port") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {}) { Text("Password") }
-                Button(onClick = {}) { Text("Identity") }
-                Button(onClick = {}) { Text("Both") }
+                AuthChoice("Password", AuthMethod.PASSWORD, auth.value) { auth.value = it }
+                AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
+                AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
             }
             Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text("Connect")
