@@ -3,6 +3,7 @@ package com.sshpeaches.app.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,14 +11,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -131,20 +135,64 @@ private fun KeySlotDialog(
 ) {
     val categories = listOf(
         "Navigation" to listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn"),
-        "System" to listOf("Ctrl", "Alt", "Shift", "Super"),
-        "Symbols" to listOf("/", "-", "_", "|", "~"),
-        "Numbers" to (0..9).map { it.toString() }
+        "Letters" to ('A'..'Z').map { it.toString() },
+        "Numbers" to (0..9).map { it.toString() },
+        "Symbols" to listOf("/", "-", "_", "|", "~", "@", "#", "%", "&", "+", "=")
     )
+    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super")
+    val currentCategory = remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (current.isBlank()) "Add key" else "Edit key") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                categories.forEach { (cat, keys) ->
-                    Text(cat, style = MaterialTheme.typography.labelLarge)
+            if (currentCategory.value == null) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Meta keys shown directly
+                    Text("Meta keys", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        keys.forEach { key ->
+                        metaKeys.forEach { key ->
                             TextButton(onClick = { onSelect(key) }) { Text(key) }
+                        }
+                    }
+                    // Category rows with arrows
+                    categories.forEach { (cat, _) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(cat, style = MaterialTheme.typography.bodyLarge)
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowRight,
+                                contentDescription = "Open $cat",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.Transparent)
+                                    .padding(2.dp)
+                                    .let {
+                                        Modifier
+                                    }
+                                    .clickable {
+                                        currentCategory.value = cat
+                                    }
+                            )
+                        }
+                    }
+                }
+            } else {
+                val items = categories.firstOrNull { it.first == currentCategory.value }?.second.orEmpty()
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = { currentCategory.value = null }) { Text("← Back") }
+                    Text(currentCategory.value ?: "", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items.chunked(4).forEach { chunk ->
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                chunk.forEach { key ->
+                                    TextButton(onClick = { onSelect(key) }) { Text(key) }
+                                }
+                            }
                         }
                     }
                 }
