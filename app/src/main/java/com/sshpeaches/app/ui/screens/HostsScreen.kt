@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
@@ -74,7 +74,7 @@ fun HostsScreen(
             )
             Column {
                 IconButton(onClick = { showMenu.value = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Sort")
+                    Icon(Icons.Default.FilterList, contentDescription = "Sort")
                 }
                 DropdownMenu(expanded = showMenu.value, onDismissRequest = { showMenu.value = false }) {
                     DropdownMenuItem(
