@@ -276,21 +276,19 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
         ) {
-            Row(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Export hosts, identities, and settings via QR code.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Button(onClick = { showTransferDialog.value = true }) {
+                Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Export hosts, identities, and settings via QR code.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Button(
+                    onClick = { showTransferDialog.value = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Export via QR")
                 }
             }

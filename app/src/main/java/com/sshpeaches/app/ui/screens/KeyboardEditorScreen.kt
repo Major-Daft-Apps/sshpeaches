@@ -40,15 +40,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.R
 
 @Composable
 fun KeyboardEditorScreen() {
-    val slotCount = 12
+    val slotCount = 8
     val keysState = remember { mutableStateOf(List(slotCount) { "" }) }
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
-    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -60,20 +60,20 @@ fun KeyboardEditorScreen() {
         Text("Tap a slot to add, replace, or remove a special key.")
         Text("The keys will be resized to fit on the screen.")
 
-        // Force a single horizontal row; allow scrolling if it overflows
+        // All keys are placed side-by-side, sharing space via weight(1f)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(scrollState)
                 .border(1.dp, Color(0xFFB8B8B8), RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 4.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             keysState.value.forEachIndexed { index, key ->
                 KeySlot(
                     label = key,
-                    onClick = { dialogIndex.value = index }
+                    onClick = { dialogIndex.value = index },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -119,22 +119,27 @@ fun KeyboardEditorScreen() {
 }
 
 @Composable
-private fun KeySlot(label: String, onClick: () -> Unit) {
+private fun KeySlot(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val isEmpty = label.isBlank()
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .height(44.dp)
-            .sizeIn(minWidth = 56.dp)
             .clip(RoundedCornerShape(6.dp)),
         shape = RoundedCornerShape(6.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
             contentColor = Color(0xFFFA992A)
-        )
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp)
     ) {
-        Text(if (isEmpty) "+" else label)
+        Text(
+            text = if (isEmpty) "+" else label,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
