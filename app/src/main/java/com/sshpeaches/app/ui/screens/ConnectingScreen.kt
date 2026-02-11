@@ -56,82 +56,79 @@ fun ConnectingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black), // Intense black background for terminal feel
+            .background(Color.Black)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        Spacer(modifier = Modifier.weight(0.2f))
+            Spacer(modifier = Modifier.weight(0.2f))
 
-        // Central Branding
-        Image(
-            painter = painterResource(id = R.drawable.sshpeaches),
-            contentDescription = "SSHPeaches Logo",
-            modifier = Modifier.size(180.dp),
-            contentScale = ContentScale.Fit
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Primary Status
-        Text(
-            text = "Connecting...",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+            Image(
+                painter = painterResource(id = R.drawable.sshpeaches),
+                contentDescription = "SSHPeaches Logo",
+                modifier = Modifier.size(180.dp),
+                contentScale = ContentScale.Fit
             )
-        )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-        // Secondary Status / Host Info
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary
-            )
             Text(
-                text = hostName,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color.Gray,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                text = "Connecting...",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             )
-        }
 
-        Spacer(modifier = Modifier.weight(0.3f))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Log Console Area
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.5f),
-            color = Color(0xFF080808) // Distinct area for logs
-        ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(logs) { log ->
-                    Text(
-                        text = log,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFFBDBDBD),
-                            fontSize = 11.sp
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = hostName,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color.Gray,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                     )
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.3f))
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.5f),
+                color = Color(0xFF080808)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(logs) { log ->
+                        Text(
+                            text = log,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFFBDBDBD),
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
                 }
             }
         }
 
-        // Top-right Close Button
         IconButton(
             onClick = onCancel,
             modifier = Modifier
