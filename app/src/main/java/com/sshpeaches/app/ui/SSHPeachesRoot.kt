@@ -1,6 +1,7 @@
 package com.sshpeaches.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -77,6 +79,7 @@ import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.logging.CrashLogger
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,89 +159,105 @@ fun SSHPeachesRoot(
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(currentTitle) },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu")
-                            }
-                        },
-                        actions = {
-                            AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
-                                IconButton(onClick = { editMode.value = !editMode.value }) {
-                                    Icon(
-                                        imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                        contentDescription = if (editing) "Done editing" else "Edit"
-                                    )
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(currentTitle) },
+                            navigationIcon = {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                }
+                            },
+                            actions = {
+                                val qrRoutes = listOf(Routes.HOSTS, Routes.IDENTITIES, Routes.FORWARDS, Routes.SNIPPETS)
+                                if (currentRoute in qrRoutes) {
+                                    IconButton(onClick = {
+                                        // Trigger QR scan for the active screen
+                                        when (currentRoute) {
+                                            Routes.HOSTS -> { /* Scan for host */ }
+                                            Routes.IDENTITIES -> { /* Scan for identity */ }
+                                            Routes.FORWARDS -> { /* Scan for forward */ }
+                                            Routes.SNIPPETS -> { /* Scan for snippet */ }
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR")
+                                    }
+                                }
+                                AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                    IconButton(onClick = { editMode.value = !editMode.value }) {
+                                        Icon(
+                                            imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                            contentDescription = if (editing) "Done editing" else "Edit"
+                                        )
+                                    }
                                 }
                             }
+                        )
+                    }
+                ) { padding ->
+                    NavHost(
+                        navController = navController,
+                        startDestination = Routes.FAVORITES,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(padding)
+                    ) {
+                        composable(Routes.FAVORITES) {
+                            FavoritesScreen(section = uiState.favorites)
                         }
-                    )
-                }
-            ) { padding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Routes.FAVORITES,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(padding)
-                ) {
-                    composable(Routes.FAVORITES) {
-                        FavoritesScreen(section = uiState.favorites)
-                    }
-                    composable(Routes.HOSTS) {
-                        HostsScreen(
-                            hosts = uiState.hosts,
-                            sortMode = uiState.sortMode,
-                            onSortModeChange = onSortModeChange,
-                            editMode = editMode.value,
-                            onImportFromQr = { /* TODO: implement QR decode + save host */ }
-                        )
-                    }
-                    composable(Routes.IDENTITIES) {
-                        IdentitiesScreen(items = uiState.identities, editMode = editMode.value, onImportFromQr = { /* TODO */ })
-                    }
-                    composable(Routes.FORWARDS) {
-                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })
-                    }
-                    composable(Routes.SNIPPETS) {
-                        SnippetManagerScreen(snippets = uiState.snippets)
-                    }
-                    composable(Routes.KEYBOARD) {
-                        KeyboardEditorScreen()
-                    }
-                    composable(Routes.SETTINGS) {
-                        SettingsScreen(
-                            currentTheme = uiState.themeMode,
-                            onThemeChange = onThemeModeChange,
-                            allowBackgroundSessions = uiState.allowBackgroundSessions,
-                            onBackgroundToggle = onBackgroundModeChange,
-                            biometricEnabled = uiState.biometricLockEnabled,
-                            onBiometricToggle = onBiometricToggle,
-                            lockTimeout = uiState.lockTimeout,
-                            onLockTimeoutChange = onLockTimeoutChange,
-                            crashReportsEnabled = uiState.crashReportsEnabled,
-                            onCrashReportsToggle = onCrashReportsToggle,
-                            analyticsEnabled = uiState.analyticsEnabled,
-                            onAnalyticsToggle = onAnalyticsToggle,
-                            diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
-                            onDiagnosticsToggle = onDiagnosticsToggle,
-                            includeIdentities = uiState.includeIdentitiesInQr,
-                            onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
-                            includeSettings = uiState.includeSettingsInQr,
-                            onIncludeSettingsToggle = onIncludeSettingsToggle,
-                            autoStartForwards = uiState.autoStartForwards,
-                            onAutoStartForwardsToggle = onAutoStartForwardsToggle,
-                            hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
-                            onHostKeyPromptToggle = onHostKeyPromptToggle,
-                            usageReportsEnabled = uiState.usageReportsEnabled,
-                            onUsageReportsToggle = onUsageReportsToggle
-                        )
+                        composable(Routes.HOSTS) {
+                            HostsScreen(
+                                hosts = uiState.hosts,
+                                sortMode = uiState.sortMode,
+                                onSortModeChange = onSortModeChange,
+                                editMode = editMode.value,
+                                onImportFromQr = { /* TODO: implement QR decode + save host */ }
+                            )
+                        }
+                        composable(Routes.IDENTITIES) {
+                            IdentitiesScreen(items = uiState.identities, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                        }
+                        composable(Routes.FORWARDS) {
+                            PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                        }
+                        composable(Routes.SNIPPETS) {
+                            SnippetManagerScreen(snippets = uiState.snippets)
+                        }
+                        composable(Routes.KEYBOARD) {
+                            KeyboardEditorScreen()
+                        }
+                        composable(Routes.SETTINGS) {
+                            SettingsScreen(
+                                currentTheme = uiState.themeMode,
+                                onThemeChange = onThemeModeChange,
+                                allowBackgroundSessions = uiState.allowBackgroundSessions,
+                                onBackgroundToggle = onBackgroundModeChange,
+                                biometricEnabled = uiState.biometricLockEnabled,
+                                onBiometricToggle = onBiometricToggle,
+                                lockTimeout = uiState.lockTimeout,
+                                onLockTimeoutChange = onLockTimeoutChange,
+                                crashReportsEnabled = uiState.crashReportsEnabled,
+                                onCrashReportsToggle = onCrashReportsToggle,
+                                analyticsEnabled = uiState.analyticsEnabled,
+                                onAnalyticsToggle = onAnalyticsToggle,
+                                diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
+                                onDiagnosticsToggle = onDiagnosticsToggle,
+                                includeIdentities = uiState.includeIdentitiesInQr,
+                                onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
+                                includeSettings = uiState.includeSettingsInQr,
+                                onIncludeSettingsToggle = onIncludeSettingsToggle,
+                                autoStartForwards = uiState.autoStartForwards,
+                                onAutoStartForwardsToggle = onAutoStartForwardsToggle,
+                                hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
+                                onHostKeyPromptToggle = onHostKeyPromptToggle,
+                                usageReportsEnabled = uiState.usageReportsEnabled,
+                                onUsageReportsToggle = onUsageReportsToggle
+                            )
+                        }
                     }
                 }
             }
+            
 
             // Connection Overlay
             connectingHost.value?.let { host ->
@@ -364,10 +383,9 @@ private fun QuickConnectSheet(
                             )
                             onLogUpdate("ssh_connect: Socket connecting, now waiting for callbacks")
                             client.connect(hostValue, portValue)
-                            onLogUpdate("ssh_client_connection_callback: SSH server banner: ${client.transport.serverBanner}")
-                            
+                            onLogUpdate("ssh_client_connection_callback: SSH transport established")
                             onLogUpdate("ssh_analyze_banner: Talking to OpenSSH client version: ${client.transport.clientVersion}")
-                            
+
                             when (auth.value) {
                                 AuthMethod.PASSWORD -> {
                                     onLogUpdate("ssh_auth_password: Attempting password authentication for $userValue")
@@ -395,6 +413,7 @@ private fun QuickConnectSheet(
                         }.onSuccess {
                             onLogUpdate("ssh_disconnect: Session finished.")
                         }.onFailure { e ->
+                            CrashLogger.logNonFatal("QuickConnect", e)
                             onLogUpdate("ssh_error: Failed: ${e.message}")
                             kotlinx.coroutines.delay(3000)
                         }

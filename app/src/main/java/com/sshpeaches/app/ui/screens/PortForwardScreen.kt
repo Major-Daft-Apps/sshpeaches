@@ -89,10 +89,6 @@ fun PortForwardScreen(
             Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add port forward")
             }
-            Button(onClick = onImportFromQr, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                Text("Import QR")
-            }
         }
         if (items.isEmpty()) {
             item { EmptyState(itemLabel = "port forward") }

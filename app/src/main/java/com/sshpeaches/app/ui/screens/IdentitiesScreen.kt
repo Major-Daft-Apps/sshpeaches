@@ -68,10 +68,6 @@ fun IdentitiesScreen(
             Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add identity")
             }
-            Button(onClick = onImportFromQr, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                Text("Import QR")
-            }
         }
         if (items.isEmpty()) {
             item { EmptyState(itemLabel = "identity") }

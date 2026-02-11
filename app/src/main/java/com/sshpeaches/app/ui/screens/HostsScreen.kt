@@ -87,14 +87,8 @@ fun HostsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
-                        Text("Add host")
-                    }
-                    Button(onClick = onImportFromQr, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                        Text("Import QR")
-                    }
+                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+                    Text("Add host")
                 }
             }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
