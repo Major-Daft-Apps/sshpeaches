@@ -87,7 +87,10 @@ fun SnippetManagerScreen(
                     if (snippet.description.isNotBlank()) {
                         Text(snippet.description, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text(snippet.command, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = snippet.command,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                    )
                     RowActions(
                         onRun = { /* TODO run snippet */ },
                         onEdit = { openDialog(snippet) },
