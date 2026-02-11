@@ -25,6 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -44,6 +45,9 @@ fun PortForwardScreen(
     onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
+    editMode: Boolean = false,
+    addRequest: Boolean = false,
+    onAddConsumed: () -> Unit = {},
     onImportFromQr: () -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
@@ -80,16 +84,18 @@ fun PortForwardScreen(
         showDialog.value = false
     }
 
+    LaunchedEffect(addRequest) {
+        if (addRequest) {
+            openDialog(null)
+            onAddConsumed()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Add port forward")
-            }
-        }
         if (items.isEmpty()) {
             item { EmptyState(itemLabel = "port forward") }
         } else {

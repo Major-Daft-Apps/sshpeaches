@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -107,6 +108,7 @@ fun SSHPeachesRoot(
     val editMode = rememberSaveable { mutableStateOf(false) }
     val connectingHost = remember { mutableStateOf<String?>(null) }
     val connectionLogs = remember { mutableStateOf(listOf<String>()) }
+    val showAddDialog = remember { mutableStateOf(false) }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.project_website)
     val backStackEntry = navController.currentBackStackEntryAsState().value
@@ -190,6 +192,11 @@ fun SSHPeachesRoot(
                                         )
                                     }
                                 }
+                                if (currentRoute in qrRoutes) {
+                                    IconButton(onClick = { showAddDialog.value = true }) {
+                                        Icon(Icons.Default.Add, contentDescription = "Add Item")
+                                    }
+                                }
                             }
                         )
                     }
@@ -211,17 +218,36 @@ fun SSHPeachesRoot(
                                 sortMode = uiState.sortMode,
                                 onSortModeChange = onSortModeChange,
                                 editMode = editMode.value,
+                                addRequest = showAddDialog.value,
+                                onAddConsumed = { showAddDialog.value = false },
                                 onImportFromQr = { /* TODO: implement QR decode + save host */ }
                             )
                         }
                         composable(Routes.IDENTITIES) {
-                            IdentitiesScreen(items = uiState.identities, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                            IdentitiesScreen(
+                                items = uiState.identities,
+                                editMode = editMode.value,
+                                addRequest = showAddDialog.value,
+                                onAddConsumed = { showAddDialog.value = false },
+                                onImportFromQr = { /* TODO */ }
+                            )
                         }
                         composable(Routes.FORWARDS) {
-                            PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                            PortForwardScreen(
+                                items = uiState.portForwards,
+                                hosts = uiState.hosts,
+                                editMode = editMode.value,
+                                addRequest = showAddDialog.value,
+                                onAddConsumed = { showAddDialog.value = false },
+                                onImportFromQr = { /* TODO */ }
+                            )
                         }
                         composable(Routes.SNIPPETS) {
-                            SnippetManagerScreen(snippets = uiState.snippets)
+                            SnippetManagerScreen(
+                                snippets = uiState.snippets,
+                                addRequest = showAddDialog.value,
+                                onAddConsumed = { showAddDialog.value = false }
+                            )
                         }
                         composable(Routes.KEYBOARD) {
                             KeyboardEditorScreen()

@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -39,6 +40,8 @@ fun IdentitiesScreen(
     onUpdate: (id: String, label: String, fingerprint: String, username: String?) -> Unit = { _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
     editMode: Boolean = false,
+    addRequest: Boolean = false,
+    onAddConsumed: () -> Unit = {},
     onImportFromQr: () -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
@@ -59,16 +62,18 @@ fun IdentitiesScreen(
         showDialog.value = false
     }
 
+    LaunchedEffect(addRequest) {
+        if (addRequest) {
+            openDialog(null)
+            onAddConsumed()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Add identity")
-            }
-        }
         if (items.isEmpty()) {
             item { EmptyState(itemLabel = "identity") }
         } else {

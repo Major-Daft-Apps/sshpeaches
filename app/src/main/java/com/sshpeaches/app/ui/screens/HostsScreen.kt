@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -37,6 +38,8 @@ fun HostsScreen(
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
+    addRequest: Boolean = false,
+    onAddConsumed: () -> Unit = {},
     onAdd: () -> Unit = {},
     onImportFromQr: () -> Unit = {},
     onDelete: (String) -> Unit = {},
@@ -44,6 +47,14 @@ fun HostsScreen(
 ) {
     val search = remember { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
+
+    LaunchedEffect(addRequest) {
+        if (addRequest) {
+            onAdd()
+            onAddConsumed()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -86,11 +97,6 @@ fun HostsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
-                    Text("Add host")
-                }
-            }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HostCard(host = host)
