@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sshpeaches.app.R
 
 @Composable
@@ -124,19 +125,19 @@ private fun KeySlot(label: String, onClick: () -> Unit, modifier: Modifier = Mod
     OutlinedButton(
         onClick = onClick,
         modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(6.dp)),
-        shape = RoundedCornerShape(6.dp),
+            .height(24.dp)
+            .clip(RoundedCornerShape(4.dp)),
+        shape = RoundedCornerShape(4.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
             contentColor = Color(0xFFFA992A)
         ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp)
     ) {
         Text(
             text = if (isEmpty) "+" else label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
