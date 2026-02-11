@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -121,7 +122,8 @@ fun SettingsScreen(
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Run shells in background")
@@ -139,7 +141,8 @@ fun SettingsScreen(
                 Text("Security", style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Biometric lock")
@@ -178,7 +181,8 @@ fun SettingsScreen(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Host key prompts")
@@ -193,7 +197,8 @@ fun SettingsScreen(
                 Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Auto-start associated forwards")
@@ -208,7 +213,8 @@ fun SettingsScreen(
                 Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Crash reports")
@@ -218,7 +224,8 @@ fun SettingsScreen(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Usage analytics")
@@ -228,7 +235,8 @@ fun SettingsScreen(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Session diagnostics")
@@ -238,7 +246,8 @@ fun SettingsScreen(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Send usage reports (Advanced)")
@@ -269,7 +278,8 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
                             Text("Include identities")
@@ -279,7 +289,8 @@ fun SettingsScreen(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
                             Text("Include settings")

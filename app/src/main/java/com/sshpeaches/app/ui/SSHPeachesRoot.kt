@@ -298,7 +298,10 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 AuthChoice("Password", AuthMethod.PASSWORD, auth.value) { auth.value = it }
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
                 AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
