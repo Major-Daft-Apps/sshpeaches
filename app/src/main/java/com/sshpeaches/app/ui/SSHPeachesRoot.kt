@@ -170,8 +170,9 @@ fun SSHPeachesRoot(
                                 }
                             },
                             actions = {
-                                val qrRoutes = listOf(Routes.HOSTS, Routes.IDENTITIES, Routes.FORWARDS, Routes.SNIPPETS)
-                                if (currentRoute in qrRoutes) {
+                                val managementRoutes = listOf(Routes.HOSTS, Routes.IDENTITIES, Routes.FORWARDS, Routes.SNIPPETS)
+                                if (currentRoute in managementRoutes) {
+                                    // 1. QR Scan
                                     IconButton(onClick = {
                                         // Trigger QR scan for the active screen
                                         when (currentRoute) {
@@ -183,16 +184,18 @@ fun SSHPeachesRoot(
                                     }) {
                                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR")
                                     }
-                                }
-                                AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
-                                    IconButton(onClick = { editMode.value = !editMode.value }) {
-                                        Icon(
-                                            imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                            contentDescription = if (editing) "Done editing" else "Edit"
-                                        )
+
+                                    // 2. Edit/Done
+                                    AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                        IconButton(onClick = { editMode.value = !editMode.value }) {
+                                            Icon(
+                                                imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                                contentDescription = if (editing) "Done editing" else "Edit"
+                                            )
+                                        }
                                     }
-                                }
-                                if (currentRoute in qrRoutes) {
+
+                                    // 3. Add Item
                                     IconButton(onClick = { showAddDialog.value = true }) {
                                         Icon(Icons.Default.Add, contentDescription = "Add Item")
                                     }
