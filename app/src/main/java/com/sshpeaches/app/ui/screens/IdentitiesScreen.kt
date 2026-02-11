@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
+
+private const val TAG = "CW/IdentitiesScreen"
 
 @Composable
 fun IdentitiesScreen(
@@ -101,14 +104,20 @@ fun IdentitiesScreen(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .padding(start = 8.dp)
-                                    .clickable { openDialog(identity) }
+                                    .clickable { 
+                                        Log.i(TAG, "UI identity_edit_click id=${identity.id}")
+                                        openDialog(identity) 
+                                    }
                             )
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Delete",
                                 modifier = Modifier
                                     .size(20.dp)
-                                    .clickable { onDelete(identity.id) }
+                                    .clickable { 
+                                        Log.i(TAG, "UI identity_delete_click id=${identity.id}")
+                                        onDelete(identity.id) 
+                                    }
                             )
                         }
                     }

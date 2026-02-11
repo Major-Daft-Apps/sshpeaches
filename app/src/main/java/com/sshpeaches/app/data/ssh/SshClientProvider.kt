@@ -7,9 +7,12 @@ import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import com.sshpeaches.app.data.model.HostConnection
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
 
+import android.util.Log
+
+private const val TAG = "CW/SshClientProvider"
+
 /**
  * Minimal SSHJ provider. Callers are responsible for threading/coroutine dispatch.
- * This keeps connection setup in one place; higher layers can add auth, port forwards, etc.
  */
 object SshClientProvider {
 
@@ -18,6 +21,7 @@ object SshClientProvider {
      * Does not connect; caller must invoke connect() and auth.
      */
     fun createClient(context: Context, host: HostConnection): SSHClient {
+        Log.i(TAG, "SSH create_client host=${host.host}:${host.port}")
         val knownHostsFile = File(context.filesDir, "known_hosts")
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient().apply {

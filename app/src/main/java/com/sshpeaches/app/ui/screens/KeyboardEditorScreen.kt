@@ -44,6 +44,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sshpeaches.app.R
+import android.util.Log
+
+private const val TAG = "CW/KeyboardEditor"
 
 @Composable
 fun KeyboardEditorScreen() {
@@ -107,10 +110,12 @@ fun KeyboardEditorScreen() {
         KeySlotDialog(
             current = keysState.value[idx],
             onSelect = { newKey ->
+                Log.i(TAG, "UI key_assign slot=$idx key=$newKey")
                 keysState.value = keysState.value.toMutableList().also { it[idx] = newKey }
                 dialogIndex.value = null
             },
             onRemove = {
+                Log.i(TAG, "UI key_remove slot=$idx")
                 keysState.value = keysState.value.toMutableList().also { it[idx] = "" }
                 dialogIndex.value = null
             },

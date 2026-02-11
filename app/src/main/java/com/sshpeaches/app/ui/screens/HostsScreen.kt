@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.state.SortMode
+
+private const val TAG = "CW/HostsScreen"
 
 @Composable
 fun HostsScreen(
@@ -102,8 +105,14 @@ fun HostsScreen(
                     HostCard(host = host)
                     if (editMode) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            TextButton(onClick = { onEdit(host) }) { Text("Edit") }
-                            TextButton(onClick = { onDelete(host.id) }) { Text("Delete") }
+                            TextButton(onClick = { 
+                                Log.i(TAG, "UI host_edit_click id=${host.id}")
+                                onEdit(host) 
+                            }) { Text("Edit") }
+                            TextButton(onClick = { 
+                                Log.i(TAG, "UI host_delete_click id=${host.id}")
+                                onDelete(host.id) 
+                            }) { Text("Delete") }
                         }
                     }
                 }

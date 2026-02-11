@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.state
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sshpeaches.app.data.model.HostConnection
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+
+private const val TAG = "CW/AppViewModel"
 
 class AppViewModel(
     private val repository: AppRepository = InMemoryAppRepository()
@@ -67,6 +70,7 @@ class AppViewModel(
     )
 
     private data class SharePrefs(
+        val includeIds: Boolean,
         val includeSettings: Boolean,
         val autoStart: Boolean,
         val hostKeyPrompt: Boolean
@@ -132,34 +136,42 @@ class AppViewModel(
     )
 
     fun setSortMode(mode: SortMode) {
+        Log.i(TAG, "PREF setSortMode mode=$mode")
         sortMode.value = mode
     }
 
     fun setThemeMode(mode: ThemeMode) {
+        Log.i(TAG, "PREF setThemeMode mode=$mode")
         themeModeFlow.value = mode
     }
 
     fun setBackgroundSessions(enabled: Boolean) {
+        Log.i(TAG, "PREF setBackgroundSessions enabled=$enabled")
         backgroundSessionsFlow.value = enabled
     }
 
     fun setBiometricLock(enabled: Boolean) {
+        Log.i(TAG, "PREF setBiometricLock enabled=$enabled")
         biometricFlow.value = enabled
     }
 
     fun setLockTimeout(timeout: LockTimeout) {
+        Log.i(TAG, "PREF setLockTimeout timeout=$timeout")
         lockTimeoutFlow.value = timeout
     }
 
     fun setCrashReports(enabled: Boolean) {
+        Log.i(TAG, "PREF setCrashReports enabled=$enabled")
         crashReportsFlow.value = enabled
     }
 
     fun setAnalytics(enabled: Boolean) {
+        Log.i(TAG, "PREF setAnalytics enabled=$enabled")
         analyticsFlow.value = enabled
     }
 
     fun setDiagnosticsLogging(enabled: Boolean) {
+        Log.i(TAG, "PREF setDiagnosticsLogging enabled=$enabled")
         diagnosticsLoggingFlow.value = enabled
     }
 

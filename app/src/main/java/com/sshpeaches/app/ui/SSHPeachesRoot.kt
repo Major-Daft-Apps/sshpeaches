@@ -57,6 +57,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.sshpeaches.app.ui.components.AppDrawer
@@ -81,6 +82,9 @@ import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.logging.CrashLogger
+import android.util.Log
+
+private const val TAG = "CW/SSHPeachesRoot"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,6 +148,7 @@ fun SSHPeachesRoot(
                             Routes.ABOUT -> showAbout.value = true
                             else -> {
                                 if (destination.route != currentRoute) {
+                                    Log.i(TAG, "NAV navigate from=$currentRoute to=${destination.route}")
                                     navController.navigate(destination.route) {
                                         popUpTo(Routes.FAVORITES)
                                     }
@@ -173,6 +178,7 @@ fun SSHPeachesRoot(
                                 if (currentRoute in managementRoutes) {
                                     // 1. QR Scan
                                     IconButton(onClick = {
+                                        Log.i(TAG, "UI qr_scan_trigger screen=$currentRoute")
                                         // Trigger QR scan for the active screen
                                         when (currentRoute) {
                                             Routes.HOSTS -> { /* Scan for host */ }
@@ -325,7 +331,13 @@ private fun QuickConnectSheet(
     onLogUpdate: (String) -> Unit,
     onFinished: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val scope = rememberCoroutineScope()
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
         val context = LocalContext.current
         val host = remember { mutableStateOf("") }
         val port = remember { mutableStateOf("22") }
@@ -334,7 +346,6 @@ private fun QuickConnectSheet(
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
         val status = remember { mutableStateOf<String?>(null) }
         val isConnecting = remember { mutableStateOf(false) }
-        val scope = rememberCoroutineScope()
 
         Column(
             modifier = Modifier
@@ -394,7 +405,9 @@ private fun QuickConnectSheet(
 
                     scope.launch(Dispatchers.IO) {
                         isConnecting.value = true
+                        Log.i(TAG, "SSH connect start host=$hostValue port=$portValue user=$userValue auth=${auth.value}")
                         onLogUpdate("ssh_socket_connect: Connecting to $hostValue:$portValue...")
+                        val t0 = SystemClock.elapsedRealtime()
                         runCatching {
                             val client = SshClientProvider.createClient(
                                 context,
@@ -432,6 +445,8 @@ private fun QuickConnectSheet(
                                 }
                             }
                             onLogUpdate("ssh_connect_success: Authentication successful!")
+                            val ms = SystemClock.elapsedRealtime() - t0
+                            Log.i(TAG, "SSH connect success host=$hostValue ms=$ms")
                             // In a real app, we'd navigate to the terminal here. 
                             // For now, we'll just wait a bit so the user can see the success.
                             kotlinx.coroutines.delay(1500)
@@ -439,6 +454,8 @@ private fun QuickConnectSheet(
                         }.onSuccess {
                             onLogUpdate("ssh_disconnect: Session finished.")
                         }.onFailure { e ->
+                            val ms = SystemClock.elapsedRealtime() - t0
+                            Log.e(TAG, "SSH connect fail host=$hostValue ms=$ms err=${e.javaClass.simpleName} msg=${e.message?.take(200)}", e)
                             CrashLogger.logNonFatal("QuickConnect", e)
                             onLogUpdate("ssh_error: Failed: ${e.message}")
                             kotlinx.coroutines.delay(3000)

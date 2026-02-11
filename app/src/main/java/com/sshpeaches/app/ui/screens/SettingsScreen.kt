@@ -55,7 +55,6 @@ fun SettingsScreen(
     autoStartForwards: Boolean,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     hostKeyPromptEnabled: Boolean,
-    onHostKeyPromptToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit
 ) {
     val expanded = remember { mutableStateOf(false) }

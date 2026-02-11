@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Snippet
 import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
+
+private const val TAG = "CW/SnippetManagerScreen"
 
 @Composable
 fun SnippetManagerScreen(
@@ -92,9 +95,18 @@ fun SnippetManagerScreen(
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                     )
                     RowActions(
-                        onRun = { /* TODO run snippet */ },
-                        onEdit = { openDialog(snippet) },
-                        onDelete = { onDelete(snippet.id) }
+                        onRun = { 
+                            Log.i(TAG, "UI snippet_run_click id=${snippet.id}")
+                            /* TODO run snippet */ 
+                        },
+                        onEdit = { 
+                            Log.i(TAG, "UI snippet_edit_click id=${snippet.id}")
+                            openDialog(snippet) 
+                        },
+                        onDelete = { 
+                            Log.i(TAG, "UI snippet_delete_click id=${snippet.id}")
+                            onDelete(snippet.id) 
+                        }
                     )
                 }
             }

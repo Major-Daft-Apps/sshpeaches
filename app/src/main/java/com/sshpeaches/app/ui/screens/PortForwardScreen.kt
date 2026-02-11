@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,8 @@ import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.ui.components.EmptyState
 import java.util.UUID
 
+private const val TAG = "CW/PortForwardScreen"
+
 @Composable
 fun PortForwardScreen(
     items: List<PortForward>,
@@ -45,7 +48,6 @@ fun PortForwardScreen(
     onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, exitOnFailure: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
-    editMode: Boolean = false,
     addRequest: Boolean = false,
     onAddConsumed: () -> Unit = {},
     onImportFromQr: () -> Unit = {}
@@ -125,6 +127,7 @@ fun PortForwardScreen(
                         Switch(
                             checked = forward.enabled,
                             onCheckedChange = {
+                                Log.i(TAG, "UI forward_toggle_enabled id=${forward.id} enabled=$it")
                                 onUpdate(
                                     forward.id,
                                     forward.label,
@@ -145,14 +148,20 @@ fun PortForwardScreen(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit",
                                 modifier = Modifier
-                                    .clickable { openDialog(forward) }
+                                    .clickable { 
+                                        Log.i(TAG, "UI forward_edit_click id=${forward.id}")
+                                        openDialog(forward) 
+                                    }
                                     .padding(4.dp)
                             )
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Delete",
                                 modifier = Modifier
-                                    .clickable { onDelete(forward.id) }
+                                    .clickable { 
+                                        Log.i(TAG, "UI forward_delete_click id=${forward.id}")
+                                        onDelete(forward.id) 
+                                    }
                                     .padding(4.dp)
                             )
                         }
