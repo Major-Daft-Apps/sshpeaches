@@ -54,9 +54,32 @@ fun SSHPeachesTheme(
         }
     }
 
-    val scheme = if (useDark) DarkColors else LightColors
+    val targetScheme = if (useDark) DarkColors else LightColors
+
+    val animationSpec = androidx.compose.animation.core.tween<Color>(durationMillis = 300)
+
+    val primary = androidx.compose.animation.animateColorAsState(targetScheme.primary, animationSpec, label = "primary")
+    val onPrimary = androidx.compose.animation.animateColorAsState(targetScheme.onPrimary, animationSpec, label = "onPrimary")
+    val secondary = androidx.compose.animation.animateColorAsState(targetScheme.secondary, animationSpec, label = "secondary")
+    val onSecondary = androidx.compose.animation.animateColorAsState(targetScheme.onSecondary, animationSpec, label = "onSecondary")
+    val background = androidx.compose.animation.animateColorAsState(targetScheme.background, animationSpec, label = "background")
+    val surface = androidx.compose.animation.animateColorAsState(targetScheme.surface, animationSpec, label = "surface")
+    val onSurface = androidx.compose.animation.animateColorAsState(targetScheme.onSurface, animationSpec, label = "onSurface")
+    val onBackground = androidx.compose.animation.animateColorAsState(targetScheme.onBackground, animationSpec, label = "onBackground")
+
+    val animatedScheme = targetScheme.copy(
+        primary = primary.value,
+        onPrimary = onPrimary.value,
+        secondary = secondary.value,
+        onSecondary = onSecondary.value,
+        background = background.value,
+        surface = surface.value,
+        onSurface = onSurface.value,
+        onBackground = onBackground.value
+    )
+
     MaterialTheme(
-        colorScheme = scheme,
+        colorScheme = animatedScheme,
         typography = Typography,
         content = content
     )

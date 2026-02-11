@@ -32,6 +32,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -60,6 +65,7 @@ import android.net.Uri
 import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CompletableDeferred
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.navigation.Routes
@@ -83,6 +89,10 @@ import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.logging.CrashLogger
 import android.util.Log
+import net.schmizz.sshj.userauth.UserAuthException
+import net.schmizz.sshj.transport.TransportException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 
 private const val TAG = "CW/SSHPeachesRoot"
 
@@ -111,6 +121,8 @@ fun SSHPeachesRoot(
     val editMode = rememberSaveable { mutableStateOf(false) }
     val connectingHost = remember { mutableStateOf<String?>(null) }
     val connectionLogs = remember { mutableStateOf(listOf<String>()) }
+    val isAuthFailed = remember { mutableStateOf(false) }
+    val authRetryDeferred = remember { mutableStateOf<CompletableDeferred<String>?>(null) }
     val showAddDialog = remember { mutableStateOf(false) }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.project_website)
@@ -156,7 +168,10 @@ fun SSHPeachesRoot(
                             }
                         }
                     },
-                    onQuickConnect = { showQuickConnect.value = true }
+                    onQuickConnect = {
+                        scope.launch { drawerState.close() }
+                        showQuickConnect.value = true
+                    }
                 )
             }
         },
@@ -292,13 +307,27 @@ fun SSHPeachesRoot(
             
 
             // Connection Overlay
-            connectingHost.value?.let { host ->
-                ConnectingScreen(
-                    hostName = host,
-                    logs = connectionLogs.value,
-                    onCancel = { connectingHost.value = null },
-                    modifier = Modifier.fillMaxSize()
-                )
+            // Use AnimatedVisibility for smooth transitions (in and out)
+            AnimatedVisibility(
+                visible = connectingHost.value != null,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
+            ) {
+                connectingHost.value?.let { host ->
+                    ConnectingScreen(
+                        hostName = host,
+                        logs = connectionLogs.value,
+                        onCancel = { 
+                            connectingHost.value = null
+                            authRetryDeferred.value?.cancel() 
+                        },
+                        isAuthFailed = isAuthFailed.value,
+                        onRetryAuth = { newPassword ->
+                            authRetryDeferred.value?.complete(newPassword)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
@@ -306,15 +335,108 @@ fun SSHPeachesRoot(
     if (showQuickConnect.value) {
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
-            onConnectStart = { host ->
-                connectingHost.value = host
+            onConnect = { hostConn, password, authMethod ->
+                showQuickConnect.value = false
+                scope.launch { drawerState.close() }
+                connectingHost.value = hostConn.host
                 connectionLogs.value = emptyList()
-            },
-            onLogUpdate = { log ->
-                connectionLogs.value = connectionLogs.value + log
-            },
-            onFinished = {
-                connectingHost.value = null
+                
+                scope.launch(Dispatchers.IO) {
+                    Log.i(TAG, "SSH connect start host=${hostConn.host} port=${hostConn.port} user=${hostConn.username} auth=$authMethod")
+                    connectionLogs.value = listOf("ssh_socket_connect: Connecting to ${hostConn.host}:${hostConn.port}...")
+                    val t0 = SystemClock.elapsedRealtime()
+                    runCatching {
+                        val client = SshClientProvider.createClient(context, hostConn)
+                        connectionLogs.value = connectionLogs.value + "ssh_connect: Socket connecting, now waiting for callbacks"
+                        client.connect(hostConn.host, hostConn.port)
+                        connectionLogs.value = connectionLogs.value + "ssh_client_connection_callback: SSH transport established"
+                        connectionLogs.value = connectionLogs.value + "ssh_analyze_banner: Talking to OpenSSH client version: ${client.transport.clientVersion}"
+
+                        connectionLogs.value = connectionLogs.value + "ssh_analyze_banner: Talking to OpenSSH client version: ${client.transport.clientVersion}"
+
+                        var currentPassword = password
+                        var authenticated = false
+                        
+                        while(client.isConnected && !authenticated) {
+                            try {
+                                isAuthFailed.value = false
+                                when (authMethod) {
+                                    AuthMethod.PASSWORD -> {
+                                        connectionLogs.value = connectionLogs.value + "ssh_auth_password: Attempting password authentication for ${hostConn.username}"
+                                        client.authPassword(hostConn.username, currentPassword)
+                                    }
+                                    AuthMethod.IDENTITY -> {
+                                        connectionLogs.value = connectionLogs.value + "ssh_auth_publickey: Attempting public key authentication for ${hostConn.username}"
+                                        client.authPublickey(hostConn.username)
+                                    }
+                                    AuthMethod.PASSWORD_AND_IDENTITY -> {
+                                        connectionLogs.value = connectionLogs.value + "ssh_auth_methods: Attempting multi-factor authentication"
+                                        runCatching { 
+                                            connectionLogs.value = connectionLogs.value + "ssh_auth_publickey: Trying public key..."
+                                            client.authPublickey(hostConn.username) 
+                                        }
+                                        connectionLogs.value = connectionLogs.value + "ssh_auth_password: Trying password..."
+                                        client.authPassword(hostConn.username, currentPassword)
+                                    }
+                                }
+                                authenticated = true
+                                connectionLogs.value = connectionLogs.value + "ssh_connect_success: Authentication successful!"
+                            } catch (e: UserAuthException) {
+                                connectionLogs.value = connectionLogs.value + "ssh_auth_fail: Authentication failed."
+                                
+                                // Indicate UI failure and wait for new input
+                                isAuthFailed.value = true
+                                val deferred = CompletableDeferred<String>()
+                                authRetryDeferred.value = deferred
+                                
+                                try {
+                                    connectionLogs.value = connectionLogs.value + "ssh_auth_retry: Waiting for user input..."
+                                    currentPassword = deferred.await()
+                                    connectionLogs.value = connectionLogs.value + "ssh_auth_retry: Retrying with new password..."
+                                } catch (cancel: Exception) {
+                                    throw UserAuthException("User cancelled authentication retry")
+                                }
+                            }
+                        }
+
+                        if (authenticated) {
+                            val ms = SystemClock.elapsedRealtime() - t0
+                            Log.i(TAG, "SSH connect success host=${hostConn.host} ms=$ms")
+                            kotlinx.coroutines.delay(1500)
+                            client.disconnect()
+                        }
+                    }.onSuccess {
+                        connectionLogs.value = connectionLogs.value + "ssh_disconnect: Session finished."
+                    }.onFailure { e ->
+                        val ms = SystemClock.elapsedRealtime() - t0
+                        
+                        // Categorize error for better user feedback
+                        val errorMsg = when(e) {
+                            is UserAuthException -> "Authentication failed: Check username/password/key."
+                            is ConnectException -> "Connection refused: Server not listening on port ${hostConn.port}."
+                            is SocketTimeoutException -> "Connection timed out: Server unreachable."
+                            is TransportException -> {
+                                if (e.message?.contains("Host key verification failed") == true) {
+                                    "Security Alert: Host key verification failed! (MITM warning)"
+                                } else {
+                                    "Transport error: ${e.message}"
+                                }
+                            }
+                            else -> "Error: ${e.message ?: e.javaClass.simpleName}"
+                        }
+                        
+                        Log.e(TAG, "SSH connect fail host=${hostConn.host} ms=$ms err=${e.javaClass.simpleName} msg=$errorMsg", e)
+                        
+                        // For expected network/auth errors, maybe skip crash reporting or log as warning
+                        if (e !is UserAuthException && e !is ConnectException) {
+                            CrashLogger.logNonFatal("QuickConnect", e)
+                        }
+                        
+                        connectionLogs.value = connectionLogs.value + "ssh_error: $errorMsg"
+                        kotlinx.coroutines.delay(3000)
+                    }
+                    connectingHost.value = null
+                }
             }
         )
     }
@@ -328,9 +450,7 @@ fun SSHPeachesRoot(
 @Composable
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
-    onConnectStart: (String) -> Unit,
-    onLogUpdate: (String) -> Unit,
-    onFinished: () -> Unit
+    onConnect: (HostConnection, String, AuthMethod) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -401,69 +521,18 @@ private fun QuickConnectSheet(
                         status.value = "Host and username required"
                         return@Button
                     }
-                    onDismiss() // Close sheet to show connecting screen
-                    onConnectStart(hostValue)
-
-                    scope.launch(Dispatchers.IO) {
-                        isConnecting.value = true
-                        Log.i(TAG, "SSH connect start host=$hostValue port=$portValue user=$userValue auth=${auth.value}")
-                        onLogUpdate("ssh_socket_connect: Connecting to $hostValue:$portValue...")
-                        val t0 = SystemClock.elapsedRealtime()
-                        runCatching {
-                            val client = SshClientProvider.createClient(
-                                context,
-                                HostConnection(
-                                    id = "quick",
-                                    name = hostValue,
-                                    host = hostValue,
-                                    port = portValue,
-                                    username = userValue,
-                                    preferredAuth = AuthMethod.PASSWORD
-                                )
-                            )
-                            onLogUpdate("ssh_connect: Socket connecting, now waiting for callbacks")
-                            client.connect(hostValue, portValue)
-                            onLogUpdate("ssh_client_connection_callback: SSH transport established")
-                            onLogUpdate("ssh_analyze_banner: Talking to OpenSSH client version: ${client.transport.clientVersion}")
-
-                            when (auth.value) {
-                                AuthMethod.PASSWORD -> {
-                                    onLogUpdate("ssh_auth_password: Attempting password authentication for $userValue")
-                                    client.authPassword(userValue, password.value)
-                                }
-                                AuthMethod.IDENTITY -> {
-                                    onLogUpdate("ssh_auth_publickey: Attempting public key authentication for $userValue")
-                                    client.authPublickey(userValue)
-                                }
-                                AuthMethod.PASSWORD_AND_IDENTITY -> {
-                                    onLogUpdate("ssh_auth_methods: Attempting multi-factor authentication")
-                                    runCatching { 
-                                        onLogUpdate("ssh_auth_publickey: Trying public key...")
-                                        client.authPublickey(userValue) 
-                                    }
-                                    onLogUpdate("ssh_auth_password: Trying password...")
-                                    client.authPassword(userValue, password.value)
-                                }
-                            }
-                            onLogUpdate("ssh_connect_success: Authentication successful!")
-                            val ms = SystemClock.elapsedRealtime() - t0
-                            Log.i(TAG, "SSH connect success host=$hostValue ms=$ms")
-                            // In a real app, we'd navigate to the terminal here. 
-                            // For now, we'll just wait a bit so the user can see the success.
-                            kotlinx.coroutines.delay(1500)
-                            client.disconnect()
-                        }.onSuccess {
-                            onLogUpdate("ssh_disconnect: Session finished.")
-                        }.onFailure { e ->
-                            val ms = SystemClock.elapsedRealtime() - t0
-                            Log.e(TAG, "SSH connect fail host=$hostValue ms=$ms err=${e.javaClass.simpleName} msg=${e.message?.take(200)}", e)
-                            CrashLogger.logNonFatal("QuickConnect", e)
-                            onLogUpdate("ssh_error: Failed: ${e.message}")
-                            kotlinx.coroutines.delay(3000)
-                        }
-                        isConnecting.value = false
-                        onFinished()
-                    }
+                    onConnect(
+                        HostConnection(
+                            id = "quick",
+                            name = hostValue,
+                            host = hostValue,
+                            port = portValue,
+                            username = userValue,
+                            preferredAuth = AuthMethod.PASSWORD
+                        ),
+                        password.value,
+                        auth.value
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isConnecting.value
