@@ -125,7 +125,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Run shells in background")
                         Text(
                             "Keep SSH/Mosh sessions alive while app is backgrounded",
@@ -144,7 +144,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Biometric lock")
                         Text("Require fingerprint/face after inactivity", style = MaterialTheme.typography.bodySmall)
                     }
@@ -184,7 +184,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Host key prompts")
                         Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
                     }
@@ -200,7 +200,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Auto-start associated forwards")
                         Text("Start linked tunnels when connecting", style = MaterialTheme.typography.bodySmall)
                     }
@@ -216,7 +216,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Crash reports")
                         Text("Send anonymous crash details", style = MaterialTheme.typography.bodySmall)
                     }
@@ -227,7 +227,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Usage analytics")
                         Text("Help improve SSHPeaches by sharing usage stats", style = MaterialTheme.typography.bodySmall)
                     }
@@ -238,7 +238,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Session diagnostics")
                         Text("Capture anonymized session logs", style = MaterialTheme.typography.bodySmall)
                     }
@@ -249,7 +249,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Send usage reports (Advanced)")
                         Text("Periodically send diagnostics bundle", style = MaterialTheme.typography.bodySmall)
                     }
@@ -281,7 +281,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Include identities")
                             Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
                         }
@@ -292,7 +292,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Include settings")
                             Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
                         }
