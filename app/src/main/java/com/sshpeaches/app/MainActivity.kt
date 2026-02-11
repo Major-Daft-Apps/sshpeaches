@@ -32,8 +32,7 @@ class MainActivity : ComponentActivity() {
                     onIncludeIdentitiesToggle = viewModel::setIncludeIdentities,
                     onIncludeSettingsToggle = viewModel::setIncludeSettings,
                     onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
-                    onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
-                    onUsageReportsToggle = viewModel::setUsageReports
+                    onHostKeyPromptToggle = viewModel::setHostKeyPrompt
                 )
             }
         }

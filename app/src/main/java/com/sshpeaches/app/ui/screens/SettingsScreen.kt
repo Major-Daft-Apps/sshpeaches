@@ -56,8 +56,7 @@ fun SettingsScreen(
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     hostKeyPromptEnabled: Boolean,
     onHostKeyPromptToggle: (Boolean) -> Unit,
-    usageReportsEnabled: Boolean,
-    onUsageReportsToggle: (Boolean) -> Unit
+    onHostKeyPromptToggle: (Boolean) -> Unit
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
@@ -258,17 +257,6 @@ fun SettingsScreen(
                         Text("Capture anonymized session logs", style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = diagnosticsLoggingEnabled, onCheckedChange = onDiagnosticsToggle)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Send usage reports (Advanced)")
-                        Text("Periodically send diagnostics bundle", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = usageReportsEnabled, onCheckedChange = onUsageReportsToggle)
                 }
             }
         }

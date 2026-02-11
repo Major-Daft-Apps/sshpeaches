@@ -97,8 +97,7 @@ fun SSHPeachesRoot(
     onIncludeIdentitiesToggle: (Boolean) -> Unit,
     onIncludeSettingsToggle: (Boolean) -> Unit,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
-    onHostKeyPromptToggle: (Boolean) -> Unit,
-    onUsageReportsToggle: (Boolean) -> Unit
+    onHostKeyPromptToggle: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -278,9 +277,7 @@ fun SSHPeachesRoot(
                                 autoStartForwards = uiState.autoStartForwards,
                                 onAutoStartForwardsToggle = onAutoStartForwardsToggle,
                                 hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
-                                onHostKeyPromptToggle = onHostKeyPromptToggle,
-                                usageReportsEnabled = uiState.usageReportsEnabled,
-                                onUsageReportsToggle = onUsageReportsToggle
+                                onHostKeyPromptToggle = onHostKeyPromptToggle
                             )
                         }
                     }

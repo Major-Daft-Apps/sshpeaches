@@ -27,7 +27,6 @@ class AppViewModel(
     private val includeSettingsFlow = MutableStateFlow(true)
     private val autoStartForwardsFlow = MutableStateFlow(true)
     private val hostKeyPromptFlow = MutableStateFlow(true)
-    private val usageReportsFlow = MutableStateFlow(false)
 
     private val baseUiState = combine(
         repository.hosts,
@@ -68,11 +67,9 @@ class AppViewModel(
     )
 
     private data class SharePrefs(
-        val includeIds: Boolean,
         val includeSettings: Boolean,
         val autoStart: Boolean,
-        val hostKeyPrompt: Boolean,
-        val usage: Boolean
+        val hostKeyPrompt: Boolean
     )
 
     private val privacyPartialFlow = combine(
@@ -105,10 +102,9 @@ class AppViewModel(
         includeIdentitiesFlow,
         includeSettingsFlow,
         autoStartForwardsFlow,
-        hostKeyPromptFlow,
-        usageReportsFlow
-    ) { includeIds, includeSettings, autoStart, hostKeyPrompt, usage ->
-        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, usage)
+        hostKeyPromptFlow
+    ) { includeIds, includeSettings, autoStart, hostKeyPrompt ->
+        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt)
     }
 
     val uiState: StateFlow<AppUiState> = combine(
@@ -127,8 +123,7 @@ class AppViewModel(
             includeIdentitiesInQr = share.includeIds,
             includeSettingsInQr = share.includeSettings,
             autoStartForwards = share.autoStart,
-            hostKeyPromptEnabled = share.hostKeyPrompt,
-            usageReportsEnabled = share.usage
+            hostKeyPromptEnabled = share.hostKeyPrompt
         )
     }.stateIn(
         scope = viewModelScope,
@@ -182,10 +177,6 @@ class AppViewModel(
 
     fun setHostKeyPrompt(enabled: Boolean) {
         hostKeyPromptFlow.value = enabled
-    }
-
-    fun setUsageReports(enabled: Boolean) {
-        usageReportsFlow.value = enabled
     }
 
     companion object {

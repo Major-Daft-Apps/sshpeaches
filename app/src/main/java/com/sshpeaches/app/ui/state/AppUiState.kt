@@ -22,8 +22,7 @@ data class AppUiState(
     val includeIdentitiesInQr: Boolean = true,
     val includeSettingsInQr: Boolean = true,
     val autoStartForwards: Boolean = true,
-    val hostKeyPromptEnabled: Boolean = true,
-    val usageReportsEnabled: Boolean = false
+    val hostKeyPromptEnabled: Boolean = true
 )
 
 data class FavoritesSection(
