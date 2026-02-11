@@ -67,6 +67,7 @@ import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
 import com.sshpeaches.app.ui.screens.PortForwardScreen
 import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.sshpeaches.app.ui.screens.ConnectingScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
@@ -101,6 +102,8 @@ fun SSHPeachesRoot(
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val editMode = rememberSaveable { mutableStateOf(false) }
+    val connectingHost = remember { mutableStateOf<String?>(null) }
+    val connectionLogs = remember { mutableStateOf(listOf<String>()) }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.project_website)
     val backStackEntry = navController.currentBackStackEntryAsState().value
@@ -150,8 +153,9 @@ fun SSHPeachesRoot(
         },
         scrimColor = Color.Black.copy(alpha = 0.4f)
     ) {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            Scaffold(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Scaffold(
                 topBar = {
                     TopAppBar(
                         title = { Text(currentTitle) },
@@ -235,12 +239,31 @@ fun SSHPeachesRoot(
                     }
                 }
             }
+
+            // Connection Overlay
+            connectingHost.value?.let { host ->
+                ConnectingScreen(
+                    hostName = host,
+                    logs = connectionLogs.value,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 
     if (showQuickConnect.value) {
         QuickConnectSheet(
-            onDismiss = { showQuickConnect.value = false }
+            onDismiss = { showQuickConnect.value = false },
+            onConnectStart = { host ->
+                connectingHost.value = host
+                connectionLogs.value = emptyList()
+            },
+            onLogUpdate = { log ->
+                connectionLogs.value = connectionLogs.value + log
+            },
+            onFinished = {
+                connectingHost.value = null
+            }
         )
     }
 
@@ -251,7 +274,12 @@ fun SSHPeachesRoot(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickConnectSheet(onDismiss: () -> Unit) {
+private fun QuickConnectSheet(
+    onDismiss: () -> Unit,
+    onConnectStart: (String) -> Unit,
+    onLogUpdate: (String) -> Unit,
+    onFinished: () -> Unit
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         val context = LocalContext.current
         val host = remember { mutableStateOf("") }
@@ -316,9 +344,12 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                         status.value = "Host and username required"
                         return@Button
                     }
+                    onDismiss() // Close sheet to show connecting screen
+                    onConnectStart(hostValue)
+
                     scope.launch(Dispatchers.IO) {
                         isConnecting.value = true
-                        status.value = "Connecting..."
+                        onLogUpdate("ssh_socket_connect: Connecting to $hostValue:$portValue...")
                         runCatching {
                             val client = SshClientProvider.createClient(
                                 context,
@@ -331,22 +362,44 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                                     preferredAuth = AuthMethod.PASSWORD
                                 )
                             )
+                            onLogUpdate("ssh_connect: Socket connecting, now waiting for callbacks")
                             client.connect(hostValue, portValue)
+                            onLogUpdate("ssh_client_connection_callback: SSH server banner: ${client.transport.serverBanner}")
+                            
+                            onLogUpdate("ssh_analyze_banner: Talking to OpenSSH client version: ${client.transport.clientVersion}")
+                            
                             when (auth.value) {
-                                AuthMethod.PASSWORD -> client.authPassword(userValue, password.value)
-                                AuthMethod.IDENTITY -> client.authPublickey(userValue)
+                                AuthMethod.PASSWORD -> {
+                                    onLogUpdate("ssh_auth_password: Attempting password authentication for $userValue")
+                                    client.authPassword(userValue, password.value)
+                                }
+                                AuthMethod.IDENTITY -> {
+                                    onLogUpdate("ssh_auth_publickey: Attempting public key authentication for $userValue")
+                                    client.authPublickey(userValue)
+                                }
                                 AuthMethod.PASSWORD_AND_IDENTITY -> {
-                                    runCatching { client.authPublickey(userValue) }
+                                    onLogUpdate("ssh_auth_methods: Attempting multi-factor authentication")
+                                    runCatching { 
+                                        onLogUpdate("ssh_auth_publickey: Trying public key...")
+                                        client.authPublickey(userValue) 
+                                    }
+                                    onLogUpdate("ssh_auth_password: Trying password...")
                                     client.authPassword(userValue, password.value)
                                 }
                             }
+                            onLogUpdate("ssh_connect_success: Authentication successful!")
+                            // In a real app, we'd navigate to the terminal here. 
+                            // For now, we'll just wait a bit so the user can see the success.
+                            kotlinx.coroutines.delay(1500)
                             client.disconnect()
                         }.onSuccess {
-                            status.value = "Connected successfully"
+                            onLogUpdate("ssh_disconnect: Session finished.")
                         }.onFailure { e ->
-                            status.value = "Failed: ${e.message}"
+                            onLogUpdate("ssh_error: Failed: ${e.message}")
+                            kotlinx.coroutines.delay(3000)
                         }
                         isConnecting.value = false
+                        onFinished()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
