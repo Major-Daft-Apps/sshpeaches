@@ -82,7 +82,10 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
                 ExposedDropdownMenuBox(
@@ -117,7 +120,10 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
                 Row(
@@ -136,7 +142,10 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Security", style = MaterialTheme.typography.titleMedium)
                 Row(
@@ -192,7 +201,10 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
                 Row(
@@ -208,7 +220,10 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
                 Row(
@@ -257,13 +272,24 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Export hosts, identities, and settings via QR code.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Export hosts, identities, and settings via QR code.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 Button(onClick = { showTransferDialog.value = true }) {
                     Text("Export via QR")
                 }
