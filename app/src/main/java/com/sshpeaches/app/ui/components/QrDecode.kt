@@ -24,11 +24,12 @@ fun decodeHostFromQr(contents: String): HostConnection? = runCatching {
 
 fun decodeIdentityFromQr(contents: String): Identity? = runCatching {
     val json = JSONObject(String(Base64.decode(contents, Base64.NO_WRAP)))
+    val username = json.optString("user", "").takeIf { it.isNotBlank() }
     Identity(
         id = json.optString("id"),
         label = json.optString("label"),
         fingerprint = json.optString("fingerprint"),
-        username = json.optString("user", null),
+        username = username,
         createdEpochMillis = System.currentTimeMillis(),
         lastUsedEpochMillis = null
     )

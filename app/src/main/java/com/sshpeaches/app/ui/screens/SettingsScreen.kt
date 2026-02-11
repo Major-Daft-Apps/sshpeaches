@@ -30,6 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.ThemeMode
+import android.util.Log
+
+private const val TAG = "CW/SettingsScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,7 +276,10 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Button(
-                    onClick = { showTransferDialog.value = true },
+                    onClick = { 
+                        Log.i(TAG, "UI export_qr_click")
+                        showTransferDialog.value = true 
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Export via QR")
@@ -314,6 +320,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
+                    Log.i(TAG, "UI generate_qr_confirm includeIds=$includeIdentities includeSettings=$includeSettings")
                     // TODO: trigger QR generation flow
                     showTransferDialog.value = false
                 }) { Text("Generate QR") }

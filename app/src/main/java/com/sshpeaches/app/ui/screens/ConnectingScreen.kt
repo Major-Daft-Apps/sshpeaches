@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,6 +41,7 @@ import com.sshpeaches.app.R
 fun ConnectingScreen(
     hostName: String,
     logs: List<String>,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -47,12 +53,15 @@ fun ConnectingScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black), // Intense black background for terminal feel
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Spacer(modifier = Modifier.weight(0.2f))
 
         // Central Branding
@@ -117,10 +126,23 @@ fun ConnectingScreen(
                             fontFamily = FontFamily.Monospace,
                             color = Color(0xFFBDBDBD),
                             fontSize = 11.sp
-                        )
                     )
                 }
             }
+        }
+
+        // Top-right Close Button
+        IconButton(
+            onClick = onCancel,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Cancel Connection",
+                tint = Color.White
+            )
         }
     }
 }

@@ -176,18 +176,22 @@ class AppViewModel(
     }
 
     fun setIncludeIdentities(enabled: Boolean) {
+        Log.i(TAG, "PREF setIncludeIdentities enabled=$enabled")
         includeIdentitiesFlow.value = enabled
     }
 
     fun setIncludeSettings(enabled: Boolean) {
+        Log.i(TAG, "PREF setIncludeSettings enabled=$enabled")
         includeSettingsFlow.value = enabled
     }
 
     fun setAutoStartForwards(enabled: Boolean) {
+        Log.i(TAG, "PREF setAutoStartForwards enabled=$enabled")
         autoStartForwardsFlow.value = enabled
     }
 
     fun setHostKeyPrompt(enabled: Boolean) {
+        Log.i(TAG, "PREF setHostKeyPrompt enabled=$enabled")
         hostKeyPromptFlow.value = enabled
     }
 

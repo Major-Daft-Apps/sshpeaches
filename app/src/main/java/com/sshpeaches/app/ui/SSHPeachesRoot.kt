@@ -296,6 +296,7 @@ fun SSHPeachesRoot(
                 ConnectingScreen(
                     hostName = host,
                     logs = connectionLogs.value,
+                    onCancel = { connectingHost.value = null },
                     modifier = Modifier.fillMaxSize()
                 )
             }
