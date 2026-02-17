@@ -33,7 +33,10 @@ class MainActivity : ComponentActivity() {
                     onIncludeSettingsToggle = viewModel::setIncludeSettings,
                     onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
                     onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
-                    onUsageReportsToggle = viewModel::setUsageReports
+                    onUsageReportsToggle = viewModel::setUsageReports,
+                    onIdentityAdd = viewModel::addIdentity,
+                    onIdentityUpdate = viewModel::updateIdentity,
+                    onIdentityDelete = viewModel::deleteIdentity
                 )
             }
         }

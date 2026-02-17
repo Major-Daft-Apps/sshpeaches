@@ -3,6 +3,7 @@ package com.sshpeaches.app.ui.state
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.repository.AppRepository
 import com.sshpeaches.app.data.repository.InMemoryAppRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 class AppViewModel(
     private val repository: AppRepository = InMemoryAppRepository()
@@ -186,6 +189,41 @@ class AppViewModel(
 
     fun setUsageReports(enabled: Boolean) {
         usageReportsFlow.value = enabled
+    }
+
+    fun addIdentity(label: String, fingerprint: String, username: String?) {
+        if (fingerprint.isBlank()) return
+        val identity = Identity(
+            id = UUID.randomUUID().toString(),
+            label = label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
+            fingerprint = fingerprint.trim(),
+            username = username?.takeIf { it.isNotBlank() },
+            createdEpochMillis = System.currentTimeMillis(),
+            lastUsedEpochMillis = null,
+            favorite = false
+        )
+        viewModelScope.launch {
+            repository.addIdentity(identity)
+        }
+    }
+
+    fun updateIdentity(id: String, label: String, fingerprint: String, username: String?) {
+        val existing = uiState.value.identities.find { it.id == id } ?: return
+        val updated = existing.copy(
+            label = label.ifBlank { existing.label },
+            fingerprint = fingerprint.trim().ifBlank { existing.fingerprint },
+            username = username?.takeIf { it.isNotBlank() }
+        )
+        viewModelScope.launch {
+            repository.updateIdentity(updated)
+        }
+    }
+
+    fun deleteIdentity(id: String) {
+        val existing = uiState.value.identities.find { it.id == id } ?: return
+        viewModelScope.launch {
+            repository.deleteIdentity(existing)
+        }
     }
 
     companion object {

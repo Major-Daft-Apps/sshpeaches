@@ -15,4 +15,9 @@ interface AppRepository {
     suspend fun toggleFavorite(id: String)
     suspend fun addHost(host: HostConnection)
     suspend fun updateHost(host: HostConnection)
+    suspend fun deleteHost(host: HostConnection)
+
+    suspend fun addIdentity(identity: Identity)
+    suspend fun updateIdentity(identity: Identity)
+    suspend fun deleteIdentity(identity: Identity)
 }

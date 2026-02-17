@@ -93,7 +93,10 @@ fun SSHPeachesRoot(
     onIncludeSettingsToggle: (Boolean) -> Unit,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit,
-    onUsageReportsToggle: (Boolean) -> Unit
+    onUsageReportsToggle: (Boolean) -> Unit,
+    onIdentityAdd: (String, String, String?) -> Unit,
+    onIdentityUpdate: (String, String, String, String?) -> Unit,
+    onIdentityDelete: (String) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -194,7 +197,14 @@ fun SSHPeachesRoot(
                         )
                     }
                     composable(Routes.IDENTITIES) {
-                        IdentitiesScreen(items = uiState.identities, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                        IdentitiesScreen(
+                            items = uiState.identities,
+                            onAdd = onIdentityAdd,
+                            onUpdate = onIdentityUpdate,
+                            onDelete = onIdentityDelete,
+                            editMode = editMode.value,
+                            onImportFromQr = { /* TODO */ }
+                        )
                     }
                     composable(Routes.FORWARDS) {
                         PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })

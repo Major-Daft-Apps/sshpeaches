@@ -12,7 +12,6 @@ import com.sshpeaches.app.data.model.Snippet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import java.util.UUID
 
 class InMemoryAppRepository : AppRepository {
 
@@ -33,11 +32,27 @@ class InMemoryAppRepository : AppRepository {
     }
 
     override suspend fun addHost(host: HostConnection) {
-        hostFlow.update { it + host.copy(id = UUID.randomUUID().toString()) }
+        hostFlow.update { it + host }
     }
 
     override suspend fun updateHost(host: HostConnection) {
         hostFlow.update { list -> list.map { if (it.id == host.id) host else it } }
+    }
+
+    override suspend fun deleteHost(host: HostConnection) {
+        hostFlow.update { list -> list.filterNot { it.id == host.id } }
+    }
+
+    override suspend fun addIdentity(identity: Identity) {
+        identityFlow.update { it + identity }
+    }
+
+    override suspend fun updateIdentity(identity: Identity) {
+        identityFlow.update { list -> list.map { if (it.id == identity.id) identity else it } }
+    }
+
+    override suspend fun deleteIdentity(identity: Identity) {
+        identityFlow.update { list -> list.filterNot { it.id == identity.id } }
     }
 
     companion object {
