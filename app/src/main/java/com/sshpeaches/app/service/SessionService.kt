@@ -10,6 +10,9 @@ import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.sshpeaches.app.R
+import com.sshpeaches.app.data.ssh.SshClientProvider
+import com.sshpeaches.app.data.model.AuthMethod
+import kotlinx.coroutines.CancellationException
 import com.sshpeaches.app.data.model.HostConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,10 +47,26 @@ class SessionService : Service() {
     }
 
     fun startSession(host: HostConnection) {
-        val existing = activeSessions[host.id]
-        if (existing != null) return
+        if (activeSessions.containsKey(host.id)) return
         val job = serviceScope.launch {
-            // TODO hook into SshClientProvider, connect and stream session
+            runCatching {
+                val client = SshClientProvider.createClient(this@SessionService, host)
+                client.connect(host.host, host.port)
+                when (host.preferredAuth) {
+                    AuthMethod.PASSWORD -> client.authPassword(host.username, "")
+                    AuthMethod.IDENTITY -> client.authPublickey(host.username)
+                    AuthMethod.PASSWORD_AND_IDENTITY -> {
+                        runCatching { client.authPublickey(host.username) }
+                        client.authPassword(host.username, "")
+                    }
+                }
+                // TODO: keep shell/channel open, stream data, manage port forwards
+                client.disconnect()
+            }.onFailure { e ->
+                if (e !is CancellationException) {
+                    // log/notify failure
+                }
+            }
         }
         activeSessions[host.id] = job
         updateNotification(host.name)
