@@ -2,6 +2,8 @@ package com.sshpeaches.app.ui.state
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.repository.AppRepository
@@ -189,6 +191,67 @@ class AppViewModel(
 
     fun setUsageReports(enabled: Boolean) {
         usageReportsFlow.value = enabled
+    }
+
+    fun addHost(
+        name: String,
+        host: String,
+        port: Int,
+        username: String,
+        auth: AuthMethod,
+        group: String?,
+        notes: String,
+        defaultMode: ConnectionMode
+    ) {
+        if (name.isBlank() || host.isBlank() || username.isBlank()) return
+        val entry = HostConnection(
+            id = UUID.randomUUID().toString(),
+            name = name.trim(),
+            host = host.trim(),
+            port = port,
+            username = username.trim(),
+            preferredAuth = auth,
+            group = group?.takeIf { it.isNotBlank() },
+            notes = notes,
+            defaultMode = defaultMode
+        )
+        viewModelScope.launch {
+            repository.addHost(entry)
+        }
+    }
+
+    fun updateHost(
+        id: String,
+        name: String,
+        host: String,
+        port: Int,
+        username: String,
+        auth: AuthMethod,
+        group: String?,
+        notes: String,
+        defaultMode: ConnectionMode
+    ) {
+        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        val updated = existing.copy(
+            name = name.ifBlank { existing.name },
+            host = host.ifBlank { existing.host },
+            port = port,
+            username = username.ifBlank { existing.username },
+            preferredAuth = auth,
+            group = group?.takeIf { it.isNotBlank() },
+            notes = notes,
+            defaultMode = defaultMode
+        )
+        viewModelScope.launch {
+            repository.updateHost(updated)
+        }
+    }
+
+    fun deleteHost(id: String) {
+        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        viewModelScope.launch {
+            repository.deleteHost(existing)
+        }
     }
 
     fun addIdentity(label: String, fingerprint: String, username: String?) {

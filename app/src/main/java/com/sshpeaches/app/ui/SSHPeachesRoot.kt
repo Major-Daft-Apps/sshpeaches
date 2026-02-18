@@ -56,6 +56,10 @@ import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.ConnectionMode
+import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.navigation.Routes
@@ -71,11 +75,7 @@ import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
-import com.sshpeaches.app.ui.theme.CarbonBlack
 import com.sshpeaches.app.R
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.ssh.SshClientProvider
-import com.sshpeaches.app.data.model.AuthMethod
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +94,9 @@ fun SSHPeachesRoot(
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit,
     onUsageReportsToggle: (Boolean) -> Unit,
+    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
+    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
+    onHostDelete: (String) -> Unit,
     onIdentityAdd: (String, String, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
     onIdentityDelete: (String) -> Unit
@@ -193,7 +196,10 @@ fun SSHPeachesRoot(
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
                             editMode = editMode.value,
-                            onImportFromQr = { /* TODO: implement QR decode + save host */ }
+                            onImportFromQr = { /* TODO: implement QR decode + save host */ },
+                            onAdd = onHostAdd,
+                            onUpdate = onHostUpdate,
+                            onDeleteHost = onHostDelete
                         )
                     }
                     composable(Routes.IDENTITIES) {

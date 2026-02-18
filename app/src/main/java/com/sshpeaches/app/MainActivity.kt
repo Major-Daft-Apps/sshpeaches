@@ -34,6 +34,9 @@ class MainActivity : ComponentActivity() {
                     onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
                     onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
                     onUsageReportsToggle = viewModel::setUsageReports,
+                    onHostAdd = viewModel::addHost,
+                    onHostUpdate = viewModel::updateHost,
+                    onHostDelete = viewModel::deleteHost,
                     onIdentityAdd = viewModel::addIdentity,
                     onIdentityUpdate = viewModel::updateIdentity,
                     onIdentityDelete = viewModel::deleteIdentity
