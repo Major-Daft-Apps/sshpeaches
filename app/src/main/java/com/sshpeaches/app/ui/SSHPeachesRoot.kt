@@ -58,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
+import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.ui.components.AppDrawer
@@ -97,6 +98,9 @@ fun SSHPeachesRoot(
     onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
     onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
     onHostDelete: (String) -> Unit,
+    onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    onPortForwardDelete: (String) -> Unit,
     onIdentityAdd: (String, String, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
     onIdentityDelete: (String) -> Unit
@@ -213,7 +217,15 @@ fun SSHPeachesRoot(
                         )
                     }
                     composable(Routes.FORWARDS) {
-                        PortForwardScreen(items = uiState.portForwards, hosts = uiState.hosts, editMode = editMode.value, onImportFromQr = { /* TODO */ })
+                        PortForwardScreen(
+                            items = uiState.portForwards,
+                            hosts = uiState.hosts,
+                            editMode = editMode.value,
+                            onAdd = onPortForwardAdd,
+                            onUpdate = onPortForwardUpdate,
+                            onDelete = onPortForwardDelete,
+                            onImportFromQr = { /* TODO */ }
+                        )
                     }
                     composable(Routes.SNIPPETS) {
                         SnippetManagerScreen(snippets = uiState.snippets)

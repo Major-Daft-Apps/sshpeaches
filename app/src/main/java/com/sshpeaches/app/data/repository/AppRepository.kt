@@ -20,4 +20,8 @@ interface AppRepository {
     suspend fun addIdentity(identity: Identity)
     suspend fun updateIdentity(identity: Identity)
     suspend fun deleteIdentity(identity: Identity)
+
+    suspend fun addPortForward(forward: PortForward)
+    suspend fun updatePortForward(forward: PortForward)
+    suspend fun deletePortForward(forward: PortForward)
 }

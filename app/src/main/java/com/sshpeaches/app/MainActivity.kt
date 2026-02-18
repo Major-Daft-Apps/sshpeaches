@@ -37,6 +37,9 @@ class MainActivity : ComponentActivity() {
                     onHostAdd = viewModel::addHost,
                     onHostUpdate = viewModel::updateHost,
                     onHostDelete = viewModel::deleteHost,
+                    onPortForwardAdd = viewModel::addPortForward,
+                    onPortForwardUpdate = viewModel::updatePortForward,
+                    onPortForwardDelete = viewModel::deletePortForward,
                     onIdentityAdd = viewModel::addIdentity,
                     onIdentityUpdate = viewModel::updateIdentity,
                     onIdentityDelete = viewModel::deleteIdentity

@@ -6,6 +6,8 @@ import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.Identity
+import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.repository.AppRepository
 import com.sshpeaches.app.data.repository.InMemoryAppRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -251,6 +253,68 @@ class AppViewModel(
         val existing = uiState.value.hosts.find { it.id == id } ?: return
         viewModelScope.launch {
             repository.deleteHost(existing)
+        }
+    }
+
+    fun addPortForward(
+        label: String,
+        type: PortForwardType,
+        sourceHost: String,
+        sourcePort: Int,
+        destHost: String,
+        destPort: Int,
+        enabled: Boolean,
+        associatedHosts: List<String>
+    ) {
+        if (label.isBlank()) return
+        val forward = PortForward(
+            id = UUID.randomUUID().toString(),
+            label = label.trim(),
+            type = type,
+            sourceHost = sourceHost.ifBlank { "127.0.0.1" },
+            sourcePort = sourcePort,
+            destinationHost = destHost,
+            destinationPort = destPort,
+            associatedHosts = associatedHosts,
+            favorite = false,
+            enabled = enabled
+        )
+        viewModelScope.launch {
+            repository.addPortForward(forward)
+        }
+    }
+
+    fun updatePortForward(
+        id: String,
+        label: String,
+        type: PortForwardType,
+        sourceHost: String,
+        sourcePort: Int,
+        destHost: String,
+        destPort: Int,
+        enabled: Boolean,
+        associatedHosts: List<String>
+    ) {
+        val existing = uiState.value.portForwards.find { it.id == id } ?: return
+        val updated = existing.copy(
+            label = label.ifBlank { existing.label },
+            type = type,
+            sourceHost = sourceHost.ifBlank { existing.sourceHost },
+            sourcePort = sourcePort,
+            destinationHost = destHost,
+            destinationPort = destPort,
+            enabled = enabled,
+            associatedHosts = associatedHosts
+        )
+        viewModelScope.launch {
+            repository.updatePortForward(updated)
+        }
+    }
+
+    fun deletePortForward(id: String) {
+        val existing = uiState.value.portForwards.find { it.id == id } ?: return
+        viewModelScope.launch {
+            repository.deletePortForward(existing)
         }
     }
 
