@@ -51,7 +51,11 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 
 @Composable
-fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
+fun HostCard(
+    host: HostConnection,
+    modifier: Modifier = Modifier,
+    onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> }
+) {
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
     val showQr = remember { mutableStateOf(false) }
@@ -92,9 +96,21 @@ fun HostCard(host: HostConnection, modifier: Modifier = Modifier) {
                 }
             }
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                HostActionButton(label = "SSH", selected = host.defaultMode == ConnectionMode.SSH)
-                HostActionButton(label = "SFTP", selected = host.defaultMode == ConnectionMode.SFTP)
-                HostActionButton(label = "SCP", selected = host.defaultMode == ConnectionMode.SCP)
+                HostActionButton(
+                    label = "SSH",
+                    selected = host.defaultMode == ConnectionMode.SSH,
+                    onClick = { onAction(host, ConnectionMode.SSH) }
+                )
+                HostActionButton(
+                    label = "SFTP",
+                    selected = host.defaultMode == ConnectionMode.SFTP,
+                    onClick = { onAction(host, ConnectionMode.SFTP) }
+                )
+                HostActionButton(
+                    label = "SCP",
+                    selected = host.defaultMode == ConnectionMode.SCP,
+                    onClick = { onAction(host, ConnectionMode.SCP) }
+                )
                 Icon(
                     Icons.Default.Info,
                     contentDescription = "Info",
@@ -181,8 +197,8 @@ private fun generateQr(host: HostConnection): Bitmap? {
 }
 
 @Composable
-private fun HostActionButton(label: String, selected: Boolean) {
-    TextButton(onClick = { /* TODO */ }) {
+private fun HostActionButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }

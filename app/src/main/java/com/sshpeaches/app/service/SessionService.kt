@@ -3,6 +3,7 @@ package com.sshpeaches.app.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -10,10 +11,10 @@ import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.sshpeaches.app.R
-import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.model.AuthMethod
-import kotlinx.coroutines.CancellationException
 import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.data.ssh.SshClientProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,8 +35,15 @@ class SessionService : Service() {
         createChannel()
         startForeground(
             NOTIFICATION_ID,
-            buildNotification("Idle", "No active sessions")
+            buildNotification("SSHPeaches Sessions", "No active sessions")
         )
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_STOP -> intent.getStringExtra(EXTRA_HOST_ID)?.let { stopSession(it) }
+        }
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -69,23 +77,52 @@ class SessionService : Service() {
             }
         }
         activeSessions[host.id] = job
-        updateNotification(host.name)
+        showHostNotification(host)
+        updateSummaryNotification()
     }
 
     fun stopSession(hostId: String) {
         activeSessions.remove(hostId)?.cancel()
-        updateNotification()
+        cancelHostNotification(hostId)
+        updateSummaryNotification()
     }
 
-    private fun updateNotification(activeHostName: String? = null) {
-        val text = when {
-            activeHostName != null -> "Connected to $activeHostName"
-            activeSessions.isNotEmpty() -> "Connected to ${activeSessions.size} hosts"
-            else -> "No active sessions"
+    private fun updateSummaryNotification() {
+        val summary = when {
+            activeSessions.isEmpty() -> "No active sessions"
+            activeSessions.size == 1 -> "Connected to 1 host"
+            else -> "Connected to ${activeSessions.size} hosts"
         }
-        val notif = buildNotification("SSHPeaches", text)
+        val notif = buildNotification("SSHPeaches Sessions", summary)
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIFICATION_ID, notif)
+    }
+
+    private fun showHostNotification(host: HostConnection) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val stopIntent = Intent(this, SessionService::class.java).apply {
+            action = ACTION_STOP
+            putExtra(EXTRA_HOST_ID, host.id)
+        }
+        val pendingStop = PendingIntent.getService(
+            this,
+            host.id.hashCode(),
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(host.name)
+            .setContentText("Connected to ${host.host}:${host.port}")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .addAction(R.drawable.ic_launcher_foreground, "Disconnect", pendingStop)
+            .build()
+        nm.notify(host.id.hashCode(), notif)
+    }
+
+    private fun cancelHostNotification(hostId: String) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(hostId.hashCode())
     }
 
     private fun buildNotification(title: String, text: String): Notification =
@@ -113,5 +150,7 @@ class SessionService : Service() {
     companion object {
         private const val CHANNEL_ID = "sessions"
         private const val NOTIFICATION_ID = 42
+        private const val ACTION_STOP = "com.sshpeaches.app.service.ACTION_STOP"
+        private const val EXTRA_HOST_ID = "extra_host_id"
     }
 }

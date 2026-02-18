@@ -10,8 +10,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.service.SessionService
 import com.sshpeaches.app.ui.SSHPeachesRoot
 import com.sshpeaches.app.ui.state.AppViewModel
@@ -19,17 +22,17 @@ import com.sshpeaches.app.ui.theme.SSHPeachesTheme
 
 class MainActivity : ComponentActivity() {
 
-    private var sessionService: SessionService? = null
+    private val sessionServiceState = mutableStateOf<SessionService?>(null)
     private var serviceBound = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            sessionService = (binder as? SessionService.SessionBinder)?.getService()
+            sessionServiceState.value = (binder as? SessionService.SessionBinder)?.getService()
             serviceBound = true
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            sessionService = null
+            sessionServiceState.value = null
             serviceBound = false
         }
     }
@@ -43,6 +46,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: AppViewModel = viewModel()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val sessionService = sessionServiceState.value
+            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode) -> Unit = remember(sessionService) {
+                { host: HostConnection, _: com.sshpeaches.app.data.model.ConnectionMode ->
+                    sessionService?.startSession(host)
+                }
+            }
+            val stopSession: (String) -> Unit = remember(sessionService) {
+                { id: String -> sessionService?.stopSession(id) }
+            }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
                 SSHPeachesRoot(
                     uiState = uiState,
@@ -65,6 +77,8 @@ class MainActivity : ComponentActivity() {
                     onPortForwardAdd = viewModel::addPortForward,
                     onPortForwardUpdate = viewModel::updatePortForward,
                     onPortForwardDelete = viewModel::deletePortForward,
+                    onStartSession = startSession,
+                    onStopSession = stopSession,
                     onIdentityAdd = viewModel::addIdentity,
                     onIdentityUpdate = viewModel::updateIdentity,
                     onIdentityDelete = viewModel::deleteIdentity

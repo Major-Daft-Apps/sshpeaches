@@ -101,6 +101,8 @@ fun SSHPeachesRoot(
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
+    onStartSession: (HostConnection, ConnectionMode) -> Unit,
+    onStopSession: (String) -> Unit,
     onIdentityAdd: (String, String, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
     onIdentityDelete: (String) -> Unit
@@ -203,7 +205,9 @@ fun SSHPeachesRoot(
                             onImportFromQr = { /* TODO: implement QR decode + save host */ },
                             onAdd = onHostAdd,
                             onUpdate = onHostUpdate,
-                            onDeleteHost = onHostDelete
+                            onDeleteHost = onHostDelete,
+                            onStartSession = onStartSession,
+                            onStopSession = onStopSession
                         )
                     }
                     composable(Routes.IDENTITIES) {

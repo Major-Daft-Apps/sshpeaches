@@ -47,7 +47,9 @@ fun HostsScreen(
     onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onImportFromQr: () -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit = { _, _, _, _, _, _, _, _, _ -> }
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    onStartSession: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    onStopSession: (String) -> Unit = {}
 ) {
     val search = remember { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
@@ -136,7 +138,7 @@ fun HostsScreen(
             }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HostCard(host = host)
+                    HostCard(host = host, onAction = onStartSession)
                     if (editMode) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             TextButton(onClick = { openDialog(host) }) { Text("Edit") }
