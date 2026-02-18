@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import kotlinx.coroutines.CancellationException
@@ -54,11 +55,15 @@ class SessionService : Service() {
         activeSessions.clear()
     }
 
-    fun startSession(host: HostConnection) {
+    fun startSession(host: HostConnection, mode: ConnectionMode) {
         if (activeSessions.containsKey(host.id)) return
         val job = serviceScope.launch {
             runCatching {
-                val client = SshClientProvider.createClient(this@SessionService, host)
+                val client = SshClientProvider.createClient(
+                    this@SessionService,
+                    host,
+                    SessionLoggerFactory(host.id)
+                )
                 client.connect(host.host, host.port)
                 when (host.preferredAuth) {
                     AuthMethod.PASSWORD -> client.authPassword(host.username, "")
@@ -68,7 +73,7 @@ class SessionService : Service() {
                         client.authPassword(host.username, "")
                     }
                 }
-                // TODO: keep shell/channel open, stream data, manage port forwards
+                // TODO: keep shell/channel open, stream data, manage port forwards based on mode
                 client.disconnect()
             }.onFailure { e ->
                 if (e !is CancellationException) {

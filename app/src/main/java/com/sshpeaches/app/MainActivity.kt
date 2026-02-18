@@ -48,8 +48,8 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
             val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode) -> Unit = remember(sessionService) {
-                { host: HostConnection, _: com.sshpeaches.app.data.model.ConnectionMode ->
-                    sessionService?.startSession(host)
+                { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode ->
+                    sessionService?.startSession(host, mode)
                 }
             }
             val stopSession: (String) -> Unit = remember(sessionService) {

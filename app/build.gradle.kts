@@ -74,6 +74,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("org.slf4j:slf4j-api:1.7.36")
     implementation("io.coil-kt:coil-compose:2.4.0")
     implementation("io.coil-kt:coil-svg:2.4.0")
     implementation("com.hierynomus:sshj:0.37.0")

@@ -3,6 +3,8 @@ package com.sshpeaches.app.data.ssh
 import android.content.Context
 import java.io.File
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.DefaultConfig
+import net.schmizz.sshj.common.LoggerFactory
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import com.sshpeaches.app.data.model.HostConnection
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
@@ -17,10 +19,16 @@ object SshClientProvider {
      * Create a configured SSHClient for the given host.
      * Does not connect; caller must invoke connect() and auth.
      */
-    fun createClient(context: Context, host: HostConnection): SSHClient {
+    fun createClient(
+        context: Context,
+        host: HostConnection,
+        loggerFactory: LoggerFactory? = null
+    ): SSHClient {
+        val config = DefaultConfig()
+        loggerFactory?.let { config.setLoggerFactory(it) }
         val knownHostsFile = File(context.filesDir, "known_hosts")
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
-        return SSHClient().apply {
+        return SSHClient(config).apply {
             addHostKeyVerifier(OpenSSHKnownHosts(knownHostsFile))
             connectTimeout = 10_000
             timeout = 20_000
