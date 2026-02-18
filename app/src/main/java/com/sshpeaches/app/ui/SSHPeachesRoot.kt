@@ -2,6 +2,7 @@ package com.sshpeaches.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +33,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,6 +49,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,6 +66,7 @@ import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
+import com.sshpeaches.app.ui.components.LockScreenOverlay
 import com.sshpeaches.app.ui.navigation.Routes
 import com.sshpeaches.app.ui.navigation.drawerDestinations
 import com.sshpeaches.app.ui.screens.FavoritesScreen
@@ -82,6 +86,7 @@ import com.sshpeaches.app.R
 @Composable
 fun SSHPeachesRoot(
     uiState: AppUiState,
+    biometricAvailable: Boolean,
     onSortModeChange: (SortMode) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onBackgroundModeChange: (Boolean) -> Unit,
@@ -95,17 +100,25 @@ fun SSHPeachesRoot(
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit,
     onUsageReportsToggle: (Boolean) -> Unit,
-    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
-    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode) -> Unit,
+    onSetPin: (String) -> Unit,
+    onLockApp: () -> Unit,
+    onUnlockWithPin: (String) -> Boolean,
+    onBiometricUnlock: () -> Unit,
+    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?, String?) -> Unit,
+    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?) -> Unit,
     onHostDelete: (String) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
     onStartSession: (HostConnection, ConnectionMode) -> Unit,
     onStopSession: (String) -> Unit,
-    onIdentityAdd: (String, String, String?) -> Unit,
+    onIdentityAdd: (String, String, String?, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
-    onIdentityDelete: (String) -> Unit
+    onIdentityDelete: (String) -> Unit,
+    onImportIdentityKey: (String, String, String) -> Boolean,
+    onImportIdentityKeyPlain: (String, String) -> Boolean,
+    onKeyboardSlotChange: (Int, String) -> Unit,
+    onKeyboardReset: () -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -113,6 +126,7 @@ fun SSHPeachesRoot(
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val editMode = rememberSaveable { mutableStateOf(false) }
+    val biometricPromptLaunched = remember { mutableStateOf(false) }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.project_website)
     val backStackEntry = navController.currentBackStackEntryAsState().value
@@ -128,80 +142,104 @@ fun SSHPeachesRoot(
         else -> "SSHPeaches"
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerContentColor = MaterialTheme.colorScheme.onSurface,
-                drawerTonalElevation = 0.dp
-            ) {
-                AppDrawer(
-                    destinations = drawerDestinations,
-                    currentRoute = currentRoute,
-                    onDestinationSelected = { destination ->
-                        scope.launch { drawerState.close() }
-                        when (destination.route) {
-                            Routes.HELP -> {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
-                                context.startActivity(intent)
-                            }
-                            Routes.ABOUT -> showAbout.value = true
-                            else -> {
-                                if (destination.route != currentRoute) {
-                                    navController.navigate(destination.route) {
-                                        popUpTo(Routes.FAVORITES)
+    LaunchedEffect(uiState.isLocked) {
+        if (uiState.isLocked) {
+            showQuickConnect.value = false
+            showAbout.value = false
+        } else {
+            biometricPromptLaunched.value = false
+        }
+    }
+
+    LaunchedEffect(uiState.isLocked, uiState.biometricLockEnabled, biometricAvailable) {
+        if (
+            uiState.isLocked &&
+            uiState.biometricLockEnabled &&
+            biometricAvailable &&
+            !biometricPromptLaunched.value
+        ) {
+            biometricPromptLaunched.value = true
+            onBiometricUnlock()
+        }
+    }
+
+    Box {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    drawerContentColor = MaterialTheme.colorScheme.onSurface,
+                    drawerTonalElevation = 0.dp
+                ) {
+                    AppDrawer(
+                        destinations = drawerDestinations,
+                        currentRoute = currentRoute,
+                        onDestinationSelected = { destination ->
+                            scope.launch { drawerState.close() }
+                            when (destination.route) {
+                                Routes.HELP -> {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
+                                    context.startActivity(intent)
+                                }
+                                Routes.ABOUT -> showAbout.value = true
+                                else -> {
+                                    if (destination.route != currentRoute) {
+                                        navController.navigate(destination.route) {
+                                            popUpTo(Routes.FAVORITES)
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    onQuickConnect = { showQuickConnect.value = true }
-                )
-            }
-        },
-        scrimColor = Color.Black.copy(alpha = 0.4f)
-    ) {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(currentTitle) },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu")
-                            }
                         },
-                        actions = {
-                            AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
-                                IconButton(onClick = { editMode.value = !editMode.value }) {
-                                    Icon(
-                                        imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                        contentDescription = if (editing) "Done editing" else "Edit"
-                                    )
-                                }
-                            }
-                        }
+                        onQuickConnect = { showQuickConnect.value = true }
                     )
                 }
-            ) { padding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Routes.FAVORITES,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(padding)
-                ) {
-                    composable(Routes.FAVORITES) {
-                        FavoritesScreen(section = uiState.favorites)
+            },
+            scrimColor = Color.Black.copy(alpha = 0.4f)
+        ) {
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(currentTitle) },
+                            navigationIcon = {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                }
+                            },
+                            actions = {
+                                AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                    IconButton(onClick = { editMode.value = !editMode.value }) {
+                                        Icon(
+                                            imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                            contentDescription = if (editing) "Done editing" else "Edit"
+                                        )
+                                    }
+                                }
+                            }
+                        )
                     }
-                    composable(Routes.HOSTS) {
+                ) { padding ->
+                    NavHost(
+                        navController = navController,
+                        startDestination = Routes.FAVORITES,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(padding)
+                    ) {
+                        composable(Routes.FAVORITES) {
+                            FavoritesScreen(section = uiState.favorites)
+                        }
+                        composable(Routes.HOSTS) {
                         HostsScreen(
                             hosts = uiState.hosts,
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
                             editMode = editMode.value,
+                            pinConfigured = uiState.pinConfigured,
+                            canStoreCredentials = uiState.pinConfigured && !uiState.isLocked,
                             onImportFromQr = { /* TODO: implement QR decode + save host */ },
                             onAdd = onHostAdd,
                             onUpdate = onHostUpdate,
@@ -213,77 +251,105 @@ fun SSHPeachesRoot(
                     composable(Routes.IDENTITIES) {
                         IdentitiesScreen(
                             items = uiState.identities,
+                            pinConfigured = uiState.pinConfigured,
+                            isLocked = uiState.isLocked,
                             onAdd = onIdentityAdd,
                             onUpdate = onIdentityUpdate,
                             onDelete = onIdentityDelete,
+                            onImportIdentityKey = onImportIdentityKey,
+                            onImportIdentityKeyPlain = onImportIdentityKeyPlain,
                             editMode = editMode.value,
                             onImportFromQr = { /* TODO */ }
                         )
                     }
-                    composable(Routes.FORWARDS) {
-                        PortForwardScreen(
-                            items = uiState.portForwards,
-                            hosts = uiState.hosts,
-                            editMode = editMode.value,
-                            onAdd = onPortForwardAdd,
-                            onUpdate = onPortForwardUpdate,
-                            onDelete = onPortForwardDelete,
-                            onImportFromQr = { /* TODO */ }
-                        )
-                    }
-                    composable(Routes.SNIPPETS) {
-                        SnippetManagerScreen(snippets = uiState.snippets)
-                    }
+                        composable(Routes.FORWARDS) {
+                            PortForwardScreen(
+                                items = uiState.portForwards,
+                                hosts = uiState.hosts,
+                                editMode = editMode.value,
+                                onAdd = onPortForwardAdd,
+                                onUpdate = onPortForwardUpdate,
+                                onDelete = onPortForwardDelete,
+                                onImportFromQr = { /* TODO */ }
+                            )
+                        }
+                        composable(Routes.SNIPPETS) {
+                            SnippetManagerScreen(snippets = uiState.snippets)
+                        }
                     composable(Routes.KEYBOARD) {
-                        KeyboardEditorScreen()
-                    }
-                    composable(Routes.SETTINGS) {
-                        SettingsScreen(
-                            currentTheme = uiState.themeMode,
-                            onThemeChange = onThemeModeChange,
-                            allowBackgroundSessions = uiState.allowBackgroundSessions,
-                            onBackgroundToggle = onBackgroundModeChange,
-                            biometricEnabled = uiState.biometricLockEnabled,
-                            onBiometricToggle = onBiometricToggle,
-                            lockTimeout = uiState.lockTimeout,
-                            onLockTimeoutChange = onLockTimeoutChange,
-                            crashReportsEnabled = uiState.crashReportsEnabled,
-                            onCrashReportsToggle = onCrashReportsToggle,
-                            analyticsEnabled = uiState.analyticsEnabled,
-                            onAnalyticsToggle = onAnalyticsToggle,
-                            diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
-                            onDiagnosticsToggle = onDiagnosticsToggle,
-                            includeIdentities = uiState.includeIdentitiesInQr,
-                            onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
-                            includeSettings = uiState.includeSettingsInQr,
-                            onIncludeSettingsToggle = onIncludeSettingsToggle,
-                            autoStartForwards = uiState.autoStartForwards,
-                            onAutoStartForwardsToggle = onAutoStartForwardsToggle,
-                            hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
-                            onHostKeyPromptToggle = onHostKeyPromptToggle,
-                            usageReportsEnabled = uiState.usageReportsEnabled,
-                            onUsageReportsToggle = onUsageReportsToggle
+                        KeyboardEditorScreen(
+                            slots = uiState.keyboardSlots,
+                            onSlotChange = onKeyboardSlotChange,
+                            onReset = onKeyboardReset
                         )
+                    }
+                        composable(Routes.SETTINGS) {
+                            SettingsScreen(
+                                currentTheme = uiState.themeMode,
+                                onThemeChange = onThemeModeChange,
+                                allowBackgroundSessions = uiState.allowBackgroundSessions,
+                                onBackgroundToggle = onBackgroundModeChange,
+                                biometricEnabled = uiState.biometricLockEnabled,
+                                onBiometricToggle = onBiometricToggle,
+                                lockTimeout = uiState.lockTimeout,
+                                onLockTimeoutChange = onLockTimeoutChange,
+                                crashReportsEnabled = uiState.crashReportsEnabled,
+                                onCrashReportsToggle = onCrashReportsToggle,
+                                analyticsEnabled = uiState.analyticsEnabled,
+                                onAnalyticsToggle = onAnalyticsToggle,
+                                diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
+                                onDiagnosticsToggle = onDiagnosticsToggle,
+                                includeIdentities = uiState.includeIdentitiesInQr,
+                                onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
+                                includeSettings = uiState.includeSettingsInQr,
+                                onIncludeSettingsToggle = onIncludeSettingsToggle,
+                                autoStartForwards = uiState.autoStartForwards,
+                                onAutoStartForwardsToggle = onAutoStartForwardsToggle,
+                                hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
+                                onHostKeyPromptToggle = onHostKeyPromptToggle,
+                                usageReportsEnabled = uiState.usageReportsEnabled,
+                                onUsageReportsToggle = onUsageReportsToggle,
+                                pinConfigured = uiState.pinConfigured,
+                                isLocked = uiState.isLocked,
+                                biometricAvailable = biometricAvailable,
+                                onSetPin = onSetPin,
+                                onLockApp = onLockApp,
+                                onUnlockWithPin = onUnlockWithPin
+                            )
+                        }
                     }
                 }
             }
         }
+        if (uiState.isLocked) {
+            LockScreenOverlay(
+                biometricEnabled = uiState.biometricLockEnabled,
+                biometricAvailable = biometricAvailable,
+                onUnlockWithPin = onUnlockWithPin,
+                onBiometricUnlock = onBiometricUnlock,
+                modifier = Modifier.zIndex(1f)
+            )
+        }
     }
 
-    if (showQuickConnect.value) {
+    if (showQuickConnect.value && !uiState.isLocked) {
         QuickConnectSheet(
-            onDismiss = { showQuickConnect.value = false }
+            onDismiss = { showQuickConnect.value = false },
+            keyboardSlots = uiState.keyboardSlots
         )
     }
 
-    if (showAbout.value) {
+    if (showAbout.value && !uiState.isLocked) {
         AboutDialog(onDismiss = { showAbout.value = false })
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickConnectSheet(onDismiss: () -> Unit) {
+private fun QuickConnectSheet(
+    onDismiss: () -> Unit,
+    keyboardSlots: List<String>
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         val context = LocalContext.current
         val host = remember { mutableStateOf("") }
@@ -384,18 +450,6 @@ private fun QuickConnectSheet(onDismiss: () -> Unit) {
                 Text("Connect")
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderField(label: String, value: String = "") {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Text(
-            text = if (value.isEmpty()) "Tap to configure" else value,
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

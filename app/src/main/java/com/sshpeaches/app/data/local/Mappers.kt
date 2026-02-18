@@ -19,7 +19,8 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     notes = notes,
     defaultMode = defaultMode,
     attachedForwards = attachedForwards,
-    snippets = snippets
+    snippets = snippets,
+    hasPassword = hasPassword
 )
 
 fun HostConnection.asEntity(): HostEntity = HostEntity(
@@ -36,7 +37,8 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     notes = notes,
     defaultMode = defaultMode,
     attachedForwards = attachedForwards,
-    snippets = snippets
+    snippets = snippets,
+    hasPassword = hasPassword
 )
 
 fun IdentityEntity.asModel(): Identity = Identity(
@@ -48,7 +50,8 @@ fun IdentityEntity.asModel(): Identity = Identity(
     lastUsedEpochMillis = lastUsedEpochMillis,
     favorite = favorite,
     tags = tags,
-    notes = notes
+    notes = notes,
+    hasPrivateKey = hasPrivateKey
 )
 
 fun Identity.asEntity(): IdentityEntity = IdentityEntity(
@@ -60,7 +63,8 @@ fun Identity.asEntity(): IdentityEntity = IdentityEntity(
     lastUsedEpochMillis = lastUsedEpochMillis,
     favorite = favorite,
     tags = tags,
-    notes = notes
+    notes = notes,
+    hasPrivateKey = hasPrivateKey
 )
 
 fun PortForwardEntity.asModel(): PortForward = PortForward(

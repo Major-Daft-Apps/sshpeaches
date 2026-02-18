@@ -32,8 +32,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,11 +46,21 @@ import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.R
 
 @Composable
-fun KeyboardEditorScreen() {
-    val slotCount = 12
-    val keysState = remember { mutableStateOf(List(slotCount) { "" }) }
+fun KeyboardEditorScreen(
+    slots: List<String>,
+    onSlotChange: (Int, String) -> Unit,
+    onReset: () -> Unit
+) {
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
     val scrollState = rememberScrollState()
+    val bannerMessage = remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(bannerMessage.value) {
+        bannerMessage.value?.let {
+            delay(2000)
+            bannerMessage.value = null
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -70,12 +82,23 @@ fun KeyboardEditorScreen() {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            keysState.value.forEachIndexed { index, key ->
+            slots.forEachIndexed { index, key ->
                 KeySlot(
                     label = key,
                     onClick = { dialogIndex.value = index }
                 )
             }
+        }
+
+        bannerMessage.value?.let {
+            Text(it, color = MaterialTheme.colorScheme.primary)
+        }
+
+        TextButton(onClick = {
+            onReset()
+            bannerMessage.value = "Layout reset"
+        }) {
+            Text("Reset layout")
         }
 
         Card(
@@ -102,15 +125,20 @@ fun KeyboardEditorScreen() {
         }
     }
 
+    val handleSlotChange: (Int, String) -> Unit = { idx, value ->
+        onSlotChange(idx, value)
+        bannerMessage.value = "Layout saved"
+    }
+
     dialogIndex.value?.let { idx ->
         KeySlotDialog(
-            current = keysState.value[idx],
+            current = slots.getOrNull(idx).orEmpty(),
             onSelect = { newKey ->
-                keysState.value = keysState.value.toMutableList().also { it[idx] = newKey }
+                handleSlotChange(idx, newKey)
                 dialogIndex.value = null
             },
             onRemove = {
-                keysState.value = keysState.value.toMutableList().also { it[idx] = "" }
+                handleSlotChange(idx, "")
                 dialogIndex.value = null
             },
             onDismiss = { dialogIndex.value = null }

@@ -1,0 +1,42 @@
+System Instructions:
+- You are ChatGPT, a large language model trained by OpenAI.
+
+Developer Instructions (Codex CLI environment):
+- Identity: Codex (GPT-5) coding agent within Codex CLI.
+- Every shell command must include `workdir` (use `bash -lc "..."`), no implicit `cd`.
+- Default to `rg` for searches; use `apply_patch` for manual edits (ASCII only).
+- Avoid destructive git operations unless explicitly requested by the user.
+- Maintain plans via the planning tool: skip only for trivial tasks, update after each step.
+- Editing constraints: ASCII text, concise comments, reference file paths in summaries.
+- Follow review-focused instructions: identify bugs/risks first when reviewing.
+- Final responses must mention testing status, reference files with paths/line hints.
+
+Project Context – SSHPeaches Android App:
+- Repo root: /home/zenulabidin/Documents/sshpeaches
+- Build tooling: Gradle wrapper 8.13 (local.properties -> /home/zenulabidin/Android/Sdk). Kotlin Compose app targeting Android 8.0+.
+- Major dependencies: Compose BOM 2024.02.01, Material3, Navigation Compose, Lifecycle Compose, Room 2.6.1, SSHJ 0.37.0, ZXing, Coil (compose & svg), kotlinx-coroutines-android, SLF4J API.
+- Documentation: docs/blueprint.md (product spec), docs/design.md (UI layouts). Refer to those for feature expectations (Hosts, Identities, Port Forwards, Snippets, QR flows, Keyboard Editor, Quick Connect, Settings, branding).
+
+Implemented Features (commit 1b1f865 + latest work):
+- **Repositories/ViewModel**: AppRepository + InMemoryAppRepository support hosts/identities/port forwards + snippets (demo). AppViewModel provides add/update/delete for hosts, identities, port forwards; settings toggles handled via MutableStateFlows.
+- **UI**:
+  * HostsScreen: list with search, sort, add/edit dialog, QR import, host action buttons (SSH/SFTP/SCP) now trigger `SessionService` via callbacks.
+  * IdentitiesScreen: add/edit dialog wired to ViewModel; QR import placeholder.
+  * PortForwardScreen: add/edit dialog (type selection, bind/destination fields, associated hosts), toggles update ViewModel.
+  * SnippetManagerScreen: placeholder UI (no persistence wiring yet).
+  * SettingsScreen: theme dropdown, background sessions toggle, biometric toggle, lock timeout dropdown, diagnostics/QR defaults toggles.
+  * QuickConnectSheet: simple host/username/password fields (still placeholders for real auth).
+  * SessionService: Foreground service managing SSH connections via SSHJ. Shows per-host notifications with Disconnect action, maintains summary notification, exposes Binder to MainActivity. Session logging captured via SessionLoggerFactory -> SessionLogBus (SharedFlow of log entries).
+  * SSHPeachesRoot: binds MainActivity to TargetViewModel actions, drawer integration, About dialog with logo, Help link to project website.
+
+Outstanding Work / Future Slices:
+- Secure credential storage (passwords, private keys) tied to lock/PIN/biometric; currently no storage fields exist.
+- Session UI: “connecting” slide to display SessionLogBus entries, stop buttons, session dashboard.
+- Stop actions in UI (Hosts list + quick connect) and per-session status feedback.
+- QR flow implementation (import/export, encryption, chunking), Snippet CRUD wiring, Keyboard layout persistence.
+- Biometric lock screen + inactivity timeout enforcement.
+
+Operational Reminders:
+- Network access currently enabled; avoid installations unless instructed.
+- Use `./gradlew assembleDebug` to validate builds (already run successfully after logging changes).
+- When referencing files in summaries, use relative paths (e.g., `app/src/...`).

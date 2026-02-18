@@ -92,6 +92,11 @@ class SessionService : Service() {
         updateSummaryNotification()
     }
 
+    fun stopAllSessions() {
+        val ids = activeSessions.keys.toList()
+        ids.forEach { stopSession(it) }
+    }
+
     private fun updateSummaryNotification() {
         val summary = when {
             activeSessions.isEmpty() -> "No active sessions"

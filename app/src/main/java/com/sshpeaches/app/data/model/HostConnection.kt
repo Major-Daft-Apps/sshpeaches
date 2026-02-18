@@ -14,7 +14,8 @@ data class HostConnection(
     val notes: String = "",
     val defaultMode: ConnectionMode = ConnectionMode.SSH,
     val attachedForwards: List<String> = emptyList(),
-    val snippets: List<String> = emptyList()
+    val snippets: List<String> = emptyList(),
+    val hasPassword: Boolean = false
 )
 
 data class Identity(
@@ -26,7 +27,8 @@ data class Identity(
     val lastUsedEpochMillis: Long? = null,
     val favorite: Boolean = false,
     val tags: List<String> = emptyList(),
-    val notes: String = ""
+    val notes: String = "",
+    val hasPrivateKey: Boolean = false
 )
 
 data class PortForward(

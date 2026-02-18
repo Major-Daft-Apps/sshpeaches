@@ -4,6 +4,7 @@ import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.Snippet
+import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 
 data class AppUiState(
     val favorites: FavoritesSection = FavoritesSection(),
@@ -23,7 +24,10 @@ data class AppUiState(
     val includeSettingsInQr: Boolean = true,
     val autoStartForwards: Boolean = true,
     val hostKeyPromptEnabled: Boolean = true,
-    val usageReportsEnabled: Boolean = false
+    val usageReportsEnabled: Boolean = false,
+    val pinConfigured: Boolean = false,
+    val isLocked: Boolean = false,
+    val keyboardSlots: List<String> = KeyboardLayoutDefaults.DEFAULT_SLOTS
 )
 
 data class FavoritesSection(

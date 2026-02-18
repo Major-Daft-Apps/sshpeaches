@@ -114,7 +114,8 @@ class InMemoryAppRepository : AppRepository {
                 createdEpochMillis = System.currentTimeMillis() - 86_400_000,
                 lastUsedEpochMillis = System.currentTimeMillis() - 7_200_000,
                 favorite = true,
-                tags = listOf("prod", "ed25519")
+                tags = listOf("prod", "ed25519"),
+                hasPrivateKey = true
             ),
             Identity(
                 id = "id-2",

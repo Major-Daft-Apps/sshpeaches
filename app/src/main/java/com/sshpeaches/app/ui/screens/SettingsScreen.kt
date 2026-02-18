@@ -22,6 +22,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +57,13 @@ fun SettingsScreen(
     hostKeyPromptEnabled: Boolean,
     onHostKeyPromptToggle: (Boolean) -> Unit,
     usageReportsEnabled: Boolean,
-    onUsageReportsToggle: (Boolean) -> Unit
+    onUsageReportsToggle: (Boolean) -> Unit,
+    pinConfigured: Boolean,
+    isLocked: Boolean,
+    biometricAvailable: Boolean,
+    onSetPin: (String) -> Unit,
+    onLockApp: () -> Unit,
+    onUnlockWithPin: (String) -> Boolean
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
@@ -73,6 +80,12 @@ fun SettingsScreen(
         LockTimeout.FIFTEEN_MIN,
         LockTimeout.CUSTOM
     )
+    val showPinDialog = remember { mutableStateOf(false) }
+    val pinEntry = remember { mutableStateOf("") }
+    val confirmPinEntry = remember { mutableStateOf("") }
+    val showUnlockDialog = remember { mutableStateOf(false) }
+    val unlockEntry = remember { mutableStateOf("") }
+    val unlockError = remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -145,7 +158,24 @@ fun SettingsScreen(
                         Text("Biometric lock")
                         Text("Require fingerprint/face after inactivity", style = MaterialTheme.typography.bodySmall)
                     }
-                    Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
+                    Switch(
+                        checked = biometricEnabled,
+                        onCheckedChange = onBiometricToggle,
+                        enabled = biometricAvailable && pinConfigured
+                    )
+                }
+                if (!biometricAvailable) {
+                    Text(
+                        "Biometric hardware not available on this device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else if (!pinConfigured) {
+                    Text(
+                        "Set a PIN to enable biometric unlock.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
                 ExposedDropdownMenuBox(
                     expanded = lockExpanded.value,
@@ -185,6 +215,26 @@ fun SettingsScreen(
                         Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = hostKeyPromptEnabled, onCheckedChange = onHostKeyPromptToggle)
+                }
+                Text(
+                    if (pinConfigured) "PIN lock configured. Status: ${if (isLocked) "Locked" else "Unlocked"}"
+                    else "PIN lock not configured.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { showPinDialog.value = true }) {
+                        Text(if (pinConfigured) "Change PIN" else "Set PIN")
+                    }
+                    if (pinConfigured) {
+                        Button(
+                            onClick = onLockApp,
+                            enabled = !isLocked
+                        ) { Text("Lock now") }
+                        Button(
+                            onClick = { showUnlockDialog.value = true },
+                            enabled = isLocked
+                        ) { Text("Unlock (PIN)") }
+                    }
                 }
             }
         }
@@ -298,6 +348,89 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showTransferDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
+    if (showPinDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                showPinDialog.value = false
+                pinEntry.value = ""
+                confirmPinEntry.value = ""
+            },
+            title = { Text(if (pinConfigured) "Change PIN" else "Set PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = pinEntry.value,
+                        onValueChange = { pinEntry.value = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Enter PIN") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = confirmPinEntry.value,
+                        onValueChange = { confirmPinEntry.value = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Confirm PIN") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (pinEntry.value.length < 4 || pinEntry.value != confirmPinEntry.value) return@TextButton
+                    onSetPin(pinEntry.value)
+                    pinEntry.value = ""
+                    confirmPinEntry.value = ""
+                    showPinDialog.value = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPinDialog.value = false
+                    pinEntry.value = ""
+                    confirmPinEntry.value = ""
+                }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showUnlockDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                showUnlockDialog.value = false
+                unlockEntry.value = ""
+                unlockError.value = null
+            },
+            title = { Text("Unlock with PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = unlockEntry.value,
+                        onValueChange = { unlockEntry.value = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("PIN") },
+                        singleLine = true
+                    )
+                    unlockError.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val ok = onUnlockWithPin(unlockEntry.value)
+                    if (ok) {
+                        unlockEntry.value = ""
+                        unlockError.value = null
+                        showUnlockDialog.value = false
+                    } else {
+                        unlockError.value = "Incorrect PIN"
+                    }
+                }) { Text("Unlock") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showUnlockDialog.value = false
+                    unlockEntry.value = ""
+                    unlockError.value = null
+                }) { Text("Cancel") }
             }
         )
     }

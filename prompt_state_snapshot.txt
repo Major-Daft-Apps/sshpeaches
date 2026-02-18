@@ -1,0 +1,11 @@
+Progress Snapshot (after starting PIN/credential work):
+- Added `SecurityManager` (EncryptedSharedPreferences + PIN hash scaffold) and initialized it in `SSHPeachesApplication`.
+- Updated dependencies (`security-crypto`, `slf4j-api`).
+- Extended HostConnection/entities with `hasPassword` flag; begun wiring host dialog and ViewModel to accept passwords.
+- Began expanding Settings screen with PIN setup/lock controls.
+- Build currently fails because the new APIs (SecurityManager, Settings params, composable imports) need more plumbing.
+Pending tasks before moving forward:
+1. Fix `SecurityManager` to use correct builder (e.g., `EncryptedSharedPreferences.create(...)`) and imports.
+2. Pass new parameters (`pinConfigured`, `onSetPin`, etc.) through `SSHPeachesRoot` -> `SettingsScreen`.
+3. Complete host dialog password UI (imports, logic) and ensure `MaterialTheme` references exist.
+4. Re-run `./gradlew assembleDebug` to stabilize.

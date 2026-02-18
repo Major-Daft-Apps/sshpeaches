@@ -1,5 +1,8 @@
 package com.sshpeaches.app.ui.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,34 +10,45 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.ui.components.EmptyState
+import com.sshpeaches.app.ui.components.decodeForwardFromQr
+import com.sshpeaches.app.ui.components.generateForwardQr
+import com.sshpeaches.app.util.isValidHostAddress
+import com.sshpeaches.app.util.parsePort
 import java.util.UUID
 
 @Composable
@@ -58,6 +72,29 @@ fun PortForwardScreen(
     val enabledState = remember { mutableStateOf(true) }
     val selectedHostsState = remember { mutableStateOf<List<String>>(emptyList()) }
     val hostSearchState = remember { mutableStateOf(TextFieldValue("")) }
+    val dialogError = remember { mutableStateOf<String?>(null) }
+    val shareForward = remember { mutableStateOf<PortForward?>(null) }
+    val context = LocalContext.current
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@rememberLauncherForActivityResult
+        val imported = decodeForwardFromQr(contents)
+        if (imported == null) {
+            Toast.makeText(context, "Invalid port forward QR", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        onAdd(
+            imported.label,
+            imported.type,
+            imported.sourceHost,
+            imported.sourcePort,
+            imported.destinationHost,
+            imported.destinationPort,
+            imported.enabled,
+            imported.associatedHosts
+        )
+        onImportFromQr()
+        Toast.makeText(context, "Port forward imported", Toast.LENGTH_SHORT).show()
+    }
 
     fun openDialog(forward: PortForward?) {
         editingId.value = forward?.id
@@ -70,6 +107,7 @@ fun PortForwardScreen(
         enabledState.value = forward?.enabled ?: true
         selectedHostsState.value = forward?.associatedHosts ?: emptyList()
         hostSearchState.value = TextFieldValue("")
+        dialogError.value = null
         showDialog.value = true
     }
 
@@ -86,7 +124,17 @@ fun PortForwardScreen(
             Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add port forward")
             }
-            Button(onClick = onImportFromQr, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = {
+                    val options = ScanOptions().apply {
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        setPrompt("Scan port forward QR")
+                        setBeepEnabled(false)
+                    }
+                    scanLauncher.launch(options)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                 Text("Import QR")
             }
@@ -133,6 +181,13 @@ fun PortForwardScreen(
                                 )
                             },
                             enabled = editMode
+                        )
+                        Icon(
+                            imageVector = Icons.Default.QrCode,
+                            contentDescription = "Share",
+                            modifier = Modifier
+                                .clickable { shareForward.value = forward }
+                                .padding(4.dp)
                         )
                         if (editMode) {
                             Icon(
@@ -251,34 +306,58 @@ fun PortForwardScreen(
                             Text("No hosts match your search", style = MaterialTheme.typography.bodySmall)
                         }
                     }
+                    dialogError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val srcPort = srcPortState.value.toIntOrNull() ?: 0
-                    val dstPort = dstPortState.value.toIntOrNull() ?: 0
+                    val srcPort = parsePort(srcPortState.value) ?: run {
+                        dialogError.value = "Enter a valid source port (1-65535)."
+                        return@TextButton
+                    }
+                    var dstPort = 0
+                    var dstHost = dstHostState.value
+                    if (typeState.value != PortForwardType.DYNAMIC) {
+                        dstPort = parsePort(dstPortState.value) ?: run {
+                            dialogError.value = "Enter a valid destination port."
+                            return@TextButton
+                        }
+                        if (!isValidHostAddress(dstHostState.value)) {
+                            dialogError.value = "Enter a valid destination host."
+                            return@TextButton
+                        }
+                        dstHost = dstHostState.value.trim()
+                    } else {
+                        dstHost = ""
+                    }
+                    dialogError.value = null
+                    val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
+                    val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
+                    val associated = selectedHostsState.value
                     if (isEdit) {
                         onUpdate(
                             editingId.value!!,
-                            labelState.value.ifBlank { "Forward" },
+                            label,
                             typeState.value,
-                            bindState.value.ifBlank { "127.0.0.1" },
+                            bind,
                             srcPort,
-                            dstHostState.value.ifBlank { "" },
+                            dstHost,
                             dstPort,
                             enabledState.value,
-                            selectedHostsState.value
+                            associated
                         )
                     } else {
                         onAdd(
-                            labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" },
+                            label,
                             typeState.value,
-                            bindState.value.ifBlank { "127.0.0.1" },
+                            bind,
                             srcPort,
-                            dstHostState.value.ifBlank { "" },
+                            dstHost,
                             dstPort,
                             enabledState.value,
-                            selectedHostsState.value
+                            associated
                         )
                     }
                     closeDialog()
@@ -293,6 +372,37 @@ fun PortForwardScreen(
                         }) { Text("Delete") }
                     }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    shareForward.value?.let { forward ->
+        val qrBitmap = remember(forward) { generateForwardQr(forward) }
+        AlertDialog(
+            onDismissRequest = { shareForward.value = null },
+            confirmButton = { TextButton(onClick = { shareForward.value = null }) { Text("Close") } },
+            title = { Text("Share ${forward.label}") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    qrBitmap?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = "Port forward QR",
+                            modifier = Modifier.size(220.dp)
+                        )
+                    } ?: Text("Unable to generate QR")
+                    Text(
+                        when (forward.type) {
+                            PortForwardType.LOCAL -> "${forward.sourceHost}:${forward.sourcePort} → ${forward.destinationHost}:${forward.destinationPort}"
+                            PortForwardType.REMOTE -> "${forward.destinationHost}:${forward.destinationPort} ← ${forward.sourceHost}:${forward.sourcePort}"
+                            PortForwardType.DYNAMIC -> "SOCKS on ${forward.sourceHost}:${forward.sourcePort}"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         )

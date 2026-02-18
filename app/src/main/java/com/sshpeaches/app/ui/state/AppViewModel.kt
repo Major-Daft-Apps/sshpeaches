@@ -1,6 +1,10 @@
 package com.sshpeaches.app.ui.state
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
@@ -10,6 +14,11 @@ import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.repository.AppRepository
 import com.sshpeaches.app.data.repository.InMemoryAppRepository
+import com.sshpeaches.app.data.settings.SettingsStore
+import com.sshpeaches.app.security.SecurityManager
+import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +44,39 @@ class AppViewModel(
     private val autoStartForwardsFlow = MutableStateFlow(true)
     private val hostKeyPromptFlow = MutableStateFlow(true)
     private val usageReportsFlow = MutableStateFlow(false)
+    private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
+    private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
+    private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+    private var lockTimerJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            SecurityManager.lockState().collect { locked ->
+                lockedFlow.value = locked
+                if (locked) {
+                    lockTimerJob?.cancel()
+                    lockTimerJob = null
+                } else {
+                    scheduleLockTimer(lockTimeoutFlow.value)
+                }
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.allowBackgroundSessions.collect { enabled ->
+                backgroundSessionsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.biometricLockEnabled.collect { enabled ->
+                biometricFlow.value = enabled && SecurityManager.isPinSet()
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.keyboardLayout.collect { slots ->
+                keyboardSlotsFlow.value = slots
+            }
+        }
+    }
 
     private val baseUiState = combine(
         repository.hosts,
@@ -118,11 +160,13 @@ class AppViewModel(
         SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, usage)
     }
 
-    val uiState: StateFlow<AppUiState> = combine(
+    private val coreUiState = combine(
         baseUiState,
         privacyPrefsFlow,
-        sharePrefsFlow
-    ) { state, privacy, share ->
+        sharePrefsFlow,
+        pinConfiguredFlow,
+        lockedFlow
+    ) { state, privacy, share, pinSet, locked ->
         state.copy(
             themeMode = privacy.theme,
             allowBackgroundSessions = privacy.background,
@@ -135,8 +179,17 @@ class AppViewModel(
             includeSettingsInQr = share.includeSettings,
             autoStartForwards = share.autoStart,
             hostKeyPromptEnabled = share.hostKeyPrompt,
-            usageReportsEnabled = share.usage
+            usageReportsEnabled = share.usage,
+            pinConfigured = pinSet,
+            isLocked = locked
         )
+    }
+
+    val uiState: StateFlow<AppUiState> = combine(
+        coreUiState,
+        keyboardSlotsFlow
+    ) { state, slots ->
+        state.copy(keyboardSlots = slots)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -152,15 +205,23 @@ class AppViewModel(
     }
 
     fun setBackgroundSessions(enabled: Boolean) {
-        backgroundSessionsFlow.value = enabled
+        viewModelScope.launch {
+            SettingsStore.setAllowBackgroundSessions(enabled)
+        }
     }
 
     fun setBiometricLock(enabled: Boolean) {
-        biometricFlow.value = enabled
+        if (enabled && !SecurityManager.isPinSet()) return
+        viewModelScope.launch {
+            SettingsStore.setBiometricLockEnabled(enabled)
+        }
     }
 
     fun setLockTimeout(timeout: LockTimeout) {
         lockTimeoutFlow.value = timeout
+        if (!lockedFlow.value) {
+            scheduleLockTimer(timeout)
+        }
     }
 
     fun setCrashReports(enabled: Boolean) {
@@ -203,11 +264,21 @@ class AppViewModel(
         auth: AuthMethod,
         group: String?,
         notes: String,
-        defaultMode: ConnectionMode
+        defaultMode: ConnectionMode,
+        password: String?,
+        suppliedId: String? = null
     ) {
         if (name.isBlank() || host.isBlank() || username.isBlank()) return
+        val id = suppliedId ?: UUID.randomUUID().toString()
+        val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
+        val hasPassword = !password.isNullOrBlank() && canStoreSecret
+        if (hasPassword) {
+            SecurityManager.storeHostPassword(id, password!!)
+        } else if (password != null) {
+            SecurityManager.clearHostPassword(id)
+        }
         val entry = HostConnection(
-            id = UUID.randomUUID().toString(),
+            id = id,
             name = name.trim(),
             host = host.trim(),
             port = port,
@@ -215,7 +286,8 @@ class AppViewModel(
             preferredAuth = auth,
             group = group?.takeIf { it.isNotBlank() },
             notes = notes,
-            defaultMode = defaultMode
+            defaultMode = defaultMode,
+            hasPassword = hasPassword
         )
         viewModelScope.launch {
             repository.addHost(entry)
@@ -231,9 +303,22 @@ class AppViewModel(
         auth: AuthMethod,
         group: String?,
         notes: String,
-        defaultMode: ConnectionMode
+        defaultMode: ConnectionMode,
+        password: String?
     ) {
         val existing = uiState.value.hosts.find { it.id == id } ?: return
+        val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
+        val hasPassword = when {
+            !password.isNullOrBlank() && canStoreSecret -> {
+                SecurityManager.storeHostPassword(id, password)
+                true
+            }
+            password != null && password.isBlank() -> {
+                SecurityManager.clearHostPassword(id)
+                false
+            }
+            else -> existing.hasPassword
+        }
         val updated = existing.copy(
             name = name.ifBlank { existing.name },
             host = host.ifBlank { existing.host },
@@ -242,7 +327,8 @@ class AppViewModel(
             preferredAuth = auth,
             group = group?.takeIf { it.isNotBlank() },
             notes = notes,
-            defaultMode = defaultMode
+            defaultMode = defaultMode,
+            hasPassword = hasPassword
         )
         viewModelScope.launch {
             repository.updateHost(updated)
@@ -252,6 +338,9 @@ class AppViewModel(
     fun deleteHost(id: String) {
         val existing = uiState.value.hosts.find { it.id == id } ?: return
         viewModelScope.launch {
+            if (existing.hasPassword) {
+                SecurityManager.clearHostPassword(id)
+            }
             repository.deleteHost(existing)
         }
     }
@@ -318,16 +407,58 @@ class AppViewModel(
         }
     }
 
-    fun addIdentity(label: String, fingerprint: String, username: String?) {
+    fun setPin(pin: String) {
+        SecurityManager.setPin(pin)
+        pinConfiguredFlow.value = true
+        lockedFlow.value = SecurityManager.isLocked()
+        lockTimerJob?.cancel()
+        lockTimerJob = null
+    }
+
+    fun lockApp() {
+        SecurityManager.lock()
+        lockedFlow.value = SecurityManager.isLocked()
+        lockTimerJob?.cancel()
+        lockTimerJob = null
+    }
+
+    fun unlockWithPin(pin: String): Boolean {
+        val ok = SecurityManager.verifyPin(pin)
+        if (ok) {
+            lockedFlow.value = SecurityManager.isLocked()
+            if (!lockedFlow.value) {
+                scheduleLockTimer(lockTimeoutFlow.value)
+            }
+        }
+        return ok
+    }
+
+    fun unlockWithBiometric() {
+        if (!SecurityManager.isPinSet()) return
+        SecurityManager.unlock()
+        lockedFlow.value = SecurityManager.isLocked()
+        if (!lockedFlow.value) {
+            scheduleLockTimer(lockTimeoutFlow.value)
+        }
+    }
+
+    fun onUserInteraction() {
+        if (!lockedFlow.value) {
+            scheduleLockTimer(lockTimeoutFlow.value)
+        }
+    }
+
+    fun addIdentity(label: String, fingerprint: String, username: String?, suppliedId: String? = null, hasPrivateKey: Boolean = false) {
         if (fingerprint.isBlank()) return
         val identity = Identity(
-            id = UUID.randomUUID().toString(),
+            id = suppliedId ?: UUID.randomUUID().toString(),
             label = label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
             fingerprint = fingerprint.trim(),
             username = username?.takeIf { it.isNotBlank() },
             createdEpochMillis = System.currentTimeMillis(),
             lastUsedEpochMillis = null,
-            favorite = false
+            favorite = false,
+            hasPrivateKey = hasPrivateKey
         )
         viewModelScope.launch {
             repository.addIdentity(identity)
@@ -349,12 +480,84 @@ class AppViewModel(
     fun deleteIdentity(id: String) {
         val existing = uiState.value.identities.find { it.id == id } ?: return
         viewModelScope.launch {
+            if (existing.hasPrivateKey) {
+                SecurityManager.clearIdentityKey(id)
+            }
             repository.deleteIdentity(existing)
         }
+    }
+
+    fun markIdentityHasKey(id: String, hasKey: Boolean) {
+        val current = uiState.value.identities.find { it.id == id } ?: return
+        if (current.hasPrivateKey == hasKey) return
+        val updated = current.copy(hasPrivateKey = hasKey)
+        viewModelScope.launch {
+            repository.updateIdentity(updated)
+        }
+    }
+
+    fun importIdentityKeyFromPayload(id: String, payload: String, passphrase: String): Boolean {
+        return runCatching {
+            SecurityManager.importIdentityKeyPayload(id, payload, passphrase)
+            markIdentityHasKey(id, true)
+        }.isSuccess
+    }
+
+    fun importIdentityKeyPlain(id: String, key: String): Boolean {
+        return runCatching {
+            SecurityManager.storeIdentityKey(id, key)
+            markIdentityHasKey(id, true)
+        }.isSuccess
+    }
+
+    fun updateKeyboardSlot(index: Int, value: String) {
+        if (index !in 0 until KeyboardLayoutDefaults.SLOT_COUNT) return
+        val updated = keyboardSlotsFlow.value.toMutableList().also { list ->
+            list[index] = value
+        }.toList()
+        keyboardSlotsFlow.value = updated
+        viewModelScope.launch {
+            SettingsStore.setKeyboardLayout(updated)
+        }
+    }
+
+    fun resetKeyboardLayout() {
+        keyboardSlotsFlow.value = KeyboardLayoutDefaults.DEFAULT_SLOTS
+        viewModelScope.launch {
+            SettingsStore.setKeyboardLayout(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+        }
+    }
+
+    private fun scheduleLockTimer(timeout: LockTimeout) {
+        lockTimerJob?.cancel()
+        val duration = lockTimeoutDuration(timeout) ?: return
+        if (duration <= 0L) {
+            lockApp()
+            return
+        }
+        lockTimerJob = viewModelScope.launch {
+            delay(duration)
+            lockApp()
+        }
+    }
+
+    private fun lockTimeoutDuration(timeout: LockTimeout): Long? = when (timeout) {
+        LockTimeout.IMMEDIATE -> 0L
+        LockTimeout.ONE_MIN -> 60_000L
+        LockTimeout.FIVE_MIN -> 300_000L
+        LockTimeout.FIFTEEN_MIN -> 900_000L
+        LockTimeout.CUSTOM -> null // TODO expose UI for user-defined timeout
     }
 
     companion object {
         private val byLastUsed = compareByDescending<HostConnection> { it.lastUsedEpochMillis ?: 0L }
         private val byName = compareBy<HostConnection> { it.name.lowercase() }
+
+        fun provideFactory(repository: AppRepository): ViewModelProvider.Factory =
+            viewModelFactory {
+                initializer {
+                    AppViewModel(repository)
+                }
+            }
     }
 }

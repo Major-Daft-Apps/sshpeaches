@@ -22,7 +22,8 @@ data class HostEntity(
     val notes: String,
     val defaultMode: ConnectionMode,
     val attachedForwards: List<String>,
-    val snippets: List<String>
+    val snippets: List<String>,
+    val hasPassword: Boolean
 )
 
 @Entity(tableName = "identities")
@@ -35,7 +36,8 @@ data class IdentityEntity(
     val lastUsedEpochMillis: Long?,
     val favorite: Boolean,
     val tags: List<String>,
-    val notes: String
+    val notes: String,
+    val hasPrivateKey: Boolean
 )
 
 @Entity(tableName = "port_forwards")

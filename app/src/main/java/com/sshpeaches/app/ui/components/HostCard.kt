@@ -20,11 +20,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,7 +41,9 @@ import android.content.Intent
 import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
 import android.graphics.Bitmap
+import android.util.Base64
 import android.graphics.Color as AndroidColor
+import android.widget.Toast
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -47,8 +52,10 @@ import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.OsFamily
 import com.sshpeaches.app.data.model.OsMetadata
+import com.sshpeaches.app.security.SecurityManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import com.sshpeaches.app.ui.util.ExportPassphraseCache
 
 @Composable
 fun HostCard(
@@ -59,6 +66,20 @@ fun HostCard(
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
     val showQr = remember { mutableStateOf(false) }
+    val showPassphrasePrompt = remember { mutableStateOf(false) }
+    val passphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
+    val confirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
+    val passphraseError = remember { mutableStateOf<String?>(null) }
+    val qrBitmap = remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(host.id) {
+        showQr.value = false
+        showPassphrasePrompt.value = false
+        passphraseState.value = ExportPassphraseCache.host.orEmpty()
+        confirmPassphraseState.value = ExportPassphraseCache.host.orEmpty()
+        passphraseError.value = null
+        qrBitmap.value = null
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -74,9 +95,9 @@ fun HostCard(
                         .size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val context = LocalContext.current
+                    val imageContext = LocalContext.current
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
+                        model = ImageRequest.Builder(imageContext)
                             .data(host.osMetadata.iconRes())
                             .decoderFactory(SvgDecoder.Factory())
                             .build(),
@@ -120,7 +141,24 @@ fun HostCard(
                     Icons.Default.QrCode,
                     contentDescription = "Share",
                     modifier = Modifier.clickable {
-                        showQr.value = true
+                        if (host.hasPassword) {
+                            when {
+                                !SecurityManager.isPinSet() -> {
+                                    Toast.makeText(context, "Set a PIN before exporting passwords.", Toast.LENGTH_SHORT).show()
+                                }
+                                SecurityManager.isLocked() -> {
+                                    Toast.makeText(context, "Unlock with your PIN before exporting.", Toast.LENGTH_SHORT).show()
+                                }
+                                else -> showPassphrasePrompt.value = true
+                            }
+                        } else {
+                            qrBitmap.value = generateQr(host, passphrase = null)
+                            if (qrBitmap.value != null) {
+                                showQr.value = true
+                            } else {
+                                Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 )
             }
@@ -145,7 +183,6 @@ fun HostCard(
     }
 
     if (showQr.value) {
-        val qrBitmap = remember(host) { generateQr(host) }
         AlertDialog(
             onDismissRequest = { showQr.value = false },
             confirmButton = { TextButton(onClick = { showQr.value = false }) { Text("Close") } },
@@ -155,7 +192,7 @@ fun HostCard(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    qrBitmap?.let {
+                    qrBitmap.value?.let {
                         Image(
                             bitmap = it.asImageBitmap(),
                             contentDescription = "Host QR",
@@ -171,16 +208,102 @@ fun HostCard(
             }
         )
     }
+
+    if (showPassphrasePrompt.value) {
+        AlertDialog(
+            onDismissRequest = {
+                showPassphrasePrompt.value = false
+                passphraseState.value = ""
+                confirmPassphraseState.value = ""
+                passphraseError.value = null
+            },
+            title = { Text("Protect exported password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter a passphrase to encrypt this host's password. You will need it on the receiving device.")
+                    OutlinedTextField(
+                        value = passphraseState.value,
+                        onValueChange = {
+                            passphraseState.value = it
+                            passphraseError.value = null
+                        },
+                        label = { Text("Passphrase") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = confirmPassphraseState.value,
+                        onValueChange = {
+                            confirmPassphraseState.value = it
+                            passphraseError.value = null
+                        },
+                        label = { Text("Confirm passphrase") },
+                        singleLine = true
+                    )
+                    passphraseError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val passphrase = passphraseState.value
+                    when {
+                        passphrase.length < 4 -> {
+                            passphraseError.value = "Passphrase must be at least 4 characters."
+                        }
+                        passphrase != confirmPassphraseState.value -> {
+                            passphraseError.value = "Passphrases do not match."
+                        }
+                        else -> {
+                            val bitmap = generateQr(host, passphrase)
+                            if (bitmap != null) {
+                                qrBitmap.value = bitmap
+                                showPassphrasePrompt.value = false
+                                showQr.value = true
+                                ExportPassphraseCache.host = passphrase
+                                passphraseState.value = passphrase
+                                confirmPassphraseState.value = passphrase
+                                passphraseError.value = null
+                            } else {
+                                passphraseError.value = "Unable to export password. Unlock the app and try again."
+                            }
+                        }
+                    }
+                }) { Text("Generate QR") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPassphrasePrompt.value = false
+                    passphraseState.value = ""
+                    confirmPassphraseState.value = ""
+                    passphraseError.value = null
+                }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
-private fun generateQr(host: HostConnection): Bitmap? {
+private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
     val json = buildString {
         append("{")
         append("\"id\":\"${host.id}\",")
         append("\"name\":\"${host.name}\",")
         append("\"host\":\"${host.host}\",")
         append("\"port\":${host.port},")
-        append("\"user\":\"${host.username}\"")
+        append("\"user\":\"${host.username}\",")
+        append("\"prefAuth\":\"${host.preferredAuth.name}\",")
+        append("\"mode\":\"${host.defaultMode.name}\",")
+        append("\"group\":\"${host.group.orEmpty()}\",")
+        append("\"notes\":\"${host.notes}\",")
+        append("\"hasPassword\":${host.hasPassword}")
+        if (host.hasPassword && !passphrase.isNullOrBlank()) {
+            val payload = SecurityManager.exportHostPasswordPayload(host.id, passphrase)
+            if (payload == null) {
+                return null
+            } else {
+                append(",\"pwdPayload\":\"$payload\"")
+            }
+        }
         append("}")
     }
     val payload = android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
