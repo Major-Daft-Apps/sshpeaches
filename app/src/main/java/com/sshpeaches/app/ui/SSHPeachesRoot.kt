@@ -41,6 +41,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -515,7 +516,11 @@ private fun QuickConnectSheet(
     keyboardSlots: List<String>,
     onConnect: (String, Int, String, AuthMethod, String) -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
         val host = remember { mutableStateOf("") }
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }
