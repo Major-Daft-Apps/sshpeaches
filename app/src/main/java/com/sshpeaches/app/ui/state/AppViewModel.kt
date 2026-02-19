@@ -490,7 +490,10 @@ class AppViewModel(
     fun markIdentityHasKey(id: String, hasKey: Boolean) {
         val current = uiState.value.identities.find { it.id == id } ?: return
         if (current.hasPrivateKey == hasKey) return
-        val updated = current.copy(hasPrivateKey = hasKey)
+        val updated = current.copy(
+            hasPrivateKey = hasKey,
+            keyImportEpochMillis = if (hasKey) System.currentTimeMillis() else null
+        )
         viewModelScope.launch {
             repository.updateIdentity(updated)
         }
@@ -508,6 +511,11 @@ class AppViewModel(
             SecurityManager.storeIdentityKey(id, key)
             markIdentityHasKey(id, true)
         }.isSuccess
+    }
+
+    fun removeIdentityKey(id: String) {
+        SecurityManager.clearIdentityKey(id)
+        markIdentityHasKey(id, false)
     }
 
     fun updateKeyboardSlot(index: Int, value: String) {

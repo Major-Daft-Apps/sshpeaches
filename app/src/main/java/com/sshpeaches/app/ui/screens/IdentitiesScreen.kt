@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -71,6 +70,8 @@ fun IdentitiesScreen(
     onDelete: (id: String) -> Unit = {},
     onImportIdentityKey: (id: String, payload: String, passphrase: String) -> Boolean = { _, _, _ -> false },
     onImportIdentityKeyPlain: (id: String, key: String) -> Boolean = { _, _ -> false },
+    onRemoveIdentityKey: (id: String) -> Unit = {},
+    onShowMessage: (String) -> Unit = {},
     editMode: Boolean = false,
     onImportFromQr: () -> Unit = {}
 ) {
@@ -101,15 +102,16 @@ fun IdentitiesScreen(
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
         }.getOrNull()
         if (keyText.isNullOrBlank()) {
-            Toast.makeText(context, "Unable to read key file", Toast.LENGTH_SHORT).show()
+            onShowMessage("Unable to read key file")
             return@rememberLauncherForActivityResult
         }
-        val success = onImportIdentityKeyPlain(targetId, keyText.trim())
-        Toast.makeText(
-            context,
-            if (success) "Private key imported" else "Failed to import key",
-            Toast.LENGTH_SHORT
-        ).show()
+        val sanitized = keyText.trim()
+        if (!sanitized.startsWith("-----BEGIN")) {
+            onShowMessage("Invalid key format")
+            return@rememberLauncherForActivityResult
+        }
+        val success = onImportIdentityKeyPlain(targetId, sanitized)
+        onShowMessage(if (success) "Private key imported" else "Failed to import key")
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -135,22 +137,22 @@ fun IdentitiesScreen(
                     targetId
                 )
                 onImportFromQr()
-                    if (!payload.encryptedKeyPayload.isNullOrBlank()) {
-                        if (!pinConfigured) {
-                            Toast.makeText(context, "Set a PIN before importing encrypted keys.", Toast.LENGTH_SHORT).show()
-                        } else if (isLocked) {
-                            Toast.makeText(context, "Unlock with your PIN before importing encrypted keys.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            pendingKeyImport.value = targetId to payload.encryptedKeyPayload
-                            importPassphraseState.value = ""
-                            importPassphraseError.value = null
-                        }
+                if (!payload.encryptedKeyPayload.isNullOrBlank()) {
+                    if (!pinConfigured) {
+                        onShowMessage("Set a PIN before importing encrypted keys.")
+                    } else if (isLocked) {
+                        onShowMessage("Unlock with your PIN before importing encrypted keys.")
+                    } else {
+                        pendingKeyImport.value = targetId to payload.encryptedKeyPayload
+                        importPassphraseState.value = ""
+                        importPassphraseError.value = null
+                    }
                 } else {
-                    Toast.makeText(context, "Identity imported", Toast.LENGTH_SHORT).show()
+                    onShowMessage("Identity imported")
                 }
             }
         } else {
-            Toast.makeText(context, "Invalid identity QR", Toast.LENGTH_SHORT).show()
+            onShowMessage("Invalid identity QR")
         }
     }
 
@@ -227,8 +229,8 @@ fun IdentitiesScreen(
                                     .clickable {
                                         if (identity.hasPrivateKey) {
                                             when {
-                                                !pinConfigured -> Toast.makeText(context, "Set a PIN before exporting private keys.", Toast.LENGTH_SHORT).show()
-                                                isLocked -> Toast.makeText(context, "Unlock with your PIN before exporting.", Toast.LENGTH_SHORT).show()
+                                                !pinConfigured -> onShowMessage("Set a PIN before exporting private keys.")
+                                                isLocked -> onShowMessage("Unlock with your PIN before exporting.")
                                                 else -> {
                                                     sharePassphrasePrompt.value = identity
                                                     sharePassphraseState.value = ExportPassphraseCache.identity.orEmpty()
@@ -249,9 +251,9 @@ fun IdentitiesScreen(
                                     .size(20.dp)
                                     .clickable {
                                         if (!pinConfigured) {
-                                            Toast.makeText(context, "Set a PIN before importing keys.", Toast.LENGTH_SHORT).show()
+                                            onShowMessage("Set a PIN before importing keys.")
                                         } else if (isLocked) {
-                                            Toast.makeText(context, "Unlock with your PIN before importing keys.", Toast.LENGTH_SHORT).show()
+                                            onShowMessage("Unlock with your PIN before importing keys.")
                                         } else {
                                             fileImportTarget.value = identity.id
                                             fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
@@ -489,7 +491,7 @@ fun IdentitiesScreen(
                     }
                     val success = onImportIdentityKey(identityId, payload, phrase)
                     if (success) {
-                        Toast.makeText(context, "Private key imported", Toast.LENGTH_SHORT).show()
+                        onShowMessage("Private key imported")
                         pendingKeyImport.value = null
                         importPassphraseState.value = ""
                         importPassphraseError.value = null

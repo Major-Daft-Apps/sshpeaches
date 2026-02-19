@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
@@ -81,6 +82,7 @@ class MainActivity : FragmentActivity() {
             val viewModel = appViewModel
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
+            val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode) -> Unit = remember(sessionService) {
                 { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode ->
                     sessionService?.startSession(host, mode)
@@ -88,6 +90,13 @@ class MainActivity : FragmentActivity() {
             }
             val stopSession: (String) -> Unit = remember(sessionService) {
                 { id: String -> sessionService?.stopSession(id) }
+            }
+            val sendSessionShortcut: (String, String) -> Unit = remember(sessionService) {
+                { hostId: String, value: String ->
+                    if (value.isNotBlank()) {
+                        sessionService?.sendKeyboardShortcut(hostId, value)
+                    }
+                }
             }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
                 SSHPeachesRoot(
@@ -133,8 +142,11 @@ class MainActivity : FragmentActivity() {
                     onIdentityDelete = viewModel::deleteIdentity,
                     onImportIdentityKey = viewModel::importIdentityKeyFromPayload,
                     onImportIdentityKeyPlain = viewModel::importIdentityKeyPlain,
+                    onRemoveIdentityKey = viewModel::removeIdentityKey,
                     onKeyboardSlotChange = viewModel::updateKeyboardSlot,
-                    onKeyboardReset = viewModel::resetKeyboardLayout
+                    onKeyboardReset = viewModel::resetKeyboardLayout,
+                    onSendSessionShortcut = sendSessionShortcut,
+                    sessions = sessionSnapshots
                 )
             }
         }

@@ -37,7 +37,8 @@ data class IdentityEntity(
     val favorite: Boolean,
     val tags: List<String>,
     val notes: String,
-    val hasPrivateKey: Boolean
+    val hasPrivateKey: Boolean,
+    val keyImportEpochMillis: Long?
 )
 
 @Entity(tableName = "port_forwards")

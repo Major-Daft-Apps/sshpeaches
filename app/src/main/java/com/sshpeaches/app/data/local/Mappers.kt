@@ -51,7 +51,8 @@ fun IdentityEntity.asModel(): Identity = Identity(
     favorite = favorite,
     tags = tags,
     notes = notes,
-    hasPrivateKey = hasPrivateKey
+    hasPrivateKey = hasPrivateKey,
+    keyImportEpochMillis = keyImportEpochMillis
 )
 
 fun Identity.asEntity(): IdentityEntity = IdentityEntity(
@@ -64,7 +65,8 @@ fun Identity.asEntity(): IdentityEntity = IdentityEntity(
     favorite = favorite,
     tags = tags,
     notes = notes,
-    hasPrivateKey = hasPrivateKey
+    hasPrivateKey = hasPrivateKey,
+    keyImportEpochMillis = keyImportEpochMillis
 )
 
 fun PortForwardEntity.asModel(): PortForward = PortForward(

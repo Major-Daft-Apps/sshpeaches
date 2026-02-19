@@ -4,7 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,7 +18,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,7 +28,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -80,6 +88,7 @@ import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
+import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,8 +126,11 @@ fun SSHPeachesRoot(
     onIdentityDelete: (String) -> Unit,
     onImportIdentityKey: (String, String, String) -> Boolean,
     onImportIdentityKeyPlain: (String, String) -> Boolean,
+    onRemoveIdentityKey: (String) -> Unit,
     onKeyboardSlotChange: (Int, String) -> Unit,
-    onKeyboardReset: () -> Unit
+    onKeyboardReset: () -> Unit,
+    onSendSessionShortcut: (String, String) -> Unit,
+    sessions: List<SessionSnapshot>
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -163,6 +175,11 @@ fun SSHPeachesRoot(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val showMessage: (String) -> Unit = { message ->
+        scope.launch { snackbarHostState.showSnackbar(message) }
+        }
+
     Box {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -200,6 +217,7 @@ fun SSHPeachesRoot(
         ) {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
                         TopAppBar(
                             title = { Text(currentTitle) },
@@ -258,6 +276,8 @@ fun SSHPeachesRoot(
                             onDelete = onIdentityDelete,
                             onImportIdentityKey = onImportIdentityKey,
                             onImportIdentityKeyPlain = onImportIdentityKeyPlain,
+                            onRemoveIdentityKey = onRemoveIdentityKey,
+                            onShowMessage = showMessage,
                             editMode = editMode.value,
                             onImportFromQr = { /* TODO */ }
                         )
@@ -321,6 +341,18 @@ fun SSHPeachesRoot(
                 }
             }
         }
+        if (sessions.isNotEmpty()) {
+            ActiveSessionsPanel(
+                sessions = sessions,
+                keyboardSlots = uiState.keyboardSlots,
+                onStopSession = onStopSession,
+                onSendShortcut = onSendSessionShortcut,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .zIndex(1f)
+            )
+        }
         if (uiState.isLocked) {
             LockScreenOverlay(
                 biometricEnabled = uiState.biometricLockEnabled,
@@ -344,7 +376,7 @@ fun SSHPeachesRoot(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
@@ -396,6 +428,19 @@ private fun QuickConnectSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            if (keyboardSlots.any { it.isNotBlank() }) {
+                Text("Custom keys", style = MaterialTheme.typography.titleMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    keyboardSlots.forEach { slot ->
+                        OutlinedButton(
+                            onClick = { if (slot.isNotBlank()) password.value += slot },
+                            enabled = slot.isNotBlank()
+                        ) {
+                            Text(if (slot.isBlank()) "+" else slot)
+                        }
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AuthChoice("Password", AuthMethod.PASSWORD, auth.value) { auth.value = it }
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
@@ -492,4 +537,57 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ActiveSessionsPanel(
+    sessions: List<SessionSnapshot>,
+    keyboardSlots: List<String>,
+    onStopSession: (String) -> Unit,
+    onSendShortcut: (String, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Active Sessions", style = MaterialTheme.typography.titleMedium)
+            sessions.forEach { snapshot ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(snapshot.host.name, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${snapshot.mode} • ${snapshot.status}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    snapshot.statusMessage?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        keyboardSlots.forEach { slot ->
+                            OutlinedButton(
+                                onClick = { onSendShortcut(snapshot.hostId, slot) },
+                                enabled = slot.isNotBlank()
+                            ) {
+                                Text(if (slot.isBlank()) "+" else slot)
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { onStopSession(snapshot.hostId) }) {
+                            Text("Stop")
+                        }
+                    }
+                }
+                if (snapshot != sessions.last()) {
+                    Spacer(modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        }
+    }
 }

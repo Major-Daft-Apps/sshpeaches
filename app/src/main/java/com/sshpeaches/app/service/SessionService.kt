@@ -19,6 +19,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -30,6 +33,7 @@ class SessionService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val binder = SessionBinder()
     private val activeSessions = mutableMapOf<String, Job>()
+    private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
 
     override fun onCreate() {
         super.onCreate()
@@ -64,6 +68,7 @@ class SessionService : Service() {
                     host,
                     SessionLoggerFactory(host.id)
                 )
+                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, null)
                 client.connect(host.host, host.port)
                 when (host.preferredAuth) {
                     AuthMethod.PASSWORD -> client.authPassword(host.username, "")
@@ -73,12 +78,18 @@ class SessionService : Service() {
                         client.authPassword(host.username, "")
                     }
                 }
+                updateSessionSnapshot(host, mode, SessionStatus.ACTIVE, null)
                 // TODO: keep shell/channel open, stream data, manage port forwards based on mode
                 client.disconnect()
             }.onFailure { e ->
                 if (e !is CancellationException) {
-                    // log/notify failure
+                    updateSessionSnapshot(host, mode, SessionStatus.ERROR, e.message)
                 }
+            }
+        }
+        job.invokeOnCompletion { throwable ->
+            if (throwable is CancellationException) {
+                removeSessionSnapshot(host.id)
             }
         }
         activeSessions[host.id] = job
@@ -90,11 +101,42 @@ class SessionService : Service() {
         activeSessions.remove(hostId)?.cancel()
         cancelHostNotification(hostId)
         updateSummaryNotification()
+        removeSessionSnapshot(hostId)
     }
 
     fun stopAllSessions() {
         val ids = activeSessions.keys.toList()
         ids.forEach { stopSession(it) }
+    }
+
+    fun sendKeyboardShortcut(hostId: String, shortcut: String) {
+        if (shortcut.isBlank()) return
+        if (!activeSessions.containsKey(hostId)) return
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Shortcut \"$shortcut\" tapped"
+            )
+        )
+    }
+
+    fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
+
+    private fun updateSessionSnapshot(host: HostConnection, mode: ConnectionMode, status: SessionStatus, message: String?) {
+        val snapshot = SessionSnapshot(
+            hostId = host.id,
+            host = host,
+            mode = mode,
+            status = status,
+            statusMessage = message
+        )
+        sessionSnapshots.value = sessionSnapshots.value
+            .filterNot { it.hostId == host.id } + snapshot
+    }
+
+    private fun removeSessionSnapshot(hostId: String) {
+        sessionSnapshots.value = sessionSnapshots.value.filterNot { it.hostId == hostId }
     }
 
     private fun updateSummaryNotification() {
@@ -163,4 +205,14 @@ class SessionService : Service() {
         private const val ACTION_STOP = "com.sshpeaches.app.service.ACTION_STOP"
         private const val EXTRA_HOST_ID = "extra_host_id"
     }
+
+    data class SessionSnapshot(
+        val hostId: String,
+        val host: HostConnection,
+        val mode: ConnectionMode,
+        val status: SessionStatus,
+        val statusMessage: String?
+    )
+
+    enum class SessionStatus { CONNECTING, ACTIVE, ERROR }
 }

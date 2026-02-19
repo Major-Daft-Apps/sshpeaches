@@ -28,7 +28,8 @@ data class Identity(
     val favorite: Boolean = false,
     val tags: List<String> = emptyList(),
     val notes: String = "",
-    val hasPrivateKey: Boolean = false
+    val hasPrivateKey: Boolean = false,
+    val keyImportEpochMillis: Long? = null
 )
 
 data class PortForward(
