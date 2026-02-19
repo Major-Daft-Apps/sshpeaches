@@ -313,24 +313,26 @@ fun SSHPeachesRoot(
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        TopAppBar(
-                            title = { Text(currentTitle) },
-                            navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
-                                }
-                            },
-                            actions = {
-                                AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
-                                    IconButton(onClick = { editMode.value = !editMode.value }) {
-                                        Icon(
-                                            imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                            contentDescription = if (editing) "Done editing" else "Edit"
-                                        )
+                        if (currentRoute != Routes.CONNECTING) {
+                            TopAppBar(
+                                title = { Text(currentTitle) },
+                                navigationIcon = {
+                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                    }
+                                },
+                                actions = {
+                                    AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                        IconButton(onClick = { editMode.value = !editMode.value }) {
+                                            Icon(
+                                                imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                                contentDescription = if (editing) "Done editing" else "Edit"
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 ) { padding ->
                     NavHost(
