@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
@@ -500,6 +501,11 @@ private fun QuickConnectSheet(
 
 @Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
+    val makerLogo = if (isSystemInDarkTheme()) {
+        R.drawable.major_daft_apps_white
+    } else {
+        R.drawable.major_daft_apps_black
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -533,7 +539,18 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                         context.startActivity(intent)
                     }
                 )
-                Text("Created by Ali Sherief", style = MaterialTheme.typography.bodySmall)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = makerLogo),
+                        contentDescription = "Major Daft Apps logo",
+                        modifier = Modifier.size(20.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Text("Made by Major Daft Apps", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     )
