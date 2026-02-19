@@ -2,6 +2,7 @@ package com.sshpeaches.app.ui.navigation
 
 object Routes {
     const val FAVORITES = "favorites"
+    const val CONNECTING = "connecting"
     const val HOSTS = "hosts"
     const val IDENTITIES = "identities"
     const val FORWARDS = "forwards"
