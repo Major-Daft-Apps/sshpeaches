@@ -59,6 +59,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -102,6 +106,7 @@ import com.sshpeaches.app.service.SessionLogBus
 import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
 import java.util.UUID
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -278,6 +283,7 @@ fun SSHPeachesRoot(
     Box {
         ModalNavigationDrawer(
             drawerState = drawerState,
+            gesturesEnabled = currentRoute != Routes.CONNECTING,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -304,7 +310,10 @@ fun SSHPeachesRoot(
                                 }
                             }
                         },
-                        onQuickConnect = { showQuickConnect.value = true }
+                        onQuickConnect = {
+                            scope.launch { drawerState.close() }
+                            showQuickConnect.value = true
+                        }
                     )
                 }
             },
@@ -357,9 +366,8 @@ fun SSHPeachesRoot(
                                 state = quickConnectState.value,
                                 logs = logs,
                                 onClose = {
-                                    quickConnectRequest.value = null
-                                    quickConnectState.value = QuickConnectUiState()
                                     navController.popBackStack()
+                                    quickConnectRequest.value = null
                                 },
                                 onRetry = {
                                     quickConnectRequest.value?.let { current ->
@@ -499,13 +507,29 @@ fun SSHPeachesRoot(
                     password = password
                 )
                 showQuickConnect.value = false
-                navController.navigate(Routes.CONNECTING)
+                scope.launch {
+                    drawerState.close()
+                    navController.navigate(Routes.CONNECTING)
+                }
             }
         )
     }
 
     if (showAbout.value && !uiState.isLocked) {
         AboutDialog(onDismiss = { showAbout.value = false })
+    }
+}
+
+private class MaskPasswordWithTailReveal(
+    private val revealedIndex: Int
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val transformed = buildString(text.length) {
+            text.text.forEachIndexed { index, char ->
+                append(if (index == revealedIndex) char else '\u2022')
+            }
+        }
+        return TransformedText(AnnotatedString(transformed), OffsetMapping.Identity)
     }
 }
 
@@ -525,8 +549,21 @@ private fun QuickConnectSheet(
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }
         val password = remember { mutableStateOf("") }
+        val revealPasswordIndex = remember { mutableStateOf(-1) }
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
         val status = remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(password.value) {
+            if (password.value.isEmpty()) {
+                revealPasswordIndex.value = -1
+                return@LaunchedEffect
+            }
+            revealPasswordIndex.value = password.value.lastIndex
+            delay(700)
+            if (revealPasswordIndex.value == password.value.lastIndex) {
+                revealPasswordIndex.value = -1
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -561,6 +598,7 @@ private fun QuickConnectSheet(
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
                 singleLine = true,
+                visualTransformation = MaskPasswordWithTailReveal(revealPasswordIndex.value),
                 modifier = Modifier.fillMaxWidth()
             )
             if (keyboardSlots.any { it.isNotBlank() }) {
