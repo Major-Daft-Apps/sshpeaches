@@ -1,5 +1,6 @@
 package com.sshpeaches.app.ui.state
 
+import com.sshpeaches.app.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
@@ -17,12 +18,15 @@ import com.sshpeaches.app.data.repository.InMemoryAppRepository
 import com.sshpeaches.app.data.settings.SettingsStore
 import com.sshpeaches.app.security.SecurityManager
 import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.sshpeaches.app.ui.logging.UiDebugLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -196,64 +200,148 @@ class AppViewModel(
         initialValue = AppUiState()
     )
 
+    init {
+        if (BuildConfig.DEBUG) {
+            viewModelScope.launch {
+                uiState
+                    .map { stateFingerprint(it) }
+                    .distinctUntilChanged()
+                    .collect {
+                        UiDebugLog.state("AppViewModel.uiState", uiState.value)
+                    }
+            }
+        }
+    }
+
+    private fun logAction(action: String, details: String? = null) {
+        UiDebugLog.action(action, details)
+    }
+
+    private fun logResult(action: String, success: Boolean, details: String? = null) {
+        UiDebugLog.result(action, success, details)
+    }
+
+    private fun launchLogged(action: String, details: String? = null, work: suspend () -> Unit) {
+        logAction(action, details)
+        viewModelScope.launch {
+            try {
+                work()
+                logResult(action, true)
+            } catch (t: Throwable) {
+                UiDebugLog.error(action, t)
+                logResult(action, false, t.message ?: "exception")
+                throw t
+            }
+        }
+    }
+
+    private fun stateFingerprint(state: AppUiState): String = buildString {
+        append(state.hosts.size).append('|')
+        append(state.identities.size).append('|')
+        append(state.portForwards.size).append('|')
+        append(state.snippets.size).append('|')
+        append(state.sortMode).append('|')
+        append(state.themeMode).append('|')
+        append(state.allowBackgroundSessions).append('|')
+        append(state.biometricLockEnabled).append('|')
+        append(state.lockTimeout).append('|')
+        append(state.crashReportsEnabled).append('|')
+        append(state.analyticsEnabled).append('|')
+        append(state.diagnosticsLoggingEnabled).append('|')
+        append(state.includeIdentitiesInQr).append('|')
+        append(state.includeSettingsInQr).append('|')
+        append(state.autoStartForwards).append('|')
+        append(state.hostKeyPromptEnabled).append('|')
+        append(state.usageReportsEnabled).append('|')
+        append(state.pinConfigured).append('|')
+        append(state.isLocked).append('|')
+        append(state.keyboardSlots.joinToString(separator = ","))
+    }
+
     fun setSortMode(mode: SortMode) {
+        logAction("setSortMode", "mode=$mode")
         sortMode.value = mode
+        logResult("setSortMode", true)
     }
 
     fun setThemeMode(mode: ThemeMode) {
+        logAction("setThemeMode", "mode=$mode")
         themeModeFlow.value = mode
+        logResult("setThemeMode", true)
     }
 
     fun setBackgroundSessions(enabled: Boolean) {
-        viewModelScope.launch {
+        launchLogged("setBackgroundSessions", "enabled=$enabled") {
             SettingsStore.setAllowBackgroundSessions(enabled)
         }
     }
 
     fun setBiometricLock(enabled: Boolean) {
-        if (enabled && !SecurityManager.isPinSet()) return
-        viewModelScope.launch {
+        logAction("setBiometricLock", "enabled=$enabled")
+        if (enabled && !SecurityManager.isPinSet()) {
+            logResult("setBiometricLock", false, "pin-not-configured")
+            return
+        }
+        launchLogged("setBiometricLock", "enabled=$enabled") {
             SettingsStore.setBiometricLockEnabled(enabled)
         }
     }
 
     fun setLockTimeout(timeout: LockTimeout) {
+        logAction("setLockTimeout", "timeout=$timeout")
         lockTimeoutFlow.value = timeout
         if (!lockedFlow.value) {
             scheduleLockTimer(timeout)
         }
+        logResult("setLockTimeout", true, "locked=${lockedFlow.value}")
     }
 
     fun setCrashReports(enabled: Boolean) {
+        logAction("setCrashReports", "enabled=$enabled")
         crashReportsFlow.value = enabled
+        logResult("setCrashReports", true)
     }
 
     fun setAnalytics(enabled: Boolean) {
+        logAction("setAnalytics", "enabled=$enabled")
         analyticsFlow.value = enabled
+        logResult("setAnalytics", true)
     }
 
     fun setDiagnosticsLogging(enabled: Boolean) {
+        logAction("setDiagnosticsLogging", "enabled=$enabled")
         diagnosticsLoggingFlow.value = enabled
+        logResult("setDiagnosticsLogging", true)
     }
 
     fun setIncludeIdentities(enabled: Boolean) {
+        logAction("setIncludeIdentities", "enabled=$enabled")
         includeIdentitiesFlow.value = enabled
+        logResult("setIncludeIdentities", true)
     }
 
     fun setIncludeSettings(enabled: Boolean) {
+        logAction("setIncludeSettings", "enabled=$enabled")
         includeSettingsFlow.value = enabled
+        logResult("setIncludeSettings", true)
     }
 
     fun setAutoStartForwards(enabled: Boolean) {
+        logAction("setAutoStartForwards", "enabled=$enabled")
         autoStartForwardsFlow.value = enabled
+        logResult("setAutoStartForwards", true)
     }
 
     fun setHostKeyPrompt(enabled: Boolean) {
+        logAction("setHostKeyPrompt", "enabled=$enabled")
         hostKeyPromptFlow.value = enabled
+        logResult("setHostKeyPrompt", true)
     }
 
     fun setUsageReports(enabled: Boolean) {
+        logAction("setUsageReports", "enabled=$enabled")
         usageReportsFlow.value = enabled
+        logResult("setUsageReports", true)
     }
 
     fun addHost(
@@ -268,7 +356,14 @@ class AppViewModel(
         password: String?,
         suppliedId: String? = null
     ) {
-        if (name.isBlank() || host.isBlank() || username.isBlank()) return
+        logAction(
+            "addHost",
+            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, hasPasswordInput=${!password.isNullOrBlank()}"
+        )
+        if (name.isBlank() || host.isBlank() || username.isBlank()) {
+            logResult("addHost", false, "validation-failed")
+            return
+        }
         val id = suppliedId ?: UUID.randomUUID().toString()
         val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
         val hasPassword = !password.isNullOrBlank() && canStoreSecret
@@ -289,7 +384,7 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword
         )
-        viewModelScope.launch {
+        launchLogged("addHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.addHost(entry)
         }
     }
@@ -306,7 +401,12 @@ class AppViewModel(
         defaultMode: ConnectionMode,
         password: String?
     ) {
-        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        logAction("updateHost", "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, passwordProvided=${password != null}")
+        val existing = uiState.value.hosts.find { it.id == id }
+        if (existing == null) {
+            logResult("updateHost", false, "not-found")
+            return
+        }
         val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
         val hasPassword = when {
             !password.isNullOrBlank() && canStoreSecret -> {
@@ -330,14 +430,19 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword
         )
-        viewModelScope.launch {
+        launchLogged("updateHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.updateHost(updated)
         }
     }
 
     fun deleteHost(id: String) {
-        val existing = uiState.value.hosts.find { it.id == id } ?: return
-        viewModelScope.launch {
+        logAction("deleteHost", "hostId=$id")
+        val existing = uiState.value.hosts.find { it.id == id }
+        if (existing == null) {
+            logResult("deleteHost", false, "not-found")
+            return
+        }
+        launchLogged("deleteHost", "hostId=$id, hadPassword=${existing.hasPassword}") {
             if (existing.hasPassword) {
                 SecurityManager.clearHostPassword(id)
             }
@@ -355,7 +460,11 @@ class AppViewModel(
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        if (label.isBlank()) return
+        logAction("addPortForward", "labelBlank=${label.isBlank()}, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        if (label.isBlank()) {
+            logResult("addPortForward", false, "validation-failed")
+            return
+        }
         val forward = PortForward(
             id = UUID.randomUUID().toString(),
             label = label.trim(),
@@ -368,7 +477,7 @@ class AppViewModel(
             favorite = false,
             enabled = enabled
         )
-        viewModelScope.launch {
+        launchLogged("addPortForward", "forwardId=${forward.id}, type=$type") {
             repository.addPortForward(forward)
         }
     }
@@ -384,7 +493,12 @@ class AppViewModel(
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        val existing = uiState.value.portForwards.find { it.id == id } ?: return
+        logAction("updatePortForward", "forwardId=$id, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        val existing = uiState.value.portForwards.find { it.id == id }
+        if (existing == null) {
+            logResult("updatePortForward", false, "not-found")
+            return
+        }
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
             type = type,
@@ -395,34 +509,44 @@ class AppViewModel(
             enabled = enabled,
             associatedHosts = associatedHosts
         )
-        viewModelScope.launch {
+        launchLogged("updatePortForward", "forwardId=$id") {
             repository.updatePortForward(updated)
         }
     }
 
     fun deletePortForward(id: String) {
-        val existing = uiState.value.portForwards.find { it.id == id } ?: return
-        viewModelScope.launch {
+        logAction("deletePortForward", "forwardId=$id")
+        val existing = uiState.value.portForwards.find { it.id == id }
+        if (existing == null) {
+            logResult("deletePortForward", false, "not-found")
+            return
+        }
+        launchLogged("deletePortForward", "forwardId=$id") {
             repository.deletePortForward(existing)
         }
     }
 
     fun setPin(pin: String) {
+        logAction("setPin", "pinLength=${pin.length}")
         SecurityManager.setPin(pin)
         pinConfiguredFlow.value = true
         lockedFlow.value = SecurityManager.isLocked()
         lockTimerJob?.cancel()
         lockTimerJob = null
+        logResult("setPin", true, "locked=${lockedFlow.value}")
     }
 
     fun lockApp() {
+        logAction("lockApp")
         SecurityManager.lock()
         lockedFlow.value = SecurityManager.isLocked()
         lockTimerJob?.cancel()
         lockTimerJob = null
+        logResult("lockApp", true, "locked=${lockedFlow.value}")
     }
 
     fun unlockWithPin(pin: String): Boolean {
+        logAction("unlockWithPin", "pinLength=${pin.length}")
         val ok = SecurityManager.verifyPin(pin)
         if (ok) {
             lockedFlow.value = SecurityManager.isLocked()
@@ -430,26 +554,38 @@ class AppViewModel(
                 scheduleLockTimer(lockTimeoutFlow.value)
             }
         }
+        logResult("unlockWithPin", ok, "locked=${lockedFlow.value}")
         return ok
     }
 
     fun unlockWithBiometric() {
-        if (!SecurityManager.isPinSet()) return
+        logAction("unlockWithBiometric")
+        if (!SecurityManager.isPinSet()) {
+            logResult("unlockWithBiometric", false, "pin-not-configured")
+            return
+        }
         SecurityManager.unlock()
         lockedFlow.value = SecurityManager.isLocked()
         if (!lockedFlow.value) {
             scheduleLockTimer(lockTimeoutFlow.value)
         }
+        logResult("unlockWithBiometric", true, "locked=${lockedFlow.value}")
     }
 
     fun onUserInteraction() {
+        logAction("onUserInteraction", "locked=${lockedFlow.value}")
         if (!lockedFlow.value) {
             scheduleLockTimer(lockTimeoutFlow.value)
         }
+        logResult("onUserInteraction", true)
     }
 
     fun addIdentity(label: String, fingerprint: String, username: String?, suppliedId: String? = null, hasPrivateKey: Boolean = false) {
-        if (fingerprint.isBlank()) return
+        logAction("addIdentity", "labelBlank=${label.isBlank()}, fingerprintBlank=${fingerprint.isBlank()}, hasUsername=${!username.isNullOrBlank()}, hasPrivateKey=$hasPrivateKey")
+        if (fingerprint.isBlank()) {
+            logResult("addIdentity", false, "validation-failed")
+            return
+        }
         val identity = Identity(
             id = suppliedId ?: UUID.randomUUID().toString(),
             label = label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
@@ -460,26 +596,36 @@ class AppViewModel(
             favorite = false,
             hasPrivateKey = hasPrivateKey
         )
-        viewModelScope.launch {
+        launchLogged("addIdentity", "identityId=${identity.id}, hasPrivateKey=$hasPrivateKey") {
             repository.addIdentity(identity)
         }
     }
 
     fun updateIdentity(id: String, label: String, fingerprint: String, username: String?) {
-        val existing = uiState.value.identities.find { it.id == id } ?: return
+        logAction("updateIdentity", "identityId=$id, labelBlank=${label.isBlank()}, fingerprintBlank=${fingerprint.isBlank()}, hasUsername=${!username.isNullOrBlank()}")
+        val existing = uiState.value.identities.find { it.id == id }
+        if (existing == null) {
+            logResult("updateIdentity", false, "not-found")
+            return
+        }
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
             fingerprint = fingerprint.trim().ifBlank { existing.fingerprint },
             username = username?.takeIf { it.isNotBlank() }
         )
-        viewModelScope.launch {
+        launchLogged("updateIdentity", "identityId=$id") {
             repository.updateIdentity(updated)
         }
     }
 
     fun deleteIdentity(id: String) {
-        val existing = uiState.value.identities.find { it.id == id } ?: return
-        viewModelScope.launch {
+        logAction("deleteIdentity", "identityId=$id")
+        val existing = uiState.value.identities.find { it.id == id }
+        if (existing == null) {
+            logResult("deleteIdentity", false, "not-found")
+            return
+        }
+        launchLogged("deleteIdentity", "identityId=$id, hadPrivateKey=${existing.hasPrivateKey}") {
             if (existing.hasPrivateKey) {
                 SecurityManager.clearIdentityKey(id)
             }
@@ -488,50 +634,75 @@ class AppViewModel(
     }
 
     fun markIdentityHasKey(id: String, hasKey: Boolean) {
-        val current = uiState.value.identities.find { it.id == id } ?: return
-        if (current.hasPrivateKey == hasKey) return
+        logAction("markIdentityHasKey", "identityId=$id, hasKey=$hasKey")
+        val current = uiState.value.identities.find { it.id == id }
+        if (current == null) {
+            logResult("markIdentityHasKey", false, "not-found")
+            return
+        }
+        if (current.hasPrivateKey == hasKey) {
+            logResult("markIdentityHasKey", true, "no-change")
+            return
+        }
         val updated = current.copy(
             hasPrivateKey = hasKey,
             keyImportEpochMillis = if (hasKey) System.currentTimeMillis() else null
         )
-        viewModelScope.launch {
+        launchLogged("markIdentityHasKey", "identityId=$id, hasKey=$hasKey") {
             repository.updateIdentity(updated)
         }
     }
 
     fun importIdentityKeyFromPayload(id: String, payload: String, passphrase: String): Boolean {
-        return runCatching {
+        logAction("importIdentityKeyFromPayload", "identityId=$id, payloadLength=${payload.length}, passphraseLength=${passphrase.length}")
+        val ok = runCatching {
             SecurityManager.importIdentityKeyPayload(id, payload, passphrase)
             markIdentityHasKey(id, true)
+        }.onFailure { t ->
+            UiDebugLog.error("importIdentityKeyFromPayload", t, "identityId=$id")
         }.isSuccess
+        logResult("importIdentityKeyFromPayload", ok, "identityId=$id")
+        return ok
     }
 
     fun importIdentityKeyPlain(id: String, key: String): Boolean {
-        return runCatching {
+        logAction("importIdentityKeyPlain", "identityId=$id, keyLength=${key.length}")
+        val ok = runCatching {
             SecurityManager.storeIdentityKey(id, key)
             markIdentityHasKey(id, true)
+        }.onFailure { t ->
+            UiDebugLog.error("importIdentityKeyPlain", t, "identityId=$id")
         }.isSuccess
+        logResult("importIdentityKeyPlain", ok, "identityId=$id")
+        return ok
     }
 
     fun removeIdentityKey(id: String) {
+        logAction("removeIdentityKey", "identityId=$id")
         SecurityManager.clearIdentityKey(id)
         markIdentityHasKey(id, false)
+        logResult("removeIdentityKey", true, "identityId=$id")
     }
 
     fun updateKeyboardSlot(index: Int, value: String) {
-        if (index !in 0 until KeyboardLayoutDefaults.SLOT_COUNT) return
+        logAction("updateKeyboardSlot", "index=$index, valueBlank=${value.isBlank()}")
+        if (index !in 0 until KeyboardLayoutDefaults.SLOT_COUNT) {
+            logResult("updateKeyboardSlot", false, "index-out-of-range")
+            return
+        }
         val updated = keyboardSlotsFlow.value.toMutableList().also { list ->
             list[index] = value
         }.toList()
         keyboardSlotsFlow.value = updated
-        viewModelScope.launch {
+        launchLogged("updateKeyboardSlot", "index=$index") {
             SettingsStore.setKeyboardLayout(updated)
         }
     }
 
     fun resetKeyboardLayout() {
+        logAction("resetKeyboardLayout")
         keyboardSlotsFlow.value = KeyboardLayoutDefaults.DEFAULT_SLOTS
-        viewModelScope.launch {
+        launchLogged("resetKeyboardLayout") {
             SettingsStore.setKeyboardLayout(KeyboardLayoutDefaults.DEFAULT_SLOTS)
         }
     }

@@ -52,6 +52,7 @@ import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.OsFamily
 import com.sshpeaches.app.data.model.OsMetadata
+import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.security.SecurityManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -175,8 +176,8 @@ fun HostCard(
                     Text("Address: ${host.host}:${host.port}")
                     Text("User: ${host.username}")
                     host.group?.let { Text("Group: $it") }
-                    Text("Auth: ${host.preferredAuth}")
-                    Text("Default: ${host.defaultMode}")
+                    Text("Auth: ${host.preferredAuth.toSentenceCaseLabel()}")
+                    Text("Default: ${host.defaultMode.toSentenceCaseLabel()}")
                 }
             }
         )

@@ -2,6 +2,13 @@ package com.sshpeaches.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +50,7 @@ import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.components.decodeHostFromQr
 import com.sshpeaches.app.ui.state.SortMode
+import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.util.isValidHostAddress
 import com.sshpeaches.app.util.parsePort
 import com.journeyapps.barcodescanner.ScanContract
@@ -63,7 +71,7 @@ fun HostsScreen(
     onImportFromQr: () -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
     onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onStartSession: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {}
 ) {
     val search = remember { mutableStateOf("") }
@@ -86,6 +94,9 @@ fun HostsScreen(
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
+    val pendingConnect = remember { mutableStateOf<Pair<HostConnection, ConnectionMode>?>(null) }
+    val connectPassword = remember { mutableStateOf("") }
+    val connectPasswordError = remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -273,9 +284,36 @@ fun HostsScreen(
                 }
             }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HostCard(host = host, onAction = onStartSession)
-                    if (editMode) {
+                Column(
+                    modifier = Modifier.animateContentSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    HostCard(
+                        host = host,
+                        onAction = { selected, mode ->
+                            val needsPassword = selected.preferredAuth != AuthMethod.IDENTITY
+                            if (needsPassword && !selected.hasPassword) {
+                                pendingConnect.value = selected to mode
+                                connectPassword.value = ""
+                                connectPasswordError.value = null
+                            } else {
+                                onStartSession(selected, mode, null)
+                            }
+                        }
+                    )
+                    AnimatedVisibility(
+                        visible = editMode,
+                        enter = fadeIn(animationSpec = tween(220)) +
+                            slideInVertically(
+                                animationSpec = tween(220),
+                                initialOffsetY = { fullHeight -> fullHeight / 2 }
+                            ),
+                        exit = fadeOut(animationSpec = tween(180)) +
+                            slideOutVertically(
+                                animationSpec = tween(180),
+                                targetOffsetY = { fullHeight -> fullHeight / 2 }
+                            )
+                    ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             TextButton(onClick = { openDialog(host) }) { Text("Edit") }
                             TextButton(onClick = { onDeleteHost(host.id) }) { Text("Delete") }
@@ -322,37 +360,31 @@ fun HostsScreen(
                         onValueChange = { notesState.value = it },
                         label = { Text("Notes") }
                     )
-                    if (pinConfigured && canStoreCredentials) {
-                        OutlinedTextField(
-                            value = passwordState.value,
-                            onValueChange = { passwordState.value = it },
-                            label = {
-                                Text(
-                                    if (editingHost.value?.hasPassword == true)
-                                        "Password (leave blank to keep)"
-                                    else
-                                        "Password (optional)"
-                                )
-                            },
-                            visualTransformation = PasswordVisualTransformation()
-                        )
-                        if (editingHost.value?.hasPassword == true) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                androidx.compose.material3.Checkbox(
-                                    checked = clearPasswordState.value,
-                                    onCheckedChange = { clearPasswordState.value = it }
-                                )
-                                Text("Remove stored password")
-                            }
+                    OutlinedTextField(
+                        value = passwordState.value,
+                        onValueChange = { passwordState.value = it },
+                        label = {
+                            Text(
+                                if (editingHost.value?.hasPassword == true)
+                                    "Password (leave blank to keep)"
+                                else
+                                    "Password (optional)"
+                            )
+                        },
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    if (editingHost.value?.hasPassword == true) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Checkbox(
+                                checked = clearPasswordState.value,
+                                onCheckedChange = { clearPasswordState.value = it }
+                            )
+                            Text("Remove stored password")
                         }
-                    } else if (!pinConfigured) {
+                    }
+                    if (!pinConfigured || !canStoreCredentials) {
                         Text(
-                            "Set a PIN in Settings to store passwords securely.",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Text(
-                            "Unlock the app to edit stored passwords.",
+                            "Passwords are not saved right now. You will be prompted on connect.",
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -364,7 +396,7 @@ fun HostsScreen(
                         onExpandedChange = { authMenuExpanded.value = !authMenuExpanded.value }
                     ) {
                         TextField(
-                            value = authState.value.name,
+                            value = authState.value.toSentenceCaseLabel(),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Authentication") },
@@ -379,7 +411,7 @@ fun HostsScreen(
                         ) {
                             AuthMethod.values().forEach { method ->
                                 DropdownMenuItem(
-                                    text = { Text(method.name) },
+                                    text = { Text(method.toSentenceCaseLabel()) },
                                     onClick = {
                                         authState.value = method
                                         authMenuExpanded.value = false
@@ -393,7 +425,7 @@ fun HostsScreen(
                         onExpandedChange = { modeExpanded.value = !modeExpanded.value }
                     ) {
                         TextField(
-                            value = modeState.value.name,
+                            value = modeState.value.toSentenceCaseLabel(),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Default mode") },
@@ -408,7 +440,7 @@ fun HostsScreen(
                         ) {
                             ConnectionMode.values().forEach { mode ->
                                 DropdownMenuItem(
-                                    text = { Text(mode.name) },
+                                    text = { Text(mode.toSentenceCaseLabel()) },
                                     onClick = {
                                         modeState.value = mode
                                         modeExpanded.value = false
@@ -425,7 +457,6 @@ fun HostsScreen(
                         dialogError.value = "Enter a valid port between 1 and 65535."
                         return@TextButton
                     }
-                    val requiresPassword = authState.value != AuthMethod.IDENTITY
                     when {
                         nameState.value.isBlank() || hostState.value.isBlank() || userState.value.isBlank() -> {
                             dialogError.value = "Name, host, and username are required."
@@ -443,20 +474,7 @@ fun HostsScreen(
                             dialogError.value = "A host with that name already exists."
                             return@TextButton
                         }
-                        requiresPassword && !pinConfigured -> {
-                            dialogError.value = "Set a PIN to store passwords for password authentication."
-                            return@TextButton
-                        }
-                        requiresPassword && !canStoreCredentials -> {
-                            dialogError.value = "Unlock the app to store passwords."
-                            return@TextButton
-                        }
                         dialogError.value != null -> dialogError.value = null
-                    }
-                    val hasExistingPassword = editingHost.value?.hasPassword == true && !clearPasswordState.value
-                    if (requiresPassword && passwordState.value.isBlank() && !hasExistingPassword) {
-                        dialogError.value = "Password is required for the selected authentication method."
-                        return@TextButton
                     }
                     val passwordValue = when {
                         !pinConfigured || !canStoreCredentials -> null
@@ -505,6 +523,48 @@ fun HostsScreen(
                         }) { Text("Delete") }
                     }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    pendingConnect.value?.let { (host, mode) ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingConnect.value = null },
+            title = { Text("Enter password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Connect to ${host.name} (${host.host})")
+                    OutlinedTextField(
+                        value = connectPassword.value,
+                        onValueChange = { connectPassword.value = it },
+                        label = { Text("Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true
+                    )
+                    connectPasswordError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (connectPassword.value.isBlank()) {
+                        connectPasswordError.value = "Password is required."
+                        return@TextButton
+                    }
+                    val password = connectPassword.value
+                    pendingConnect.value = null
+                    connectPassword.value = ""
+                    connectPasswordError.value = null
+                    onStartSession(host, mode, password)
+                }) {
+                    Text("Connect")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingConnect.value = null }) {
+                    Text("Cancel")
                 }
             }
         )

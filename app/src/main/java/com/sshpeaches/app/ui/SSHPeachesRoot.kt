@@ -1,6 +1,7 @@
 package com.sshpeaches.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,11 +39,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,6 +65,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -67,30 +79,41 @@ import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
+import com.sshpeaches.app.service.SessionLoggerFactory
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.components.LockScreenOverlay
 import com.sshpeaches.app.ui.navigation.Routes
 import com.sshpeaches.app.ui.navigation.drawerDestinations
+import com.sshpeaches.app.ui.screens.ConnectingScreen
 import com.sshpeaches.app.ui.screens.FavoritesScreen
 import com.sshpeaches.app.ui.screens.HostsScreen
 import com.sshpeaches.app.ui.screens.IdentitiesScreen
 import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
 import com.sshpeaches.app.ui.screens.PortForwardScreen
+import com.sshpeaches.app.ui.screens.QuickConnectPhase
+import com.sshpeaches.app.ui.screens.QuickConnectRequest
+import com.sshpeaches.app.ui.screens.QuickConnectUiState
 import com.sshpeaches.app.ui.screens.SettingsScreen
 import com.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
+import com.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.sshpeaches.app.service.SessionLogBus
 import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
+import java.util.UUID
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,7 +143,7 @@ fun SSHPeachesRoot(
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
-    onStartSession: (HostConnection, ConnectionMode) -> Unit,
+    onStartSession: (HostConnection, ConnectionMode, String?) -> Unit,
     onStopSession: (String) -> Unit,
     onIdentityAdd: (String, String, String?, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
@@ -138,6 +161,8 @@ fun SSHPeachesRoot(
     val scope = rememberCoroutineScope()
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
+    val quickConnectRequest = remember { mutableStateOf<QuickConnectRequest?>(null) }
+    val quickConnectState = remember { mutableStateOf(QuickConnectUiState()) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val biometricPromptLaunched = remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -146,6 +171,7 @@ fun SSHPeachesRoot(
     val currentRoute = backStackEntry?.destination?.route ?: Routes.FAVORITES
     val currentTitle = when (currentRoute) {
         Routes.FAVORITES -> "Favorites"
+        Routes.CONNECTING -> "Connecting"
         Routes.HOSTS -> "Hosts"
         Routes.IDENTITIES -> "Identities"
         Routes.FORWARDS -> "Port Forwards"
@@ -176,14 +202,95 @@ fun SSHPeachesRoot(
         }
     }
 
+    LaunchedEffect(quickConnectRequest.value?.sessionId) {
+        val request = quickConnectRequest.value ?: return@LaunchedEffect
+        quickConnectState.value = QuickConnectUiState(
+            phase = QuickConnectPhase.CONNECTING,
+            message = "Connecting to ${request.host}:${request.port}..."
+        )
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = request.sessionId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Connecting as ${request.username} (${request.auth})"
+            )
+        )
+
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                val host = HostConnection(
+                    id = request.sessionId,
+                    name = request.host,
+                    host = request.host,
+                    port = request.port,
+                    username = request.username,
+                    preferredAuth = request.auth
+                )
+                val client = SshClientProvider.createClient(
+                    context = context,
+                    host = host,
+                    loggerFactory = SessionLoggerFactory(request.sessionId)
+                )
+                client.connect(request.host, request.port)
+                when (request.auth) {
+                    AuthMethod.PASSWORD -> client.authPassword(request.username, request.password)
+                    AuthMethod.IDENTITY -> client.authPublickey(request.username)
+                    AuthMethod.PASSWORD_AND_IDENTITY -> {
+                        runCatching { client.authPublickey(request.username) }
+                        client.authPassword(request.username, request.password)
+                    }
+                }
+                client.disconnect()
+            }
+        }
+
+        result.onSuccess {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = request.sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Connection completed successfully"
+                )
+            )
+            quickConnectState.value = QuickConnectUiState(
+                phase = QuickConnectPhase.SUCCESS,
+                message = "Connected successfully"
+            )
+        }.onFailure { error ->
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = request.sessionId,
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = error.message ?: "Connection failed"
+                )
+            )
+            quickConnectState.value = QuickConnectUiState(
+                phase = QuickConnectPhase.ERROR,
+                message = "Failed: ${error.message ?: "Unknown error"}"
+            )
+        }
+    }
+
     val snackbarHostState = remember { SnackbarHostState() }
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
         }
+    val sessionLogs = remember { mutableStateListOf<SessionLogBus.Entry>() }
+
+    LaunchedEffect(Unit) {
+        SessionLogBus.entries.collect { entry ->
+            sessionLogs.add(entry)
+            val overflow = sessionLogs.size - 400
+            if (overflow > 0) {
+                repeat(overflow) { sessionLogs.removeAt(0) }
+            }
+        }
+    }
 
     Box {
         ModalNavigationDrawer(
             drawerState = drawerState,
+            gesturesEnabled = currentRoute != Routes.CONNECTING,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -210,7 +317,10 @@ fun SSHPeachesRoot(
                                 }
                             }
                         },
-                        onQuickConnect = { showQuickConnect.value = true }
+                        onQuickConnect = {
+                            scope.launch { drawerState.close() }
+                            showQuickConnect.value = true
+                        }
                     )
                 }
             },
@@ -220,24 +330,33 @@ fun SSHPeachesRoot(
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        TopAppBar(
-                            title = { Text(currentTitle) },
-                            navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
-                                }
-                            },
-                            actions = {
-                                AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
-                                    IconButton(onClick = { editMode.value = !editMode.value }) {
-                                        Icon(
-                                            imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                            contentDescription = if (editing) "Done editing" else "Edit"
-                                        )
+                        if (currentRoute != Routes.CONNECTING) {
+                            TopAppBar(
+                                title = { Text(currentTitle) },
+                                navigationIcon = {
+                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                    }
+                                },
+                                actions = {
+                                    AnimatedContent(
+                                        targetState = editMode.value,
+                                        transitionSpec = {
+                                            (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
+                                                (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
+                                        },
+                                        label = "editMode"
+                                    ) { editing ->
+                                        IconButton(onClick = { editMode.value = !editMode.value }) {
+                                            Icon(
+                                                imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                                contentDescription = if (editing) "Done editing" else "Edit"
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 ) { padding ->
                     NavHost(
@@ -250,6 +369,28 @@ fun SSHPeachesRoot(
                     ) {
                         composable(Routes.FAVORITES) {
                             FavoritesScreen(section = uiState.favorites)
+                        }
+                        composable(Routes.CONNECTING) {
+                            val request = quickConnectRequest.value
+                            val logs = request?.let { current ->
+                                sessionLogs.filter { it.hostId == current.sessionId }
+                            } ?: emptyList()
+                            ConnectingScreen(
+                                request = request,
+                                state = quickConnectState.value,
+                                logs = logs,
+                                onClose = {
+                                    navController.popBackStack()
+                                    quickConnectRequest.value = null
+                                },
+                                onRetry = {
+                                    quickConnectRequest.value?.let { current ->
+                                        quickConnectRequest.value = current.copy(
+                                            sessionId = "quick-${UUID.randomUUID()}"
+                                        )
+                                    }
+                                }
+                            )
                         }
                         composable(Routes.HOSTS) {
                         HostsScreen(
@@ -345,6 +486,7 @@ fun SSHPeachesRoot(
         if (sessions.isNotEmpty()) {
             ActiveSessionsPanel(
                 sessions = sessions,
+                logs = sessionLogs,
                 keyboardSlots = uiState.keyboardSlots,
                 onStopSession = onStopSession,
                 onSendShortcut = onSendSessionShortcut,
@@ -368,7 +510,22 @@ fun SSHPeachesRoot(
     if (showQuickConnect.value && !uiState.isLocked) {
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
-            keyboardSlots = uiState.keyboardSlots
+            keyboardSlots = uiState.keyboardSlots,
+            onConnect = { host, port, username, auth, password ->
+                quickConnectRequest.value = QuickConnectRequest(
+                    sessionId = "quick-${UUID.randomUUID()}",
+                    host = host,
+                    port = port,
+                    username = username,
+                    auth = auth,
+                    password = password
+                )
+                showQuickConnect.value = false
+                scope.launch {
+                    drawerState.close()
+                    navController.navigate(Routes.CONNECTING)
+                }
+            }
         )
     }
 
@@ -377,22 +534,50 @@ fun SSHPeachesRoot(
     }
 }
 
+private class MaskPasswordWithTailReveal(
+    private val revealedIndex: Int
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val transformed = buildString(text.length) {
+            text.text.forEachIndexed { index, char ->
+                append(if (index == revealedIndex) char else '\u2022')
+            }
+        }
+        return TransformedText(AnnotatedString(transformed), OffsetMapping.Identity)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
-    keyboardSlots: List<String>
+    keyboardSlots: List<String>,
+    onConnect: (String, Int, String, AuthMethod, String) -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
         val host = remember { mutableStateOf("") }
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }
         val password = remember { mutableStateOf("") }
+        val revealPasswordIndex = remember { mutableStateOf(-1) }
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
         val status = remember { mutableStateOf<String?>(null) }
-        val isConnecting = remember { mutableStateOf(false) }
-        val scope = rememberCoroutineScope()
+
+        LaunchedEffect(password.value) {
+            if (password.value.isEmpty()) {
+                revealPasswordIndex.value = -1
+                return@LaunchedEffect
+            }
+            revealPasswordIndex.value = password.value.lastIndex
+            delay(700)
+            if (revealPasswordIndex.value == password.value.lastIndex) {
+                revealPasswordIndex.value = -1
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -427,6 +612,7 @@ private fun QuickConnectSheet(
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
                 singleLine = true,
+                visualTransformation = MaskPasswordWithTailReveal(revealPasswordIndex.value),
                 modifier = Modifier.fillMaxWidth()
             )
             if (keyboardSlots.any { it.isNotBlank() }) {
@@ -457,41 +643,16 @@ private fun QuickConnectSheet(
                         status.value = "Host and username required"
                         return@Button
                     }
-                    scope.launch(Dispatchers.IO) {
-                        isConnecting.value = true
-                        status.value = "Connecting..."
-                        runCatching {
-                            val client = SshClientProvider.createClient(
-                                context,
-                                HostConnection(
-                                    id = "quick",
-                                    name = hostValue,
-                                    host = hostValue,
-                                    port = portValue,
-                                    username = userValue,
-                                    preferredAuth = AuthMethod.PASSWORD
-                                )
-                            )
-                            client.connect(hostValue, portValue)
-                            when (auth.value) {
-                                AuthMethod.PASSWORD -> client.authPassword(userValue, password.value)
-                                AuthMethod.IDENTITY -> client.authPublickey(userValue)
-                                AuthMethod.PASSWORD_AND_IDENTITY -> {
-                                    runCatching { client.authPublickey(userValue) }
-                                    client.authPassword(userValue, password.value)
-                                }
-                            }
-                            client.disconnect()
-                        }.onSuccess {
-                            status.value = "Connected successfully"
-                        }.onFailure { e ->
-                            status.value = "Failed: ${e.message}"
-                        }
-                        isConnecting.value = false
-                    }
+                    onConnect(
+                        hostValue,
+                        portValue,
+                        userValue,
+                        auth.value,
+                        password.value
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isConnecting.value
+                enabled = true
             ) {
                 Text("Connect")
             }
@@ -560,6 +721,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
 @Composable
 private fun ActiveSessionsPanel(
     sessions: List<SessionSnapshot>,
+    logs: List<SessionLogBus.Entry>,
     keyboardSlots: List<String>,
     onStopSession: (String) -> Unit,
     onSendShortcut: (String, String) -> Unit,
@@ -576,14 +738,47 @@ private fun ActiveSessionsPanel(
         ) {
             Text("Active Sessions", style = MaterialTheme.typography.titleMedium)
             sessions.forEach { snapshot ->
+                val hostLogs = logs
+                    .asReversed()
+                    .filter { it.hostId == snapshot.hostId }
+                    .take(10)
+                    .asReversed()
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(snapshot.host.name, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "${snapshot.mode} • ${snapshot.status}",
+                        "${snapshot.mode.toSentenceCaseLabel()} | ${snapshot.status.toSentenceCaseLabel()}",
                         style = MaterialTheme.typography.bodySmall
                     )
                     snapshot.statusMessage?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (hostLogs.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text("Session Logs", style = MaterialTheme.typography.labelMedium)
+                            hostLogs.forEach { entry ->
+                                Text(
+                                    text = "[${entry.level}] ${entry.message}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = when (entry.level) {
+                                        SessionLogBus.LogLevel.ERROR -> MaterialTheme.colorScheme.error
+                                        SessionLogBus.LogLevel.WARN -> MaterialTheme.colorScheme.tertiary
+                                        SessionLogBus.LogLevel.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        SessionLogBus.LogLevel.DEBUG -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         keyboardSlots.forEach { slot ->
