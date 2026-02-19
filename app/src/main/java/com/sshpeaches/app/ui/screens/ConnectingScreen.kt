@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -79,7 +81,7 @@ fun ConnectingScreen(
     }
     val statusColor = when (state.phase) {
         QuickConnectPhase.ERROR -> Color(0xFFFF6B6B)
-        else -> Color.White
+        else -> colorResource(id = R.color.peachy_orange)
     }
 
     val hostName = request?.let { "${it.username}@${it.host}:${it.port}" } ?: "Quick Connect"
@@ -155,22 +157,38 @@ fun ConnectingScreen(
                     .weight(0.5f),
                 color = Color(0xFF080808)
             ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    items(renderedLogs) { log ->
-                        Text(
-                            text = log,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFFBDBDBD),
-                                fontSize = 11.sp
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(renderedLogs) { log ->
+                            Text(
+                                text = log,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFFBDBDBD),
+                                    fontSize = 11.sp
+                                )
                             )
-                        )
+                        }
                     }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF080808),
+                                        Color(0x00080808)
+                                    )
+                                )
+                            )
+                    )
                 }
             }
         }
