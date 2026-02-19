@@ -700,14 +700,14 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                         context.startActivity(intent)
                     }
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Image(
                         painter = painterResource(id = makerLogo),
                         contentDescription = "Major Daft Apps logo",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(96.dp),
                         contentScale = ContentScale.Fit
                     )
                     Text("Made by Major Daft Apps", style = MaterialTheme.typography.bodySmall)
