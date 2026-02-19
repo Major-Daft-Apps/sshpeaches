@@ -44,13 +44,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -59,7 +57,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -278,11 +275,6 @@ fun SSHPeachesRoot(
         scope.launch { snackbarHostState.showSnackbar(message) }
         }
     val sessionLogs = remember { mutableStateListOf<SessionLogBus.Entry>() }
-    val editIconRotation by animateFloatAsState(
-        targetValue = if (editMode.value) 180f else 0f,
-        animationSpec = tween(durationMillis = 260),
-        label = "editIconRotation"
-    )
 
     LaunchedEffect(Unit) {
         SessionLogBus.entries.collect { entry ->
@@ -357,8 +349,7 @@ fun SSHPeachesRoot(
                                         IconButton(onClick = { editMode.value = !editMode.value }) {
                                             Icon(
                                                 imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                                contentDescription = if (editing) "Done editing" else "Edit",
-                                                modifier = Modifier.graphicsLayer(rotationZ = editIconRotation)
+                                                contentDescription = if (editing) "Done editing" else "Edit"
                                             )
                                         }
                                     }

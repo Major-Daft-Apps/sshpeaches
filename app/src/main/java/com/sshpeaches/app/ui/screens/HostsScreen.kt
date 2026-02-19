@@ -3,10 +3,12 @@ package com.sshpeaches.app.ui.screens
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -282,7 +284,10 @@ fun HostsScreen(
                 }
             }
             items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.animateContentSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     HostCard(
                         host = host,
                         onAction = { selected, mode ->
@@ -298,8 +303,16 @@ fun HostsScreen(
                     )
                     AnimatedVisibility(
                         visible = editMode,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                        enter = fadeIn(animationSpec = tween(220)) +
+                            slideInVertically(
+                                animationSpec = tween(220),
+                                initialOffsetY = { fullHeight -> fullHeight / 2 }
+                            ),
+                        exit = fadeOut(animationSpec = tween(180)) +
+                            slideOutVertically(
+                                animationSpec = tween(180),
+                                targetOffsetY = { fullHeight -> fullHeight / 2 }
+                            )
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             TextButton(onClick = { openDialog(host) }) { Text("Edit") }
