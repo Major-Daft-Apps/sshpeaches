@@ -92,13 +92,16 @@ class MainActivity : FragmentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
             val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode) -> Unit = remember(sessionService) {
-                { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode ->
-                    UiDebugLog.action("uiStartSession", "hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}")
+            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit = remember(sessionService) {
+                { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode, password: String? ->
+                    UiDebugLog.action(
+                        "uiStartSession",
+                        "hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
+                    )
                     if (sessionService == null) {
                         UiDebugLog.result("uiStartSession", false, "service-not-ready")
                     } else {
-                        sessionService.startSession(host, mode)
+                        sessionService.startSession(host, mode, password)
                         UiDebugLog.result("uiStartSession", true, "hostId=${host.id}")
                     }
                 }

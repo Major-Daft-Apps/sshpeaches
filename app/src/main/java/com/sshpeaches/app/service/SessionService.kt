@@ -15,6 +15,7 @@ import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.ssh.SshClientProvider
+import com.sshpeaches.app.security.SecurityManager
 import com.sshpeaches.app.ui.logging.UiDebugLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,10 +67,28 @@ class SessionService : Service() {
         UiDebugLog.result("SessionService.onDestroy", true)
     }
 
-    fun startSession(host: HostConnection, mode: ConnectionMode) {
-        UiDebugLog.action("startSession", "hostId=${host.id}, mode=$mode, alreadyActive=${activeSessions.containsKey(host.id)}")
+    fun startSession(host: HostConnection, mode: ConnectionMode, passwordOverride: String? = null) {
+        UiDebugLog.action(
+            "startSession",
+            "hostId=${host.id}, mode=$mode, alreadyActive=${activeSessions.containsKey(host.id)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
+        )
         if (activeSessions.containsKey(host.id)) {
             UiDebugLog.result("startSession", false, "already-active hostId=${host.id}")
+            return
+        }
+        val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
+        val resolvedPassword = if (needsPassword) {
+            when {
+                !passwordOverride.isNullOrBlank() -> passwordOverride
+                host.hasPassword -> runCatching { SecurityManager.getHostPassword(host.id) }.getOrNull()
+                else -> null
+            }
+        } else {
+            null
+        }
+        if (needsPassword && resolvedPassword.isNullOrBlank()) {
+            updateSessionSnapshot(host, mode, SessionStatus.ERROR, "Password required. Enter password to connect.")
+            UiDebugLog.result("startSession", false, "missing-password hostId=${host.id}")
             return
         }
         val job = serviceScope.launch {
@@ -82,11 +101,11 @@ class SessionService : Service() {
                 updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, null)
                 client.connect(host.host, host.port)
                 when (host.preferredAuth) {
-                    AuthMethod.PASSWORD -> client.authPassword(host.username, "")
+                    AuthMethod.PASSWORD -> client.authPassword(host.username, resolvedPassword ?: "")
                     AuthMethod.IDENTITY -> client.authPublickey(host.username)
                     AuthMethod.PASSWORD_AND_IDENTITY -> {
                         runCatching { client.authPublickey(host.username) }
-                        client.authPassword(host.username, "")
+                        client.authPassword(host.username, resolvedPassword ?: "")
                     }
                 }
                 updateSessionSnapshot(host, mode, SessionStatus.ACTIVE, null)

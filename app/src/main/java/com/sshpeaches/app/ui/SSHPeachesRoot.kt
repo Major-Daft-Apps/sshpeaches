@@ -39,11 +39,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -52,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -102,6 +110,7 @@ import com.sshpeaches.app.ui.state.AppUiState
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
+import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.service.SessionLogBus
 import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
@@ -136,7 +145,7 @@ fun SSHPeachesRoot(
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
-    onStartSession: (HostConnection, ConnectionMode) -> Unit,
+    onStartSession: (HostConnection, ConnectionMode, String?) -> Unit,
     onStopSession: (String) -> Unit,
     onIdentityAdd: (String, String, String?, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
@@ -269,6 +278,11 @@ fun SSHPeachesRoot(
         scope.launch { snackbarHostState.showSnackbar(message) }
         }
     val sessionLogs = remember { mutableStateListOf<SessionLogBus.Entry>() }
+    val editIconRotation by animateFloatAsState(
+        targetValue = if (editMode.value) 180f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "editIconRotation"
+    )
 
     LaunchedEffect(Unit) {
         SessionLogBus.entries.collect { entry ->
@@ -332,11 +346,19 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 actions = {
-                                    AnimatedContent(targetState = editMode.value, label = "editMode") { editing ->
+                                    AnimatedContent(
+                                        targetState = editMode.value,
+                                        transitionSpec = {
+                                            (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
+                                                (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
+                                        },
+                                        label = "editMode"
+                                    ) { editing ->
                                         IconButton(onClick = { editMode.value = !editMode.value }) {
                                             Icon(
                                                 imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                                contentDescription = if (editing) "Done editing" else "Edit"
+                                                contentDescription = if (editing) "Done editing" else "Edit",
+                                                modifier = Modifier.graphicsLayer(rotationZ = editIconRotation)
                                             )
                                         }
                                     }
@@ -716,7 +738,7 @@ private fun ActiveSessionsPanel(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(snapshot.host.name, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "${snapshot.mode} | ${snapshot.status}",
+                        "${snapshot.mode.toSentenceCaseLabel()} | ${snapshot.status.toSentenceCaseLabel()}",
                         style = MaterialTheme.typography.bodySmall
                     )
                     snapshot.statusMessage?.let {
