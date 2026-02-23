@@ -154,6 +154,11 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
+            val resizeShell: (String, Int, Int) -> Unit = remember(sessionService) {
+                { hostId: String, columns: Int, rows: Int ->
+                    sessionService?.resizeShell(hostId, columns, rows)
+                }
+            }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
                 SSHPeachesRoot(
                     uiState = uiState,
@@ -243,6 +248,7 @@ class MainActivity : FragmentActivity() {
                     onToggleFavorite = viewModel::toggleFavorite,
                     onSendSessionShortcut = sendSessionShortcut,
                     onSendShellInput = sendShellInput,
+                    onResizeShell = resizeShell,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
                     hostKeyPrompts = hostKeyPrompts,

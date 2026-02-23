@@ -175,6 +175,7 @@ fun SSHPeachesRoot(
     onToggleFavorite: (String) -> Unit,
     onSendSessionShortcut: (String, String) -> Unit,
     onSendShellInput: (String, String) -> Unit,
+    onResizeShell: (String, Int, Int) -> Unit,
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
     hostKeyPrompts: List<HostKeyPrompt>,
@@ -189,6 +190,7 @@ fun SSHPeachesRoot(
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val quickConnectRequest = remember { mutableStateOf<QuickConnectRequest?>(null) }
     val quickConnectState = remember { mutableStateOf(QuickConnectUiState()) }
+    val pendingConnectingNavigation = remember { mutableStateOf(false) }
     val pendingFavoriteHostId = remember { mutableStateOf<String?>(null) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val biometricPromptLaunched = remember { mutableStateOf(false) }
@@ -268,6 +270,11 @@ fun SSHPeachesRoot(
                     message = snapshot.statusMessage ?: "Connection failed"
                 )
             }
+        }
+    }
+    LaunchedEffect(currentRoute, quickConnectRequest.value?.sessionId) {
+        if (currentRoute == Routes.CONNECTING || quickConnectRequest.value == null) {
+            pendingConnectingNavigation.value = false
         }
     }
 
@@ -392,17 +399,25 @@ fun SSHPeachesRoot(
                                         onSendShellInput(current.sessionId, input)
                                     }
                                 },
+                                onTerminalResize = { cols, rows ->
+                                    request?.let { current ->
+                                        onResizeShell(current.sessionId, cols, rows)
+                                    }
+                                },
                                 onClose = {
                                     request?.let { onStopSession(it.sessionId) }
+                                    pendingConnectingNavigation.value = false
                                     navController.popBackStack()
                                     quickConnectRequest.value = null
                                 },
                                 onRetry = {
                                     quickConnectRequest.value?.let { current ->
                                         onStopSession(current.sessionId)
-                                        val next = current.copy(
-                                            sessionId = "quick-${UUID.randomUUID()}"
-                                        )
+                                        val next = if (current.savedHostId == null) {
+                                            current.copy(sessionId = "quick-${UUID.randomUUID()}")
+                                        } else {
+                                            current.copy(sessionId = current.savedHostId)
+                                        }
                                         quickConnectRequest.value = next
                                         quickConnectState.value = QuickConnectUiState(
                                             phase = QuickConnectPhase.CONNECTING,
@@ -410,7 +425,7 @@ fun SSHPeachesRoot(
                                         )
                                         onStartSession(
                                             quickConnectHost(next),
-                                            ConnectionMode.SSH,
+                                            next.mode,
                                             next.password
                                         )
                                     }
@@ -431,7 +446,32 @@ fun SSHPeachesRoot(
                             onAdd = onHostAdd,
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
-                            onStartSession = onStartSession,
+                            onStartSession = { host, mode, password ->
+                                pendingConnectingNavigation.value = true
+                                quickConnectRequest.value = QuickConnectRequest(
+                                    sessionId = host.id,
+                                    name = host.name,
+                                    host = host.host,
+                                    port = host.port,
+                                    username = host.username,
+                                    auth = host.preferredAuth,
+                                    password = password ?: "",
+                                    mode = mode,
+                                    savedHostId = host.id,
+                                    useMosh = host.useMosh,
+                                    forwardId = host.preferredForwardId,
+                                    script = host.startupScript
+                                )
+                                quickConnectState.value = QuickConnectUiState(
+                                    phase = QuickConnectPhase.CONNECTING,
+                                    message = "Connecting to ${host.host}:${host.port}..."
+                                )
+                                onStartSession(host, mode, password)
+                                scope.launch {
+                                    drawerState.close()
+                                    navController.navigate(Routes.CONNECTING)
+                                }
+                            },
                             onStopSession = onStopSession
                         )
                     }
@@ -532,7 +572,13 @@ fun SSHPeachesRoot(
                 }
             }
         }
-        if (sessions.isNotEmpty() && currentRoute != Routes.CONNECTING) {
+        if (
+            sessions.isNotEmpty() &&
+            currentRoute != Routes.CONNECTING &&
+            quickConnectRequest.value == null &&
+            !pendingConnectingNavigation.value &&
+            !showQuickConnect.value
+        ) {
             ActiveSessionsPanel(
                 sessions = sessions,
                 logs = sessionLogs,
@@ -561,8 +607,10 @@ fun SSHPeachesRoot(
             onDismiss = { showQuickConnect.value = false },
             portForwards = uiState.portForwards,
             onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, forwardId, script ->
+                var savedHostId: String? = null
                 if (pinToFavorites) {
                     val pinnedId = UUID.randomUUID().toString()
+                    savedHostId = pinnedId
                     onHostAdd(
                         host,
                         host,
@@ -582,17 +630,21 @@ fun SSHPeachesRoot(
                     pendingFavoriteHostId.value = pinnedId
                 }
                 quickConnectRequest.value = QuickConnectRequest(
-                    sessionId = "quick-${UUID.randomUUID()}",
+                    sessionId = savedHostId ?: "quick-${UUID.randomUUID()}",
+                    name = host,
                     host = host,
                     port = port,
                     username = username,
                     auth = auth,
                     password = password,
+                    mode = ConnectionMode.SSH,
+                    savedHostId = savedHostId,
                     useMosh = useMosh,
                     forwardId = forwardId,
                     script = script
                 )
                 quickConnectRequest.value?.let { request ->
+                    pendingConnectingNavigation.value = true
                     quickConnectState.value = QuickConnectUiState(
                         phase = QuickConnectPhase.CONNECTING,
                         message = "Connecting to ${request.host}:${request.port}..."
@@ -624,7 +676,7 @@ fun SSHPeachesRoot(
                     }
                     onStartSession(
                         quickConnectHost(request),
-                        ConnectionMode.SSH,
+                        request.mode,
                         request.password
                     )
                 }
@@ -768,13 +820,13 @@ fun SSHPeachesRoot(
 
 private fun quickConnectHost(request: QuickConnectRequest): HostConnection =
     HostConnection(
-        id = request.sessionId,
-        name = request.host,
+        id = request.savedHostId ?: request.sessionId,
+        name = request.name,
         host = request.host,
         port = request.port,
         username = request.username,
         preferredAuth = request.auth,
-        defaultMode = ConnectionMode.SSH,
+        defaultMode = request.mode,
         useMosh = request.useMosh,
         preferredForwardId = request.forwardId,
         startupScript = request.script

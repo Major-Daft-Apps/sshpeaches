@@ -15,6 +15,7 @@ import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.settings.SettingsStore
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.sshpeaches.app.security.SecurityManager
@@ -56,10 +57,20 @@ class SessionService : Service() {
     private val passwordPrompts = MutableStateFlow<List<PasswordPrompt>>(emptyList())
     private val passwordPromptWaiters = ConcurrentHashMap<String, CompletableFuture<PasswordResponse>>()
     private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
+    private val shellReadSequence = ConcurrentHashMap<String, Int>()
+    private val shellWriteSequence = ConcurrentHashMap<String, Int>()
+    @Volatile
+    private var diagnosticsEnabled: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
         UiDebugLog.action("SessionService.onCreate")
+        serviceScope.launch {
+            SettingsStore.diagnosticsEnabled.collect { enabled ->
+                diagnosticsEnabled = enabled
+            }
+        }
         createChannel()
         startForeground(
             NOTIFICATION_ID,
@@ -86,6 +97,9 @@ class SessionService : Service() {
         clearAllHostKeyPrompts()
         clearAllPasswordPrompts()
         shellOutput.value = emptyMap()
+        shellSizes.clear()
+        shellReadSequence.clear()
+        shellWriteSequence.clear()
         UiDebugLog.result("SessionService.onDestroy", true)
     }
 
@@ -268,6 +282,8 @@ class SessionService : Service() {
         updateSummaryNotification()
         removeSessionSnapshot(hostId)
         clearShellOutputForHost(hostId)
+        shellReadSequence.remove(hostId)
+        shellWriteSequence.remove(hostId)
         UiDebugLog.result("stopSession", true, "hostId=$hostId")
     }
 
@@ -372,8 +388,10 @@ class SessionService : Service() {
         }
         serviceScope.launch {
             runCatching {
-                shell.outputStream.write(text.toByteArray(StandardCharsets.UTF_8))
+                val bytes = text.toByteArray(StandardCharsets.UTF_8)
+                shell.outputStream.write(bytes)
                 shell.outputStream.flush()
+                emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
             }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -382,6 +400,21 @@ class SessionService : Service() {
                         message = "Failed to write to shell: ${err.message ?: "unknown error"}"
                     )
                 )
+            }
+        }
+    }
+
+    fun resizeShell(hostId: String, columns: Int, rows: Int) {
+        if (columns <= 0 || rows <= 0) return
+        val connection = activeConnections[hostId] ?: return
+        val shell = connection.shellBinding?.shell ?: return
+        if (connection.mode != ConnectionMode.SSH) return
+        val next = columns to rows
+        if (shellSizes[hostId] == next) return
+        shellSizes[hostId] = next
+        serviceScope.launch {
+            runCatching {
+                shell.changeWindowDimensions(columns, rows, 0, 0)
             }
         }
     }
@@ -571,18 +604,33 @@ class SessionService : Service() {
         val session = client.startSession()
         session.allocateDefaultPTY()
         val shell = session.startShell()
+        runCatching {
+            // Trigger an initial prompt on shells that wait for first input.
+            val bytes = "\n".toByteArray(StandardCharsets.UTF_8)
+            shell.outputStream.write(bytes)
+            shell.outputStream.flush()
+            emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
+        }
         serviceScope.launch {
             runCatching {
                 val buffer = ByteArray(2048)
                 while (true) {
                     val read = shell.inputStream.read(buffer)
-                    if (read < 0) break
+                    if (read < 0) {
+                        emitShellLifecycleDiagnostic(hostId, "RX EOF")
+                        break
+                    }
                     if (read > 0) {
                         val text = String(buffer, 0, read, StandardCharsets.UTF_8)
                         appendShellOutput(hostId, text)
+                        emitShellStreamDiagnostic(hostId = hostId, direction = "RX", payload = buffer, size = read)
                     }
                 }
             }.onFailure { err ->
+                emitShellLifecycleDiagnostic(
+                    hostId,
+                    "RX stream error: ${err::class.java.simpleName}: ${err.message ?: "unknown error"}"
+                )
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = hostId,
@@ -609,6 +657,81 @@ class SessionService : Service() {
         val updated = shellOutput.value.toMutableMap()
         updated.remove(hostId)
         shellOutput.value = updated
+        shellSizes.remove(hostId)
+        shellReadSequence.remove(hostId)
+        shellWriteSequence.remove(hostId)
+    }
+
+    private fun emitShellLifecycleDiagnostic(hostId: String, message: String) {
+        if (!diagnosticsEnabled) return
+        val line = "SHELL-DIAG $message"
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.DEBUG,
+                message = line
+            )
+        )
+        UiDebugLog.action("shellDiag", "hostId=$hostId, $message")
+    }
+
+    private fun emitShellStreamDiagnostic(
+        hostId: String,
+        direction: String,
+        payload: ByteArray,
+        size: Int
+    ) {
+        if (!diagnosticsEnabled || size <= 0) return
+        val sequenceMap = if (direction == "RX") shellReadSequence else shellWriteSequence
+        val seq = (sequenceMap[hostId] ?: 0) + 1
+        sequenceMap[hostId] = seq
+        val previewSize = minOf(size, SHELL_DIAG_PREVIEW_BYTES)
+        val hex = payload.toHexPreview(previewSize)
+        val ascii = payload.toAsciiPreview(previewSize)
+        val truncated = if (size > previewSize) " (+${size - previewSize} bytes)" else ""
+        val line = "SHELL-DIAG $direction#$seq bytes=$size hex=$hex ascii=\"$ascii\"$truncated"
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.DEBUG,
+                message = line
+            )
+        )
+        UiDebugLog.action("shellDiag", "hostId=$hostId, $direction#$seq bytes=$size")
+    }
+
+    private fun ByteArray.toHexPreview(length: Int): String {
+        if (length <= 0) return ""
+        val out = StringBuilder(length * 3)
+        for (index in 0 until length) {
+            if (index > 0) out.append(' ')
+            val value = this[index].toInt() and 0xFF
+            out.append(HEX_DIGITS[value ushr 4])
+            out.append(HEX_DIGITS[value and 0x0F])
+        }
+        return out.toString()
+    }
+
+    private fun ByteArray.toAsciiPreview(length: Int): String {
+        if (length <= 0) return ""
+        val out = StringBuilder(length * 2)
+        for (index in 0 until length) {
+            val value = this[index].toInt() and 0xFF
+            when (value) {
+                0x0A -> out.append("\\n")
+                0x0D -> out.append("\\r")
+                0x09 -> out.append("\\t")
+                0x08 -> out.append("\\b")
+                0x1B -> out.append("\\e")
+                in 0x20..0x7E -> out.append(value.toChar())
+                else -> {
+                    out.append("\\x")
+                    out.append(HEX_DIGITS[value ushr 4])
+                    out.append(HEX_DIGITS[value and 0x0F])
+                }
+            }
+        }
+        return out.toString()
     }
 
     private fun throwIfAttemptTimedOut(deadlineMillis: Long) {
@@ -717,6 +840,8 @@ class SessionService : Service() {
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
+        private const val SHELL_DIAG_PREVIEW_BYTES = 96
+        private val HEX_DIGITS = "0123456789ABCDEF".toCharArray()
     }
 
     private class ConnectionTimeoutException(message: String) : RuntimeException(message)
