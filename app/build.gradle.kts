@@ -82,6 +82,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.4.0")
     implementation("io.coil-kt:coil-svg:2.4.0")
     implementation("com.hierynomus:sshj:0.37.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

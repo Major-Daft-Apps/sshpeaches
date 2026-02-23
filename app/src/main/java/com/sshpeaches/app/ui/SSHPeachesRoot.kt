@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,6 +58,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -67,11 +71,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -110,6 +121,7 @@ import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.service.SessionLogBus
 import com.sshpeaches.app.service.SessionService.HostKeyPrompt
+import com.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
 import java.util.UUID
@@ -162,9 +174,13 @@ fun SSHPeachesRoot(
     onSnippetDelete: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onSendSessionShortcut: (String, String) -> Unit,
+    onSendShellInput: (String, String) -> Unit,
     sessions: List<SessionSnapshot>,
+    shellOutputs: Map<String, String>,
     hostKeyPrompts: List<HostKeyPrompt>,
-    onRespondToHostKeyPrompt: (String, Boolean) -> Unit
+    passwordPrompts: List<PasswordPrompt>,
+    onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
+    onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -362,10 +378,20 @@ fun SSHPeachesRoot(
                             val logs = request?.let { current ->
                                 sessionLogs.filter { it.hostId == current.sessionId }
                             } ?: emptyList()
+                            val shellOutput = request?.let { current ->
+                                shellOutputs[current.sessionId].orEmpty()
+                            }.orEmpty()
                             ConnectingScreen(
                                 request = request,
                                 state = quickConnectState.value,
                                 logs = logs,
+                                shellOutput = shellOutput,
+                                keyboardSlots = uiState.keyboardSlots,
+                                onSendShellInput = { input ->
+                                    request?.let { current ->
+                                        onSendShellInput(current.sessionId, input)
+                                    }
+                                },
                                 onClose = {
                                     request?.let { onStopSession(it.sessionId) }
                                     navController.popBackStack()
@@ -506,7 +532,7 @@ fun SSHPeachesRoot(
                 }
             }
         }
-        if (sessions.isNotEmpty()) {
+        if (sessions.isNotEmpty() && currentRoute != Routes.CONNECTING) {
             ActiveSessionsPanel(
                 sessions = sessions,
                 logs = sessionLogs,
@@ -533,7 +559,6 @@ fun SSHPeachesRoot(
     if (showQuickConnect.value && !uiState.isLocked) {
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
-            keyboardSlots = uiState.keyboardSlots,
             portForwards = uiState.portForwards,
             onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, forwardId, script ->
                 if (pinToFavorites) {
@@ -612,7 +637,9 @@ fun SSHPeachesRoot(
         )
     }
 
-    hostKeyPrompts.firstOrNull()?.let { prompt ->
+    val hostKeyPrompt = hostKeyPrompts.firstOrNull()
+    val passwordPrompt = if (hostKeyPrompt == null) passwordPrompts.firstOrNull() else null
+    hostKeyPrompt?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
             title = {
@@ -632,7 +659,7 @@ fun SSHPeachesRoot(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { onRespondToHostKeyPrompt(prompt.id, true) }) {
+                Button(onClick = { onRespondToHostKeyPrompt(prompt.id, true) }) {
                     Text("Yes")
                 }
             },
@@ -651,6 +678,84 @@ fun SSHPeachesRoot(
                     TextButton(onClick = { onRespondToHostKeyPrompt(prompt.id, false) }) {
                         Text("No")
                     }
+                }
+            }
+        )
+    }
+    val promptPassword = remember(passwordPrompt?.id) { mutableStateOf("") }
+    val promptSavePassword = remember(passwordPrompt?.id) { mutableStateOf(false) }
+    val passwordFocusRequester = remember(passwordPrompt?.id) { FocusRequester() }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(passwordPrompt?.id) {
+        if (passwordPrompt != null) {
+            passwordFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+    passwordPrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Password Required") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(prompt.reason)
+                    Text("${prompt.username}@${prompt.host}:${prompt.port}", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = promptPassword.value,
+                        onValueChange = { promptPassword.value = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (promptPassword.value.isNotBlank()) {
+                                    onRespondToPasswordPrompt(
+                                        prompt.id,
+                                        promptPassword.value,
+                                        prompt.allowSave && promptSavePassword.value
+                                    )
+                                }
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(passwordFocusRequester)
+                    )
+                    if (prompt.allowSave) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = promptSavePassword.value,
+                                onCheckedChange = { promptSavePassword.value = it }
+                            )
+                            Text("Save password for this host")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = promptPassword.value.isNotBlank(),
+                    onClick = {
+                        onRespondToPasswordPrompt(
+                            prompt.id,
+                            promptPassword.value,
+                            prompt.allowSave && promptSavePassword.value
+                        )
+                    }
+                ) {
+                    Text("Continue")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onRespondToPasswordPrompt(prompt.id, null, false) }) {
+                    Text("Cancel")
                 }
             }
         )
@@ -692,7 +797,6 @@ private class MaskPasswordWithTailReveal(
 @Composable
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
-    keyboardSlots: List<String>,
     portForwards: List<PortForward>,
     onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String) -> Unit
 ) {
@@ -779,19 +883,6 @@ private fun QuickConnectSheet(
                     userHistory.value.forEach { recent ->
                         OutlinedButton(onClick = { username.value = recent }) {
                             Text(recent)
-                        }
-                    }
-                }
-            }
-            if (keyboardSlots.any { it.isNotBlank() }) {
-                Text("Custom keys", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    keyboardSlots.forEach { slot ->
-                        OutlinedButton(
-                            onClick = { if (slot.isNotBlank()) password.value += slot },
-                            enabled = slot.isNotBlank()
-                        ) {
-                            Text(if (slot.isBlank()) "+" else slot)
                         }
                     }
                 }

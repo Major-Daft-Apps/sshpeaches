@@ -93,8 +93,10 @@ class MainActivity : FragmentActivity() {
             val sessionService = sessionServiceState.value
             val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+            val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+            val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
-                remember(sessionService, uiState.portForwards, uiState.autoStartForwards, uiState.autoTrustHostKey) {
+                remember(sessionService, uiState.portForwards, uiState.autoStartForwards, uiState.autoTrustHostKey, uiState.hosts) {
                 { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode, password: String? ->
                     UiDebugLog.action(
                         "uiStartSession",
@@ -109,7 +111,8 @@ class MainActivity : FragmentActivity() {
                             passwordOverride = password,
                             availableForwards = uiState.portForwards,
                             autoStartForwards = uiState.autoStartForwards,
-                            autoTrustUnknownHostKey = uiState.autoTrustHostKey
+                            autoTrustUnknownHostKey = uiState.autoTrustHostKey,
+                            allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id }
                         )
                         UiDebugLog.result("uiStartSession", true, "hostId=${host.id}")
                     }
@@ -141,6 +144,13 @@ class MainActivity : FragmentActivity() {
                         }
                     } else {
                         UiDebugLog.result("uiSendSessionShortcut", false, "blank-shortcut")
+                    }
+                }
+            }
+            val sendShellInput: (String, String) -> Unit = remember(sessionService) {
+                { hostId: String, value: String ->
+                    if (value.isNotBlank()) {
+                        sessionService?.sendShellInput(hostId, value)
                     }
                 }
             }
@@ -232,10 +242,16 @@ class MainActivity : FragmentActivity() {
                     onSnippetDelete = viewModel::deleteSnippet,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onSendSessionShortcut = sendSessionShortcut,
+                    onSendShellInput = sendShellInput,
                     sessions = sessionSnapshots,
+                    shellOutputs = shellOutputs,
                     hostKeyPrompts = hostKeyPrompts,
+                    passwordPrompts = passwordPrompts,
                     onRespondToHostKeyPrompt = { promptId, trust ->
                         sessionService?.respondToHostKeyPrompt(promptId, trust)
+                    },
+                    onRespondToPasswordPrompt = { promptId, password, savePassword ->
+                        sessionService?.respondToPasswordPrompt(promptId, password, savePassword)
                     }
                 )
             }

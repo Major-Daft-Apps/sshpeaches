@@ -19,6 +19,7 @@ import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.sshpeaches.app.security.SecurityManager
 import com.sshpeaches.app.ui.logging.UiDebugLog
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -35,7 +36,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.userauth.UserAuthException
 
 /**
  * Foreground service that keeps SSH/Mosh sessions alive.
@@ -50,6 +53,9 @@ class SessionService : Service() {
     private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
     private val hostKeyPrompts = MutableStateFlow<List<HostKeyPrompt>>(emptyList())
     private val hostKeyPromptWaiters = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
+    private val passwordPrompts = MutableStateFlow<List<PasswordPrompt>>(emptyList())
+    private val passwordPromptWaiters = ConcurrentHashMap<String, CompletableFuture<PasswordResponse>>()
+    private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
 
     override fun onCreate() {
         super.onCreate()
@@ -78,6 +84,8 @@ class SessionService : Service() {
         super.onDestroy()
         stopAllSessions()
         clearAllHostKeyPrompts()
+        clearAllPasswordPrompts()
+        shellOutput.value = emptyMap()
         UiDebugLog.result("SessionService.onDestroy", true)
     }
 
@@ -87,7 +95,8 @@ class SessionService : Service() {
         passwordOverride: String? = null,
         availableForwards: List<PortForward> = emptyList(),
         autoStartForwards: Boolean = true,
-        autoTrustUnknownHostKey: Boolean = true
+        autoTrustUnknownHostKey: Boolean = true,
+        allowPasswordSave: Boolean = false
     ) {
         UiDebugLog.action(
             "startSession",
@@ -98,41 +107,62 @@ class SessionService : Service() {
             return
         }
         val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
-        val resolvedPassword = if (needsPassword) {
+        val initialPassword = if (needsPassword) {
             when {
                 !passwordOverride.isNullOrBlank() -> passwordOverride
-                host.hasPassword -> runCatching { SecurityManager.getHostPassword(host.id) }.getOrNull()
-                else -> null
+                else -> runCatching { SecurityManager.getHostPassword(host.id) }.getOrNull()
             }
         } else {
             null
         }
-        if (needsPassword && resolvedPassword.isNullOrBlank()) {
-            updateSessionSnapshot(host, mode, SessionStatus.ERROR, "Password required. Enter password to connect.")
-            UiDebugLog.result("startSession", false, "missing-password hostId=${host.id}")
-            return
-        }
         val job = serviceScope.launch {
             var client: SSHClient? = null
+            var shellBinding: ShellBinding? = null
+            val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
             runCatching {
+                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
                 client = SshClientProvider.createClient(
                     this@SessionService,
                     host,
                     SessionLoggerFactory(host.id),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
                     onHostKeyPrompt = { prompt ->
-                        awaitHostKeyDecision(host.id, prompt)
+                        awaitHostKeyDecision(host.id, prompt, attemptDeadlineMillis)
                     }
                 )
-                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, null)
+                throwIfAttemptTimedOut(attemptDeadlineMillis)
                 client!!.connect(host.host, host.port)
+                throwIfAttemptTimedOut(attemptDeadlineMillis)
                 when (host.preferredAuth) {
-                    AuthMethod.PASSWORD -> client!!.authPassword(host.username, resolvedPassword ?: "")
-                    AuthMethod.IDENTITY -> client!!.authPublickey(host.username)
+                    AuthMethod.PASSWORD -> {
+                        authenticateWithPassword(
+                            client = client!!,
+                            host = host,
+                            mode = mode,
+                            initialPassword = initialPassword,
+                            deadlineMillis = attemptDeadlineMillis,
+                            allowPasswordSave = allowPasswordSave
+                        )
+                    }
+                    AuthMethod.IDENTITY -> {
+                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
+                        client!!.authPublickey(host.username)
+                    }
                     AuthMethod.PASSWORD_AND_IDENTITY -> {
                         runCatching { client!!.authPublickey(host.username) }
-                        client!!.authPassword(host.username, resolvedPassword ?: "")
+                        authenticateWithPassword(
+                            client = client!!,
+                            host = host,
+                            mode = mode,
+                            initialPassword = initialPassword,
+                            deadlineMillis = attemptDeadlineMillis,
+                            allowPasswordSave = allowPasswordSave
+                        )
                     }
+                }
+                if (mode == ConnectionMode.SSH) {
+                    updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting shell...")
+                    shellBinding = openShell(host.id, client!!)
                 }
                 if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
                     runCatching {
@@ -177,7 +207,8 @@ class SessionService : Service() {
                 activeConnections[host.id] = ActiveConnection(
                     host = host,
                     mode = mode,
-                    client = client!!
+                    client = client!!,
+                    shellBinding = shellBinding
                 )
                 val modeLabel = when (mode) {
                     ConnectionMode.SSH -> "Interactive shell session ready"
@@ -193,13 +224,21 @@ class SessionService : Service() {
                 }
             }.onFailure { e ->
                 if (e !is CancellationException) {
-                    updateSessionSnapshot(host, mode, SessionStatus.ERROR, e.message)
+                    clearHostKeyPromptsForHost(host.id, trust = false)
+                    clearPasswordPromptsForHost(host.id, password = null)
+                    val statusMessage = e.message ?: "Connection failed"
+                    updateSessionSnapshot(host, mode, SessionStatus.ERROR, statusMessage)
                     UiDebugLog.error("startSession", e, "hostId=${host.id}, mode=$mode")
                     UiDebugLog.result("startSession", false, "hostId=${host.id}, mode=$mode")
                 }
             }
+            runCatching { shellBinding?.shell?.close() }
+            runCatching { shellBinding?.session?.close() }
             runCatching { client?.disconnect() }
             activeConnections.remove(host.id)
+            clearHostKeyPromptsForHost(host.id, trust = false)
+            clearPasswordPromptsForHost(host.id, password = null)
+            clearShellOutputForHost(host.id)
         }
         job.invokeOnCompletion {
             activeJobs.remove(host.id)
@@ -218,13 +257,17 @@ class SessionService : Service() {
     fun stopSession(hostId: String) {
         UiDebugLog.action("stopSession", "hostId=$hostId")
         clearHostKeyPromptsForHost(hostId, trust = false)
+        clearPasswordPromptsForHost(hostId, password = null)
         activeConnections.remove(hostId)?.let { connection ->
+            runCatching { connection.shellBinding?.shell?.close() }
+            runCatching { connection.shellBinding?.session?.close() }
             runCatching { connection.client.disconnect() }
         }
         activeJobs.remove(hostId)?.cancel()
         cancelHostNotification(hostId)
         updateSummaryNotification()
         removeSessionSnapshot(hostId)
+        clearShellOutputForHost(hostId)
         UiDebugLog.result("stopSession", true, "hostId=$hostId")
     }
 
@@ -297,13 +340,57 @@ class SessionService : Service() {
 
     fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
     fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPrompts.asStateFlow()
+    fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPrompts.asStateFlow()
+    fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutput.asStateFlow()
 
     fun respondToHostKeyPrompt(promptId: String, trust: Boolean) {
         hostKeyPromptWaiters.remove(promptId)?.complete(trust)
         hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
     }
 
-    private fun awaitHostKeyDecision(hostId: String, prompt: SshHostKeyPrompt): Boolean {
+    fun respondToPasswordPrompt(promptId: String, password: String?, savePassword: Boolean) {
+        passwordPromptWaiters.remove(promptId)?.complete(
+            PasswordResponse(
+                password = password,
+                savePassword = savePassword
+            )
+        )
+        passwordPrompts.value = passwordPrompts.value.filterNot { it.id == promptId }
+    }
+
+    fun sendShellInput(hostId: String, text: String) {
+        if (text.isEmpty()) return
+        val connection = activeConnections[hostId]
+        if (connection == null) {
+            UiDebugLog.result("sendShellInput", false, "session-not-active hostId=$hostId")
+            return
+        }
+        val shell = connection.shellBinding?.shell
+        if (connection.mode != ConnectionMode.SSH || shell == null) {
+            UiDebugLog.result("sendShellInput", false, "shell-not-available hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                shell.outputStream.write(text.toByteArray(StandardCharsets.UTF_8))
+                shell.outputStream.flush()
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "Failed to write to shell: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun awaitHostKeyDecision(
+        hostId: String,
+        prompt: SshHostKeyPrompt,
+        deadlineMillis: Long
+    ): Boolean {
         val promptId = UUID.randomUUID().toString()
         val waiter = CompletableFuture<Boolean>()
         val uiPrompt = HostKeyPrompt(
@@ -328,15 +415,60 @@ class SessionService : Service() {
                 message = warning
             )
         )
+        val remainingMillis = millisUntilDeadline(deadlineMillis)
+        if (remainingMillis <= 0L) {
+            throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
+        }
         return try {
-            waiter.get(2, TimeUnit.MINUTES)
+            waiter.get(remainingMillis, TimeUnit.MILLISECONDS)
         } catch (_: TimeoutException) {
+            throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
+        } catch (_: CancellationException) {
             false
         } catch (_: Exception) {
             false
         } finally {
             hostKeyPromptWaiters.remove(promptId)
             hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
+        }
+    }
+
+    private fun awaitPasswordDecision(
+        host: HostConnection,
+        mode: ConnectionMode,
+        reason: String,
+        deadlineMillis: Long,
+        allowSave: Boolean
+    ): PasswordResponse? {
+        val promptId = UUID.randomUUID().toString()
+        val waiter = CompletableFuture<PasswordResponse>()
+        val prompt = PasswordPrompt(
+            id = promptId,
+            hostId = host.id,
+            host = host.host,
+            port = host.port,
+            username = host.username,
+            reason = reason,
+            allowSave = allowSave
+        )
+        passwordPromptWaiters[promptId] = waiter
+        passwordPrompts.value = passwordPrompts.value + prompt
+        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, reason)
+        val remainingMillis = millisUntilDeadline(deadlineMillis)
+        if (remainingMillis <= 0L) {
+            throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
+        }
+        return try {
+            waiter.get(remainingMillis, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
+        } catch (_: CancellationException) {
+            null
+        } catch (_: Exception) {
+            null
+        } finally {
+            passwordPromptWaiters.remove(promptId)
+            passwordPrompts.value = passwordPrompts.value.filterNot { it.id == promptId }
         }
     }
 
@@ -354,6 +486,140 @@ class SessionService : Service() {
         hostKeyPromptWaiters.values.forEach { it.complete(false) }
         hostKeyPromptWaiters.clear()
         hostKeyPrompts.value = emptyList()
+    }
+
+    private fun clearPasswordPromptsForHost(hostId: String, password: String?) {
+        val promptsForHost = passwordPrompts.value.filter { it.hostId == hostId }
+        promptsForHost.forEach { prompt ->
+            passwordPromptWaiters.remove(prompt.id)?.complete(
+                PasswordResponse(
+                    password = password,
+                    savePassword = false
+                )
+            )
+        }
+        if (promptsForHost.isNotEmpty()) {
+            passwordPrompts.value = passwordPrompts.value.filterNot { it.hostId == hostId }
+        }
+    }
+
+    private fun clearAllPasswordPrompts() {
+        passwordPromptWaiters.values.forEach {
+            it.complete(
+                PasswordResponse(
+                    password = null,
+                    savePassword = false
+                )
+            )
+        }
+        passwordPromptWaiters.clear()
+        passwordPrompts.value = emptyList()
+    }
+
+    private fun authenticateWithPassword(
+        client: SSHClient,
+        host: HostConnection,
+        mode: ConnectionMode,
+        initialPassword: String?,
+        deadlineMillis: Long,
+        allowPasswordSave: Boolean
+    ) {
+        var password = initialPassword
+        var savePassword = false
+        var failedAttempts = 0
+        while (true) {
+            throwIfAttemptTimedOut(deadlineMillis)
+            if (password.isNullOrBlank()) {
+                val reason = if (failedAttempts == 0) {
+                    "Password required. Enter password to continue."
+                } else {
+                    "Authentication failed. Enter password and try again."
+                }
+                val response = awaitPasswordDecision(
+                    host = host,
+                    mode = mode,
+                    reason = reason,
+                    deadlineMillis = deadlineMillis,
+                    allowSave = allowPasswordSave
+                )
+                password = response?.password
+                savePassword = response?.savePassword == true && allowPasswordSave
+                if (password.isNullOrBlank()) {
+                    throw RuntimeException("Connection canceled while waiting for password.")
+                }
+            }
+            try {
+                val currentPassword = password
+                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating as ${host.username}...")
+                client.authPassword(host.username, currentPassword)
+                if (savePassword) {
+                    runCatching { SecurityManager.storeHostPassword(host.id, currentPassword) }
+                }
+                return
+            } catch (_: UserAuthException) {
+                failedAttempts += 1
+                if (failedAttempts >= MAX_PASSWORD_PROMPT_ATTEMPTS) {
+                    throw RuntimeException("Authentication failed after $MAX_PASSWORD_PROMPT_ATTEMPTS attempts.")
+                }
+                password = null
+                savePassword = false
+            }
+        }
+    }
+
+    private fun openShell(hostId: String, client: SSHClient): ShellBinding {
+        val session = client.startSession()
+        session.allocateDefaultPTY()
+        val shell = session.startShell()
+        serviceScope.launch {
+            runCatching {
+                val buffer = ByteArray(2048)
+                while (true) {
+                    val read = shell.inputStream.read(buffer)
+                    if (read < 0) break
+                    if (read > 0) {
+                        val text = String(buffer, 0, read, StandardCharsets.UTF_8)
+                        appendShellOutput(hostId, text)
+                    }
+                }
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Shell stream ended: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+        return ShellBinding(session = session, shell = shell)
+    }
+
+    private fun appendShellOutput(hostId: String, text: String) {
+        if (text.isEmpty()) return
+        val current = shellOutput.value[hostId].orEmpty()
+        val next = (current + text).takeLast(MAX_SHELL_OUTPUT_CHARS)
+        val updated = shellOutput.value.toMutableMap()
+        updated[hostId] = next
+        shellOutput.value = updated
+    }
+
+    private fun clearShellOutputForHost(hostId: String) {
+        if (!shellOutput.value.containsKey(hostId)) return
+        val updated = shellOutput.value.toMutableMap()
+        updated.remove(hostId)
+        shellOutput.value = updated
+    }
+
+    private fun throwIfAttemptTimedOut(deadlineMillis: Long) {
+        if (millisUntilDeadline(deadlineMillis) <= 0L) {
+            throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
+        }
+    }
+
+    private fun millisUntilDeadline(deadlineMillis: Long): Long {
+        val remaining = deadlineMillis - System.currentTimeMillis()
+        return if (remaining > 0L) remaining else 0L
     }
 
     private fun updateSessionSnapshot(
@@ -447,12 +713,29 @@ class SessionService : Service() {
         private const val NOTIFICATION_ID = 42
         private const val ACTION_STOP = "com.sshpeaches.app.service.ACTION_STOP"
         private const val EXTRA_HOST_ID = "extra_host_id"
+        private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
+        private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
+        private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
+        private const val MAX_SHELL_OUTPUT_CHARS = 32_000
     }
+
+    private class ConnectionTimeoutException(message: String) : RuntimeException(message)
 
     private data class ActiveConnection(
         val host: HostConnection,
         val mode: ConnectionMode,
-        val client: SSHClient
+        val client: SSHClient,
+        val shellBinding: ShellBinding?
+    )
+
+    private data class ShellBinding(
+        val session: Session,
+        val shell: Session.Shell
+    )
+
+    private data class PasswordResponse(
+        val password: String?,
+        val savePassword: Boolean
     )
 
     data class SessionSnapshot(
@@ -470,6 +753,16 @@ class SessionService : Service() {
         val port: Int,
         val fingerprint: String,
         val keyChanged: Boolean
+    )
+
+    data class PasswordPrompt(
+        val id: String,
+        val hostId: String,
+        val host: String,
+        val port: Int,
+        val username: String,
+        val reason: String,
+        val allowSave: Boolean
     )
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }
