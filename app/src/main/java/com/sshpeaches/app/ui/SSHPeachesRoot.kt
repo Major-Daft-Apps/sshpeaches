@@ -78,16 +78,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
-import kotlinx.coroutines.Dispatchers
+import android.util.Base64
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.ssh.SshClientProvider
-import com.sshpeaches.app.service.SessionLoggerFactory
+import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.ui.components.AppDrawer
 import com.sshpeaches.app.ui.components.AuthChoice
 import com.sshpeaches.app.ui.components.LockScreenOverlay
@@ -110,10 +109,13 @@ import com.sshpeaches.app.ui.state.SortMode
 import com.sshpeaches.app.ui.state.ThemeMode
 import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.service.SessionLogBus
+import com.sshpeaches.app.service.SessionService.HostKeyPrompt
 import com.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.sshpeaches.app.R
 import java.util.UUID
 import kotlinx.coroutines.delay
+import org.json.JSONArray
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +127,7 @@ fun SSHPeachesRoot(
     onBackgroundModeChange: (Boolean) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
     onLockTimeoutChange: (LockTimeout) -> Unit,
+    onCustomLockTimeoutMinutesChange: (Int) -> Unit,
     onCrashReportsToggle: (Boolean) -> Unit,
     onAnalyticsToggle: (Boolean) -> Unit,
     onDiagnosticsToggle: (Boolean) -> Unit,
@@ -132,13 +135,14 @@ fun SSHPeachesRoot(
     onIncludeSettingsToggle: (Boolean) -> Unit,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit,
+    onAutoTrustHostKeyToggle: (Boolean) -> Unit,
     onUsageReportsToggle: (Boolean) -> Unit,
     onSetPin: (String) -> Unit,
     onLockApp: () -> Unit,
     onUnlockWithPin: (String) -> Boolean,
     onBiometricUnlock: () -> Unit,
-    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?, String?) -> Unit,
-    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?) -> Unit,
+    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?) -> Unit,
     onHostDelete: (String) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
@@ -153,8 +157,14 @@ fun SSHPeachesRoot(
     onRemoveIdentityKey: (String) -> Unit,
     onKeyboardSlotChange: (Int, String) -> Unit,
     onKeyboardReset: () -> Unit,
+    onSnippetAdd: (String, String, String) -> Unit,
+    onSnippetUpdate: (String, String, String, String) -> Unit,
+    onSnippetDelete: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
     onSendSessionShortcut: (String, String) -> Unit,
-    sessions: List<SessionSnapshot>
+    sessions: List<SessionSnapshot>,
+    hostKeyPrompts: List<HostKeyPrompt>,
+    onRespondToHostKeyPrompt: (String, Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -163,6 +173,7 @@ fun SSHPeachesRoot(
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val quickConnectRequest = remember { mutableStateOf<QuickConnectRequest?>(null) }
     val quickConnectState = remember { mutableStateOf(QuickConnectUiState()) }
+    val pendingFavoriteHostId = remember { mutableStateOf<String?>(null) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val biometricPromptLaunched = remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -202,72 +213,45 @@ fun SSHPeachesRoot(
         }
     }
 
-    LaunchedEffect(quickConnectRequest.value?.sessionId) {
-        val request = quickConnectRequest.value ?: return@LaunchedEffect
-        quickConnectState.value = QuickConnectUiState(
-            phase = QuickConnectPhase.CONNECTING,
-            message = "Connecting to ${request.host}:${request.port}..."
-        )
-        SessionLogBus.emit(
-            SessionLogBus.Entry(
-                hostId = request.sessionId,
-                level = SessionLogBus.LogLevel.INFO,
-                message = "Connecting as ${request.username} (${request.auth})"
-            )
-        )
-
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                val host = HostConnection(
-                    id = request.sessionId,
-                    name = request.host,
-                    host = request.host,
-                    port = request.port,
-                    username = request.username,
-                    preferredAuth = request.auth
-                )
-                val client = SshClientProvider.createClient(
-                    context = context,
-                    host = host,
-                    loggerFactory = SessionLoggerFactory(request.sessionId)
-                )
-                client.connect(request.host, request.port)
-                when (request.auth) {
-                    AuthMethod.PASSWORD -> client.authPassword(request.username, request.password)
-                    AuthMethod.IDENTITY -> client.authPublickey(request.username)
-                    AuthMethod.PASSWORD_AND_IDENTITY -> {
-                        runCatching { client.authPublickey(request.username) }
-                        client.authPassword(request.username, request.password)
-                    }
-                }
-                client.disconnect()
-            }
+    LaunchedEffect(uiState.hosts, pendingFavoriteHostId.value) {
+        val pendingId = pendingFavoriteHostId.value ?: return@LaunchedEffect
+        if (uiState.hosts.any { it.id == pendingId }) {
+            onToggleFavorite(pendingId)
+            pendingFavoriteHostId.value = null
         }
+    }
 
-        result.onSuccess {
-            SessionLogBus.emit(
-                SessionLogBus.Entry(
-                    hostId = request.sessionId,
-                    level = SessionLogBus.LogLevel.INFO,
-                    message = "Connection completed successfully"
+    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions) {
+        val request = quickConnectRequest.value ?: return@LaunchedEffect
+        val snapshot = sessions.firstOrNull { it.hostId == request.sessionId }
+        when (snapshot?.status) {
+            null -> {
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.CONNECTING,
+                    message = "Connecting to ${request.host}:${request.port}..."
                 )
-            )
-            quickConnectState.value = QuickConnectUiState(
-                phase = QuickConnectPhase.SUCCESS,
-                message = "Connected successfully"
-            )
-        }.onFailure { error ->
-            SessionLogBus.emit(
-                SessionLogBus.Entry(
-                    hostId = request.sessionId,
-                    level = SessionLogBus.LogLevel.ERROR,
-                    message = error.message ?: "Connection failed"
+            }
+
+            com.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.CONNECTING,
+                    message = snapshot.statusMessage ?: "Connecting to ${request.host}:${request.port}..."
                 )
-            )
-            quickConnectState.value = QuickConnectUiState(
-                phase = QuickConnectPhase.ERROR,
-                message = "Failed: ${error.message ?: "Unknown error"}"
-            )
+            }
+
+            com.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.SUCCESS,
+                    message = snapshot.statusMessage ?: "Connected successfully"
+                )
+            }
+
+            com.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.ERROR,
+                    message = snapshot.statusMessage ?: "Connection failed"
+                )
+            }
         }
     }
 
@@ -368,7 +352,10 @@ fun SSHPeachesRoot(
                             .padding(padding)
                     ) {
                         composable(Routes.FAVORITES) {
-                            FavoritesScreen(section = uiState.favorites)
+                            FavoritesScreen(
+                                section = uiState.favorites,
+                                onToggleFavorite = onToggleFavorite
+                            )
                         }
                         composable(Routes.CONNECTING) {
                             val request = quickConnectRequest.value
@@ -380,13 +367,25 @@ fun SSHPeachesRoot(
                                 state = quickConnectState.value,
                                 logs = logs,
                                 onClose = {
+                                    request?.let { onStopSession(it.sessionId) }
                                     navController.popBackStack()
                                     quickConnectRequest.value = null
                                 },
                                 onRetry = {
                                     quickConnectRequest.value?.let { current ->
-                                        quickConnectRequest.value = current.copy(
+                                        onStopSession(current.sessionId)
+                                        val next = current.copy(
                                             sessionId = "quick-${UUID.randomUUID()}"
+                                        )
+                                        quickConnectRequest.value = next
+                                        quickConnectState.value = QuickConnectUiState(
+                                            phase = QuickConnectPhase.CONNECTING,
+                                            message = "Connecting to ${next.host}:${next.port}..."
+                                        )
+                                        onStartSession(
+                                            quickConnectHost(next),
+                                            ConnectionMode.SSH,
+                                            next.password
                                         )
                                     }
                                 }
@@ -395,12 +394,14 @@ fun SSHPeachesRoot(
                         composable(Routes.HOSTS) {
                         HostsScreen(
                             hosts = uiState.hosts,
+                            portForwards = uiState.portForwards,
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
                             editMode = editMode.value,
                             pinConfigured = uiState.pinConfigured,
                             canStoreCredentials = uiState.pinConfigured && !uiState.isLocked,
-                            onImportFromQr = { /* TODO: implement QR decode + save host */ },
+                            onImportFromQr = { showMessage("Host imported from QR") },
+                            onToggleFavorite = onToggleFavorite,
                             onAdd = onHostAdd,
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
@@ -419,9 +420,10 @@ fun SSHPeachesRoot(
                             onImportIdentityKey = onImportIdentityKey,
                             onImportIdentityKeyPlain = onImportIdentityKeyPlain,
                             onRemoveIdentityKey = onRemoveIdentityKey,
+                            onToggleFavorite = onToggleFavorite,
                             onShowMessage = showMessage,
                             editMode = editMode.value,
-                            onImportFromQr = { /* TODO */ }
+                            onImportFromQr = { showMessage("Identity imported from QR") }
                         )
                     }
                         composable(Routes.FORWARDS) {
@@ -432,11 +434,26 @@ fun SSHPeachesRoot(
                                 onAdd = onPortForwardAdd,
                                 onUpdate = onPortForwardUpdate,
                                 onDelete = onPortForwardDelete,
-                                onImportFromQr = { /* TODO */ }
+                                onToggleFavorite = onToggleFavorite,
+                                onImportFromQr = { showMessage("Port forward imported from QR") }
                             )
                         }
                         composable(Routes.SNIPPETS) {
-                            SnippetManagerScreen(snippets = uiState.snippets)
+                            SnippetManagerScreen(
+                                snippets = uiState.snippets,
+                                onAdd = onSnippetAdd,
+                                onUpdate = onSnippetUpdate,
+                                onDelete = onSnippetDelete,
+                                onRun = { snippet ->
+                                    val target = sessions.firstOrNull()
+                                    if (target != null) {
+                                        onSendSessionShortcut(target.hostId, snippet.command)
+                                        showMessage("Ran snippet on ${target.host.name}")
+                                    } else {
+                                        showMessage("No active session to run snippet.")
+                                    }
+                                }
+                            )
                         }
                     composable(Routes.KEYBOARD) {
                         KeyboardEditorScreen(
@@ -455,6 +472,8 @@ fun SSHPeachesRoot(
                                 onBiometricToggle = onBiometricToggle,
                                 lockTimeout = uiState.lockTimeout,
                                 onLockTimeoutChange = onLockTimeoutChange,
+                                customLockTimeoutMinutes = uiState.customLockTimeoutMinutes,
+                                onCustomLockTimeoutMinutesChange = onCustomLockTimeoutMinutesChange,
                                 crashReportsEnabled = uiState.crashReportsEnabled,
                                 onCrashReportsToggle = onCrashReportsToggle,
                                 analyticsEnabled = uiState.analyticsEnabled,
@@ -469,6 +488,8 @@ fun SSHPeachesRoot(
                                 onAutoStartForwardsToggle = onAutoStartForwardsToggle,
                                 hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
                                 onHostKeyPromptToggle = onHostKeyPromptToggle,
+                                autoTrustHostKey = uiState.autoTrustHostKey,
+                                onAutoTrustHostKeyToggle = onAutoTrustHostKeyToggle,
                                 usageReportsEnabled = uiState.usageReportsEnabled,
                                 onUsageReportsToggle = onUsageReportsToggle,
                                 pinConfigured = uiState.pinConfigured,
@@ -476,7 +497,9 @@ fun SSHPeachesRoot(
                                 biometricAvailable = biometricAvailable,
                                 onSetPin = onSetPin,
                                 onLockApp = onLockApp,
-                                onUnlockWithPin = onUnlockWithPin
+                                onUnlockWithPin = onUnlockWithPin,
+                                onGenerateExportPayload = { buildExportPayload(uiState) },
+                                onShowMessage = showMessage
                             )
                         }
                     }
@@ -511,15 +534,75 @@ fun SSHPeachesRoot(
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
             keyboardSlots = uiState.keyboardSlots,
-            onConnect = { host, port, username, auth, password ->
+            portForwards = uiState.portForwards,
+            onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, forwardId, script ->
+                if (pinToFavorites) {
+                    val pinnedId = UUID.randomUUID().toString()
+                    onHostAdd(
+                        host,
+                        host,
+                        port,
+                        username,
+                        auth,
+                        null,
+                        "",
+                        ConnectionMode.SSH,
+                        useMosh,
+                        forwardId,
+                        script,
+                        BackgroundBehavior.INHERIT,
+                        password,
+                        pinnedId
+                    )
+                    pendingFavoriteHostId.value = pinnedId
+                }
                 quickConnectRequest.value = QuickConnectRequest(
                     sessionId = "quick-${UUID.randomUUID()}",
                     host = host,
                     port = port,
                     username = username,
                     auth = auth,
-                    password = password
+                    password = password,
+                    useMosh = useMosh,
+                    forwardId = forwardId,
+                    script = script
                 )
+                quickConnectRequest.value?.let { request ->
+                    quickConnectState.value = QuickConnectUiState(
+                        phase = QuickConnectPhase.CONNECTING,
+                        message = "Connecting to ${request.host}:${request.port}..."
+                    )
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = request.sessionId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Connecting as ${request.username} (${request.auth})"
+                        )
+                    )
+                    if (request.useMosh) {
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = request.sessionId,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = "Mosh requested. Using SSH fallback in this MVP build."
+                            )
+                        )
+                    }
+                    request.forwardId?.let { selectedForward ->
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = request.sessionId,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = "Selected forward: $selectedForward"
+                            )
+                        )
+                    }
+                    onStartSession(
+                        quickConnectHost(request),
+                        ConnectionMode.SSH,
+                        request.password
+                    )
+                }
                 showQuickConnect.value = false
                 scope.launch {
                     drawerState.close()
@@ -529,10 +612,68 @@ fun SSHPeachesRoot(
         )
     }
 
+    hostKeyPrompts.firstOrNull()?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(if (prompt.keyChanged) "Host Key Changed" else "Trust Host Key?")
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (prompt.keyChanged) {
+                        Text(
+                            "WARNING: The host key for ${prompt.host}:${prompt.port} changed. " +
+                                "Only continue if you trust this change."
+                        )
+                    } else {
+                        Text("Do you want to trust this host key for ${prompt.host}:${prompt.port}?")
+                    }
+                    Text("Fingerprint: ${prompt.fingerprint}")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onRespondToHostKeyPrompt(prompt.id, true) }) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!prompt.keyChanged) {
+                        TextButton(
+                            onClick = {
+                                onAutoTrustHostKeyToggle(true)
+                                onRespondToHostKeyPrompt(prompt.id, true)
+                            }
+                        ) {
+                            Text("Yes (Don't Ask Again)")
+                        }
+                    }
+                    TextButton(onClick = { onRespondToHostKeyPrompt(prompt.id, false) }) {
+                        Text("No")
+                    }
+                }
+            }
+        )
+    }
+
     if (showAbout.value && !uiState.isLocked) {
         AboutDialog(onDismiss = { showAbout.value = false })
     }
 }
+
+private fun quickConnectHost(request: QuickConnectRequest): HostConnection =
+    HostConnection(
+        id = request.sessionId,
+        name = request.host,
+        host = request.host,
+        port = request.port,
+        username = request.username,
+        preferredAuth = request.auth,
+        defaultMode = ConnectionMode.SSH,
+        useMosh = request.useMosh,
+        preferredForwardId = request.forwardId,
+        startupScript = request.script
+    )
 
 private class MaskPasswordWithTailReveal(
     private val revealedIndex: Int
@@ -552,7 +693,8 @@ private class MaskPasswordWithTailReveal(
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
     keyboardSlots: List<String>,
-    onConnect: (String, Int, String, AuthMethod, String) -> Unit
+    portForwards: List<PortForward>,
+    onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -565,6 +707,12 @@ private fun QuickConnectSheet(
         val password = remember { mutableStateOf("") }
         val revealPasswordIndex = remember { mutableStateOf(-1) }
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
+        val pinToFavorites = remember { mutableStateOf(false) }
+        val useMosh = remember { mutableStateOf(false) }
+        val selectedForwardId = remember { mutableStateOf<String?>(null) }
+        val script = remember { mutableStateOf("") }
+        val hostHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
+        val userHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
         val status = remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(password.value) {
@@ -615,6 +763,26 @@ private fun QuickConnectSheet(
                 visualTransformation = MaskPasswordWithTailReveal(revealPasswordIndex.value),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (hostHistory.value.isNotEmpty()) {
+                Text("Last used hosts", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    hostHistory.value.forEach { recent ->
+                        OutlinedButton(onClick = { host.value = recent }) {
+                            Text(recent)
+                        }
+                    }
+                }
+            }
+            if (userHistory.value.isNotEmpty()) {
+                Text("Last used users", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    userHistory.value.forEach { recent ->
+                        OutlinedButton(onClick = { username.value = recent }) {
+                            Text(recent)
+                        }
+                    }
+                }
+            }
             if (keyboardSlots.any { it.isNotBlank() }) {
                 Text("Custom keys", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -633,6 +801,50 @@ private fun QuickConnectSheet(
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
                 AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
             }
+            if (portForwards.isNotEmpty()) {
+                Text("Forwarded port", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { selectedForwardId.value = null }) {
+                        Text("None")
+                    }
+                    portForwards.forEach { forward ->
+                        val selected = selectedForwardId.value == forward.id
+                        OutlinedButton(onClick = { selectedForwardId.value = forward.id }) {
+                            Text(if (selected) "✓ ${forward.label}" else forward.label)
+                        }
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = script.value,
+                onValueChange = { script.value = it },
+                label = { Text("Optional script") },
+                minLines = 2,
+                maxLines = 6,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Use Mosh")
+                androidx.compose.material3.Switch(
+                    checked = useMosh.value,
+                    onCheckedChange = { useMosh.value = it }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Pin to Favorites")
+                androidx.compose.material3.Switch(
+                    checked = pinToFavorites.value,
+                    onCheckedChange = { pinToFavorites.value = it }
+                )
+            }
             status.value?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             Button(
                 onClick = {
@@ -643,12 +855,18 @@ private fun QuickConnectSheet(
                         status.value = "Host and username required"
                         return@Button
                     }
+                    hostHistory.value = (listOf(hostValue) + hostHistory.value.filterNot { it.equals(hostValue, true) }).take(5)
+                    userHistory.value = (listOf(userValue) + userHistory.value.filterNot { it.equals(userValue, true) }).take(5)
                     onConnect(
                         hostValue,
                         portValue,
                         userValue,
                         auth.value,
-                        password.value
+                        password.value,
+                        pinToFavorites.value,
+                        useMosh.value,
+                        selectedForwardId.value,
+                        script.value
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -715,6 +933,70 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+private fun buildExportPayload(state: AppUiState): String {
+    val payload = JSONObject().apply {
+        put("v", 1)
+        put("exportedAt", System.currentTimeMillis())
+        put("hosts", JSONArray().apply {
+            state.hosts.forEach { host ->
+                put(JSONObject().apply {
+                    put("id", host.id)
+                    put("name", host.name)
+                    put("host", host.host)
+                    put("port", host.port)
+                    put("username", host.username)
+                    put("auth", host.preferredAuth.name)
+                    put("group", host.group)
+                    put("notes", host.notes)
+                    put("defaultMode", host.defaultMode.name)
+                    put("hasPassword", host.hasPassword)
+                })
+            }
+        })
+        if (state.includeIdentitiesInQr) {
+            put("identities", JSONArray().apply {
+                state.identities.forEach { identity ->
+                    put(JSONObject().apply {
+                        put("id", identity.id)
+                        put("label", identity.label)
+                        put("fingerprint", identity.fingerprint)
+                        put("username", identity.username)
+                        put("hasPrivateKey", identity.hasPrivateKey)
+                    })
+                }
+            })
+        }
+        if (state.includeSettingsInQr) {
+            put("settings", JSONObject().apply {
+                put("themeMode", state.themeMode.name)
+                put("allowBackgroundSessions", state.allowBackgroundSessions)
+                put("biometricLockEnabled", state.biometricLockEnabled)
+                put("lockTimeout", state.lockTimeout.name)
+                put("customLockTimeoutMinutes", state.customLockTimeoutMinutes)
+                put("autoStartForwards", state.autoStartForwards)
+                put("hostKeyPromptEnabled", state.hostKeyPromptEnabled)
+                put("autoTrustHostKey", state.autoTrustHostKey)
+            })
+        }
+        put("portForwards", JSONArray().apply {
+            state.portForwards.forEach { forward ->
+                put(JSONObject().apply {
+                    put("id", forward.id)
+                    put("label", forward.label)
+                    put("type", forward.type.name)
+                    put("sourceHost", forward.sourceHost)
+                    put("sourcePort", forward.sourcePort)
+                    put("destinationHost", forward.destinationHost)
+                    put("destinationPort", forward.destinationPort)
+                    put("associatedHosts", JSONArray(forward.associatedHosts))
+                    put("enabled", forward.enabled)
+                })
+            }
+        })
+    }.toString()
+    return Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
 }
 
 @OptIn(ExperimentalLayoutApi::class)

@@ -2,6 +2,7 @@ package com.sshpeaches.app.data.local
 
 import androidx.room.TypeConverter
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.OsFamily
 import com.sshpeaches.app.data.model.OsMetadata
@@ -38,6 +39,17 @@ object Converters {
     @JvmStatic
     fun toMode(value: String?): ConnectionMode =
         runCatching { ConnectionMode.valueOf(value ?: ConnectionMode.SSH.name) }.getOrDefault(ConnectionMode.SSH)
+
+    @TypeConverter
+    @JvmStatic
+    fun fromBackgroundBehavior(value: BackgroundBehavior?): String =
+        value?.name ?: BackgroundBehavior.INHERIT.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toBackgroundBehavior(value: String?): BackgroundBehavior =
+        runCatching { BackgroundBehavior.valueOf(value ?: BackgroundBehavior.INHERIT.name) }
+            .getOrDefault(BackgroundBehavior.INHERIT)
 
     @TypeConverter
     @JvmStatic

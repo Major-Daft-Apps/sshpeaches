@@ -20,7 +20,11 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     defaultMode = defaultMode,
     attachedForwards = attachedForwards,
     snippets = snippets,
-    hasPassword = hasPassword
+    hasPassword = hasPassword,
+    useMosh = useMosh,
+    preferredForwardId = preferredForwardId,
+    startupScript = startupScript,
+    backgroundBehavior = backgroundBehavior
 )
 
 fun HostConnection.asEntity(): HostEntity = HostEntity(
@@ -38,7 +42,11 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     defaultMode = defaultMode,
     attachedForwards = attachedForwards,
     snippets = snippets,
-    hasPassword = hasPassword
+    hasPassword = hasPassword,
+    useMosh = useMosh,
+    preferredForwardId = preferredForwardId,
+    startupScript = startupScript,
+    backgroundBehavior = backgroundBehavior
 )
 
 fun IdentityEntity.asModel(): Identity = Identity(

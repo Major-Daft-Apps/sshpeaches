@@ -26,8 +26,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.ThemeMode
 
@@ -42,6 +45,8 @@ fun SettingsScreen(
     onBiometricToggle: (Boolean) -> Unit,
     lockTimeout: LockTimeout,
     onLockTimeoutChange: (LockTimeout) -> Unit,
+    customLockTimeoutMinutes: Int,
+    onCustomLockTimeoutMinutesChange: (Int) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -56,6 +61,8 @@ fun SettingsScreen(
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     hostKeyPromptEnabled: Boolean,
     onHostKeyPromptToggle: (Boolean) -> Unit,
+    autoTrustHostKey: Boolean,
+    onAutoTrustHostKeyToggle: (Boolean) -> Unit,
     usageReportsEnabled: Boolean,
     onUsageReportsToggle: (Boolean) -> Unit,
     pinConfigured: Boolean,
@@ -63,7 +70,9 @@ fun SettingsScreen(
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
     onLockApp: () -> Unit,
-    onUnlockWithPin: (String) -> Boolean
+    onUnlockWithPin: (String) -> Boolean,
+    onGenerateExportPayload: () -> String,
+    onShowMessage: (String) -> Unit = {}
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
@@ -86,6 +95,8 @@ fun SettingsScreen(
     val showUnlockDialog = remember { mutableStateOf(false) }
     val unlockEntry = remember { mutableStateOf("") }
     val unlockError = remember { mutableStateOf<String?>(null) }
+    val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
+    val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -206,6 +217,22 @@ fun SettingsScreen(
                         }
                     }
                 }
+                if (lockTimeout == LockTimeout.CUSTOM) {
+                    OutlinedTextField(
+                        value = customMinutesState.value,
+                        onValueChange = { next ->
+                            val digits = next.filter { it.isDigit() }.take(3)
+                            customMinutesState.value = digits
+                            val parsed = digits.toIntOrNull()
+                            if (parsed != null) {
+                                onCustomLockTimeoutMinutesChange(parsed.coerceIn(1, 720))
+                            }
+                        },
+                        label = { Text("Custom timeout (minutes)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -215,6 +242,19 @@ fun SettingsScreen(
                         Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = hostKeyPromptEnabled, onCheckedChange = onHostKeyPromptToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Automatically trust host key")
+                        Text(
+                            "If disabled, you will be prompted before trusting unknown host keys.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(checked = autoTrustHostKey, onCheckedChange = onAutoTrustHostKeyToggle)
                 }
                 Text(
                     if (pinConfigured) "PIN lock configured. Status: ${if (isLocked) "Locked" else "Unlocked"}"
@@ -342,12 +382,52 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    // TODO: trigger QR generation flow
+                    val payload = onGenerateExportPayload()
+                    exportQrBitmap.value = runCatching {
+                        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
+                        val bmp = android.graphics.Bitmap.createBitmap(
+                            matrix.width,
+                            matrix.height,
+                            android.graphics.Bitmap.Config.ARGB_8888
+                        )
+                        for (x in 0 until matrix.width) {
+                            for (y in 0 until matrix.height) {
+                                bmp.setPixel(
+                                    x,
+                                    y,
+                                    if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                                )
+                            }
+                        }
+                        bmp
+                    }.getOrNull()
+                    if (exportQrBitmap.value == null) {
+                        onShowMessage("Unable to generate export QR.")
+                    }
                     showTransferDialog.value = false
                 }) { Text("Generate QR") }
             },
             dismissButton = {
                 TextButton(onClick = { showTransferDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
+    exportQrBitmap.value?.let { bitmap ->
+        AlertDialog(
+            onDismissRequest = { exportQrBitmap.value = null },
+            title = { Text("Export QR") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.foundation.Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Export QR",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Scan this QR on another device to import.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { exportQrBitmap.value = null }) { Text("Close") }
             }
         )
     }

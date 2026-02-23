@@ -14,28 +14,42 @@ import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
+import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.ssh.SshClientProvider
+import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.sshpeaches.app.security.SecurityManager
 import com.sshpeaches.app.ui.logging.UiDebugLog
+import java.util.UUID
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import net.schmizz.sshj.SSHClient
 
 /**
  * Foreground service that keeps SSH/Mosh sessions alive.
- * Currently a skeleton – actual session wiring to SshClientProvider will be added later.
+ * Sessions remain connected until explicitly stopped.
  */
 class SessionService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val binder = SessionBinder()
-    private val activeSessions = mutableMapOf<String, Job>()
+    private val activeJobs = mutableMapOf<String, Job>()
+    private val activeConnections = mutableMapOf<String, ActiveConnection>()
     private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
+    private val hostKeyPrompts = MutableStateFlow<List<HostKeyPrompt>>(emptyList())
+    private val hostKeyPromptWaiters = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
 
     override fun onCreate() {
         super.onCreate()
@@ -60,19 +74,26 @@ class SessionService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        UiDebugLog.action("SessionService.onDestroy", "activeSessions=${activeSessions.size}")
+        UiDebugLog.action("SessionService.onDestroy", "activeSessions=${activeJobs.size}")
         super.onDestroy()
-        activeSessions.values.forEach { it.cancel() }
-        activeSessions.clear()
+        stopAllSessions()
+        clearAllHostKeyPrompts()
         UiDebugLog.result("SessionService.onDestroy", true)
     }
 
-    fun startSession(host: HostConnection, mode: ConnectionMode, passwordOverride: String? = null) {
+    fun startSession(
+        host: HostConnection,
+        mode: ConnectionMode,
+        passwordOverride: String? = null,
+        availableForwards: List<PortForward> = emptyList(),
+        autoStartForwards: Boolean = true,
+        autoTrustUnknownHostKey: Boolean = true
+    ) {
         UiDebugLog.action(
             "startSession",
-            "hostId=${host.id}, mode=$mode, alreadyActive=${activeSessions.containsKey(host.id)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
+            "hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(host.id)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
         )
-        if (activeSessions.containsKey(host.id)) {
+        if (activeJobs.containsKey(host.id)) {
             UiDebugLog.result("startSession", false, "already-active hostId=${host.id}")
             return
         }
@@ -92,26 +113,84 @@ class SessionService : Service() {
             return
         }
         val job = serviceScope.launch {
+            var client: SSHClient? = null
             runCatching {
-                val client = SshClientProvider.createClient(
+                client = SshClientProvider.createClient(
                     this@SessionService,
                     host,
-                    SessionLoggerFactory(host.id)
+                    SessionLoggerFactory(host.id),
+                    autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+                    onHostKeyPrompt = { prompt ->
+                        awaitHostKeyDecision(host.id, prompt)
+                    }
                 )
                 updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, null)
-                client.connect(host.host, host.port)
+                client!!.connect(host.host, host.port)
                 when (host.preferredAuth) {
-                    AuthMethod.PASSWORD -> client.authPassword(host.username, resolvedPassword ?: "")
-                    AuthMethod.IDENTITY -> client.authPublickey(host.username)
+                    AuthMethod.PASSWORD -> client!!.authPassword(host.username, resolvedPassword ?: "")
+                    AuthMethod.IDENTITY -> client!!.authPublickey(host.username)
                     AuthMethod.PASSWORD_AND_IDENTITY -> {
-                        runCatching { client.authPublickey(host.username) }
-                        client.authPassword(host.username, resolvedPassword ?: "")
+                        runCatching { client!!.authPublickey(host.username) }
+                        client!!.authPassword(host.username, resolvedPassword ?: "")
                     }
                 }
-                updateSessionSnapshot(host, mode, SessionStatus.ACTIVE, null)
-                // TODO: keep shell/channel open, stream data, manage port forwards based on mode
-                client.disconnect()
+                if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
+                    runCatching {
+                        client!!.startSession().use { shell ->
+                            val cmd = shell.exec(host.startupScript)
+                            cmd.join(12, TimeUnit.SECONDS)
+                            val output = runCatching { cmd.inputStream.bufferedReader().readText() }.getOrNull()
+                            if (!output.isNullOrBlank()) {
+                                SessionLogBus.emit(
+                                    SessionLogBus.Entry(
+                                        hostId = host.id,
+                                        level = SessionLogBus.LogLevel.INFO,
+                                        message = output.trim()
+                                    )
+                                )
+                            }
+                        }
+                    }.onFailure { err ->
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = host.id,
+                                level = SessionLogBus.LogLevel.WARN,
+                                message = "Startup script failed: ${err.message ?: "unknown error"}"
+                            )
+                        )
+                    }
+                }
+                val configuredForwards = if (autoStartForwards) {
+                    availableForwards.filter { it.enabled && it.associatedHosts.contains(host.id) }
+                } else {
+                    emptyList()
+                }
+                if (configuredForwards.isNotEmpty()) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = host.id,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Prepared ${configuredForwards.size} associated forward(s)"
+                        )
+                    )
+                }
+                activeConnections[host.id] = ActiveConnection(
+                    host = host,
+                    mode = mode,
+                    client = client!!
+                )
+                val modeLabel = when (mode) {
+                    ConnectionMode.SSH -> "Interactive shell session ready"
+                    ConnectionMode.SFTP -> "SFTP control session ready"
+                    ConnectionMode.SCP -> "SCP transfer session ready"
+                }
+                updateSessionSnapshot(host, mode, SessionStatus.ACTIVE, modeLabel)
                 UiDebugLog.result("startSession", true, "hostId=${host.id}, mode=$mode")
+
+                // Keep the connection alive until user stops it.
+                while (currentCoroutineContext().isActive) {
+                    delay(10_000)
+                }
             }.onFailure { e ->
                 if (e !is CancellationException) {
                     updateSessionSnapshot(host, mode, SessionStatus.ERROR, e.message)
@@ -119,20 +198,30 @@ class SessionService : Service() {
                     UiDebugLog.result("startSession", false, "hostId=${host.id}, mode=$mode")
                 }
             }
+            runCatching { client?.disconnect() }
+            activeConnections.remove(host.id)
         }
-        job.invokeOnCompletion { throwable ->
-            if (throwable is CancellationException) {
+        job.invokeOnCompletion {
+            activeJobs.remove(host.id)
+            activeConnections.remove(host.id)
+            cancelHostNotification(host.id)
+            updateSummaryNotification()
+            if (it is CancellationException) {
                 removeSessionSnapshot(host.id)
             }
         }
-        activeSessions[host.id] = job
+        activeJobs[host.id] = job
         showHostNotification(host)
         updateSummaryNotification()
     }
 
     fun stopSession(hostId: String) {
         UiDebugLog.action("stopSession", "hostId=$hostId")
-        activeSessions.remove(hostId)?.cancel()
+        clearHostKeyPromptsForHost(hostId, trust = false)
+        activeConnections.remove(hostId)?.let { connection ->
+            runCatching { connection.client.disconnect() }
+        }
+        activeJobs.remove(hostId)?.cancel()
         cancelHostNotification(hostId)
         updateSummaryNotification()
         removeSessionSnapshot(hostId)
@@ -140,8 +229,8 @@ class SessionService : Service() {
     }
 
     fun stopAllSessions() {
-        UiDebugLog.action("stopAllSessions", "count=${activeSessions.size}")
-        val ids = activeSessions.keys.toList()
+        UiDebugLog.action("stopAllSessions", "count=${activeJobs.size}")
+        val ids = activeJobs.keys.toList()
         ids.forEach { stopSession(it) }
         UiDebugLog.result("stopAllSessions", true)
     }
@@ -152,23 +241,127 @@ class SessionService : Service() {
             UiDebugLog.result("sendKeyboardShortcut", false, "blank-shortcut")
             return
         }
-        if (!activeSessions.containsKey(hostId)) {
+        val connection = activeConnections[hostId]
+        if (connection == null) {
             UiDebugLog.result("sendKeyboardShortcut", false, "session-not-active hostId=$hostId")
             return
+        }
+        if (connection.mode != ConnectionMode.SSH) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "Snippet/shortcut execution is only available in SSH mode."
+                )
+            )
+            UiDebugLog.result("sendKeyboardShortcut", false, "unsupported-mode hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                connection.client.startSession().use { session ->
+                    val command = session.exec(shortcut)
+                    command.join(8, TimeUnit.SECONDS)
+                    val output = runCatching { command.inputStream.bufferedReader().readText() }.getOrNull()
+                    if (!output.isNullOrBlank()) {
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = hostId,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = output.trim()
+                            )
+                        )
+                    }
+                }
+            }.onSuccess {
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "Executed: $shortcut"
+                    )
+                )
+                UiDebugLog.result("sendKeyboardShortcut", true, "hostId=$hostId")
+            }.onFailure { error ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = error.message ?: "Command failed"
+                    )
+                )
+                UiDebugLog.result("sendKeyboardShortcut", false, "hostId=$hostId")
+            }
+        }
+    }
+
+    fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
+    fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPrompts.asStateFlow()
+
+    fun respondToHostKeyPrompt(promptId: String, trust: Boolean) {
+        hostKeyPromptWaiters.remove(promptId)?.complete(trust)
+        hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
+    }
+
+    private fun awaitHostKeyDecision(hostId: String, prompt: SshHostKeyPrompt): Boolean {
+        val promptId = UUID.randomUUID().toString()
+        val waiter = CompletableFuture<Boolean>()
+        val uiPrompt = HostKeyPrompt(
+            id = promptId,
+            hostId = hostId,
+            host = prompt.host,
+            port = prompt.port,
+            fingerprint = prompt.fingerprint,
+            keyChanged = prompt.keyChanged
+        )
+        hostKeyPromptWaiters[promptId] = waiter
+        hostKeyPrompts.value = hostKeyPrompts.value + uiPrompt
+        val warning = if (prompt.keyChanged) {
+            "WARNING: Host key changed for ${prompt.host}:${prompt.port} (${prompt.fingerprint})"
+        } else {
+            "Unknown host key for ${prompt.host}:${prompt.port} (${prompt.fingerprint})"
         }
         SessionLogBus.emit(
             SessionLogBus.Entry(
                 hostId = hostId,
-                level = SessionLogBus.LogLevel.INFO,
-                message = "Shortcut \"$shortcut\" tapped"
+                level = if (prompt.keyChanged) SessionLogBus.LogLevel.WARN else SessionLogBus.LogLevel.INFO,
+                message = warning
             )
         )
-        UiDebugLog.result("sendKeyboardShortcut", true, "hostId=$hostId")
+        return try {
+            waiter.get(2, TimeUnit.MINUTES)
+        } catch (_: TimeoutException) {
+            false
+        } catch (_: Exception) {
+            false
+        } finally {
+            hostKeyPromptWaiters.remove(promptId)
+            hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
+        }
     }
 
-    fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
+    private fun clearHostKeyPromptsForHost(hostId: String, trust: Boolean) {
+        val promptsForHost = hostKeyPrompts.value.filter { it.hostId == hostId }
+        promptsForHost.forEach { prompt ->
+            hostKeyPromptWaiters.remove(prompt.id)?.complete(trust)
+        }
+        if (promptsForHost.isNotEmpty()) {
+            hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.hostId == hostId }
+        }
+    }
 
-    private fun updateSessionSnapshot(host: HostConnection, mode: ConnectionMode, status: SessionStatus, message: String?) {
+    private fun clearAllHostKeyPrompts() {
+        hostKeyPromptWaiters.values.forEach { it.complete(false) }
+        hostKeyPromptWaiters.clear()
+        hostKeyPrompts.value = emptyList()
+    }
+
+    private fun updateSessionSnapshot(
+        host: HostConnection,
+        mode: ConnectionMode,
+        status: SessionStatus,
+        message: String?
+    ) {
         val snapshot = SessionSnapshot(
             hostId = host.id,
             host = host,
@@ -191,9 +384,9 @@ class SessionService : Service() {
 
     private fun updateSummaryNotification() {
         val summary = when {
-            activeSessions.isEmpty() -> "No active sessions"
-            activeSessions.size == 1 -> "Connected to 1 host"
-            else -> "Connected to ${activeSessions.size} hosts"
+            activeJobs.isEmpty() -> "No active sessions"
+            activeJobs.size == 1 -> "Connected to 1 host"
+            else -> "Connected to ${activeJobs.size} hosts"
         }
         val notif = buildNotification("SSHPeaches Sessions", summary)
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -256,12 +449,27 @@ class SessionService : Service() {
         private const val EXTRA_HOST_ID = "extra_host_id"
     }
 
+    private data class ActiveConnection(
+        val host: HostConnection,
+        val mode: ConnectionMode,
+        val client: SSHClient
+    )
+
     data class SessionSnapshot(
         val hostId: String,
         val host: HostConnection,
         val mode: ConnectionMode,
         val status: SessionStatus,
         val statusMessage: String?
+    )
+
+    data class HostKeyPrompt(
+        val id: String,
+        val hostId: String,
+        val host: String,
+        val port: Int,
+        val fingerprint: String,
+        val keyChanged: Boolean
     )
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }

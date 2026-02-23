@@ -3,6 +3,7 @@ package com.sshpeaches.app.ui.components
 import org.json.JSONObject
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
@@ -35,7 +36,13 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         defaultMode = runCatching { ConnectionMode.valueOf(modeName) }.getOrDefault(ConnectionMode.SSH),
         group = json.optString("group").takeIf { it.isNotBlank() },
         notes = json.optString("notes", ""),
-        hasPassword = json.optBoolean("hasPassword", false)
+        hasPassword = json.optBoolean("hasPassword", false),
+        useMosh = json.optBoolean("useMosh", false),
+        preferredForwardId = json.optString("preferredForwardId").takeIf { it.isNotBlank() },
+        startupScript = json.optString("startupScript", ""),
+        backgroundBehavior = runCatching {
+            BackgroundBehavior.valueOf(json.optString("backgroundBehavior", BackgroundBehavior.INHERIT.name))
+        }.getOrDefault(BackgroundBehavior.INHERIT)
     )
     val encrypted = json.optString("pwdPayload").takeIf { it.isNotBlank() }
     val legacy = json.optString("pwd").takeIf { it.isNotBlank() }?.let { encoded ->

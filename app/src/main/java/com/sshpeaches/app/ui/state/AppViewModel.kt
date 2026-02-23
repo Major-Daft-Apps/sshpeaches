@@ -8,11 +8,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
+import com.sshpeaches.app.data.model.Snippet
 import com.sshpeaches.app.data.repository.AppRepository
 import com.sshpeaches.app.data.repository.InMemoryAppRepository
 import com.sshpeaches.app.data.settings.SettingsStore
@@ -40,6 +42,7 @@ class AppViewModel(
     private val backgroundSessionsFlow = MutableStateFlow(true)
     private val biometricFlow = MutableStateFlow(false)
     private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
+    private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
     private val crashReportsFlow = MutableStateFlow(false)
     private val analyticsFlow = MutableStateFlow(false)
     private val diagnosticsLoggingFlow = MutableStateFlow(false)
@@ -47,6 +50,7 @@ class AppViewModel(
     private val includeSettingsFlow = MutableStateFlow(true)
     private val autoStartForwardsFlow = MutableStateFlow(true)
     private val hostKeyPromptFlow = MutableStateFlow(true)
+    private val autoTrustHostKeyFlow = MutableStateFlow(true)
     private val usageReportsFlow = MutableStateFlow(false)
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
@@ -71,8 +75,68 @@ class AppViewModel(
             }
         }
         viewModelScope.launch {
+            SettingsStore.themeMode.collect { mode ->
+                themeModeFlow.value = mode
+            }
+        }
+        viewModelScope.launch {
             SettingsStore.biometricLockEnabled.collect { enabled ->
                 biometricFlow.value = enabled && SecurityManager.isPinSet()
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.lockTimeout.collect { timeout ->
+                lockTimeoutFlow.value = timeout
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.customLockTimeoutMinutes.collect { minutes ->
+                customLockTimeoutMinutesFlow.value = minutes
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.crashReportsEnabled.collect { enabled ->
+                crashReportsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.analyticsEnabled.collect { enabled ->
+                analyticsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.diagnosticsEnabled.collect { enabled ->
+                diagnosticsLoggingFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.includeIdentities.collect { enabled ->
+                includeIdentitiesFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.includeSettings.collect { enabled ->
+                includeSettingsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.autoStartForwards.collect { enabled ->
+                autoStartForwardsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.hostKeyPromptEnabled.collect { enabled ->
+                hostKeyPromptFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.autoTrustHostKeyEnabled.collect { enabled ->
+                autoTrustHostKeyFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.usageReportsEnabled.collect { enabled ->
+                usageReportsFlow.value = enabled
             }
         }
         viewModelScope.launch {
@@ -108,6 +172,7 @@ class AppViewModel(
         val background: Boolean,
         val biometric: Boolean,
         val timeout: LockTimeout,
+        val customTimeoutMinutes: Int,
         val crash: Boolean,
         val analytics: Boolean,
         val diagnostics: Boolean
@@ -117,7 +182,8 @@ class AppViewModel(
         val theme: ThemeMode,
         val background: Boolean,
         val biometric: Boolean,
-        val timeout: LockTimeout
+        val timeout: LockTimeout,
+        val customTimeoutMinutes: Int
     )
 
     private data class SharePrefs(
@@ -125,6 +191,7 @@ class AppViewModel(
         val includeSettings: Boolean,
         val autoStart: Boolean,
         val hostKeyPrompt: Boolean,
+        val autoTrustHostKey: Boolean,
         val usage: Boolean
     )
 
@@ -132,9 +199,10 @@ class AppViewModel(
         themeModeFlow,
         backgroundSessionsFlow,
         biometricFlow,
-        lockTimeoutFlow
-    ) { theme, background, biometric, timeout ->
-        PrivacyPartial(theme, background, biometric, timeout)
+        lockTimeoutFlow,
+        customLockTimeoutMinutesFlow
+    ) { theme, background, biometric, timeout, customMinutes ->
+        PrivacyPartial(theme, background, biometric, timeout, customMinutes)
     }
 
     private val privacyPrefsFlow = combine(
@@ -148,20 +216,28 @@ class AppViewModel(
             background = partial.background,
             biometric = partial.biometric,
             timeout = partial.timeout,
+            customTimeoutMinutes = partial.customTimeoutMinutes,
             crash = crash,
             analytics = analytics,
             diagnostics = diagnostics
         )
     }
 
-    private val sharePrefsFlow = combine(
+    private val shareBasePrefsFlow = combine(
         includeIdentitiesFlow,
         includeSettingsFlow,
         autoStartForwardsFlow,
         hostKeyPromptFlow,
+        autoTrustHostKeyFlow
+    ) { includeIds, includeSettings, autoStart, hostKeyPrompt, autoTrustHostKey ->
+        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, autoTrustHostKey, false)
+    }
+
+    private val sharePrefsFlow = combine(
+        shareBasePrefsFlow,
         usageReportsFlow
-    ) { includeIds, includeSettings, autoStart, hostKeyPrompt, usage ->
-        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, usage)
+    ) { base, usage ->
+        base.copy(usage = usage)
     }
 
     private val coreUiState = combine(
@@ -176,6 +252,7 @@ class AppViewModel(
             allowBackgroundSessions = privacy.background,
             biometricLockEnabled = privacy.biometric,
             lockTimeout = privacy.timeout,
+            customLockTimeoutMinutes = privacy.customTimeoutMinutes,
             crashReportsEnabled = privacy.crash,
             analyticsEnabled = privacy.analytics,
             diagnosticsLoggingEnabled = privacy.diagnostics,
@@ -183,6 +260,7 @@ class AppViewModel(
             includeSettingsInQr = share.includeSettings,
             autoStartForwards = share.autoStart,
             hostKeyPromptEnabled = share.hostKeyPrompt,
+            autoTrustHostKey = share.autoTrustHostKey,
             usageReportsEnabled = share.usage,
             pinConfigured = pinSet,
             isLocked = locked
@@ -245,6 +323,7 @@ class AppViewModel(
         append(state.allowBackgroundSessions).append('|')
         append(state.biometricLockEnabled).append('|')
         append(state.lockTimeout).append('|')
+        append(state.customLockTimeoutMinutes).append('|')
         append(state.crashReportsEnabled).append('|')
         append(state.analyticsEnabled).append('|')
         append(state.diagnosticsLoggingEnabled).append('|')
@@ -252,6 +331,7 @@ class AppViewModel(
         append(state.includeSettingsInQr).append('|')
         append(state.autoStartForwards).append('|')
         append(state.hostKeyPromptEnabled).append('|')
+        append(state.autoTrustHostKey).append('|')
         append(state.usageReportsEnabled).append('|')
         append(state.pinConfigured).append('|')
         append(state.isLocked).append('|')
@@ -265,9 +345,9 @@ class AppViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        logAction("setThemeMode", "mode=$mode")
-        themeModeFlow.value = mode
-        logResult("setThemeMode", true)
+        launchLogged("setThemeMode", "mode=$mode") {
+            SettingsStore.setThemeMode(mode)
+        }
     }
 
     fun setBackgroundSessions(enabled: Boolean) {
@@ -288,60 +368,75 @@ class AppViewModel(
     }
 
     fun setLockTimeout(timeout: LockTimeout) {
-        logAction("setLockTimeout", "timeout=$timeout")
-        lockTimeoutFlow.value = timeout
-        if (!lockedFlow.value) {
-            scheduleLockTimer(timeout)
+        launchLogged("setLockTimeout", "timeout=$timeout") {
+            SettingsStore.setLockTimeout(timeout)
+            if (!lockedFlow.value) {
+                scheduleLockTimer(timeout)
+            }
         }
-        logResult("setLockTimeout", true, "locked=${lockedFlow.value}")
+    }
+
+    fun setCustomLockTimeoutMinutes(minutes: Int) {
+        launchLogged("setCustomLockTimeoutMinutes", "minutes=$minutes") {
+            SettingsStore.setCustomLockTimeoutMinutes(minutes)
+            if (!lockedFlow.value && lockTimeoutFlow.value == LockTimeout.CUSTOM) {
+                scheduleLockTimer(LockTimeout.CUSTOM)
+            }
+        }
     }
 
     fun setCrashReports(enabled: Boolean) {
-        logAction("setCrashReports", "enabled=$enabled")
-        crashReportsFlow.value = enabled
-        logResult("setCrashReports", true)
+        launchLogged("setCrashReports", "enabled=$enabled") {
+            SettingsStore.setCrashReportsEnabled(enabled)
+        }
     }
 
     fun setAnalytics(enabled: Boolean) {
-        logAction("setAnalytics", "enabled=$enabled")
-        analyticsFlow.value = enabled
-        logResult("setAnalytics", true)
+        launchLogged("setAnalytics", "enabled=$enabled") {
+            SettingsStore.setAnalyticsEnabled(enabled)
+        }
     }
 
     fun setDiagnosticsLogging(enabled: Boolean) {
-        logAction("setDiagnosticsLogging", "enabled=$enabled")
-        diagnosticsLoggingFlow.value = enabled
-        logResult("setDiagnosticsLogging", true)
+        launchLogged("setDiagnosticsLogging", "enabled=$enabled") {
+            SettingsStore.setDiagnosticsEnabled(enabled)
+        }
     }
 
     fun setIncludeIdentities(enabled: Boolean) {
-        logAction("setIncludeIdentities", "enabled=$enabled")
-        includeIdentitiesFlow.value = enabled
-        logResult("setIncludeIdentities", true)
+        launchLogged("setIncludeIdentities", "enabled=$enabled") {
+            SettingsStore.setIncludeIdentities(enabled)
+        }
     }
 
     fun setIncludeSettings(enabled: Boolean) {
-        logAction("setIncludeSettings", "enabled=$enabled")
-        includeSettingsFlow.value = enabled
-        logResult("setIncludeSettings", true)
+        launchLogged("setIncludeSettings", "enabled=$enabled") {
+            SettingsStore.setIncludeSettings(enabled)
+        }
     }
 
     fun setAutoStartForwards(enabled: Boolean) {
-        logAction("setAutoStartForwards", "enabled=$enabled")
-        autoStartForwardsFlow.value = enabled
-        logResult("setAutoStartForwards", true)
+        launchLogged("setAutoStartForwards", "enabled=$enabled") {
+            SettingsStore.setAutoStartForwards(enabled)
+        }
     }
 
     fun setHostKeyPrompt(enabled: Boolean) {
-        logAction("setHostKeyPrompt", "enabled=$enabled")
-        hostKeyPromptFlow.value = enabled
-        logResult("setHostKeyPrompt", true)
+        launchLogged("setHostKeyPrompt", "enabled=$enabled") {
+            SettingsStore.setHostKeyPromptEnabled(enabled)
+        }
+    }
+
+    fun setAutoTrustHostKey(enabled: Boolean) {
+        launchLogged("setAutoTrustHostKey", "enabled=$enabled") {
+            SettingsStore.setAutoTrustHostKeyEnabled(enabled)
+        }
     }
 
     fun setUsageReports(enabled: Boolean) {
-        logAction("setUsageReports", "enabled=$enabled")
-        usageReportsFlow.value = enabled
-        logResult("setUsageReports", true)
+        launchLogged("setUsageReports", "enabled=$enabled") {
+            SettingsStore.setUsageReportsEnabled(enabled)
+        }
     }
 
     fun addHost(
@@ -353,12 +448,16 @@ class AppViewModel(
         group: String?,
         notes: String,
         defaultMode: ConnectionMode,
+        useMosh: Boolean,
+        preferredForwardId: String?,
+        startupScript: String,
+        backgroundBehavior: BackgroundBehavior,
         password: String?,
         suppliedId: String? = null
     ) {
         logAction(
             "addHost",
-            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, hasPasswordInput=${!password.isNullOrBlank()}"
+            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, hasPasswordInput=${!password.isNullOrBlank()}"
         )
         if (name.isBlank() || host.isBlank() || username.isBlank()) {
             logResult("addHost", false, "validation-failed")
@@ -382,7 +481,11 @@ class AppViewModel(
             group = group?.takeIf { it.isNotBlank() },
             notes = notes,
             defaultMode = defaultMode,
-            hasPassword = hasPassword
+            hasPassword = hasPassword,
+            useMosh = useMosh,
+            preferredForwardId = preferredForwardId,
+            startupScript = startupScript,
+            backgroundBehavior = backgroundBehavior
         )
         launchLogged("addHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.addHost(entry)
@@ -399,9 +502,16 @@ class AppViewModel(
         group: String?,
         notes: String,
         defaultMode: ConnectionMode,
+        useMosh: Boolean,
+        preferredForwardId: String?,
+        startupScript: String,
+        backgroundBehavior: BackgroundBehavior,
         password: String?
     ) {
-        logAction("updateHost", "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, passwordProvided=${password != null}")
+        logAction(
+            "updateHost",
+            "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, passwordProvided=${password != null}"
+        )
         val existing = uiState.value.hosts.find { it.id == id }
         if (existing == null) {
             logResult("updateHost", false, "not-found")
@@ -428,7 +538,11 @@ class AppViewModel(
             group = group?.takeIf { it.isNotBlank() },
             notes = notes,
             defaultMode = defaultMode,
-            hasPassword = hasPassword
+            hasPassword = hasPassword,
+            useMosh = useMosh,
+            preferredForwardId = preferredForwardId,
+            startupScript = startupScript,
+            backgroundBehavior = backgroundBehavior
         )
         launchLogged("updateHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.updateHost(updated)
@@ -523,6 +637,65 @@ class AppViewModel(
         }
         launchLogged("deletePortForward", "forwardId=$id") {
             repository.deletePortForward(existing)
+        }
+    }
+
+    fun addSnippet(title: String, description: String, command: String) {
+        logAction(
+            "addSnippet",
+            "titleBlank=${title.isBlank()}, commandBlank=${command.isBlank()}"
+        )
+        if (command.isBlank()) {
+            logResult("addSnippet", false, "validation-failed")
+            return
+        }
+        val snippet = Snippet(
+            id = UUID.randomUUID().toString(),
+            title = title.ifBlank { "Snippet" },
+            description = description,
+            command = command
+        )
+        launchLogged("addSnippet", "snippetId=${snippet.id}") {
+            repository.addSnippet(snippet)
+        }
+    }
+
+    fun updateSnippet(id: String, title: String, description: String, command: String) {
+        logAction("updateSnippet", "snippetId=$id, commandBlank=${command.isBlank()}")
+        val existing = uiState.value.snippets.find { it.id == id }
+        if (existing == null) {
+            logResult("updateSnippet", false, "not-found")
+            return
+        }
+        if (command.isBlank()) {
+            logResult("updateSnippet", false, "validation-failed")
+            return
+        }
+        val updated = existing.copy(
+            title = title.ifBlank { existing.title },
+            description = description,
+            command = command
+        )
+        launchLogged("updateSnippet", "snippetId=$id") {
+            repository.updateSnippet(updated)
+        }
+    }
+
+    fun deleteSnippet(id: String) {
+        logAction("deleteSnippet", "snippetId=$id")
+        val existing = uiState.value.snippets.find { it.id == id }
+        if (existing == null) {
+            logResult("deleteSnippet", false, "not-found")
+            return
+        }
+        launchLogged("deleteSnippet", "snippetId=$id") {
+            repository.deleteSnippet(existing)
+        }
+    }
+
+    fun toggleFavorite(id: String) {
+        launchLogged("toggleFavorite", "id=$id") {
+            repository.toggleFavorite(id)
         }
     }
 
@@ -725,7 +898,7 @@ class AppViewModel(
         LockTimeout.ONE_MIN -> 60_000L
         LockTimeout.FIVE_MIN -> 300_000L
         LockTimeout.FIFTEEN_MIN -> 900_000L
-        LockTimeout.CUSTOM -> null // TODO expose UI for user-defined timeout
+        LockTimeout.CUSTOM -> customLockTimeoutMinutesFlow.value * 60_000L
     }
 
     companion object {

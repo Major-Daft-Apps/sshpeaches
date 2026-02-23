@@ -46,7 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
+import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.components.decodeHostFromQr
 import com.sshpeaches.app.ui.state.SortMode
@@ -62,15 +64,17 @@ import java.util.UUID
 @Composable
 fun HostsScreen(
     hosts: List<HostConnection>,
+    portForwards: List<PortForward>,
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
     pinConfigured: Boolean,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportFromQr: () -> Unit = {},
+    onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {}
 ) {
@@ -88,6 +92,12 @@ fun HostsScreen(
     val authMenuExpanded = remember { mutableStateOf(false) }
     val modeState = remember { mutableStateOf(ConnectionMode.SSH) }
     val modeExpanded = remember { mutableStateOf(false) }
+    val useMoshState = remember { mutableStateOf(false) }
+    val preferredForwardIdState = remember { mutableStateOf<String?>(null) }
+    val forwardExpanded = remember { mutableStateOf(false) }
+    val startupScriptState = remember { mutableStateOf("") }
+    val backgroundBehaviorState = remember { mutableStateOf(BackgroundBehavior.INHERIT) }
+    val backgroundExpanded = remember { mutableStateOf(false) }
     val passwordState = remember { mutableStateOf("") }
     val clearPasswordState = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
@@ -125,6 +135,10 @@ fun HostsScreen(
             imported.group,
             imported.notes,
             imported.defaultMode,
+            imported.useMosh,
+            imported.preferredForwardId,
+            imported.startupScript,
+            imported.backgroundBehavior,
             legacyPassword,
             targetId
         )
@@ -210,6 +224,10 @@ fun HostsScreen(
         notesState.value = host?.notes ?: ""
         authState.value = host?.preferredAuth ?: AuthMethod.IDENTITY
         modeState.value = host?.defaultMode ?: ConnectionMode.SSH
+        useMoshState.value = host?.useMosh ?: false
+        preferredForwardIdState.value = host?.preferredForwardId
+        startupScriptState.value = host?.startupScript ?: ""
+        backgroundBehaviorState.value = host?.backgroundBehavior ?: BackgroundBehavior.INHERIT
         showDialog.value = true
         passwordState.value = ""
         clearPasswordState.value = false
@@ -290,6 +308,7 @@ fun HostsScreen(
                 ) {
                     HostCard(
                         host = host,
+                        onToggleFavorite = onToggleFavorite,
                         onAction = { selected, mode ->
                             val needsPassword = selected.preferredAuth != AuthMethod.IDENTITY
                             if (needsPassword && !selected.hasPassword) {
@@ -449,6 +468,97 @@ fun HostsScreen(
                             }
                         }
                     }
+                    ExposedDropdownMenuBox(
+                        expanded = forwardExpanded.value,
+                        onExpandedChange = { forwardExpanded.value = !forwardExpanded.value }
+                    ) {
+                        TextField(
+                            value = portForwards.firstOrNull { it.id == preferredForwardIdState.value }?.label ?: "None",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Use forwarded port") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = forwardExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = forwardExpanded.value,
+                            onDismissRequest = { forwardExpanded.value = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None") },
+                                onClick = {
+                                    preferredForwardIdState.value = null
+                                    forwardExpanded.value = false
+                                }
+                            )
+                            portForwards.forEach { forward ->
+                                DropdownMenuItem(
+                                    text = { Text(forward.label) },
+                                    onClick = {
+                                        preferredForwardIdState.value = forward.id
+                                        forwardExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = startupScriptState.value,
+                        onValueChange = { startupScriptState.value = it },
+                        label = { Text("Optional script") },
+                        minLines = 2,
+                        maxLines = 6
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Checkbox(
+                            checked = useMoshState.value,
+                            onCheckedChange = { useMoshState.value = it }
+                        )
+                        Text("Enable Mosh")
+                    }
+                    ExposedDropdownMenuBox(
+                        expanded = backgroundExpanded.value,
+                        onExpandedChange = { backgroundExpanded.value = !backgroundExpanded.value }
+                    ) {
+                        TextField(
+                            value = when (backgroundBehaviorState.value) {
+                                BackgroundBehavior.INHERIT -> "Inherit global"
+                                BackgroundBehavior.ALWAYS_ALLOW -> "Always allow"
+                                BackgroundBehavior.ALWAYS_STOP -> "Always stop"
+                            },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Background behavior") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = backgroundExpanded.value,
+                            onDismissRequest = { backgroundExpanded.value = false }
+                        ) {
+                            BackgroundBehavior.values().forEach { behavior ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (behavior) {
+                                                BackgroundBehavior.INHERIT -> "Inherit global"
+                                                BackgroundBehavior.ALWAYS_ALLOW -> "Always allow"
+                                                BackgroundBehavior.ALWAYS_STOP -> "Always stop"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        backgroundBehaviorState.value = behavior
+                                        backgroundExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -460,10 +570,6 @@ fun HostsScreen(
                     when {
                         nameState.value.isBlank() || hostState.value.isBlank() || userState.value.isBlank() -> {
                             dialogError.value = "Name, host, and username are required."
-                            return@TextButton
-                        }
-                        !isValidHostAddress(hostState.value) -> {
-                            dialogError.value = "Enter a valid hostname or IP address."
                             return@TextButton
                         }
                         !isValidHostAddress(hostState.value) -> {
@@ -492,6 +598,10 @@ fun HostsScreen(
                             groupState.value.ifBlank { null },
                             notesState.value,
                             modeState.value,
+                            useMoshState.value,
+                            preferredForwardIdState.value,
+                            startupScriptState.value,
+                            backgroundBehaviorState.value,
                             passwordValue,
                             null
                         )
@@ -506,6 +616,10 @@ fun HostsScreen(
                             groupState.value.ifBlank { null },
                             notesState.value,
                             modeState.value,
+                            useMoshState.value,
+                            preferredForwardIdState.value,
+                            startupScriptState.value,
+                            backgroundBehaviorState.value,
                             passwordValue
                         )
                     }

@@ -48,7 +48,10 @@ data class QuickConnectRequest(
     val port: Int,
     val username: String,
     val auth: AuthMethod,
-    val password: String
+    val password: String,
+    val useMosh: Boolean = false,
+    val forwardId: String? = null,
+    val script: String = ""
 )
 
 enum class QuickConnectPhase {
@@ -86,6 +89,13 @@ fun ConnectingScreen(
 
     val hostName = request?.let { "${it.username}@${it.host}:${it.port}" } ?: "Quick Connect"
     val renderedLogs = logs.map { "[${it.level}] ${it.message}" }
+    val detailLine = request?.let {
+        buildString {
+            append(if (it.useMosh) "Mosh requested" else "SSH")
+            it.forwardId?.let { id -> append(" | Forward: $id") }
+            if (it.script.isNotBlank()) append(" | Script configured")
+        }
+    }
 
     LaunchedEffect(renderedLogs.size) {
         if (renderedLogs.isNotEmpty()) {
@@ -140,6 +150,13 @@ fun ConnectingScreen(
                         color = Color.Gray,
                         fontStyle = FontStyle.Italic
                     )
+                )
+            }
+            detailLine?.let {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E))
                 )
             }
 

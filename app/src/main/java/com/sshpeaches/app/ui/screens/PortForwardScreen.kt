@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -59,6 +60,7 @@ fun PortForwardScreen(
     onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
+    onToggleFavorite: (String) -> Unit = {},
     onImportFromQr: () -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
@@ -181,6 +183,14 @@ fun PortForwardScreen(
                                 )
                             },
                             enabled = editMode
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
+                            tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            modifier = Modifier
+                                .clickable { onToggleFavorite(forward.id) }
+                                .padding(4.dp)
                         )
                         Icon(
                             imageVector = Icons.Default.QrCode,

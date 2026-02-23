@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         PortForwardEntity::class,
         SnippetEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,7 +32,10 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                     context.applicationContext,
                     SshPeachesDatabase::class.java,
                     "sshpeaches.db"
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }

@@ -39,7 +39,8 @@ fun SnippetManagerScreen(
     snippets: List<Snippet>,
     onAdd: (title: String, description: String, command: String) -> Unit = { _, _, _ -> },
     onUpdate: (id: String, title: String, description: String, command: String) -> Unit = { _, _, _, _ -> },
-    onDelete: (id: String) -> Unit = {}
+    onDelete: (id: String) -> Unit = {},
+    onRun: (snippet: Snippet) -> Unit = {}
 ) {
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
@@ -84,7 +85,7 @@ fun SnippetManagerScreen(
                     }
                     Text(snippet.command, style = MaterialTheme.typography.bodySmall)
                     RowActions(
-                        onRun = { /* TODO run snippet */ },
+                        onRun = { onRun(snippet) },
                         onEdit = { openDialog(snippet) },
                         onDelete = { onDelete(snippet.id) }
                     )

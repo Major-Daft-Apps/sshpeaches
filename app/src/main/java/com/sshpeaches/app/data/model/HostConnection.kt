@@ -15,7 +15,11 @@ data class HostConnection(
     val defaultMode: ConnectionMode = ConnectionMode.SSH,
     val attachedForwards: List<String> = emptyList(),
     val snippets: List<String> = emptyList(),
-    val hasPassword: Boolean = false
+    val hasPassword: Boolean = false,
+    val useMosh: Boolean = false,
+    val preferredForwardId: String? = null,
+    val startupScript: String = "",
+    val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT
 )
 
 data class Identity(
@@ -61,6 +65,8 @@ enum class AuthMethod { PASSWORD, IDENTITY, PASSWORD_AND_IDENTITY }
 enum class ConnectionMode { SSH, SFTP, SCP }
 
 enum class PortForwardType { LOCAL, REMOTE, DYNAMIC }
+
+enum class BackgroundBehavior { INHERIT, ALWAYS_ALLOW, ALWAYS_STOP }
 
 sealed class OsMetadata {
     data object Undetected : OsMetadata()

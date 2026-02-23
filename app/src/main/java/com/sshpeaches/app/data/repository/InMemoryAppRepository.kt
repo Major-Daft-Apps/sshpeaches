@@ -67,6 +67,18 @@ class InMemoryAppRepository : AppRepository {
         portForwardFlow.update { list -> list.filterNot { it.id == forward.id } }
     }
 
+    override suspend fun addSnippet(snippet: Snippet) {
+        snippetFlow.update { it + snippet }
+    }
+
+    override suspend fun updateSnippet(snippet: Snippet) {
+        snippetFlow.update { list -> list.map { if (it.id == snippet.id) snippet else it } }
+    }
+
+    override suspend fun deleteSnippet(snippet: Snippet) {
+        snippetFlow.update { list -> list.filterNot { it.id == snippet.id } }
+    }
+
     companion object {
         private fun sampleHosts() = listOf(
             HostConnection(

@@ -84,4 +84,16 @@ class RoomAppRepository(
     override suspend fun deletePortForward(forward: PortForward) {
         portForwardDao.delete(forward.asEntity())
     }
+
+    override suspend fun addSnippet(snippet: Snippet) {
+        snippetDao.upsert(snippet.asEntity())
+    }
+
+    override suspend fun updateSnippet(snippet: Snippet) {
+        snippetDao.upsert(snippet.asEntity())
+    }
+
+    override suspend fun deleteSnippet(snippet: Snippet) {
+        snippetDao.delete(snippet.asEntity())
+    }
 }

@@ -92,7 +92,9 @@ class MainActivity : FragmentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
             val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit = remember(sessionService) {
+            val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
+                remember(sessionService, uiState.portForwards, uiState.autoStartForwards, uiState.autoTrustHostKey) {
                 { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode, password: String? ->
                     UiDebugLog.action(
                         "uiStartSession",
@@ -101,7 +103,14 @@ class MainActivity : FragmentActivity() {
                     if (sessionService == null) {
                         UiDebugLog.result("uiStartSession", false, "service-not-ready")
                     } else {
-                        sessionService.startSession(host, mode, password)
+                        sessionService.startSession(
+                            host = host,
+                            mode = mode,
+                            passwordOverride = password,
+                            availableForwards = uiState.portForwards,
+                            autoStartForwards = uiState.autoStartForwards,
+                            autoTrustUnknownHostKey = uiState.autoTrustHostKey
+                        )
                         UiDebugLog.result("uiStartSession", true, "hostId=${host.id}")
                     }
                 }
@@ -144,6 +153,7 @@ class MainActivity : FragmentActivity() {
                     onBackgroundModeChange = viewModel::setBackgroundSessions,
                     onBiometricToggle = viewModel::setBiometricLock,
                     onLockTimeoutChange = viewModel::setLockTimeout,
+                    onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
                     onCrashReportsToggle = viewModel::setCrashReports,
                     onAnalyticsToggle = viewModel::setAnalytics,
                     onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -151,6 +161,7 @@ class MainActivity : FragmentActivity() {
                     onIncludeSettingsToggle = viewModel::setIncludeSettings,
                     onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
                     onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
+                    onAutoTrustHostKeyToggle = viewModel::setAutoTrustHostKey,
                     onUsageReportsToggle = viewModel::setUsageReports,
                     onSetPin = viewModel::setPin,
                     onLockApp = viewModel::lockApp,
@@ -166,11 +177,41 @@ class MainActivity : FragmentActivity() {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
                         }
                     },
-                    onHostAdd = { name, host, port, user, auth, group, notes, mode, password, suppliedId ->
-                        viewModel.addHost(name, host, port, user, auth, group, notes, mode, password, suppliedId)
+                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, password, suppliedId ->
+                        viewModel.addHost(
+                            name,
+                            host,
+                            port,
+                            user,
+                            auth,
+                            group,
+                            notes,
+                            mode,
+                            useMosh,
+                            forwardId,
+                            script,
+                            backgroundBehavior,
+                            password,
+                            suppliedId
+                        )
                     },
-                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, password ->
-                        viewModel.updateHost(id, name, host, port, user, auth, group, notes, mode, password)
+                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, password ->
+                        viewModel.updateHost(
+                            id,
+                            name,
+                            host,
+                            port,
+                            user,
+                            auth,
+                            group,
+                            notes,
+                            mode,
+                            useMosh,
+                            forwardId,
+                            script,
+                            backgroundBehavior,
+                            password
+                        )
                     },
                     onHostDelete = viewModel::deleteHost,
                     onPortForwardAdd = viewModel::addPortForward,
@@ -186,8 +227,16 @@ class MainActivity : FragmentActivity() {
                     onRemoveIdentityKey = viewModel::removeIdentityKey,
                     onKeyboardSlotChange = viewModel::updateKeyboardSlot,
                     onKeyboardReset = viewModel::resetKeyboardLayout,
+                    onSnippetAdd = viewModel::addSnippet,
+                    onSnippetUpdate = viewModel::updateSnippet,
+                    onSnippetDelete = viewModel::deleteSnippet,
+                    onToggleFavorite = viewModel::toggleFavorite,
                     onSendSessionShortcut = sendSessionShortcut,
-                    sessions = sessionSnapshots
+                    sessions = sessionSnapshots,
+                    hostKeyPrompts = hostKeyPrompts,
+                    onRespondToHostKeyPrompt = { promptId, trust ->
+                        sessionService?.respondToHostKeyPrompt(promptId, trust)
+                    }
                 )
             }
         }

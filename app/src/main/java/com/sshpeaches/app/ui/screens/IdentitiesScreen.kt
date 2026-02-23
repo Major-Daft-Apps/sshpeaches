@@ -71,6 +71,7 @@ fun IdentitiesScreen(
     onImportIdentityKey: (id: String, payload: String, passphrase: String) -> Boolean = { _, _, _ -> false },
     onImportIdentityKeyPlain: (id: String, key: String) -> Boolean = { _, _ -> false },
     onRemoveIdentityKey: (id: String) -> Unit = {},
+    onToggleFavorite: (String) -> Unit = {},
     onShowMessage: (String) -> Unit = {},
     editMode: Boolean = false,
     onImportFromQr: () -> Unit = {}
@@ -210,9 +211,14 @@ fun IdentitiesScreen(
                             identity.username?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (identity.favorite) {
-                                Icon(Icons.Default.Star, contentDescription = null)
-                            }
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = if (identity.favorite) "Unfavorite" else "Favorite",
+                                tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { onToggleFavorite(identity.id) }
+                            )
                             if (identity.hasPrivateKey) {
                                 Icon(
                                     Icons.Default.VpnKey,

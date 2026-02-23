@@ -3,6 +3,7 @@ package com.sshpeaches.app.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.sshpeaches.app.data.model.AuthMethod
+import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.OsMetadata
 import com.sshpeaches.app.data.model.PortForwardType
@@ -23,7 +24,11 @@ data class HostEntity(
     val defaultMode: ConnectionMode,
     val attachedForwards: List<String>,
     val snippets: List<String>,
-    val hasPassword: Boolean
+    val hasPassword: Boolean,
+    val useMosh: Boolean,
+    val preferredForwardId: String?,
+    val startupScript: String,
+    val backgroundBehavior: BackgroundBehavior
 )
 
 @Entity(tableName = "identities")

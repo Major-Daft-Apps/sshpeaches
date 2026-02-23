@@ -24,4 +24,8 @@ interface AppRepository {
     suspend fun addPortForward(forward: PortForward)
     suspend fun updatePortForward(forward: PortForward)
     suspend fun deletePortForward(forward: PortForward)
+
+    suspend fun addSnippet(snippet: Snippet)
+    suspend fun updateSnippet(snippet: Snippet)
+    suspend fun deleteSnippet(snippet: Snippet)
 }

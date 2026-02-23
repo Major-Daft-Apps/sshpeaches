@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +46,7 @@ import android.graphics.Bitmap
 import android.util.Base64
 import android.graphics.Color as AndroidColor
 import android.widget.Toast
+import org.json.JSONObject
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -62,6 +65,7 @@ import com.sshpeaches.app.ui.util.ExportPassphraseCache
 fun HostCard(
     host: HostConnection,
     modifier: Modifier = Modifier,
+    onToggleFavorite: (String) -> Unit = {},
     onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
@@ -113,8 +117,11 @@ fun HostCard(
                     Text("${host.username}@${host.host}:${host.port}", style = MaterialTheme.typography.bodyMedium)
                     host.group?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                 }
-                TextButton(onClick = { /* TODO status */ }) {
-                    Text(host.lastUsedEpochMillis?.let { "Last used" } ?: "New")
+                TextButton(onClick = { onToggleFavorite(host.id) }) {
+                    Icon(
+                        imageVector = if (host.favorite) Icons.Default.Star else Icons.Outlined.StarBorder,
+                        contentDescription = if (host.favorite) "Unfavorite" else "Favorite"
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -285,29 +292,27 @@ fun HostCard(
 }
 
 private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
-    val json = buildString {
-        append("{")
-        append("\"id\":\"${host.id}\",")
-        append("\"name\":\"${host.name}\",")
-        append("\"host\":\"${host.host}\",")
-        append("\"port\":${host.port},")
-        append("\"user\":\"${host.username}\",")
-        append("\"prefAuth\":\"${host.preferredAuth.name}\",")
-        append("\"mode\":\"${host.defaultMode.name}\",")
-        append("\"group\":\"${host.group.orEmpty()}\",")
-        append("\"notes\":\"${host.notes}\",")
-        append("\"hasPassword\":${host.hasPassword}")
+    val json = JSONObject().apply {
+        put("id", host.id)
+        put("name", host.name)
+        put("host", host.host)
+        put("port", host.port)
+        put("user", host.username)
+        put("prefAuth", host.preferredAuth.name)
+        put("mode", host.defaultMode.name)
+        put("group", host.group ?: "")
+        put("notes", host.notes)
+        put("hasPassword", host.hasPassword)
+        put("useMosh", host.useMosh)
+        put("preferredForwardId", host.preferredForwardId ?: "")
+        put("startupScript", host.startupScript)
+        put("backgroundBehavior", host.backgroundBehavior.name)
         if (host.hasPassword && !passphrase.isNullOrBlank()) {
-            val payload = SecurityManager.exportHostPasswordPayload(host.id, passphrase)
-            if (payload == null) {
-                return null
-            } else {
-                append(",\"pwdPayload\":\"$payload\"")
-            }
+            val encrypted = SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
+            put("pwdPayload", encrypted)
         }
-        append("}")
     }
-    val payload = android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+    val payload = Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
     return runCatching {
         val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
         val bmp = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
