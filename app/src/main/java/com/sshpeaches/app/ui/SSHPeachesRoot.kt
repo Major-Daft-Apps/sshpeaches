@@ -211,7 +211,7 @@ fun SSHPeachesRoot(
     val pendingFavoriteHostId = remember { mutableStateOf<String?>(null) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val helpUrl = context.getString(R.string.project_website)
+    val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route ?: Routes.FAVORITES
     val currentTitle = when (currentRoute) {
@@ -1153,12 +1153,38 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                         .clip(RoundedCornerShape(16.dp)),
                     contentScale = ContentScale.Crop
                 )
-                Text("Version 0.1.0", style = MaterialTheme.typography.titleMedium)
+                val appVersion = stringResource(id = R.string.app_version)
+                Text(
+                    stringResource(id = R.string.about_version, appVersion),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                val website = stringResource(id = R.string.project_website)
+                val supportUrl = stringResource(id = R.string.support_url)
                 val privacy = stringResource(id = R.string.privacy_policy_url)
                 val context = LocalContext.current
-                Text("Website: https://sshpeaches.app")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Website:")
+                    Text(
+                        website,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(website))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
                 Text("License: Apache-2.0 (draft)")
-                Text("Support: support@sshpeaches.app")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Support:")
+                    Text(
+                        supportUrl,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(supportUrl))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
                 Text(
                     "Privacy Policy",
                     color = MaterialTheme.colorScheme.primary,
