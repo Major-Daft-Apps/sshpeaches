@@ -127,17 +127,17 @@ fun HostCard(
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 HostActionButton(
                     label = "SSH",
-                    selected = host.defaultMode == ConnectionMode.SSH,
+                    selected = true,
                     onClick = { onAction(host, ConnectionMode.SSH) }
                 )
                 HostActionButton(
                     label = "SFTP",
-                    selected = host.defaultMode == ConnectionMode.SFTP,
+                    selected = false,
                     onClick = { onAction(host, ConnectionMode.SFTP) }
                 )
                 HostActionButton(
                     label = "SCP",
-                    selected = host.defaultMode == ConnectionMode.SCP,
+                    selected = false,
                     onClick = { onAction(host, ConnectionMode.SCP) }
                 )
                 Icon(
@@ -184,7 +184,7 @@ fun HostCard(
                     Text("User: ${host.username}")
                     host.group?.let { Text("Group: $it") }
                     Text("Auth: ${host.preferredAuth.toSentenceCaseLabel()}")
-                    Text("Default: ${host.defaultMode.toSentenceCaseLabel()}")
+                    Text("Transport: ${if (host.useMosh) "Mosh (SSH fallback)" else "SSH"}")
                 }
             }
         )
@@ -307,6 +307,7 @@ private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
         put("preferredForwardId", host.preferredForwardId ?: "")
         put("startupScript", host.startupScript)
         put("backgroundBehavior", host.backgroundBehavior.name)
+        put("terminalProfileId", host.terminalProfileId ?: "")
         if (host.hasPassword && !passphrase.isNullOrBlank()) {
             val encrypted = SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
             put("pwdPayload", encrypted)

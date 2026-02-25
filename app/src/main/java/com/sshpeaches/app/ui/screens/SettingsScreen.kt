@@ -32,8 +32,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import com.sshpeaches.app.data.model.TerminalCursorStyle
+import com.sshpeaches.app.data.model.TerminalEmulation
+import com.sshpeaches.app.data.model.TerminalProfile
+import com.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.ThemeMode
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +53,13 @@ fun SettingsScreen(
     onLockTimeoutChange: (LockTimeout) -> Unit,
     customLockTimeoutMinutes: Int,
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    terminalEmulation: TerminalEmulation,
+    onTerminalEmulationChange: (TerminalEmulation) -> Unit,
+    terminalProfiles: List<TerminalProfile>,
+    defaultTerminalProfileId: String,
+    onDefaultTerminalProfileChange: (String) -> Unit,
+    onSaveTerminalProfile: (TerminalProfile) -> Unit,
+    onDeleteTerminalProfile: (String) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -66,10 +78,12 @@ fun SettingsScreen(
     onAutoTrustHostKeyToggle: (Boolean) -> Unit,
     usageReportsEnabled: Boolean,
     onUsageReportsToggle: (Boolean) -> Unit,
+    onRestoreDefaultSettings: () -> Unit,
     pinConfigured: Boolean,
     isLocked: Boolean,
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
+    onClearPin: () -> Unit,
     onLockApp: () -> Unit,
     onUnlockWithPin: (String) -> Boolean,
     onGenerateExportPayload: () -> String,
@@ -77,6 +91,8 @@ fun SettingsScreen(
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
+    val terminalExpanded = remember { mutableStateOf(false) }
+    val defaultTerminalProfileExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = remember { mutableStateOf(false) }
     val themeOptions = listOf(
         ThemeMode.SYSTEM to "System",
@@ -90,14 +106,44 @@ fun SettingsScreen(
         LockTimeout.FIFTEEN_MIN,
         LockTimeout.CUSTOM
     )
+    val terminalOptions = listOf(TerminalEmulation.XTERM, TerminalEmulation.VT100)
     val showPinDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
     val confirmPinEntry = remember { mutableStateOf("") }
+    val showDisablePinDialog = remember { mutableStateOf(false) }
     val showUnlockDialog = remember { mutableStateOf(false) }
+    val showRestoreDefaultsDialog = remember { mutableStateOf(false) }
+    val showProfileEditorDialog = remember { mutableStateOf(false) }
+    val showDeleteProfileDialog = remember { mutableStateOf<String?>(null) }
+    val editingProfile = remember { mutableStateOf<TerminalProfile?>(null) }
     val unlockEntry = remember { mutableStateOf("") }
     val unlockError = remember { mutableStateOf<String?>(null) }
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
     val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val profileNameState = remember { mutableStateOf("") }
+    val profileFontSizeState = remember { mutableStateOf("12") }
+    val profileForegroundState = remember { mutableStateOf("#E6E6E6") }
+    val profileBackgroundState = remember { mutableStateOf("#101010") }
+    val profileCursorState = remember { mutableStateOf("#FFB74D") }
+    val profileCursorStyleExpanded = remember { mutableStateOf(false) }
+    val profileCursorStyleState = remember { mutableStateOf(TerminalCursorStyle.BLOCK) }
+    val profileCursorBlinkState = remember { mutableStateOf(true) }
+    val profileEditorError = remember { mutableStateOf<String?>(null) }
+    val builtInProfileIds = remember { TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet() }
+
+    fun openProfileEditor(profile: TerminalProfile?) {
+        editingProfile.value = profile
+        val source = profile ?: TerminalProfileDefaults.customTemplate()
+        profileNameState.value = source.name
+        profileFontSizeState.value = source.fontSizeSp.toString()
+        profileForegroundState.value = source.foregroundHex
+        profileBackgroundState.value = source.backgroundHex
+        profileCursorState.value = source.cursorHex
+        profileCursorStyleState.value = source.cursorStyle
+        profileCursorBlinkState.value = source.cursorBlink
+        profileEditorError.value = null
+        showProfileEditorDialog.value = true
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -163,6 +209,133 @@ fun SettingsScreen(
                     }
                     Switch(checked = allowBackgroundSessions, onCheckedChange = onBackgroundToggle)
                 }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Terminal", style = MaterialTheme.typography.titleMedium)
+                ExposedDropdownMenuBox(
+                    expanded = terminalExpanded.value,
+                    onExpandedChange = { terminalExpanded.value = !terminalExpanded.value }
+                ) {
+                    TextField(
+                        value = terminalEmulation.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Emulation mode") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalExpanded.value) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = terminalExpanded.value,
+                        onDismissRequest = { terminalExpanded.value = false }
+                    ) {
+                        terminalOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    terminalExpanded.value = false
+                                    onTerminalEmulationChange(option)
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "xterm is the default and recommended mode.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Terminal Profiles", style = MaterialTheme.typography.titleMedium)
+                ExposedDropdownMenuBox(
+                    expanded = defaultTerminalProfileExpanded.value,
+                    onExpandedChange = { defaultTerminalProfileExpanded.value = !defaultTerminalProfileExpanded.value }
+                ) {
+                    TextField(
+                        value = terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
+                            ?: terminalProfiles.firstOrNull()?.name.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Default profile") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultTerminalProfileExpanded.value)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = defaultTerminalProfileExpanded.value,
+                        onDismissRequest = { defaultTerminalProfileExpanded.value = false }
+                    ) {
+                        terminalProfiles.forEach { profile ->
+                            DropdownMenuItem(
+                                text = { Text(profile.name) },
+                                onClick = {
+                                    defaultTerminalProfileExpanded.value = false
+                                    onDefaultTerminalProfileChange(profile.id)
+                                }
+                            )
+                        }
+                    }
+                }
+                terminalProfiles.forEach { profile ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(profile.name)
+                            Text(
+                                "Font ${profile.fontSizeSp}sp  ${profile.foregroundHex}/${profile.backgroundHex}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (builtInProfileIds.contains(profile.id)) {
+                            TextButton(
+                                onClick = {
+                                    openProfileEditor(
+                                        profile.copy(
+                                            id = "custom-${UUID.randomUUID()}",
+                                            name = "${profile.name} Copy"
+                                        )
+                                    )
+                                }
+                            ) {
+                                Text("Duplicate")
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = { openProfileEditor(profile) }) {
+                                    Text("Edit")
+                                }
+                                TextButton(onClick = { showDeleteProfileDialog.value = profile.id }) {
+                                    Text("Delete")
+                                }
+                            }
+                        }
+                    }
+                }
+                Button(
+                    onClick = { openProfileEditor(null) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add Custom Profile")
+                }
+                Text(
+                    "Profiles are similar to desktop terminal profiles and can be assigned per host or per quick connect session.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
@@ -280,6 +453,10 @@ fun SettingsScreen(
                     }
                     if (pinConfigured) {
                         Button(
+                            onClick = { showDisablePinDialog.value = true },
+                            enabled = !isLocked
+                        ) { Text("Disable PIN") }
+                        Button(
                             onClick = onLockApp,
                             enabled = !isLocked
                         ) { Text("Lock now") }
@@ -288,6 +465,13 @@ fun SettingsScreen(
                             enabled = isLocked
                         ) { Text("Unlock (PIN)") }
                     }
+                }
+                if (pinConfigured && isLocked) {
+                    Text(
+                        "Unlock before disabling PIN.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }
@@ -348,6 +532,21 @@ fun SettingsScreen(
                         Text("Periodically send diagnostics bundle", style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = usageReportsEnabled, onCheckedChange = onUsageReportsToggle)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Restore Defaults", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Reset app settings to default values. Hosts, identities, snippets, and saved secrets are unchanged.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Button(
+                    onClick = { showRestoreDefaultsDialog.value = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Restore Default Settings")
                 }
             }
         }
@@ -527,4 +726,213 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showDisablePinDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showDisablePinDialog.value = false },
+            title = { Text("Disable PIN lock?") },
+            text = {
+                Text("This removes the PIN requirement. Biometric lock will also be disabled.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onClearPin()
+                    showDisablePinDialog.value = false
+                }) { Text("Disable") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisablePinDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showProfileEditorDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showProfileEditorDialog.value = false },
+            title = {
+                Text(if (editingProfile.value == null) "Add terminal profile" else "Edit terminal profile")
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = profileNameState.value,
+                        onValueChange = {
+                            profileNameState.value = it
+                            profileEditorError.value = null
+                        },
+                        label = { Text("Name") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = profileFontSizeState.value,
+                        onValueChange = {
+                            profileFontSizeState.value = it.filter { ch -> ch.isDigit() }.take(2)
+                            profileEditorError.value = null
+                        },
+                        label = { Text("Font size (sp)") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = profileForegroundState.value,
+                        onValueChange = {
+                            profileForegroundState.value = it
+                            profileEditorError.value = null
+                        },
+                        label = { Text("Foreground color (#RRGGBB)") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = profileBackgroundState.value,
+                        onValueChange = {
+                            profileBackgroundState.value = it
+                            profileEditorError.value = null
+                        },
+                        label = { Text("Background color (#RRGGBB)") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = profileCursorState.value,
+                        onValueChange = {
+                            profileCursorState.value = it
+                            profileEditorError.value = null
+                        },
+                        label = { Text("Cursor color (#RRGGBB)") },
+                        singleLine = true
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = profileCursorStyleExpanded.value,
+                        onExpandedChange = { profileCursorStyleExpanded.value = !profileCursorStyleExpanded.value }
+                    ) {
+                        TextField(
+                            value = profileCursorStyleState.value.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Cursor style") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = profileCursorStyleExpanded.value)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = profileCursorStyleExpanded.value,
+                            onDismissRequest = { profileCursorStyleExpanded.value = false }
+                        ) {
+                            TerminalCursorStyle.values().forEach { style ->
+                                DropdownMenuItem(
+                                    text = { Text(style.label) },
+                                    onClick = {
+                                        profileCursorStyleState.value = style
+                                        profileCursorStyleExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Cursor blink")
+                        Switch(
+                            checked = profileCursorBlinkState.value,
+                            onCheckedChange = { profileCursorBlinkState.value = it }
+                        )
+                    }
+                    profileEditorError.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val fontSize = profileFontSizeState.value.toIntOrNull()?.coerceIn(9, 28)
+                    when {
+                        profileNameState.value.isBlank() -> {
+                            profileEditorError.value = "Profile name is required."
+                            return@TextButton
+                        }
+                        fontSize == null -> {
+                            profileEditorError.value = "Font size must be between 9 and 28."
+                            return@TextButton
+                        }
+                        !isValidHexColor(profileForegroundState.value) -> {
+                            profileEditorError.value = "Foreground must be #RRGGBB."
+                            return@TextButton
+                        }
+                        !isValidHexColor(profileBackgroundState.value) -> {
+                            profileEditorError.value = "Background must be #RRGGBB."
+                            return@TextButton
+                        }
+                        !isValidHexColor(profileCursorState.value) -> {
+                            profileEditorError.value = "Cursor must be #RRGGBB."
+                            return@TextButton
+                        }
+                    }
+                    val safeFontSize = fontSize ?: return@TextButton
+                    val existingId = editingProfile.value?.id
+                    val profile = TerminalProfile(
+                        id = existingId ?: "custom-${UUID.randomUUID()}",
+                        name = profileNameState.value.trim(),
+                        fontSizeSp = safeFontSize,
+                        foregroundHex = profileForegroundState.value.trim().uppercase(),
+                        backgroundHex = profileBackgroundState.value.trim().uppercase(),
+                        cursorHex = profileCursorState.value.trim().uppercase(),
+                        cursorStyle = profileCursorStyleState.value,
+                        cursorBlink = profileCursorBlinkState.value
+                    )
+                    onSaveTerminalProfile(profile)
+                    showProfileEditorDialog.value = false
+                    onShowMessage("Terminal profile saved.")
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileEditorDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    showDeleteProfileDialog.value?.let { profileId ->
+        val profileName = terminalProfiles.firstOrNull { it.id == profileId }?.name ?: "this profile"
+        AlertDialog(
+            onDismissRequest = { showDeleteProfileDialog.value = null },
+            title = { Text("Delete terminal profile?") },
+            text = { Text("Delete $profileName? Hosts using it will fall back to app default.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteTerminalProfile(profileId)
+                    showDeleteProfileDialog.value = null
+                    onShowMessage("Terminal profile deleted.")
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteProfileDialog.value = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showRestoreDefaultsDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDefaultsDialog.value = false },
+            title = { Text("Restore default settings?") },
+            text = {
+                Text(
+                    "This resets app settings (theme, terminal, lock timeout, host key preferences, diagnostics, and keyboard layout) to defaults."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRestoreDefaultSettings()
+                    showRestoreDefaultsDialog.value = false
+                    onShowMessage("Settings restored to defaults.")
+                }) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreDefaultsDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
+
+private fun isValidHexColor(value: String): Boolean =
+    Regex("^#[0-9A-Fa-f]{6}$").matches(value.trim())

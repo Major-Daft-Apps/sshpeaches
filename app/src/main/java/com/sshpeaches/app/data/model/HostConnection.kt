@@ -19,7 +19,8 @@ data class HostConnection(
     val useMosh: Boolean = false,
     val preferredForwardId: String? = null,
     val startupScript: String = "",
-    val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT
+    val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT,
+    val terminalProfileId: String? = null
 )
 
 data class Identity(
@@ -63,6 +64,11 @@ data class Snippet(
 enum class AuthMethod { PASSWORD, IDENTITY, PASSWORD_AND_IDENTITY }
 
 enum class ConnectionMode { SSH, SFTP, SCP }
+
+enum class TerminalEmulation(val ptyName: String, val label: String) {
+    XTERM("xterm", "xterm"),
+    VT100("vt100", "vt100")
+}
 
 enum class PortForwardType { LOCAL, REMOTE, DYNAMIC }
 

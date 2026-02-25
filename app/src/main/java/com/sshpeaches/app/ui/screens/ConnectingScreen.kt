@@ -2,9 +2,6 @@ package com.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
@@ -38,43 +34,54 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
+import com.sshpeaches.app.data.model.TerminalProfile
 import com.sshpeaches.app.service.SessionLogBus
-
-private const val MAX_RENDERED_TERMINAL_CHARS = 24_000
+import com.sshpeaches.app.ui.terminal.TerminalInputRouter
+import com.sshpeaches.app.ui.terminal.TerminalRenderView
+import com.sshpeaches.app.ui.terminal.TermuxTerminalEngine
+import android.view.KeyEvent
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import java.nio.charset.StandardCharsets
 
 data class QuickConnectRequest(
     val sessionId: String,
@@ -88,7 +95,8 @@ data class QuickConnectRequest(
     val savedHostId: String? = null,
     val useMosh: Boolean = false,
     val forwardId: String? = null,
-    val script: String = ""
+    val script: String = "",
+    val terminalProfileId: String? = null
 )
 
 enum class QuickConnectPhase {
@@ -110,37 +118,54 @@ fun ConnectingScreen(
     state: QuickConnectUiState,
     logs: List<SessionLogBus.Entry>,
     shellOutput: String,
+    terminalProfile: TerminalProfile,
     keyboardSlots: List<String>,
-    onSendShellInput: (String) -> Unit,
+    onSendShellBytes: (ByteArray) -> Unit,
     onTerminalResize: (Int, Int) -> Unit,
     onClose: () -> Unit,
     onRetry: () -> Unit
 ) {
     val listState = rememberLazyListState()
-    val shellScrollState = rememberScrollState()
-    val terminalSize = remember { mutableStateOf(IntSize.Zero) }
-    val density = LocalDensity.current
+    val clipboardManager = LocalClipboardManager.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val keyboardFocusRequester = remember { FocusRequester() }
-    val renderedTerminal = remember(shellOutput) { renderTerminalText(shellOutput) }
-    var keyboardBridgeValue by remember(request?.sessionId) { mutableStateOf("") }
+    val density = LocalDensity.current
+    val keyboardFocusRequester = remember(request?.sessionId) { FocusRequester() }
+    val terminalEngine = remember(request?.sessionId, clipboardManager) {
+        TermuxTerminalEngine(
+            onWriteToRemote = onSendShellBytes,
+            onCopyToClipboard = { text -> clipboardManager.setText(AnnotatedString(text)) },
+            onRequestPasteText = { clipboardManager.getText()?.text }
+        )
+    }
+    val terminalInput = remember(request?.sessionId) {
+        TerminalInputRouter(
+            emulatorProvider = { terminalEngine.emulator() },
+            onWriteToRemote = onSendShellBytes
+        )
+    }
+    var lastShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
+    var imeBridgeValue by remember(request?.sessionId) { mutableStateOf(TextFieldValue("")) }
+    var imeCommittedText by remember(request?.sessionId) { mutableStateOf("") }
+    var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalRenderView?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
-    var terminalFontSizeSp by remember(request?.sessionId) { mutableFloatStateOf(12f) }
+    var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(12f) }
+    var lastResize by remember(request?.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val terminalKeys = remember {
         listOf(
-            "Esc" to "\u001B",
-            "Tab" to "\t",
-            "Ent" to "\n",
-            "Bk" to "\u007F",
-            "Up" to "\u001B[A",
-            "Dn" to "\u001B[B",
-            "Lt" to "\u001B[D",
-            "Rt" to "\u001B[C",
-            "C-C" to "\u0003",
-            "C-D" to "\u0004",
-            "C-Z" to "\u001A"
+            CompactTerminalKey("Esc", "\u001B", keyCode = KeyEvent.KEYCODE_ESCAPE),
+            CompactTerminalKey("Tab", "\t", keyCode = KeyEvent.KEYCODE_TAB),
+            CompactTerminalKey("Ent", "\r", keyCode = KeyEvent.KEYCODE_ENTER),
+            CompactTerminalKey("Bk", "\u007F", keyCode = KeyEvent.KEYCODE_DEL),
+            CompactTerminalKey("Up", "\u001B[A", keyCode = KeyEvent.KEYCODE_DPAD_UP),
+            CompactTerminalKey("Dn", "\u001B[B", keyCode = KeyEvent.KEYCODE_DPAD_DOWN),
+            CompactTerminalKey("Lt", "\u001B[D", keyCode = KeyEvent.KEYCODE_DPAD_LEFT),
+            CompactTerminalKey("Rt", "\u001B[C", keyCode = KeyEvent.KEYCODE_DPAD_RIGHT),
+            CompactTerminalKey("C-C", "\u0003", keyCode = KeyEvent.KEYCODE_C, ctrl = true),
+            CompactTerminalKey("C-D", "\u0004", keyCode = KeyEvent.KEYCODE_D, ctrl = true),
+            CompactTerminalKey("C-Z", "\u001A", keyCode = KeyEvent.KEYCODE_Z, ctrl = true)
         )
     }
 
@@ -149,7 +174,10 @@ fun ConnectingScreen(
             .filter { it.isNotBlank() }
             .map { slot ->
                 val compactLabel = slot.trim().replace("\n", " ").take(4)
-                (if (compactLabel.isBlank()) "Slot" else compactLabel) to slot
+                CompactTerminalKey(
+                    label = if (compactLabel.isBlank()) "Slot" else compactLabel,
+                    payload = slot
+                )
             }
         terminalKeys + slotKeys
     }
@@ -180,26 +208,67 @@ fun ConnectingScreen(
             listState.animateScrollToItem(renderedLogs.size - 1)
         }
     }
-    LaunchedEffect(renderedTerminal.length) {
-        if (renderedTerminal.isNotEmpty()) {
-            shellScrollState.scrollTo(shellScrollState.maxValue)
+    LaunchedEffect(request?.sessionId) {
+        terminalEngine.reset()
+        terminalEngine.applyProfile(terminalProfile)
+        lastShellSnapshot = ""
+        imeBridgeValue = TextFieldValue("")
+        imeCommittedText = ""
+        terminalFontSizeSp = terminalProfile.fontSizeSp.toFloat()
+        lastResize = null
+        terminalViewRef?.onTerminalUpdated()
+    }
+    LaunchedEffect(terminalProfile.id) {
+        terminalEngine.applyProfile(terminalProfile)
+        terminalViewRef?.setTerminalBackgroundColor(terminalEngine.backgroundColor())
+        terminalViewRef?.onTerminalUpdated()
+    }
+    DisposableEffect(request?.sessionId) {
+        onDispose {
+            terminalViewRef = null
         }
     }
-    LaunchedEffect(terminalSize.value, state.phase, request?.sessionId) {
-        if (state.phase != QuickConnectPhase.SUCCESS) return@LaunchedEffect
-        val size = terminalSize.value
-        if (size.width <= 0 || size.height <= 0) return@LaunchedEffect
-        val cellWidthPx = with(density) { 8.dp.toPx() }
-        val cellHeightPx = with(density) { 16.dp.toPx() }
-        val columns = (size.width / cellWidthPx).toInt().coerceAtLeast(20)
-        val rows = (size.height / cellHeightPx).toInt().coerceAtLeast(8)
-        onTerminalResize(columns, rows)
+    DisposableEffect(lifecycleOwner, request?.sessionId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
+                keyboardFocused = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+        }
+    }
+    LaunchedEffect(shellOutput, request?.sessionId) {
+        if (request == null) return@LaunchedEffect
+        val snapshot = shellOutput
+        if (snapshot.startsWith(lastShellSnapshot)) {
+            val delta = snapshot.substring(lastShellSnapshot.length)
+            if (delta.isNotEmpty()) {
+                terminalEngine.appendIncoming(delta.toByteArray(StandardCharsets.UTF_8))
+            }
+        } else {
+            terminalEngine.reset()
+            if (snapshot.isNotEmpty()) {
+                terminalEngine.appendIncoming(snapshot.toByteArray(StandardCharsets.UTF_8))
+            }
+        }
+        lastShellSnapshot = snapshot
+        terminalViewRef?.onTerminalUpdated()
     }
     LaunchedEffect(state.phase, request?.sessionId) {
         if (state.phase == QuickConnectPhase.SUCCESS) {
             keyboardFocusRequester.requestFocus()
-            keyboardFocused = true
             keyboardController?.show()
+            keyboardFocused = true
+        } else {
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+            keyboardFocused = false
         }
     }
 
@@ -207,129 +276,132 @@ fun ConnectingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .statusBarsPadding()
     ) {
         if (state.phase == QuickConnectPhase.SUCCESS) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .imePadding(),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .onSizeChanged { terminalSize.value = it }
-                        .pointerInput(request?.sessionId) {
-                            detectTransformGestures { _, _, zoom, _ ->
-                                if (zoom != 1f) {
-                                    terminalFontSizeSp = (terminalFontSizeSp * zoom).coerceIn(9f, 28f)
-                                }
-                            }
-                        }
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
-                        ) {
-                            keyboardFocusRequester.requestFocus()
-                            keyboardFocused = true
-                            keyboardController?.show()
-                        },
+                        .weight(1f),
                     color = Color(0xFF080808)
                 ) {
-                    Text(
-                        text = if (renderedTerminal.isBlank()) " " else renderedTerminal,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp)
-                            .verticalScroll(shellScrollState),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFFEDEDED),
-                            fontSize = terminalFontSizeSp.sp
-                        )
+                    AndroidView(
+                        factory = {
+                            TerminalRenderView(it).apply {
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        update = { view ->
+                            terminalViewRef = view
+                            val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) }
+                            view.setTerminalBackgroundColor(terminalEngine.backgroundColor())
+                            view.setTerminalTextSizePx(textSizePx)
+                            view.bind(
+                                emulatorProvider = { terminalEngine.emulator() },
+                                onSingleTap = {
+                                    if (keyboardFocused) {
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus(force = true)
+                                        keyboardFocused = false
+                                    } else {
+                                        keyboardFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                        keyboardFocused = true
+                                    }
+                                },
+                                onScaleDelta = { scale ->
+                                    terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(9f, 28f)
+                                },
+                                onResize = { columns, rows, cellWidthPx, cellHeightPx ->
+                                    terminalEngine.resize(columns, rows, cellWidthPx, cellHeightPx)
+                                    val resize = columns to rows
+                                    if (lastResize != resize) {
+                                        lastResize = resize
+                                        onTerminalResize(columns, rows)
+                                    }
+                                }
+                            )
+                            view.onTerminalUpdated()
+                        }
                     )
                 }
 
                 CompactKeyRow(
                     keys = compactKeys,
-                    onSendShellInput = onSendShellInput,
+                    onSendKey = { key ->
+                        val sent = key.keyCode?.let { keyCode ->
+                            terminalInput.sendVirtualKey(
+                                keyCode = keyCode,
+                                ctrlDown = key.ctrl,
+                                altDown = key.alt,
+                                shiftDown = key.shift
+                            )
+                        } ?: false
+                        if (!sent) {
+                            terminalInput.sendText(key.payload)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .imePadding()
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 1.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Pinch to zoom (${terminalFontSizeSp.toInt()}sp)",
-                        style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFFBDBDBD))
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            if (keyboardFocused) {
-                                focusManager.clearFocus(force = true)
-                                keyboardFocused = false
-                                keyboardController?.hide()
-                            } else {
-                                keyboardFocusRequester.requestFocus()
-                                keyboardFocused = true
-                                keyboardController?.show()
-                            }
-                        },
-                        modifier = Modifier.height(28.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = if (keyboardFocused) "Hide KB" else "Keyboard",
-                            maxLines = 1,
-                            fontSize = 10.sp
-                        )
-                    }
-                }
 
-                // Invisible text bridge used only to capture system keyboard input for the shell.
                 BasicTextField(
-                    value = keyboardBridgeValue,
+                    value = imeBridgeValue,
                     onValueChange = { next ->
-                        val previous = keyboardBridgeValue
-                        when {
-                            next.startsWith(previous) -> {
-                                val appended = next.removePrefix(previous)
-                                if (appended.isNotEmpty()) onSendShellInput(appended)
-                            }
+                        if (next == imeBridgeValue) return@BasicTextField
+                        imeBridgeValue = next
 
-                            previous.startsWith(next) -> {
-                                val removed = previous.length - next.length
-                                repeat(removed) { onSendShellInput("\u007F") }
-                            }
+                        // Keep composition local until IME commits it, then send final delta once.
+                        if (next.composition != null) return@BasicTextField
 
-                            else -> {
-                                if (next.isNotEmpty()) onSendShellInput(next)
-                            }
+                        sendImeDelta(
+                            previous = imeCommittedText,
+                            next = next.text,
+                            send = terminalInput::sendText
+                        )
+                        imeCommittedText = next.text
+
+                        if (imeCommittedText.length > IME_BUFFER_MAX_CHARS) {
+                            val tail = imeCommittedText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
+                            imeCommittedText = tail
+                            imeBridgeValue = TextFieldValue(
+                                text = tail,
+                                selection = TextRange(tail.length)
+                            )
                         }
-                        keyboardBridgeValue = next.takeLast(64)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
                         .alpha(0f)
                         .focusRequester(keyboardFocusRequester)
-                        .onFocusChanged { keyboardFocused = it.isFocused },
+                        .onFocusChanged { keyboardFocused = it.isFocused }
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) {
+                                return@onPreviewKeyEvent false
+                            }
+                            terminalInput.onAndroidKeyDown(keyEvent.nativeKeyEvent)
+                        },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Ascii,
                         imeAction = ImeAction.Done,
                         autoCorrect = false
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
-                            onSendShellInput("\n")
-                            keyboardBridgeValue = ""
+                            terminalInput.sendText("\r")
+                            imeBridgeValue = TextFieldValue("")
+                            imeCommittedText = ""
                         }
                     )
                 )
@@ -438,8 +510,8 @@ fun ConnectingScreen(
 
 @Composable
 private fun CompactKeyRow(
-    keys: List<Pair<String, String>>,
-    onSendShellInput: (String) -> Unit,
+    keys: List<CompactTerminalKey>,
+    onSendKey: (CompactTerminalKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (keys.isEmpty()) return
@@ -448,9 +520,9 @@ private fun CompactKeyRow(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        keys.forEach { (label, payload) ->
+        keys.forEach { key ->
             OutlinedButton(
-                onClick = { onSendShellInput(payload) },
+                onClick = { onSendKey(key) },
                 modifier = Modifier
                     .weight(1f)
                     .height(28.dp),
@@ -458,7 +530,7 @@ private fun CompactKeyRow(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEDEDED))
             ) {
                 Text(
-                    text = label,
+                    text = key.label,
                     fontSize = 9.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -514,47 +586,57 @@ private fun ConnectionLogsPane(
     }
 }
 
-private fun renderTerminalText(raw: String): String {
-    if (raw.isEmpty()) return ""
-    val lines = mutableListOf(StringBuilder())
-    var current = lines.last()
-    var escapeMode = false
-    var csiMode = false
+private data class CompactTerminalKey(
+    val label: String,
+    val payload: String,
+    val keyCode: Int? = null,
+    val ctrl: Boolean = false,
+    val alt: Boolean = false,
+    val shift: Boolean = false
+)
 
-    fun newLine() {
-        lines.add(StringBuilder())
-        if (lines.size > 300) {
-            lines.removeAt(0)
-        }
-        current = lines.last()
-    }
-
-    val normalized = raw
+private fun normalizeImeChunk(chunk: String): String {
+    if (chunk.isEmpty()) return chunk
+    val normalized = chunk
         .replace("\r\n", "\n")
         .replace('\r', '\n')
-
-    normalized.forEach { ch ->
-        if (escapeMode) {
-            if (!csiMode && ch == '[') {
-                csiMode = true
-                return@forEach
-            }
-            if (!csiMode) {
-                escapeMode = false
-                return@forEach
-            }
-            if (ch in '@'..'~') {
-                escapeMode = false
-                csiMode = false
-            }
-            return@forEach
-        }
-        when (ch) {
-            '\u001B' -> escapeMode = true
-            '\n' -> newLine()
-            '\b' -> if (current.isNotEmpty()) current.setLength(current.length - 1)
-            else -> if (ch >= ' ' || ch == '\t') current.append(ch)
-        }
-    }
-    return lines.joinToString("\n") { it.toString() }.takeLast(MAX_RENDERED_TERMINAL_CHARS)
+        .replace("\u0000", "")
+    return normalized.replace('\n', '\r')
 }
+
+private fun sendImeDelta(previous: String, next: String, send: (String) -> Unit) {
+    if (previous == next) return
+
+    val prefixLength = commonPrefixLength(previous, next)
+    val suffixLength = commonSuffixLength(previous, next, prefixLength)
+    val previousMiddleEnd = previous.length - suffixLength
+    val nextMiddleEnd = next.length - suffixLength
+
+    val removed = previous.substring(prefixLength, previousMiddleEnd)
+    if (removed.isNotEmpty()) {
+        val deleteCount = removed.codePointCount(0, removed.length)
+        repeat(deleteCount) { send("\u007F") }
+    }
+
+    val inserted = normalizeImeChunk(next.substring(prefixLength, nextMiddleEnd))
+    if (inserted.isNotEmpty()) {
+        send(inserted)
+    }
+}
+
+private fun commonPrefixLength(a: String, b: String): Int {
+    val max = minOf(a.length, b.length)
+    var i = 0
+    while (i < max && a[i] == b[i]) i++
+    return i
+}
+
+private fun commonSuffixLength(a: String, b: String, prefixLength: Int): Int {
+    val max = minOf(a.length, b.length) - prefixLength
+    var i = 0
+    while (i < max && a[a.length - 1 - i] == b[b.length - 1 - i]) i++
+    return i
+}
+
+private const val IME_BUFFER_MAX_CHARS = 512
+private const val IME_BUFFER_KEEP_TAIL_CHARS = 160

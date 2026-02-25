@@ -28,7 +28,8 @@ data class HostEntity(
     val useMosh: Boolean,
     val preferredForwardId: String?,
     val startupScript: String,
-    val backgroundBehavior: BackgroundBehavior
+    val backgroundBehavior: BackgroundBehavior,
+    val terminalProfileId: String?
 )
 
 @Entity(tableName = "identities")

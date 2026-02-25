@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -48,6 +51,7 @@ import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.ui.components.EmptyState
 import com.sshpeaches.app.ui.components.decodeForwardFromQr
 import com.sshpeaches.app.ui.components.generateForwardQr
+import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.sshpeaches.app.util.isValidHostAddress
 import com.sshpeaches.app.util.parsePort
 import java.util.UUID
@@ -76,6 +80,7 @@ fun PortForwardScreen(
     val hostSearchState = remember { mutableStateOf(TextFieldValue("")) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val shareForward = remember { mutableStateOf<PortForward?>(null) }
+    val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -228,7 +233,13 @@ fun PortForwardScreen(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit port forward" else "Add port forward") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = dialogBodyMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
                         value = labelState.value,
                         onValueChange = { labelState.value = it },

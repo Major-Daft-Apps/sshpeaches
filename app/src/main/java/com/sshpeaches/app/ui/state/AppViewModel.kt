@@ -15,6 +15,9 @@ import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.PortForwardType
 import com.sshpeaches.app.data.model.Snippet
+import com.sshpeaches.app.data.model.TerminalEmulation
+import com.sshpeaches.app.data.model.TerminalProfile
+import com.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.sshpeaches.app.data.repository.AppRepository
 import com.sshpeaches.app.data.repository.InMemoryAppRepository
 import com.sshpeaches.app.data.settings.SettingsStore
@@ -43,6 +46,9 @@ class AppViewModel(
     private val biometricFlow = MutableStateFlow(false)
     private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
     private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
+    private val terminalEmulationFlow = MutableStateFlow(TerminalEmulation.XTERM)
+    private val terminalProfilesFlow = MutableStateFlow(TerminalProfileDefaults.builtInProfiles)
+    private val defaultTerminalProfileIdFlow = MutableStateFlow(TerminalProfileDefaults.DEFAULT_PROFILE_ID)
     private val crashReportsFlow = MutableStateFlow(false)
     private val analyticsFlow = MutableStateFlow(false)
     private val diagnosticsLoggingFlow = MutableStateFlow(false)
@@ -56,6 +62,7 @@ class AppViewModel(
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
     private var lockTimerJob: Job? = null
+    private var appInBackground: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -64,8 +71,11 @@ class AppViewModel(
                 if (locked) {
                     lockTimerJob?.cancel()
                     lockTimerJob = null
-                } else {
+                } else if (appInBackground) {
                     scheduleLockTimer(lockTimeoutFlow.value)
+                } else {
+                    lockTimerJob?.cancel()
+                    lockTimerJob = null
                 }
             }
         }
@@ -87,6 +97,21 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.lockTimeout.collect { timeout ->
                 lockTimeoutFlow.value = timeout
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalEmulation.collect { value ->
+                terminalEmulationFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalProfiles.collect { value ->
+                terminalProfilesFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.defaultTerminalProfileId.collect { value ->
+                defaultTerminalProfileIdFlow.value = value
             }
         }
         viewModelScope.launch {
@@ -173,6 +198,9 @@ class AppViewModel(
         val biometric: Boolean,
         val timeout: LockTimeout,
         val customTimeoutMinutes: Int,
+        val terminalEmulation: TerminalEmulation,
+        val terminalProfiles: List<TerminalProfile>,
+        val defaultTerminalProfileId: String,
         val crash: Boolean,
         val analytics: Boolean,
         val diagnostics: Boolean
@@ -183,7 +211,10 @@ class AppViewModel(
         val background: Boolean,
         val biometric: Boolean,
         val timeout: LockTimeout,
-        val customTimeoutMinutes: Int
+        val customTimeoutMinutes: Int,
+        val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+        val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
+        val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID
     )
 
     private data class SharePrefs(
@@ -195,7 +226,7 @@ class AppViewModel(
         val usage: Boolean
     )
 
-    private val privacyPartialFlow = combine(
+    private val privacyPartialBaseFlow = combine(
         themeModeFlow,
         backgroundSessionsFlow,
         biometricFlow,
@@ -203,6 +234,19 @@ class AppViewModel(
         customLockTimeoutMinutesFlow
     ) { theme, background, biometric, timeout, customMinutes ->
         PrivacyPartial(theme, background, biometric, timeout, customMinutes)
+    }
+
+    private val privacyPartialFlow = combine(
+        privacyPartialBaseFlow,
+        terminalEmulationFlow,
+        terminalProfilesFlow,
+        defaultTerminalProfileIdFlow
+    ) { partial, terminalEmulation, profiles, defaultProfileId ->
+        partial.copy(
+            terminalEmulation = terminalEmulation,
+            terminalProfiles = profiles,
+            defaultTerminalProfileId = defaultProfileId
+        )
     }
 
     private val privacyPrefsFlow = combine(
@@ -217,6 +261,9 @@ class AppViewModel(
             biometric = partial.biometric,
             timeout = partial.timeout,
             customTimeoutMinutes = partial.customTimeoutMinutes,
+            terminalEmulation = partial.terminalEmulation,
+            terminalProfiles = partial.terminalProfiles,
+            defaultTerminalProfileId = partial.defaultTerminalProfileId,
             crash = crash,
             analytics = analytics,
             diagnostics = diagnostics
@@ -253,6 +300,9 @@ class AppViewModel(
             biometricLockEnabled = privacy.biometric,
             lockTimeout = privacy.timeout,
             customLockTimeoutMinutes = privacy.customTimeoutMinutes,
+            terminalEmulation = privacy.terminalEmulation,
+            terminalProfiles = privacy.terminalProfiles,
+            defaultTerminalProfileId = privacy.defaultTerminalProfileId,
             crashReportsEnabled = privacy.crash,
             analyticsEnabled = privacy.analytics,
             diagnosticsLoggingEnabled = privacy.diagnostics,
@@ -324,6 +374,9 @@ class AppViewModel(
         append(state.biometricLockEnabled).append('|')
         append(state.lockTimeout).append('|')
         append(state.customLockTimeoutMinutes).append('|')
+        append(state.terminalEmulation).append('|')
+        append(state.defaultTerminalProfileId).append('|')
+        append(state.terminalProfiles.size).append('|')
         append(state.crashReportsEnabled).append('|')
         append(state.analyticsEnabled).append('|')
         append(state.diagnosticsLoggingEnabled).append('|')
@@ -370,7 +423,7 @@ class AppViewModel(
     fun setLockTimeout(timeout: LockTimeout) {
         launchLogged("setLockTimeout", "timeout=$timeout") {
             SettingsStore.setLockTimeout(timeout)
-            if (!lockedFlow.value) {
+            if (!lockedFlow.value && appInBackground) {
                 scheduleLockTimer(timeout)
             }
         }
@@ -379,8 +432,64 @@ class AppViewModel(
     fun setCustomLockTimeoutMinutes(minutes: Int) {
         launchLogged("setCustomLockTimeoutMinutes", "minutes=$minutes") {
             SettingsStore.setCustomLockTimeoutMinutes(minutes)
-            if (!lockedFlow.value && lockTimeoutFlow.value == LockTimeout.CUSTOM) {
+            if (!lockedFlow.value && appInBackground && lockTimeoutFlow.value == LockTimeout.CUSTOM) {
                 scheduleLockTimer(LockTimeout.CUSTOM)
+            }
+        }
+    }
+
+    fun setTerminalEmulation(value: TerminalEmulation) {
+        launchLogged("setTerminalEmulation", "value=$value") {
+            SettingsStore.setTerminalEmulation(value)
+        }
+    }
+
+    fun setDefaultTerminalProfile(profileId: String) {
+        launchLogged("setDefaultTerminalProfile", "profileId=$profileId") {
+            val profiles = terminalProfilesFlow.value
+            val selected = if (profiles.any { it.id == profileId }) {
+                profileId
+            } else {
+                profiles.firstOrNull()?.id ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+            }
+            SettingsStore.setDefaultTerminalProfileId(selected)
+        }
+    }
+
+    fun saveTerminalProfile(profile: TerminalProfile) {
+        launchLogged("saveTerminalProfile", "profileId=${profile.id}") {
+            val normalized = normalizeProfile(profile)
+            val builtInIds = TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet()
+            if (builtInIds.contains(normalized.id)) {
+                logResult("saveTerminalProfile", false, "cannot-overwrite-builtin")
+                return@launchLogged
+            }
+            val updated = terminalProfilesFlow.value
+                .filterNot { it.id == normalized.id }
+                .plus(normalized)
+                .sortedBy { it.name.lowercase() }
+            SettingsStore.setTerminalProfiles(updated)
+        }
+    }
+
+    fun deleteTerminalProfile(profileId: String) {
+        launchLogged("deleteTerminalProfile", "profileId=$profileId") {
+            val builtInIds = TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet()
+            if (builtInIds.contains(profileId)) {
+                logResult("deleteTerminalProfile", false, "cannot-delete-builtin")
+                return@launchLogged
+            }
+            val updated = terminalProfilesFlow.value.filterNot { it.id == profileId }
+            SettingsStore.setTerminalProfiles(updated)
+
+            if (defaultTerminalProfileIdFlow.value == profileId) {
+                val replacement = updated.firstOrNull()?.id ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+                SettingsStore.setDefaultTerminalProfileId(replacement)
+            }
+
+            val hostsUsingProfile = uiState.value.hosts.filter { it.terminalProfileId == profileId }
+            hostsUsingProfile.forEach { host ->
+                repository.updateHost(host.copy(terminalProfileId = null))
             }
         }
     }
@@ -439,6 +548,15 @@ class AppViewModel(
         }
     }
 
+    fun restoreDefaultSettings() {
+        launchLogged("restoreDefaultSettings") {
+            SettingsStore.resetToDefaults()
+            if (!lockedFlow.value && appInBackground) {
+                scheduleLockTimer(LockTimeout.FIVE_MIN)
+            }
+        }
+    }
+
     fun addHost(
         name: String,
         host: String,
@@ -452,19 +570,20 @@ class AppViewModel(
         preferredForwardId: String?,
         startupScript: String,
         backgroundBehavior: BackgroundBehavior,
+        terminalProfileId: String?,
         password: String?,
         suppliedId: String? = null
     ) {
         logAction(
             "addHost",
-            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, hasPasswordInput=${!password.isNullOrBlank()}"
+            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, hasPasswordInput=${!password.isNullOrBlank()}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
         )
         if (name.isBlank() || host.isBlank() || username.isBlank()) {
             logResult("addHost", false, "validation-failed")
             return
         }
         val id = suppliedId ?: UUID.randomUUID().toString()
-        val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
+        val canStoreSecret = !SecurityManager.isLocked()
         val hasPassword = !password.isNullOrBlank() && canStoreSecret
         if (hasPassword) {
             SecurityManager.storeHostPassword(id, password!!)
@@ -485,7 +604,8 @@ class AppViewModel(
             useMosh = useMosh,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
-            backgroundBehavior = backgroundBehavior
+            backgroundBehavior = backgroundBehavior,
+            terminalProfileId = terminalProfileId
         )
         launchLogged("addHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.addHost(entry)
@@ -506,18 +626,19 @@ class AppViewModel(
         preferredForwardId: String?,
         startupScript: String,
         backgroundBehavior: BackgroundBehavior,
+        terminalProfileId: String?,
         password: String?
     ) {
         logAction(
             "updateHost",
-            "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, passwordProvided=${password != null}"
+            "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, passwordProvided=${password != null}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
         )
         val existing = uiState.value.hosts.find { it.id == id }
         if (existing == null) {
             logResult("updateHost", false, "not-found")
             return
         }
-        val canStoreSecret = SecurityManager.isPinSet() && !SecurityManager.isLocked()
+        val canStoreSecret = !SecurityManager.isLocked()
         val hasPassword = when {
             !password.isNullOrBlank() && canStoreSecret -> {
                 SecurityManager.storeHostPassword(id, password)
@@ -542,7 +663,8 @@ class AppViewModel(
             useMosh = useMosh,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
-            backgroundBehavior = backgroundBehavior
+            backgroundBehavior = backgroundBehavior,
+            terminalProfileId = terminalProfileId
         )
         launchLogged("updateHost", "hostId=$id, storedPassword=$hasPassword") {
             repository.updateHost(updated)
@@ -709,6 +831,19 @@ class AppViewModel(
         logResult("setPin", true, "locked=${lockedFlow.value}")
     }
 
+    fun clearPin() {
+        logAction("clearPin")
+        SecurityManager.clearPin()
+        pinConfiguredFlow.value = SecurityManager.isPinSet()
+        lockedFlow.value = SecurityManager.isLocked()
+        lockTimerJob?.cancel()
+        lockTimerJob = null
+        viewModelScope.launch {
+            SettingsStore.setBiometricLockEnabled(false)
+        }
+        logResult("clearPin", true, "pinConfigured=${pinConfiguredFlow.value}, locked=${lockedFlow.value}")
+    }
+
     fun lockApp() {
         logAction("lockApp")
         SecurityManager.lock()
@@ -723,7 +858,7 @@ class AppViewModel(
         val ok = SecurityManager.verifyPin(pin)
         if (ok) {
             lockedFlow.value = SecurityManager.isLocked()
-            if (!lockedFlow.value) {
+            if (!lockedFlow.value && appInBackground) {
                 scheduleLockTimer(lockTimeoutFlow.value)
             }
         }
@@ -733,13 +868,9 @@ class AppViewModel(
 
     fun unlockWithBiometric() {
         logAction("unlockWithBiometric")
-        if (!SecurityManager.isPinSet()) {
-            logResult("unlockWithBiometric", false, "pin-not-configured")
-            return
-        }
         SecurityManager.unlock()
         lockedFlow.value = SecurityManager.isLocked()
-        if (!lockedFlow.value) {
+        if (!lockedFlow.value && appInBackground) {
             scheduleLockTimer(lockTimeoutFlow.value)
         }
         logResult("unlockWithBiometric", true, "locked=${lockedFlow.value}")
@@ -747,10 +878,24 @@ class AppViewModel(
 
     fun onUserInteraction() {
         logAction("onUserInteraction", "locked=${lockedFlow.value}")
+        logResult("onUserInteraction", true)
+    }
+
+    fun onAppBackgrounded() {
+        logAction("onAppBackgrounded", "locked=${lockedFlow.value}")
+        appInBackground = true
         if (!lockedFlow.value) {
             scheduleLockTimer(lockTimeoutFlow.value)
         }
-        logResult("onUserInteraction", true)
+        logResult("onAppBackgrounded", true, "timerActive=${lockTimerJob != null}")
+    }
+
+    fun onAppForegrounded() {
+        logAction("onAppForegrounded", "locked=${lockedFlow.value}")
+        appInBackground = false
+        lockTimerJob?.cancel()
+        lockTimerJob = null
+        logResult("onAppForegrounded", true)
     }
 
     fun addIdentity(label: String, fingerprint: String, username: String?, suppliedId: String? = null, hasPrivateKey: Boolean = false) {
@@ -878,6 +1023,14 @@ class AppViewModel(
         launchLogged("resetKeyboardLayout") {
             SettingsStore.setKeyboardLayout(KeyboardLayoutDefaults.DEFAULT_SLOTS)
         }
+    }
+
+    private fun normalizeProfile(profile: TerminalProfile): TerminalProfile {
+        val normalizedName = profile.name.trim().ifBlank { "Custom Profile" }.take(48)
+        return profile.copy(
+            name = normalizedName,
+            fontSizeSp = profile.fontSizeSp.coerceIn(9, 28)
+        )
     }
 
     private fun scheduleLockTimer(timeout: LockTimeout) {

@@ -8,11 +8,16 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.sshpeaches.app.data.model.TerminalCursorStyle
+import com.sshpeaches.app.data.model.TerminalEmulation
+import com.sshpeaches.app.data.model.TerminalProfile
+import com.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.sshpeaches.app.ui.state.LockTimeout
 import com.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
+import org.json.JSONObject
 import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -27,6 +32,9 @@ object SettingsStore {
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
+    private val terminalEmulationKey = stringPreferencesKey("terminal_emulation")
+    private val terminalProfilesKey = stringPreferencesKey("terminal_profiles")
+    private val defaultTerminalProfileIdKey = stringPreferencesKey("default_terminal_profile_id")
     private val customLockTimeoutMinutesKey = intPreferencesKey("custom_lock_timeout_minutes")
     private val crashReportsKey = booleanPreferencesKey("crash_reports")
     private val analyticsKey = booleanPreferencesKey("analytics")
@@ -73,6 +81,34 @@ object SettingsStore {
             runCatching {
                 LockTimeout.valueOf(prefs[lockTimeoutKey] ?: LockTimeout.FIVE_MIN.name)
             }.getOrDefault(LockTimeout.FIVE_MIN)
+        }
+    }
+
+    val terminalEmulation: Flow<TerminalEmulation> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalEmulation.valueOf(
+                    prefs[terminalEmulationKey] ?: TerminalEmulation.XTERM.name
+                )
+            }.getOrDefault(TerminalEmulation.XTERM)
+        }
+    }
+
+    val terminalProfiles: Flow<List<TerminalProfile>> by lazy {
+        dataStore.data.map { prefs ->
+            mergedTerminalProfiles(prefs[terminalProfilesKey])
+        }
+    }
+
+    val defaultTerminalProfileId: Flow<String> by lazy {
+        dataStore.data.map { prefs ->
+            val profiles = mergedTerminalProfiles(prefs[terminalProfilesKey])
+            val configured = prefs[defaultTerminalProfileIdKey] ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+            if (profiles.any { it.id == configured }) {
+                configured
+            } else {
+                profiles.firstOrNull()?.id ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+            }
         }
     }
 
@@ -150,6 +186,26 @@ object SettingsStore {
         }
     }
 
+    suspend fun setTerminalEmulation(value: TerminalEmulation) {
+        dataStore.edit { prefs ->
+            prefs[terminalEmulationKey] = value.name
+        }
+    }
+
+    suspend fun setTerminalProfiles(profiles: List<TerminalProfile>) {
+        val builtInIds = TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet()
+        val custom = profiles.filterNot { builtInIds.contains(it.id) }
+        dataStore.edit { prefs ->
+            prefs[terminalProfilesKey] = encodeTerminalProfiles(custom)
+        }
+    }
+
+    suspend fun setDefaultTerminalProfileId(profileId: String) {
+        dataStore.edit { prefs ->
+            prefs[defaultTerminalProfileIdKey] = profileId
+        }
+    }
+
     suspend fun setCustomLockTimeoutMinutes(minutes: Int) {
         dataStore.edit { prefs ->
             prefs[customLockTimeoutMinutesKey] = minutes.coerceIn(1, 720)
@@ -210,6 +266,15 @@ object SettingsStore {
         }
     }
 
+    suspend fun resetToDefaults() {
+        dataStore.edit { prefs ->
+            prefs.asMap().keys.toList().forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                prefs.remove(key as Preferences.Key<Any>)
+            }
+        }
+    }
+
     private val dataStore: DataStore<Preferences>
         get() {
             check(::appContext.isInitialized) { "SettingsStore not initialized" }
@@ -223,4 +288,58 @@ object SettingsStore {
                 if (index < array.length()) array.optString(index) ?: "" else ""
             }
         }.getOrElse { KeyboardLayoutDefaults.DEFAULT_SLOTS }
+
+    private fun mergedTerminalProfiles(serializedCustomProfiles: String?): List<TerminalProfile> {
+        val builtIns = TerminalProfileDefaults.builtInProfiles
+        val builtInIds = builtIns.map { it.id }.toSet()
+        val customProfiles = serializedCustomProfiles
+            ?.let(::decodeTerminalProfiles)
+            .orEmpty()
+            .filterNot { builtInIds.contains(it.id) }
+        return builtIns + customProfiles
+    }
+
+    private fun encodeTerminalProfiles(profiles: List<TerminalProfile>): String {
+        val array = JSONArray()
+        profiles.forEach { profile ->
+            array.put(
+                JSONObject().apply {
+                    put("id", profile.id)
+                    put("name", profile.name)
+                    put("fontSizeSp", profile.fontSizeSp)
+                    put("foregroundHex", profile.foregroundHex)
+                    put("backgroundHex", profile.backgroundHex)
+                    put("cursorHex", profile.cursorHex)
+                    put("cursorStyle", profile.cursorStyle.name)
+                    put("cursorBlink", profile.cursorBlink)
+                }
+            )
+        }
+        return array.toString()
+    }
+
+    private fun decodeTerminalProfiles(serialized: String): List<TerminalProfile> =
+        runCatching {
+            val array = JSONArray(serialized)
+            val out = mutableListOf<TerminalProfile>()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val id = item.optString("id").trim()
+                if (id.isBlank()) continue
+                val name = item.optString("name", "Profile").trim().ifBlank { "Profile" }
+                out += TerminalProfile(
+                    id = id,
+                    name = name,
+                    fontSizeSp = item.optInt("fontSizeSp", 12).coerceIn(9, 28),
+                    foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
+                    backgroundHex = item.optString("backgroundHex", "#101010"),
+                    cursorHex = item.optString("cursorHex", "#FFB74D"),
+                    cursorStyle = runCatching {
+                        TerminalCursorStyle.valueOf(item.optString("cursorStyle", TerminalCursorStyle.BLOCK.name))
+                    }.getOrDefault(TerminalCursorStyle.BLOCK),
+                    cursorBlink = item.optBoolean("cursorBlink", true)
+                )
+            }
+            out.distinctBy { it.id }
+        }.getOrDefault(emptyList())
 }

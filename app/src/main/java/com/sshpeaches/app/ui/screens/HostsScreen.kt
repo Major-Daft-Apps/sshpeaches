@@ -11,12 +11,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -49,9 +52,11 @@ import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.BackgroundBehavior
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.model.TerminalProfile
 import com.sshpeaches.app.ui.components.HostCard
 import com.sshpeaches.app.ui.components.decodeHostFromQr
 import com.sshpeaches.app.ui.state.SortMode
+import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.sshpeaches.app.util.isValidHostAddress
 import com.sshpeaches.app.util.parsePort
@@ -65,16 +70,18 @@ import java.util.UUID
 fun HostsScreen(
     hosts: List<HostConnection>,
     portForwards: List<PortForward>,
+    terminalProfiles: List<TerminalProfile>,
+    defaultTerminalProfileId: String,
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
     pinConfigured: Boolean,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {}
 ) {
@@ -90,9 +97,9 @@ fun HostsScreen(
     val notesState = remember { mutableStateOf("") }
     val authState = remember { mutableStateOf(AuthMethod.IDENTITY) }
     val authMenuExpanded = remember { mutableStateOf(false) }
-    val modeState = remember { mutableStateOf(ConnectionMode.SSH) }
-    val modeExpanded = remember { mutableStateOf(false) }
     val useMoshState = remember { mutableStateOf(false) }
+    val terminalProfileIdState = remember { mutableStateOf<String?>(null) }
+    val terminalProfileExpanded = remember { mutableStateOf(false) }
     val preferredForwardIdState = remember { mutableStateOf<String?>(null) }
     val forwardExpanded = remember { mutableStateOf(false) }
     val startupScriptState = remember { mutableStateOf("") }
@@ -107,6 +114,7 @@ fun HostsScreen(
     val pendingConnect = remember { mutableStateOf<Pair<HostConnection, ConnectionMode>?>(null) }
     val connectPassword = remember { mutableStateOf("") }
     val connectPasswordError = remember { mutableStateOf<String?>(null) }
+    val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -134,11 +142,12 @@ fun HostsScreen(
             imported.preferredAuth,
             imported.group,
             imported.notes,
-            imported.defaultMode,
+            ConnectionMode.SSH,
             imported.useMosh,
             imported.preferredForwardId,
             imported.startupScript,
             imported.backgroundBehavior,
+            imported.terminalProfileId,
             legacyPassword,
             targetId
         )
@@ -223,8 +232,8 @@ fun HostsScreen(
         groupState.value = host?.group ?: ""
         notesState.value = host?.notes ?: ""
         authState.value = host?.preferredAuth ?: AuthMethod.IDENTITY
-        modeState.value = host?.defaultMode ?: ConnectionMode.SSH
         useMoshState.value = host?.useMosh ?: false
+        terminalProfileIdState.value = host?.terminalProfileId
         preferredForwardIdState.value = host?.preferredForwardId
         startupScriptState.value = host?.startupScript ?: ""
         backgroundBehaviorState.value = host?.backgroundBehavior ?: BackgroundBehavior.INHERIT
@@ -348,7 +357,13 @@ fun HostsScreen(
             onDismissRequest = { closeDialog() },
             title = { Text(if (editingHost.value != null) "Edit Host" else "Add Host") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = dialogBodyMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = nameState.value,
                         onValueChange = { nameState.value = it },
@@ -401,9 +416,9 @@ fun HostsScreen(
                             Text("Remove stored password")
                         }
                     }
-                    if (!pinConfigured || !canStoreCredentials) {
+                    if (!canStoreCredentials) {
                         Text(
-                            "Passwords are not saved right now. You will be prompted on connect.",
+                            "Passwords cannot be saved while the secure store is locked.",
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -439,30 +454,54 @@ fun HostsScreen(
                             }
                         }
                     }
-                    ExposedDropdownMenuBox(
-                        expanded = modeExpanded.value,
-                        onExpandedChange = { modeExpanded.value = !modeExpanded.value }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Text("Transport")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { useMoshState.value = false }
+                            ) { Text(if (!useMoshState.value) "SSH ✓" else "SSH") }
+                            TextButton(
+                                onClick = { useMoshState.value = true }
+                            ) { Text(if (useMoshState.value) "Mosh ✓" else "Mosh") }
+                        }
+                    }
+                    ExposedDropdownMenuBox(
+                        expanded = terminalProfileExpanded.value,
+                        onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
+                    ) {
+                        val effectiveProfileId = terminalProfileIdState.value ?: defaultTerminalProfileId
                         TextField(
-                            value = modeState.value.toSentenceCaseLabel(),
+                            value = terminalProfiles.firstOrNull { it.id == effectiveProfileId }?.name ?: "App default",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Default mode") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modeExpanded.value) },
+                            label = { Text("Terminal profile") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalProfileExpanded.value)
+                            },
                             modifier = Modifier
                                 .menuAnchor()
                                 .fillMaxWidth()
                         )
                         ExposedDropdownMenu(
-                            expanded = modeExpanded.value,
-                            onDismissRequest = { modeExpanded.value = false }
+                            expanded = terminalProfileExpanded.value,
+                            onDismissRequest = { terminalProfileExpanded.value = false }
                         ) {
-                            ConnectionMode.values().forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text("App default") },
+                                onClick = {
+                                    terminalProfileIdState.value = null
+                                    terminalProfileExpanded.value = false
+                                }
+                            )
+                            terminalProfiles.forEach { profile ->
                                 DropdownMenuItem(
-                                    text = { Text(mode.toSentenceCaseLabel()) },
+                                    text = { Text(profile.name) },
                                     onClick = {
-                                        modeState.value = mode
-                                        modeExpanded.value = false
+                                        terminalProfileIdState.value = profile.id
+                                        terminalProfileExpanded.value = false
                                     }
                                 )
                             }
@@ -511,13 +550,6 @@ fun HostsScreen(
                         minLines = 2,
                         maxLines = 6
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Checkbox(
-                            checked = useMoshState.value,
-                            onCheckedChange = { useMoshState.value = it }
-                        )
-                        Text("Enable Mosh")
-                    }
                     ExposedDropdownMenuBox(
                         expanded = backgroundExpanded.value,
                         onExpandedChange = { backgroundExpanded.value = !backgroundExpanded.value }
@@ -583,7 +615,7 @@ fun HostsScreen(
                         dialogError.value != null -> dialogError.value = null
                     }
                     val passwordValue = when {
-                        !pinConfigured || !canStoreCredentials -> null
+                        !canStoreCredentials -> null
                         clearPasswordState.value -> ""
                         passwordState.value.isNotBlank() -> passwordState.value
                         else -> null
@@ -597,11 +629,12 @@ fun HostsScreen(
                             authState.value,
                             groupState.value.ifBlank { null },
                             notesState.value,
-                            modeState.value,
+                            ConnectionMode.SSH,
                             useMoshState.value,
                             preferredForwardIdState.value,
                             startupScriptState.value,
                             backgroundBehaviorState.value,
+                            terminalProfileIdState.value,
                             passwordValue,
                             null
                         )
@@ -615,11 +648,12 @@ fun HostsScreen(
                             authState.value,
                             groupState.value.ifBlank { null },
                             notesState.value,
-                            modeState.value,
+                            ConnectionMode.SSH,
                             useMoshState.value,
                             preferredForwardIdState.value,
                             startupScriptState.value,
                             backgroundBehaviorState.value,
+                            terminalProfileIdState.value,
                             passwordValue
                         )
                     }

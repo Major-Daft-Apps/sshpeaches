@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -49,6 +52,7 @@ import com.sshpeaches.app.ui.components.IdentityQrPayload
 import com.sshpeaches.app.ui.components.decodeIdentityFromQr
 import com.sshpeaches.app.ui.components.generateIdentityQr
 import com.sshpeaches.app.ui.util.ExportPassphraseCache
+import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.sshpeaches.app.util.isValidFingerprint
 import java.util.UUID
 
@@ -93,6 +97,7 @@ fun IdentitiesScreen(
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
     val fileImportTarget = remember { mutableStateOf<String?>(null) }
+    val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
 
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -296,7 +301,13 @@ fun IdentitiesScreen(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit identity" else "Add identity") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = dialogBodyMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = labelState.value,
                         onValueChange = { labelState.value = it },

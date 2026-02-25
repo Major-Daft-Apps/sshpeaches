@@ -4,6 +4,9 @@ import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.Identity
 import com.sshpeaches.app.data.model.PortForward
 import com.sshpeaches.app.data.model.Snippet
+import com.sshpeaches.app.data.model.TerminalEmulation
+import com.sshpeaches.app.data.model.TerminalProfile
+import com.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 
 data class AppUiState(
@@ -18,6 +21,9 @@ data class AppUiState(
     val biometricLockEnabled: Boolean = false,
     val lockTimeout: LockTimeout = LockTimeout.FIVE_MIN,
     val customLockTimeoutMinutes: Int = 30,
+    val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+    val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
+    val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
     val crashReportsEnabled: Boolean = false,
     val analyticsEnabled: Boolean = false,
     val diagnosticsLoggingEnabled: Boolean = false,

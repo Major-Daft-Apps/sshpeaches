@@ -42,7 +42,8 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         startupScript = json.optString("startupScript", ""),
         backgroundBehavior = runCatching {
             BackgroundBehavior.valueOf(json.optString("backgroundBehavior", BackgroundBehavior.INHERIT.name))
-        }.getOrDefault(BackgroundBehavior.INHERIT)
+        }.getOrDefault(BackgroundBehavior.INHERIT),
+        terminalProfileId = json.optString("terminalProfileId").takeIf { it.isNotBlank() }
     )
     val encrypted = json.optString("pwdPayload").takeIf { it.isNotBlank() }
     val legacy = json.optString("pwd").takeIf { it.isNotBlank() }?.let { encoded ->

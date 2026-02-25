@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -32,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.sshpeaches.app.data.model.Snippet
 import com.sshpeaches.app.ui.components.EmptyState
+import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import java.util.UUID
 
 @Composable
@@ -47,6 +51,7 @@ fun SnippetManagerScreen(
     val titleState = remember { mutableStateOf("") }
     val descriptionState = remember { mutableStateOf("") }
     val commandState = remember { mutableStateOf("") }
+    val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
 
     fun openDialog(snippet: Snippet?) {
         editingId.value = snippet?.id
@@ -101,7 +106,13 @@ fun SnippetManagerScreen(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit snippet" else "Add snippet") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = dialogBodyMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
                         value = titleState.value,
                         onValueChange = { titleState.value = it },

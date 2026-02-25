@@ -86,6 +86,9 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.termux.termux-app:terminal-emulator:0.118.0")
+    implementation("com.termux.termux-app:terminal-view:0.118.0")
+    implementation("com.google.guava:listenablefuture:1.0")
     debugRuntimeOnly("org.slf4j:slf4j-simple:2.0.7")
     releaseRuntimeOnly("org.slf4j:slf4j-nop:2.0.7")
 

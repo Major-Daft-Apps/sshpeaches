@@ -10,11 +10,13 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.sshpeaches.app.MainActivity
 import com.sshpeaches.app.R
 import com.sshpeaches.app.data.model.AuthMethod
 import com.sshpeaches.app.data.model.ConnectionMode
 import com.sshpeaches.app.data.model.HostConnection
 import com.sshpeaches.app.data.model.PortForward
+import com.sshpeaches.app.data.model.TerminalEmulation
 import com.sshpeaches.app.data.settings.SettingsStore
 import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import net.schmizz.sshj.connection.channel.direct.Session
+import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.userauth.UserAuthException
 
@@ -74,7 +77,7 @@ class SessionService : Service() {
         createChannel()
         startForeground(
             NOTIFICATION_ID,
-            buildNotification("SSHPeaches Sessions", "No active sessions")
+            buildSummaryNotification()
         )
         UiDebugLog.result("SessionService.onCreate", true)
     }
@@ -110,7 +113,8 @@ class SessionService : Service() {
         availableForwards: List<PortForward> = emptyList(),
         autoStartForwards: Boolean = true,
         autoTrustUnknownHostKey: Boolean = true,
-        allowPasswordSave: Boolean = false
+        allowPasswordSave: Boolean = false,
+        terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM
     ) {
         UiDebugLog.action(
             "startSession",
@@ -176,7 +180,7 @@ class SessionService : Service() {
                 }
                 if (mode == ConnectionMode.SSH) {
                     updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting shell...")
-                    shellBinding = openShell(host.id, client!!)
+                    shellBinding = openShell(host.id, client!!, terminalEmulation)
                 }
                 if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
                     runCatching {
@@ -264,7 +268,6 @@ class SessionService : Service() {
             }
         }
         activeJobs[host.id] = job
-        showHostNotification(host)
         updateSummaryNotification()
     }
 
@@ -376,19 +379,23 @@ class SessionService : Service() {
 
     fun sendShellInput(hostId: String, text: String) {
         if (text.isEmpty()) return
+        sendShellBytes(hostId, text.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    fun sendShellBytes(hostId: String, bytes: ByteArray) {
+        if (bytes.isEmpty()) return
         val connection = activeConnections[hostId]
         if (connection == null) {
-            UiDebugLog.result("sendShellInput", false, "session-not-active hostId=$hostId")
+            UiDebugLog.result("sendShellBytes", false, "session-not-active hostId=$hostId")
             return
         }
         val shell = connection.shellBinding?.shell
         if (connection.mode != ConnectionMode.SSH || shell == null) {
-            UiDebugLog.result("sendShellInput", false, "shell-not-available hostId=$hostId")
+            UiDebugLog.result("sendShellBytes", false, "shell-not-available hostId=$hostId")
             return
         }
         serviceScope.launch {
             runCatching {
-                val bytes = text.toByteArray(StandardCharsets.UTF_8)
                 shell.outputStream.write(bytes)
                 shell.outputStream.flush()
                 emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
@@ -600,23 +607,34 @@ class SessionService : Service() {
         }
     }
 
-    private fun openShell(hostId: String, client: SSHClient): ShellBinding {
+    private fun openShell(
+        hostId: String,
+        client: SSHClient,
+        terminalEmulation: TerminalEmulation
+    ): ShellBinding {
         val session = client.startSession()
-        session.allocateDefaultPTY()
-        val shell = session.startShell()
-        runCatching {
-            // Trigger an initial prompt on shells that wait for first input.
-            val bytes = "\n".toByteArray(StandardCharsets.UTF_8)
-            shell.outputStream.write(bytes)
-            shell.outputStream.flush()
-            emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
+        val allocated = runCatching {
+            session.allocatePTY(
+                terminalEmulation.ptyName,
+                120,
+                40,
+                0,
+                0,
+                mutableMapOf<PTYMode, Int>()
+            )
+        }.isSuccess
+        if (!allocated) {
+            session.allocateDefaultPTY()
         }
+        val shell = session.startShell()
         serviceScope.launch {
+            var reachedEof = false
             runCatching {
                 val buffer = ByteArray(2048)
                 while (true) {
                     val read = shell.inputStream.read(buffer)
                     if (read < 0) {
+                        reachedEof = true
                         emitShellLifecycleDiagnostic(hostId, "RX EOF")
                         break
                     }
@@ -638,9 +656,29 @@ class SessionService : Service() {
                         message = "Shell stream ended: ${err.message ?: "unknown error"}"
                     )
                 )
+                closeSessionAfterShellExit(
+                    hostId,
+                    "Shell stream ended: ${err.message ?: "unknown error"}"
+                )
+            }
+            if (reachedEof) {
+                closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
             }
         }
         return ShellBinding(session = session, shell = shell)
+    }
+
+    private fun closeSessionAfterShellExit(hostId: String, reason: String) {
+        if (!activeJobs.containsKey(hostId)) return
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "$reason. Closing session."
+            )
+        )
+        UiDebugLog.action("autoCloseSessionOnShellExit", "hostId=$hostId, reason=$reason")
+        stopSession(hostId)
     }
 
     private fun appendShellOutput(hostId: String, text: String) {
@@ -760,6 +798,10 @@ class SessionService : Service() {
         )
         sessionSnapshots.value = sessionSnapshots.value
             .filterNot { it.hostId == host.id } + snapshot
+        if (activeJobs.containsKey(host.id)) {
+            showHostNotification(snapshot)
+            updateSummaryNotification()
+        }
         UiDebugLog.result(
             "sessionSnapshot",
             true,
@@ -772,18 +814,25 @@ class SessionService : Service() {
     }
 
     private fun updateSummaryNotification() {
-        val summary = when {
-            activeJobs.isEmpty() -> "No active sessions"
-            activeJobs.size == 1 -> "Connected to 1 host"
-            else -> "Connected to ${activeJobs.size} hosts"
-        }
-        val notif = buildNotification("SSHPeaches Sessions", summary)
+        val notif = buildSummaryNotification()
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIFICATION_ID, notif)
     }
 
-    private fun showHostNotification(host: HostConnection) {
+    private fun showHostNotification(snapshot: SessionSnapshot) {
+        val host = snapshot.host
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            action = ACTION_OPEN_SESSION
+            putExtra(EXTRA_HOST_ID, host.id)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingOpen = PendingIntent.getActivity(
+            this,
+            host.id.hashCode() xor 0x4F50454E,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val stopIntent = Intent(this, SessionService::class.java).apply {
             action = ACTION_STOP
             putExtra(EXTRA_HOST_ID, host.id)
@@ -795,10 +844,18 @@ class SessionService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(host.name)
-            .setContentText("Connected to ${host.host}:${host.port}")
+            .setContentTitle("${host.username}@${host.host}")
+            .setContentText(buildSessionStatusLine(snapshot))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setGroup(GROUP_KEY_SESSIONS)
+            .setSortKey("${host.name.lowercase()}-${host.id}")
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setSubText(host.name)
+            .setContentIntent(pendingOpen)
+            .addAction(R.drawable.ic_launcher_foreground, "Open", pendingOpen)
             .addAction(R.drawable.ic_launcher_foreground, "Disconnect", pendingStop)
             .build()
         nm.notify(host.id.hashCode(), notif)
@@ -809,13 +866,65 @@ class SessionService : Service() {
         nm.cancel(hostId.hashCode())
     }
 
-    private fun buildNotification(title: String, text: String): Notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
+    private fun buildSummaryNotification(): Notification {
+        val activeHostIds = activeJobs.keys
+        val snapshots = sessionSnapshots.value
+            .filter { activeHostIds.contains(it.hostId) }
+            .sortedBy { it.host.name.lowercase() }
+        val runningCount = activeHostIds.size
+        val activeCount = snapshots.count { it.status == SessionStatus.ACTIVE }
+        val connectingCount = snapshots.count { it.status == SessionStatus.CONNECTING }
+        val text = when {
+            runningCount == 0 -> "No active sessions"
+            snapshots.isEmpty() -> "$runningCount session running"
+            activeCount > 0 && connectingCount > 0 -> "$activeCount connected, $connectingCount connecting"
+            activeCount > 0 -> "$activeCount connected"
+            else -> "$connectingCount connecting"
+        }
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingOpen = PendingIntent.getActivity(
+            this,
+            OPEN_APP_REQUEST_CODE,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val style = NotificationCompat.InboxStyle().also { inbox ->
+            snapshots.take(6).forEach { snapshot ->
+                inbox.addLine("${snapshot.host.username}@${snapshot.host.host}  ${snapshot.status.toSummaryLabel()}")
+            }
+            if (snapshots.size > 6) {
+                inbox.setSummaryText("+${snapshots.size - 6} more")
+            }
+        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("SSHPeaches Sessions")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setGroup(GROUP_KEY_SESSIONS)
+            .setGroupSummary(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setContentIntent(pendingOpen)
+            .setStyle(style)
             .build()
+    }
+
+    private fun buildSessionStatusLine(snapshot: SessionSnapshot): String {
+        val endpoint = "${snapshot.host.host}:${snapshot.host.port}"
+        val mode = snapshot.mode.name
+        val status = snapshot.status.toSummaryLabel()
+        return "$status | $mode | $endpoint"
+    }
+
+    private fun SessionStatus.toSummaryLabel(): String = when (this) {
+        SessionStatus.CONNECTING -> "Connecting"
+        SessionStatus.ACTIVE -> "Connected"
+        SessionStatus.ERROR -> "Error"
+    }
 
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -823,7 +932,13 @@ class SessionService : Service() {
             CHANNEL_ID,
             "SSHPeaches Sessions",
             NotificationManager.IMPORTANCE_LOW
-        )
+        ).apply {
+            description = "Active SSH sessions and controls"
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
         nm.createNotificationChannel(channel)
     }
 
@@ -833,9 +948,12 @@ class SessionService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "sessions"
+        private const val GROUP_KEY_SESSIONS = "com.sshpeaches.app.group.sessions"
+        private const val OPEN_APP_REQUEST_CODE = 19_241
         private const val NOTIFICATION_ID = 42
         private const val ACTION_STOP = "com.sshpeaches.app.service.ACTION_STOP"
-        private const val EXTRA_HOST_ID = "extra_host_id"
+        const val ACTION_OPEN_SESSION = "com.sshpeaches.app.service.ACTION_OPEN_SESSION"
+        const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3

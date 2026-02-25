@@ -71,6 +71,15 @@ object SecurityManager {
         lock()
     }
 
+    fun clearPin() {
+        ensureInit()
+        prefs.edit()
+            .remove(KEY_PIN_HASH)
+            .remove(KEY_PIN_SALT)
+            .apply()
+        lockState.value = false
+    }
+
     fun verifyPin(pin: String): Boolean {
         ensureInit()
         val saltEncoded = prefs.getString(KEY_PIN_SALT, null) ?: return false

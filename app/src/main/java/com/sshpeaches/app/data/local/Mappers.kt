@@ -24,7 +24,8 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     useMosh = useMosh,
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
-    backgroundBehavior = backgroundBehavior
+    backgroundBehavior = backgroundBehavior,
+    terminalProfileId = terminalProfileId
 )
 
 fun HostConnection.asEntity(): HostEntity = HostEntity(
@@ -46,7 +47,8 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     useMosh = useMosh,
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
-    backgroundBehavior = backgroundBehavior
+    backgroundBehavior = backgroundBehavior,
+    terminalProfileId = terminalProfileId
 )
 
 fun IdentityEntity.asModel(): Identity = Identity(

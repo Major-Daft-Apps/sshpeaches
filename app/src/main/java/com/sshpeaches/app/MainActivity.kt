@@ -37,6 +37,7 @@ class MainActivity : FragmentActivity() {
     private var biometricPrompt: BiometricPrompt? = null
     private var biometricPromptInfo: BiometricPrompt.PromptInfo? = null
     private var biometricAvailable: Boolean = false
+    private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -87,6 +88,7 @@ class MainActivity : FragmentActivity() {
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
         UiDebugLog.result("MainActivity.onCreate", true, "requestedServiceStart=true")
         setupBiometricPrompt()
+        handleSessionOpenIntent(intent)
         setContent {
             val viewModel = appViewModel
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -96,7 +98,14 @@ class MainActivity : FragmentActivity() {
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
-                remember(sessionService, uiState.portForwards, uiState.autoStartForwards, uiState.autoTrustHostKey, uiState.hosts) {
+                remember(
+                    sessionService,
+                    uiState.portForwards,
+                    uiState.autoStartForwards,
+                    uiState.autoTrustHostKey,
+                    uiState.hosts,
+                    uiState.terminalEmulation
+                ) {
                 { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode, password: String? ->
                     UiDebugLog.action(
                         "uiStartSession",
@@ -112,7 +121,8 @@ class MainActivity : FragmentActivity() {
                             availableForwards = uiState.portForwards,
                             autoStartForwards = uiState.autoStartForwards,
                             autoTrustUnknownHostKey = uiState.autoTrustHostKey,
-                            allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id }
+                            allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id },
+                            terminalEmulation = uiState.terminalEmulation
                         )
                         UiDebugLog.result("uiStartSession", true, "hostId=${host.id}")
                     }
@@ -147,10 +157,10 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
-            val sendShellInput: (String, String) -> Unit = remember(sessionService) {
-                { hostId: String, value: String ->
-                    if (value.isNotBlank()) {
-                        sessionService?.sendShellInput(hostId, value)
+            val sendShellBytes: (String, ByteArray) -> Unit = remember(sessionService) {
+                { hostId: String, value: ByteArray ->
+                    if (value.isNotEmpty()) {
+                        sessionService?.sendShellBytes(hostId, value)
                     }
                 }
             }
@@ -169,6 +179,7 @@ class MainActivity : FragmentActivity() {
                     onBiometricToggle = viewModel::setBiometricLock,
                     onLockTimeoutChange = viewModel::setLockTimeout,
                     onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
+                    onTerminalEmulationChange = viewModel::setTerminalEmulation,
                     onCrashReportsToggle = viewModel::setCrashReports,
                     onAnalyticsToggle = viewModel::setAnalytics,
                     onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -178,7 +189,12 @@ class MainActivity : FragmentActivity() {
                     onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
                     onAutoTrustHostKeyToggle = viewModel::setAutoTrustHostKey,
                     onUsageReportsToggle = viewModel::setUsageReports,
+                    onDefaultTerminalProfileChange = viewModel::setDefaultTerminalProfile,
+                    onSaveTerminalProfile = viewModel::saveTerminalProfile,
+                    onDeleteTerminalProfile = viewModel::deleteTerminalProfile,
+                    onRestoreDefaultSettings = viewModel::restoreDefaultSettings,
                     onSetPin = viewModel::setPin,
+                    onClearPin = viewModel::clearPin,
                     onLockApp = viewModel::lockApp,
                     onUnlockWithPin = viewModel::unlockWithPin,
                     onBiometricUnlock = {
@@ -192,7 +208,7 @@ class MainActivity : FragmentActivity() {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
                         }
                     },
-                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, password, suppliedId ->
+                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
                         viewModel.addHost(
                             name,
                             host,
@@ -206,11 +222,12 @@ class MainActivity : FragmentActivity() {
                             forwardId,
                             script,
                             backgroundBehavior,
+                            terminalProfileId,
                             password,
                             suppliedId
                         )
                     },
-                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, password ->
+                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, terminalProfileId, password ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -225,6 +242,7 @@ class MainActivity : FragmentActivity() {
                             forwardId,
                             script,
                             backgroundBehavior,
+                            terminalProfileId,
                             password
                         )
                     },
@@ -247,12 +265,14 @@ class MainActivity : FragmentActivity() {
                     onSnippetDelete = viewModel::deleteSnippet,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onSendSessionShortcut = sendSessionShortcut,
-                    onSendShellInput = sendShellInput,
+                    onSendShellBytes = sendShellBytes,
                     onResizeShell = resizeShell,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
                     hostKeyPrompts = hostKeyPrompts,
                     passwordPrompts = passwordPrompts,
+                    requestedOpenSessionId = requestedOpenSessionHostId.value,
+                    onOpenSessionRequestHandled = { requestedOpenSessionHostId.value = null },
                     onRespondToHostKeyPrompt = { promptId, trust ->
                         sessionService?.respondToHostKeyPrompt(promptId, trust)
                     },
@@ -274,13 +294,27 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.result("MainActivity.onDestroy", true)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSessionOpenIntent(intent)
+    }
+
     override fun onUserInteraction() {
         super.onUserInteraction()
         appViewModel.onUserInteraction()
     }
 
+    override fun onStart() {
+        super.onStart()
+        appViewModel.onAppForegrounded()
+    }
+
     override fun onStop() {
         super.onStop()
+        if (!isChangingConfigurations) {
+            appViewModel.onAppBackgrounded()
+        }
         UiDebugLog.action("MainActivity.onStop", "allowBackground=${appViewModel.uiState.value.allowBackgroundSessions}")
         if (!appViewModel.uiState.value.allowBackgroundSessions) {
             sessionServiceState.value?.stopAllSessions()
@@ -288,5 +322,16 @@ class MainActivity : FragmentActivity() {
         } else {
             UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
         }
+    }
+
+    private fun handleSessionOpenIntent(intent: Intent?) {
+        if (intent?.action != SessionService.ACTION_OPEN_SESSION) return
+        val hostId = intent.getStringExtra(SessionService.EXTRA_HOST_ID).orEmpty()
+        if (hostId.isBlank()) {
+            UiDebugLog.result("handleSessionOpenIntent", false, "missing-host-id")
+            return
+        }
+        requestedOpenSessionHostId.value = hostId
+        UiDebugLog.result("handleSessionOpenIntent", true, "hostId=$hostId")
     }
 }
