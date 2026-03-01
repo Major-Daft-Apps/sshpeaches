@@ -1,4 +1,4 @@
-package com.sshpeaches.app.data.local
+package com.majordaftapps.sshpeaches.app.data.local
 
 import android.content.Context
 import androidx.room.Database
@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         PortForwardEntity::class,
         SnippetEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

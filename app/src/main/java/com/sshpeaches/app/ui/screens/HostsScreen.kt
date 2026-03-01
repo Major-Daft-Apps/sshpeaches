@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,43 +47,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.ui.components.HostCard
-import com.sshpeaches.app.ui.components.decodeHostFromQr
-import com.sshpeaches.app.ui.state.SortMode
-import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
-import com.sshpeaches.app.ui.util.toSentenceCaseLabel
-import com.sshpeaches.app.util.isValidHostAddress
-import com.sshpeaches.app.util.parsePort
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.ui.components.HostCard
+import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
+import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
+import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
+import com.majordaftapps.sshpeaches.app.util.parsePort
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import com.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HostsScreen(
     hosts: List<HostConnection>,
+    identities: List<Identity>,
     portForwards: List<PortForward>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     editMode: Boolean = false,
-    pinConfigured: Boolean,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
-    @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {}
+    @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
+    activeSshSessionHostIds: Set<String> = emptySet(),
+    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false }
 ) {
     val search = remember { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
@@ -97,6 +101,8 @@ fun HostsScreen(
     val notesState = remember { mutableStateOf("") }
     val authState = remember { mutableStateOf(AuthMethod.IDENTITY) }
     val authMenuExpanded = remember { mutableStateOf(false) }
+    val preferredIdentityIdState = remember { mutableStateOf<String?>(null) }
+    val identityExpanded = remember { mutableStateOf(false) }
     val useMoshState = remember { mutableStateOf(false) }
     val terminalProfileIdState = remember { mutableStateOf<String?>(null) }
     val terminalProfileExpanded = remember { mutableStateOf(false) }
@@ -118,52 +124,39 @@ fun HostsScreen(
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
-        val payload = decodeHostFromQr(contents)
-        val imported = payload?.host
-        if (imported == null || imported.host.isBlank() || imported.username.isBlank()) {
-            Toast.makeText(context, "Invalid host QR", Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-        if (hosts.any { it.name.equals(imported.name, true) }) {
-            Toast.makeText(context, "Host already exists", Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-        val encryptedPayload = payload.encryptedPasswordPayload
-        val legacyPassword = payload.legacyPassword?.takeIf { pinConfigured && !SecurityManager.isLocked() }
-        if (payload.legacyPassword != null && legacyPassword == null) {
-            Toast.makeText(context, "Unlock and configure a PIN to import passwords.", Toast.LENGTH_SHORT).show()
-        }
-        val targetId = imported.id.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
-        onAdd(
-            imported.name.ifBlank { imported.host },
-            imported.host,
-            imported.port,
-            imported.username,
-            imported.preferredAuth,
-            imported.group,
-            imported.notes,
-            ConnectionMode.SSH,
-            imported.useMosh,
-            imported.preferredForwardId,
-            imported.startupScript,
-            imported.backgroundBehavior,
-            imported.terminalProfileId,
-            legacyPassword,
-            targetId
-        )
-        if (encryptedPayload != null) {
-            if (!pinConfigured) {
-                Toast.makeText(context, "Set a PIN before importing encrypted passwords.", Toast.LENGTH_SHORT).show()
-            } else if (SecurityManager.isLocked()) {
-                Toast.makeText(context, "Unlock with your PIN before importing encrypted passwords.", Toast.LENGTH_SHORT).show()
-            } else {
-                pendingEncryptedImport.value = encryptedPayload to targetId
-                importPassphraseState.value = ""
-                importPassphraseError.value = null
+        when (val processed = processHostQrImport(contents = contents, existingHosts = hosts)) {
+            is HostQrImportResult.Error -> {
+                Toast.makeText(context, processed.message, Toast.LENGTH_SHORT).show()
+            }
+            is HostQrImportResult.Ready -> {
+                val imported = processed.data.host
+                onAdd(
+                    imported.name.ifBlank { imported.host },
+                    imported.host,
+                    imported.port,
+                    imported.username,
+                    imported.preferredAuth,
+                    imported.group,
+                    imported.notes,
+                    ConnectionMode.SSH,
+                    imported.useMosh,
+                    imported.preferredIdentityId,
+                    imported.preferredForwardId,
+                    imported.startupScript,
+                    imported.backgroundBehavior,
+                    imported.terminalProfileId,
+                    processed.data.legacyPassword,
+                    processed.data.targetId
+                )
+                if (processed.data.encryptedPasswordPayload != null) {
+                    pendingEncryptedImport.value = processed.data.encryptedPasswordPayload to processed.data.targetId
+                    importPassphraseState.value = ""
+                    importPassphraseError.value = null
+                }
+                onImportFromQr()
+                Toast.makeText(context, "Host imported", Toast.LENGTH_SHORT).show()
             }
         }
-        onImportFromQr()
-        Toast.makeText(context, "Host imported", Toast.LENGTH_SHORT).show()
     }
 
     pendingEncryptedImport.value?.let { (payload, targetId) ->
@@ -232,6 +225,7 @@ fun HostsScreen(
         groupState.value = host?.group ?: ""
         notesState.value = host?.notes ?: ""
         authState.value = host?.preferredAuth ?: AuthMethod.IDENTITY
+        preferredIdentityIdState.value = host?.preferredIdentityId
         useMoshState.value = host?.useMosh ?: false
         terminalProfileIdState.value = host?.terminalProfileId
         preferredForwardIdState.value = host?.preferredForwardId
@@ -318,6 +312,8 @@ fun HostsScreen(
                     HostCard(
                         host = host,
                         onToggleFavorite = onToggleFavorite,
+                        canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
+                        onRunInfoCommand = onRunInfoCommand,
                         onAction = { selected, mode ->
                             val needsPassword = selected.preferredAuth != AuthMethod.IDENTITY
                             if (needsPassword && !selected.hasPassword) {
@@ -454,6 +450,50 @@ fun HostsScreen(
                             }
                         }
                     }
+                    val identitiesWithKeys = identities.filter { it.hasPrivateKey }
+                    ExposedDropdownMenuBox(
+                        expanded = identityExpanded.value,
+                        onExpandedChange = { identityExpanded.value = !identityExpanded.value }
+                    ) {
+                        val selectedIdentity = identitiesWithKeys.firstOrNull { it.id == preferredIdentityIdState.value }
+                        TextField(
+                            value = selectedIdentity?.label ?: "None",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Identity key") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = identityExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = identityExpanded.value,
+                            onDismissRequest = { identityExpanded.value = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None") },
+                                onClick = {
+                                    preferredIdentityIdState.value = null
+                                    identityExpanded.value = false
+                                }
+                            )
+                            identitiesWithKeys.forEach { identity ->
+                                DropdownMenuItem(
+                                    text = { Text(identity.label) },
+                                    onClick = {
+                                        preferredIdentityIdState.value = identity.id
+                                        identityExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    if (authState.value != AuthMethod.PASSWORD && preferredIdentityIdState.value == null) {
+                        Text(
+                            "Select an identity key for identity authentication.",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -511,11 +551,14 @@ fun HostsScreen(
                         expanded = forwardExpanded.value,
                         onExpandedChange = { forwardExpanded.value = !forwardExpanded.value }
                     ) {
+                        val localForwards = portForwards.filter {
+                            it.type == com.majordaftapps.sshpeaches.app.data.model.PortForwardType.LOCAL
+                        }
                         TextField(
-                            value = portForwards.firstOrNull { it.id == preferredForwardIdState.value }?.label ?: "None",
+                            value = localForwards.firstOrNull { it.id == preferredForwardIdState.value }?.label ?: "None",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Use forwarded port") },
+                            label = { Text("Use local forwarded port") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = forwardExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()
@@ -532,7 +575,7 @@ fun HostsScreen(
                                     forwardExpanded.value = false
                                 }
                             )
-                            portForwards.forEach { forward ->
+                            localForwards.forEach { forward ->
                                 DropdownMenuItem(
                                     text = { Text(forward.label) },
                                     onClick = {
@@ -612,6 +655,10 @@ fun HostsScreen(
                             dialogError.value = "A host with that name already exists."
                             return@TextButton
                         }
+                        authState.value != AuthMethod.PASSWORD && preferredIdentityIdState.value == null -> {
+                            dialogError.value = "Select an identity key for identity authentication."
+                            return@TextButton
+                        }
                         dialogError.value != null -> dialogError.value = null
                     }
                     val passwordValue = when {
@@ -631,6 +678,7 @@ fun HostsScreen(
                             notesState.value,
                             ConnectionMode.SSH,
                             useMoshState.value,
+                            preferredIdentityIdState.value,
                             preferredForwardIdState.value,
                             startupScriptState.value,
                             backgroundBehaviorState.value,
@@ -650,6 +698,7 @@ fun HostsScreen(
                             notesState.value,
                             ConnectionMode.SSH,
                             useMoshState.value,
+                            preferredIdentityIdState.value,
                             preferredForwardIdState.value,
                             startupScriptState.value,
                             backgroundBehaviorState.value,

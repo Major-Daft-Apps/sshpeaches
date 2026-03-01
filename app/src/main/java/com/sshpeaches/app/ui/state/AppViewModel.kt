@@ -1,29 +1,32 @@
-package com.sshpeaches.app.ui.state
+package com.majordaftapps.sshpeaches.app.ui.state
 
-import com.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewModelScope
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.PortForwardType
-import com.sshpeaches.app.data.model.Snippet
-import com.sshpeaches.app.data.model.TerminalEmulation
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.data.model.TerminalProfileDefaults
-import com.sshpeaches.app.data.repository.AppRepository
-import com.sshpeaches.app.data.repository.InMemoryAppRepository
-import com.sshpeaches.app.data.settings.SettingsStore
-import com.sshpeaches.app.security.SecurityManager
-import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
-import com.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
+import com.majordaftapps.sshpeaches.app.data.repository.InMemoryAppRepository
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -354,8 +357,10 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 work()
+                TelemetryInitializer.logUsageEvent(action)
                 logResult(action, true)
             } catch (t: Throwable) {
+                TelemetryInitializer.recordNonFatal(action, t)
                 UiDebugLog.error(action, t)
                 logResult(action, false, t.message ?: "exception")
                 throw t
@@ -567,6 +572,7 @@ class AppViewModel(
         notes: String,
         defaultMode: ConnectionMode,
         useMosh: Boolean,
+        preferredIdentityId: String?,
         preferredForwardId: String?,
         startupScript: String,
         backgroundBehavior: BackgroundBehavior,
@@ -576,7 +582,7 @@ class AppViewModel(
     ) {
         logAction(
             "addHost",
-            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, hasPasswordInput=${!password.isNullOrBlank()}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
+            "nameBlank=${name.isBlank()}, hostBlank=${host.isBlank()}, usernameBlank=${username.isBlank()}, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasIdentity=${!preferredIdentityId.isNullOrBlank()}, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, hasPasswordInput=${!password.isNullOrBlank()}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
         )
         if (name.isBlank() || host.isBlank() || username.isBlank()) {
             logResult("addHost", false, "validation-failed")
@@ -602,6 +608,7 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword,
             useMosh = useMosh,
+            preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
             backgroundBehavior = backgroundBehavior,
@@ -623,6 +630,7 @@ class AppViewModel(
         notes: String,
         defaultMode: ConnectionMode,
         useMosh: Boolean,
+        preferredIdentityId: String?,
         preferredForwardId: String?,
         startupScript: String,
         backgroundBehavior: BackgroundBehavior,
@@ -631,7 +639,7 @@ class AppViewModel(
     ) {
         logAction(
             "updateHost",
-            "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, passwordProvided=${password != null}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
+            "hostId=$id, port=$port, auth=$auth, mode=$defaultMode, useMosh=$useMosh, hasIdentity=${!preferredIdentityId.isNullOrBlank()}, hasForward=${!preferredForwardId.isNullOrBlank()}, hasScript=${startupScript.isNotBlank()}, passwordProvided=${password != null}, hasTerminalProfile=${!terminalProfileId.isNullOrBlank()}"
         )
         val existing = uiState.value.hosts.find { it.id == id }
         if (existing == null) {
@@ -661,6 +669,7 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword,
             useMosh = useMosh,
+            preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
             backgroundBehavior = backgroundBehavior,
@@ -686,6 +695,14 @@ class AppViewModel(
         }
     }
 
+    fun updateHostOsMetadata(id: String, osMetadata: OsMetadata) {
+        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        if (existing.osMetadata == osMetadata) return
+        launchLogged("updateHostOsMetadata", "hostId=$id, os=$osMetadata") {
+            repository.updateHost(existing.copy(osMetadata = osMetadata))
+        }
+    }
+
     fun addPortForward(
         label: String,
         type: PortForwardType,
@@ -701,10 +718,11 @@ class AppViewModel(
             logResult("addPortForward", false, "validation-failed")
             return
         }
+        val normalizedType = PortForwardType.LOCAL
         val forward = PortForward(
             id = UUID.randomUUID().toString(),
             label = label.trim(),
-            type = type,
+            type = normalizedType,
             sourceHost = sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = sourcePort,
             destinationHost = destHost,
@@ -713,7 +731,7 @@ class AppViewModel(
             favorite = false,
             enabled = enabled
         )
-        launchLogged("addPortForward", "forwardId=${forward.id}, type=$type") {
+        launchLogged("addPortForward", "forwardId=${forward.id}, type=$normalizedType") {
             repository.addPortForward(forward)
         }
     }
@@ -735,9 +753,10 @@ class AppViewModel(
             logResult("updatePortForward", false, "not-found")
             return
         }
+        val normalizedType = PortForwardType.LOCAL
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
-            type = type,
+            type = normalizedType,
             sourceHost = sourceHost.ifBlank { existing.sourceHost },
             sourcePort = sourcePort,
             destinationHost = destHost,
@@ -1002,8 +1021,8 @@ class AppViewModel(
         logResult("removeIdentityKey", true, "identityId=$id")
     }
 
-    fun updateKeyboardSlot(index: Int, value: String) {
-        logAction("updateKeyboardSlot", "index=$index, valueBlank=${value.isBlank()}")
+    fun updateKeyboardSlot(index: Int, value: KeyboardSlotAction) {
+        logAction("updateKeyboardSlot", "index=$index, type=${value.type}")
         if (index !in 0 until KeyboardLayoutDefaults.SLOT_COUNT) {
             logResult("updateKeyboardSlot", false, "index-out-of-range")
             return

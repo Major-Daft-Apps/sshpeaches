@@ -1,7 +1,7 @@
-package com.sshpeaches.app.data.ssh
+package com.majordaftapps.sshpeaches.app.data.ssh
 
 import android.content.Context
-import com.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
 import java.security.MessageDigest
 import java.security.PublicKey

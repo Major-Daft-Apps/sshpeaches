@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Star
@@ -43,30 +46,30 @@ import android.content.Intent
 import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
 import android.graphics.Bitmap
-import android.util.Base64
 import android.graphics.Color as AndroidColor
 import android.widget.Toast
-import org.json.JSONObject
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
-import com.sshpeaches.app.R
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.OsFamily
-import com.sshpeaches.app.data.model.OsMetadata
-import com.sshpeaches.app.ui.util.toSentenceCaseLabel
-import com.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.OsFamily
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.sshpeaches.app.ui.util.ExportPassphraseCache
+import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 
 @Composable
 fun HostCard(
     host: HostConnection,
     modifier: Modifier = Modifier,
     onToggleFavorite: (String) -> Unit = {},
-    onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> }
+    onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    canRunInfoCommands: Boolean = false,
+    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false }
 ) {
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
@@ -76,6 +79,9 @@ fun HostCard(
     val confirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
     val passphraseError = remember { mutableStateOf<String?>(null) }
     val qrBitmap = remember { mutableStateOf<Bitmap?>(null) }
+    val infoCommandsState = rememberSaveable(host.id) { mutableStateOf(defaultInfoCommands()) }
+    val infoCommandDraft = rememberSaveable(host.id) { mutableStateOf("") }
+    val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(host.id) {
         showQr.value = false
@@ -84,6 +90,7 @@ fun HostCard(
         confirmPassphraseState.value = ExportPassphraseCache.host.orEmpty()
         passphraseError.value = null
         qrBitmap.value = null
+        infoCommandStatus.value = null
     }
 
     Card(
@@ -100,17 +107,27 @@ fun HostCard(
                         .size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val imageContext = LocalContext.current
-                    AsyncImage(
-                        model = ImageRequest.Builder(imageContext)
-                            .data(host.osMetadata.iconRes())
-                            .decoderFactory(SvgDecoder.Factory())
-                            .build(),
-                        contentDescription = host.osMetadata.label(),
-                        contentScale = ContentScale.Fit,
-                        colorFilter = ColorFilter.tint(Color.White),
-                        modifier = Modifier.size(28.dp)
-                    )
+                    val iconRes = host.osMetadata.iconResOrNull()
+                    if (iconRes != null) {
+                        val imageContext = LocalContext.current
+                        AsyncImage(
+                            model = ImageRequest.Builder(imageContext)
+                                .data(iconRes)
+                                .decoderFactory(SvgDecoder.Factory())
+                                .build(),
+                            contentDescription = host.osMetadata.label(),
+                            contentScale = ContentScale.Fit,
+                            colorFilter = ColorFilter.tint(Color.White),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.DesktopWindows,
+                            contentDescription = host.osMetadata.label(),
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(host.name, style = MaterialTheme.typography.titleMedium)
@@ -150,15 +167,7 @@ fun HostCard(
                     contentDescription = "Share",
                     modifier = Modifier.clickable {
                         if (host.hasPassword) {
-                            when {
-                                !SecurityManager.isPinSet() -> {
-                                    Toast.makeText(context, "Set a PIN before exporting passwords.", Toast.LENGTH_SHORT).show()
-                                }
-                                SecurityManager.isLocked() -> {
-                                    Toast.makeText(context, "Unlock with your PIN before exporting.", Toast.LENGTH_SHORT).show()
-                                }
-                                else -> showPassphrasePrompt.value = true
-                            }
+                            showPassphrasePrompt.value = true
                         } else {
                             qrBitmap.value = generateQr(host, passphrase = null)
                             if (qrBitmap.value != null) {
@@ -179,12 +188,89 @@ fun HostCard(
             confirmButton = { TextButton(onClick = { showInfo.value = false }) { Text("Close") } },
             title = { Text(host.name) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text("Address: ${host.host}:${host.port}")
                     Text("User: ${host.username}")
                     host.group?.let { Text("Group: $it") }
                     Text("Auth: ${host.preferredAuth.toSentenceCaseLabel()}")
                     Text("Transport: ${if (host.useMosh) "Mosh" else "SSH"}")
+                    Text("Info commands", style = MaterialTheme.typography.titleSmall)
+                    infoCommandsState.value.forEachIndexed { index, command ->
+                        val trimmed = command.trim()
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedTextField(
+                                value = command,
+                                onValueChange = { next ->
+                                    val current = infoCommandsState.value.toMutableList()
+                                    current[index] = next
+                                    infoCommandsState.value = current
+                                },
+                                singleLine = true,
+                                label = { Text("Command ${index + 1}") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    enabled = canRunInfoCommands && trimmed.isNotBlank(),
+                                    onClick = {
+                                        val dispatched = onRunInfoCommand(host, trimmed)
+                                        infoCommandStatus.value = if (dispatched) {
+                                            "Queued command: $trimmed"
+                                        } else {
+                                            "No active SSH session for this host."
+                                        }
+                                    }
+                                ) {
+                                    Text("Run")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        val current = infoCommandsState.value.toMutableList()
+                                        current.removeAt(index)
+                                        infoCommandsState.value = current
+                                        if (current.isEmpty()) {
+                                            infoCommandStatus.value = "Add a command to run."
+                                        }
+                                    }
+                                ) {
+                                    Text("Remove")
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = infoCommandDraft.value,
+                        onValueChange = { infoCommandDraft.value = it },
+                        label = { Text("New command") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            enabled = infoCommandDraft.value.isNotBlank(),
+                            onClick = {
+                                val next = infoCommandDraft.value.trim()
+                                if (next.isNotBlank()) {
+                                    infoCommandsState.value = infoCommandsState.value + next
+                                    infoCommandDraft.value = ""
+                                }
+                            }
+                        ) {
+                            Text("Add")
+                        }
+                        if (!canRunInfoCommands) {
+                            Text(
+                                "Start an SSH session to run commands.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    infoCommandStatus.value?.let { status ->
+                        Text(status, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         )
@@ -292,28 +378,12 @@ fun HostCard(
 }
 
 private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
-    val json = JSONObject().apply {
-        put("id", host.id)
-        put("name", host.name)
-        put("host", host.host)
-        put("port", host.port)
-        put("user", host.username)
-        put("prefAuth", host.preferredAuth.name)
-        put("mode", host.defaultMode.name)
-        put("group", host.group ?: "")
-        put("notes", host.notes)
-        put("hasPassword", host.hasPassword)
-        put("useMosh", host.useMosh)
-        put("preferredForwardId", host.preferredForwardId ?: "")
-        put("startupScript", host.startupScript)
-        put("backgroundBehavior", host.backgroundBehavior.name)
-        put("terminalProfileId", host.terminalProfileId ?: "")
-        if (host.hasPassword && !passphrase.isNullOrBlank()) {
-            val encrypted = SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
-            put("pwdPayload", encrypted)
-        }
+    val encrypted = if (host.hasPassword && !passphrase.isNullOrBlank()) {
+        SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
+    } else {
+        null
     }
-    val payload = Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    val payload = encodeHostPayload(host = host, encryptedPasswordPayload = encrypted)
     return runCatching {
         val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
         val bmp = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
@@ -337,16 +407,23 @@ private fun HostActionButton(label: String, selected: Boolean, onClick: () -> Un
 private fun OsMetadata.label(): String = when (this) {
     is OsMetadata.Known -> family.displayName
     is OsMetadata.Custom -> label
-    OsMetadata.Undetected -> "?"
+    OsMetadata.Undetected -> "Unknown OS"
 }
+
+private fun defaultInfoCommands(): List<String> = listOf(
+    "uname -a",
+    "uptime",
+    "whoami",
+    "df -h"
+)
 
 @Composable
 private fun OsMetadata.toColor(): Color = when (this) {
     is OsMetadata.Known -> Color(android.graphics.Color.parseColor(family.colorHex))
-    else -> MaterialTheme.colorScheme.primary
+    else -> Color(android.graphics.Color.parseColor(OsFamily.UNKNOWN.colorHex))
 }
 
-private fun OsMetadata.iconRes(): Int = when (this) {
+private fun OsMetadata.iconResOrNull(): Int? = when (this) {
     is OsMetadata.Known -> when (family) {
         OsFamily.UBUNTU -> R.raw.ubuntu
         OsFamily.DEBIAN -> R.raw.debian
@@ -359,7 +436,7 @@ private fun OsMetadata.iconRes(): Int = when (this) {
         OsFamily.WINDOWS -> R.raw.windows
         OsFamily.BSD -> R.raw.bsd
         OsFamily.GENERIC -> R.raw.linux
-        else -> R.raw.linux
+        else -> null
     }
-    else -> R.raw.linux
+    else -> null
 }

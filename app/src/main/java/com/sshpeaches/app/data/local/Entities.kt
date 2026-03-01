@@ -1,12 +1,12 @@
-package com.sshpeaches.app.data.local
+package com.majordaftapps.sshpeaches.app.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.OsMetadata
-import com.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 
 @Entity(tableName = "hosts")
 data class HostEntity(
@@ -26,6 +26,7 @@ data class HostEntity(
     val snippets: List<String>,
     val hasPassword: Boolean,
     val useMosh: Boolean,
+    val preferredIdentityId: String?,
     val preferredForwardId: String?,
     val startupScript: String,
     val backgroundBehavior: BackgroundBehavior,

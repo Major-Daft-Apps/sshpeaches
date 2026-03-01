@@ -1,12 +1,12 @@
-package com.sshpeaches.app.data.local
+package com.majordaftapps.sshpeaches.app.data.local
 
 import androidx.room.TypeConverter
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.OsFamily
-import com.sshpeaches.app.data.model.OsMetadata
-import com.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.OsFamily
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 
 /**
  * Centralized Room converters for enums and small aggregates.

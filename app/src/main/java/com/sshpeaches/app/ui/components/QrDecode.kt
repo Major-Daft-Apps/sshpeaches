@@ -1,14 +1,15 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import org.json.JSONObject
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.PortForwardType
-import android.util.Base64
-import com.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import java.util.Base64
 
 data class HostQrPayload(
     val host: HostConnection,
@@ -22,7 +23,7 @@ data class IdentityQrPayload(
 )
 
 fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
-    val raw = String(Base64.decode(contents, Base64.NO_WRAP))
+    val raw = String(Base64.getDecoder().decode(contents), Charsets.UTF_8)
     val json = JSONObject(raw)
     val authName = json.optString("prefAuth", AuthMethod.PASSWORD.name)
     val modeName = json.optString("mode", ConnectionMode.SSH.name)
@@ -38,6 +39,7 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         notes = json.optString("notes", ""),
         hasPassword = json.optBoolean("hasPassword", false),
         useMosh = json.optBoolean("useMosh", false),
+        preferredIdentityId = json.optString("preferredIdentityId").takeIf { it.isNotBlank() },
         preferredForwardId = json.optString("preferredForwardId").takeIf { it.isNotBlank() },
         startupScript = json.optString("startupScript", ""),
         backgroundBehavior = runCatching {
@@ -47,13 +49,13 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
     )
     val encrypted = json.optString("pwdPayload").takeIf { it.isNotBlank() }
     val legacy = json.optString("pwd").takeIf { it.isNotBlank() }?.let { encoded ->
-        String(Base64.decode(encoded, Base64.NO_WRAP))
+        String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
     }
     HostQrPayload(host, encrypted, legacy)
 }.getOrNull()
 
 fun decodeIdentityFromQr(contents: String): IdentityQrPayload? = runCatching {
-    val json = JSONObject(String(Base64.decode(contents, Base64.NO_WRAP)))
+    val json = JSONObject(String(Base64.getDecoder().decode(contents), Charsets.UTF_8))
     val identity = Identity(
         id = json.optString("id"),
         label = json.optString("label"),
@@ -68,7 +70,7 @@ fun decodeIdentityFromQr(contents: String): IdentityQrPayload? = runCatching {
 }.getOrNull()
 
 fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
-    val json = JSONObject(String(Base64.decode(contents, Base64.NO_WRAP)))
+    val json = JSONObject(String(Base64.getDecoder().decode(contents), Charsets.UTF_8))
     val type = PortForwardType.valueOf(json.optString("type", "LOCAL"))
     PortForward(
         id = json.optString("id"),
@@ -80,5 +82,15 @@ fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
         destinationPort = json.optInt("dstPort", 0),
         associatedHosts = emptyList(),
         enabled = false
+    )
+}.getOrNull()
+
+fun decodeSnippetFromQr(contents: String): Snippet? = runCatching {
+    val json = JSONObject(String(Base64.getDecoder().decode(contents), Charsets.UTF_8))
+    Snippet(
+        id = json.optString("id"),
+        title = json.optString("title", "Snippet"),
+        description = json.optString("description", ""),
+        command = json.optString("command", "")
     )
 }.getOrNull()

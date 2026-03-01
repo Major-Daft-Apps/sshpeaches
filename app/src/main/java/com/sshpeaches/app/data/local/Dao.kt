@@ -1,4 +1,4 @@
-package com.sshpeaches.app.data.local
+package com.majordaftapps.sshpeaches.app.data.local
 
 import androidx.room.Dao
 import androidx.room.Delete

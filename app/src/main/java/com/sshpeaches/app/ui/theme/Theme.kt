@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.theme
+package com.majordaftapps.sshpeaches.app.ui.theme
 
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 
 private val DarkColors = darkColorScheme(
     primary = PeachyOrange,

@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,25 +18,18 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,24 +37,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.sshpeaches.app.R
+import androidx.compose.ui.unit.sp
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
 @Composable
 fun KeyboardEditorScreen(
-    slots: List<String>,
-    onSlotChange: (Int, String) -> Unit,
+    slots: List<KeyboardSlotAction>,
+    onSlotChange: (Int, KeyboardSlotAction) -> Unit,
     onReset: () -> Unit
 ) {
     val dialogIndex = remember { mutableStateOf<Int?>(null) }
-    val scrollState = rememberScrollState()
-    val bannerMessage = remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(bannerMessage.value) {
-        bannerMessage.value?.let {
-            delay(2000)
-            bannerMessage.value = null
-        }
-    }
+    val normalizedSlots = remember(slots) { KeyboardLayoutDefaults.normalizeSlots(slots) }
 
     Column(
         modifier = Modifier
@@ -69,37 +59,42 @@ fun KeyboardEditorScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to add, replace, or remove a special key.")
-        Text("The keys will be resized to fit on the screen.")
+        Text("Tap a slot to assign text, navigation keys, modifiers, functions, or sequences.")
 
-        // Force a single horizontal row; allow scrolling if it overflows
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(scrollState)
-                .border(1.dp, Color(0xFFB8B8B8), RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            slots.forEachIndexed { index, key ->
-                KeySlot(
-                    label = key,
-                    onClick = { dialogIndex.value = index }
-                )
-            }
+            normalizedSlots
+                .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+                .forEachIndexed { rowIndex, row ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        row.forEachIndexed { columnIndex, action ->
+                            val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
+                            KeySlot(
+                                label = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
+                                active = !action.isEmpty(),
+                                onClick = { dialogIndex.value = index }
+                            )
+                        }
+                    }
+                }
         }
 
-        bannerMessage.value?.let {
-            Text(it, color = MaterialTheme.colorScheme.primary)
-        }
-
-        TextButton(onClick = {
-            onReset()
-            bannerMessage.value = "Layout reset"
-        }) {
-            Text("Reset layout")
-        }
+        Text(
+            "One-shot modifiers apply to the next key or typed text, then clear automatically.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            "Tip: add F1-F12 from the Function section for tmux, htop, and remote tooling.",
+            style = MaterialTheme.typography.bodySmall
+        )
 
         Card(
             modifier = Modifier
@@ -123,22 +118,27 @@ fun KeyboardEditorScreen(
                 )
             }
         }
+
+        TextButton(onClick = {
+            onReset()
+        }) {
+            Text("Reset layout")
+        }
     }
 
-    val handleSlotChange: (Int, String) -> Unit = { idx, value ->
+    val handleSlotChange: (Int, KeyboardSlotAction) -> Unit = { idx, value ->
         onSlotChange(idx, value)
-        bannerMessage.value = "Layout saved"
     }
 
     dialogIndex.value?.let { idx ->
         KeySlotDialog(
-            current = slots.getOrNull(idx).orEmpty(),
+            current = normalizedSlots.getOrNull(idx) ?: KeyboardLayoutDefaults.emptyAction(),
             onSelect = { newKey ->
                 handleSlotChange(idx, newKey)
                 dialogIndex.value = null
             },
             onRemove = {
-                handleSlotChange(idx, "")
+                handleSlotChange(idx, KeyboardLayoutDefaults.emptyAction())
                 dialogIndex.value = null
             },
             onDismiss = { dialogIndex.value = null }
@@ -147,116 +147,124 @@ fun KeyboardEditorScreen(
 }
 
 @Composable
-private fun KeySlot(label: String, onClick: () -> Unit) {
-    val isEmpty = label.isBlank()
-    OutlinedButton(
-        onClick = onClick,
+private fun RowScope.KeySlot(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
         modifier = Modifier
-            .height(44.dp)
-            .sizeIn(minWidth = 56.dp)
-            .clip(RoundedCornerShape(6.dp)),
-        shape = RoundedCornerShape(6.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFA992A)),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color.Transparent,
-            contentColor = Color(0xFFFA992A)
-        )
+            .weight(1f)
+            .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .border(1.dp, Color(0xFF474747), RoundedCornerShape(5.dp))
+            .background(if (active) Color(0xFF121212) else Color(0xFF0A0A0A))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Text(if (isEmpty) "+" else label)
+        Text(
+            text = label,
+            color = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+            fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
+            maxLines = 1
+        )
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KeySlotDialog(
-    current: String,
-    onSelect: (String) -> Unit,
+    current: KeyboardSlotAction,
+    onSelect: (KeyboardSlotAction) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val categories = listOf(
-        "Uppercase" to ('A'..'Z').map { it.toString() },
-        "Lowercase" to ('a'..'z').map { it.toString() },
-        "Numbers" to (0..9).map { it.toString() },
-        "Symbols" to listOf("/", "-", "_", "|", "~", "@", "#", "%", "&", "+", "=")
-    )
-    val metaKeys = listOf("Ctrl", "Alt", "Shift", "Super")
-    val navigationKeys = listOf("Esc", "Tab", "Home", "End", "PgUp", "PgDn")
-    val currentCategory = remember { mutableStateOf<String?>(null) }
+    val textDraft = remember(current) {
+        mutableStateOf(if (current.type == KeyboardActionType.TEXT) current.text else "")
+    }
+    val sequenceDraft = remember(current) {
+        mutableStateOf(if (current.type == KeyboardActionType.SEQUENCE) current.sequence else "")
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (current.isBlank()) "Add key" else "Edit key") },
+        title = { Text(if (current.isEmpty()) "Add key action" else "Edit key action") },
         text = {
             val outerScroll = rememberScrollState()
-            if (currentCategory.value == null) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .verticalScroll(outerScroll)
-                        .sizeIn(maxHeight = 420.dp)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .verticalScroll(outerScroll)
+                    .sizeIn(maxHeight = 460.dp)
+            ) {
+                Text(
+                    "Current: ${KeyboardLayoutDefaults.compactLabel(current, fallback = "Empty")}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Text("Text", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = textDraft.value,
+                    onValueChange = { textDraft.value = it },
+                    label = { Text("Text payload") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    enabled = textDraft.value.isNotBlank(),
+                    onClick = { onSelect(KeyboardLayoutDefaults.textAction(textDraft.value)) }
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            metaKeys.forEach { key ->
-                                TextButton(onClick = { onSelect(key) }) { Text(key) }
-                            }
-                        }
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            navigationKeys.forEach { key ->
-                                TextButton(onClick = { onSelect(key) }) { Text(key) }
-                            }
-                        }
-                    }
-                    categories.forEach { (cat, _) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(cat, style = MaterialTheme.typography.bodyLarge)
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Open $cat",
-                                modifier = Modifier
-                                    .clickable { currentCategory.value = cat }
-                            )
-                        }
-                    }
+                    Text("Use Text")
                 }
-            } else {
-                val items = categories.firstOrNull { it.first == currentCategory.value }?.second.orEmpty()
-                val scroll = rememberScrollState()
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .verticalScroll(scroll)
-                        .sizeIn(maxHeight = 420.dp)
-                ) {
-                    TextButton(onClick = { currentCategory.value = null }) { Text("<- Back") }
-                    Text(currentCategory.value ?: "", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items.forEach { key ->
-                            TextButton(onClick = { onSelect(key) }) { Text(key) }
-                        }
+
+                Text("Modifiers", style = MaterialTheme.typography.labelLarge)
+                PresetRow(KeyboardLayoutDefaults.modifierPresets, onSelect)
+
+                Text("Navigation", style = MaterialTheme.typography.labelLarge)
+                PresetRow(KeyboardLayoutDefaults.navigationPresets, onSelect)
+
+                Text("Function", style = MaterialTheme.typography.labelLarge)
+                PresetRow(KeyboardLayoutDefaults.functionPresets, onSelect)
+
+                Text("Sequences", style = MaterialTheme.typography.labelLarge)
+                PresetRow(KeyboardLayoutDefaults.sequencePresets, onSelect)
+
+                OutlinedTextField(
+                    value = sequenceDraft.value,
+                    onValueChange = { sequenceDraft.value = it },
+                    label = { Text("Custom sequence") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    enabled = sequenceDraft.value.isNotBlank(),
+                    onClick = {
+                        onSelect(KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value))
                     }
+                ) {
+                    Text("Use Sequence")
                 }
             }
         },
         confirmButton = {
-            if (current.isNotBlank()) {
+            if (!current.isEmpty()) {
                 TextButton(onClick = onRemove) { Text("Remove") }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PresetRow(
+    presets: List<KeyboardSlotAction>,
+    onSelect: (KeyboardSlotAction) -> Unit
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        presets.forEach { action ->
+            TextButton(onClick = { onSelect(action) }) {
+                Text(action.label)
+            }
+        }
+    }
 }

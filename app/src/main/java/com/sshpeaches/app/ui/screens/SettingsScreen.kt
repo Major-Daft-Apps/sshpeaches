@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,12 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.sshpeaches.app.data.model.TerminalCursorStyle
-import com.sshpeaches.app.data.model.TerminalEmulation
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.data.model.TerminalProfileDefaults
-import com.sshpeaches.app.ui.state.LockTimeout
-import com.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -550,14 +550,20 @@ fun SettingsScreen(
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Export hosts, identities, and settings via QR code.",
                     style = MaterialTheme.typography.bodySmall
                 )
-                Button(onClick = { showTransferDialog.value = true }) {
+                Button(
+                    onClick = { showTransferDialog.value = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Export via QR")
                 }
             }

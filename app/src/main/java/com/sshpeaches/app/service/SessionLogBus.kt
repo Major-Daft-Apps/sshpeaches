@@ -1,6 +1,6 @@
-package com.sshpeaches.app.service
+package com.majordaftapps.sshpeaches.app.service
 
-import com.sshpeaches.app.service.SessionLogBus.LogLevel
+import com.majordaftapps.sshpeaches.app.service.SessionLogBus.LogLevel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow

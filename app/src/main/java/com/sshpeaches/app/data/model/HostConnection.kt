@@ -1,4 +1,4 @@
-package com.sshpeaches.app.data.model
+package com.majordaftapps.sshpeaches.app.data.model
 
 data class HostConnection(
     val id: String,
@@ -17,6 +17,7 @@ data class HostConnection(
     val snippets: List<String> = emptyList(),
     val hasPassword: Boolean = false,
     val useMosh: Boolean = false,
+    val preferredIdentityId: String? = null,
     val preferredForwardId: String? = null,
     val startupScript: String = "",
     val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT,
@@ -82,10 +83,10 @@ sealed class OsMetadata {
 
 enum class OsFamily(val displayName: String, val colorHex: String) {
     UBUNTU("Ubuntu", "#E95420"),
-    DEBIAN("Debian", "#A81D33"),
+    DEBIAN("Debian", "#A80030"),
     FEDORA("Fedora", "#294172"),
     CENTOS("CentOS", "#9C1A8C"),
-    SUSE("SUSE", "#73BA25"),
+    SUSE("SUSE", "#30BA78"),
     MINT("Linux Mint", "#87CF3E"),
     ARCH("Arch Linux", "#1793D1"),
     REDHAT("Red Hat", "#EE0000"),
@@ -100,9 +101,9 @@ enum class OsFamily(val displayName: String, val colorHex: String) {
     ALMA("AlmaLinux", "#15A1E2"),
     ASAHI("Asahi", "#ED6A5A"),
     NIXOS("NixOS", "#5277C3"),
-    MAC("macOS", "#A3AAAE"),
+    MAC("macOS", "#000000"),
     WINDOWS("Windows", "#0078D4"),
     BSD("BSD", "#AB2B28"),
-    GENERIC("Linux", "#000000"),
+    GENERIC("Linux", "#F4C300"),
     UNKNOWN("Unknown", "#888888")
 }

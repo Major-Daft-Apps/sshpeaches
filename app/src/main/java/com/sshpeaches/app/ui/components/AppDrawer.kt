@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.sshpeaches.app.ui.navigation.DrawerDestination
+import com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination
 
 @Composable
 fun AppDrawer(
@@ -39,7 +39,7 @@ fun AppDrawer(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             androidx.compose.foundation.Image(
-                painter = painterResource(id = com.sshpeaches.app.R.drawable.sshpeaches),
+                painter = painterResource(id = com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches),
                 contentDescription = "SSHPeaches logo",
                 modifier = Modifier
                     .size(48.dp)

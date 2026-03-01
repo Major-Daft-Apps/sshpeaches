@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.terminal
+package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.content.Context
 import android.graphics.Canvas
@@ -16,6 +16,7 @@ class TerminalRenderView(context: Context) : View(context) {
 
     private var emulatorProvider: (() -> TerminalEmulator)? = null
     private var onSingleTap: (() -> Unit)? = null
+    private var onDoubleTap: (() -> Unit)? = null
     private var onScaleDelta: ((Float) -> Unit)? = null
     private var onResize: ((Int, Int, Int, Int) -> Unit)? = null
 
@@ -30,8 +31,13 @@ class TerminalRenderView(context: Context) : View(context) {
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
 
-            override fun onSingleTapUp(e: MotionEvent): Boolean {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 onSingleTap?.invoke()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                onDoubleTap?.invoke()
                 return true
             }
 
@@ -72,11 +78,13 @@ class TerminalRenderView(context: Context) : View(context) {
     fun bind(
         emulatorProvider: () -> TerminalEmulator,
         onSingleTap: () -> Unit,
+        onDoubleTap: () -> Unit,
         onScaleDelta: (Float) -> Unit,
         onResize: (Int, Int, Int, Int) -> Unit
     ) {
         this.emulatorProvider = emulatorProvider
         this.onSingleTap = onSingleTap
+        this.onDoubleTap = onDoubleTap
         this.onScaleDelta = onScaleDelta
         this.onResize = onResize
         clampTopRow()

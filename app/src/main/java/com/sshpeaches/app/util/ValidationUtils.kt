@@ -1,4 +1,4 @@
-package com.sshpeaches.app.util
+package com.majordaftapps.sshpeaches.app.util
 
 private val fingerprintRegex =
     Regex("^(SHA256:)?[A-Za-z0-9+/=]{20,}\$|^([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}\$")

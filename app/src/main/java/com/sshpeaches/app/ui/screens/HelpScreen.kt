@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.webkit.WebView
 import android.webkit.WebViewClient

@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,20 +18,25 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.sshpeaches.app.ui.components.EmptyState
-import com.sshpeaches.app.ui.components.HostCard
-import com.sshpeaches.app.ui.state.FavoritesSection
+import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
+import com.majordaftapps.sshpeaches.app.ui.components.HostCard
+import com.majordaftapps.sshpeaches.app.ui.state.FavoritesSection
 
 @Composable
 fun FavoritesScreen(
     section: FavoritesSection,
-    onToggleFavorite: (String) -> Unit = {}
+    onToggleFavorite: (String) -> Unit = {},
+    onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
     val hasFavorites = section.hostFavorites.isNotEmpty() ||
         section.identityFavorites.isNotEmpty() ||
         section.portFavorites.isNotEmpty()
+    LaunchedEffect(hasFavorites) {
+        onEmptyStateVisibleChanged(!hasFavorites)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -39,7 +44,7 @@ fun FavoritesScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (!hasFavorites) {
-            item { EmptyState(itemLabel = "favorite") }
+            item { EmptyState(itemLabel = "favorite", showCreateHint = false) }
             return@LazyColumn
         }
         if (section.hostFavorites.isNotEmpty()) {

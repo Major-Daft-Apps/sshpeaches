@@ -1,4 +1,4 @@
-package com.sshpeaches.app.service
+package com.majordaftapps.sshpeaches.app.service
 
 import android.content.Context
 import android.os.Build

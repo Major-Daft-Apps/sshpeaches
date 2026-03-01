@@ -1,10 +1,11 @@
-package com.sshpeaches.app
+package com.majordaftapps.sshpeaches.app
 
 import android.app.Application
 import android.util.Log
-import com.sshpeaches.app.data.repository.AppContainer
-import com.sshpeaches.app.data.settings.SettingsStore
-import com.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.data.repository.AppContainer
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import java.security.Security
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
@@ -20,6 +21,7 @@ class SSHPeachesApplication : Application() {
         installFullBouncyCastleProvider()
         SecurityManager.init(this)
         SettingsStore.init(this)
+        TelemetryInitializer.initialize(this)
         container = AppContainer(this)
     }
 

@@ -2,14 +2,27 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
+	id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
+}
+
+// The Firebase project currently has a release client only; skip non-release processing.
+tasks.configureEach {
+    if (
+        name.startsWith("process") &&
+        name.endsWith("GoogleServices") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
 }
 
 android {
-    namespace = "com.sshpeaches.app"
+    namespace = "com.majordaftapps.sshpeaches.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.sshpeaches.app"
+        applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -101,9 +114,17 @@ dependencies {
     kapt("androidx.room:room-compiler:$roomVersion")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    val firebaseBom = platform("com.google.firebase:firebase-bom:33.7.0")
+    releaseImplementation(firebaseBom)
+    releaseImplementation("com.google.firebase:firebase-crashlytics")
+    releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
+    releaseImplementation("com.google.firebase:firebase-analytics")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

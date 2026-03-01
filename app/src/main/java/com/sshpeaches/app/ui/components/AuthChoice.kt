@@ -1,11 +1,11 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 
 @Composable
 fun AuthChoice(label: String, value: AuthMethod, current: AuthMethod, onSelect: (AuthMethod) -> Unit) {

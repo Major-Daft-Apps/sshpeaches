@@ -1,8 +1,8 @@
-package com.sshpeaches.app.ui.logging
+package com.majordaftapps.sshpeaches.app.ui.logging
 
 import android.util.Log
-import com.sshpeaches.app.BuildConfig
-import com.sshpeaches.app.ui.state.AppUiState
+import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 
 object UiDebugLog {
     private const val TAG = "SSHPeachesUI"
@@ -20,7 +20,7 @@ object UiDebugLog {
 
     fun state(origin: String, state: AppUiState) {
         if (!BuildConfig.DEBUG) return
-        val filledSlots = state.keyboardSlots.count { it.isNotBlank() }
+        val filledSlots = state.keyboardSlots.count { !it.isEmpty() }
         val summary = "hosts=${state.hosts.size}, identities=${state.identities.size}, " +
             "forwards=${state.portForwards.size}, snippets=${state.snippets.size}, " +
             "sort=${state.sortMode}, theme=${state.themeMode}, locked=${state.isLocked}, " +

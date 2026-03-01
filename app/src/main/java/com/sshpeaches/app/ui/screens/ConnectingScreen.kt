@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -27,15 +28,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,12 +48,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -57,6 +63,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
@@ -76,18 +83,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.sshpeaches.app.R
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.service.SessionLogBus
-import com.sshpeaches.app.ui.terminal.TerminalInputRouter
-import com.sshpeaches.app.ui.terminal.TerminalRenderView
-import com.sshpeaches.app.ui.terminal.TermuxTerminalEngine
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouter
+import com.majordaftapps.sshpeaches.app.ui.terminal.TerminalRenderView
+import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 data class QuickConnectRequest(
     val sessionId: String,
@@ -100,6 +116,7 @@ data class QuickConnectRequest(
     val mode: ConnectionMode = ConnectionMode.SSH,
     val savedHostId: String? = null,
     val useMosh: Boolean = false,
+    val preferredIdentityId: String? = null,
     val forwardId: String? = null,
     val script: String = "",
     val terminalProfileId: String? = null
@@ -125,9 +142,14 @@ fun ConnectingScreen(
     logs: List<SessionLogBus.Entry>,
     shellOutput: String,
     terminalProfile: TerminalProfile,
-    keyboardSlots: List<String>,
+    keyboardSlots: List<KeyboardSlotAction>,
     onSendShellBytes: (ByteArray) -> Unit,
     onTerminalResize: (Int, Int) -> Unit,
+    onSftpListDirectory: (String) -> Unit,
+    onSftpDownload: (String, String?) -> Unit,
+    onSftpUpload: (String, String) -> Unit,
+    onScpDownload: (String, String?) -> Unit,
+    onScpUpload: (String, String) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
     onClose: () -> Unit,
     onRetry: () -> Unit
@@ -154,39 +176,28 @@ fun ConnectingScreen(
     }
     var lastShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
     var imeBridgeValue by remember(request?.sessionId) { mutableStateOf(TextFieldValue("")) }
-    var imeCommittedText by remember(request?.sessionId) { mutableStateOf("") }
+    var imeSentText by remember(request?.sessionId) { mutableStateOf("") }
     var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalRenderView?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
+    var sessionTopBarVisible by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
     var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(10f) }
     var lastResize by remember(request?.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
-
-    val terminalKeys = remember {
-        listOf(
-            CompactTerminalKey("Esc", "\u001B", keyCode = KeyEvent.KEYCODE_ESCAPE),
-            CompactTerminalKey("Tab", "\t", keyCode = KeyEvent.KEYCODE_TAB),
-            CompactTerminalKey("Ent", "\r", keyCode = KeyEvent.KEYCODE_ENTER),
-            CompactTerminalKey("Bk", "\u007F", keyCode = KeyEvent.KEYCODE_DEL),
-            CompactTerminalKey("Up", "\u001B[A", keyCode = KeyEvent.KEYCODE_DPAD_UP),
-            CompactTerminalKey("Dn", "\u001B[B", keyCode = KeyEvent.KEYCODE_DPAD_DOWN),
-            CompactTerminalKey("Lt", "\u001B[D", keyCode = KeyEvent.KEYCODE_DPAD_LEFT),
-            CompactTerminalKey("Rt", "\u001B[C", keyCode = KeyEvent.KEYCODE_DPAD_RIGHT),
-            CompactTerminalKey("C-C", "\u0003", keyCode = KeyEvent.KEYCODE_C, ctrl = true),
-            CompactTerminalKey("C-D", "\u0004", keyCode = KeyEvent.KEYCODE_D, ctrl = true),
-            CompactTerminalKey("C-Z", "\u001A", keyCode = KeyEvent.KEYCODE_Z, ctrl = true)
-        )
-    }
+    var sftpPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
+    var downloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var downloadLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var uploadLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var uploadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var pendingModifiers by remember(request?.sessionId) { mutableStateOf(setOf<KeyboardModifier>()) }
 
     val compactKeys = remember(keyboardSlots) {
-        val slotKeys = keyboardSlots
-            .filter { it.isNotBlank() }
-            .map { slot ->
-                val compactLabel = slot.trim().replace("\n", " ").take(4)
-                CompactTerminalKey(
-                    label = if (compactLabel.isBlank()) "Slot" else compactLabel,
-                    payload = slot
-                )
-            }
-        terminalKeys + slotKeys
+        KeyboardLayoutDefaults.normalizeSlots(keyboardSlots).map { action ->
+            CompactTerminalKey(
+                label = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
+                action = action,
+                enabled = !action.isEmpty(),
+                repeatable = action.repeatable
+            )
+        }
     }
 
     val statusText = when (state.phase) {
@@ -211,6 +222,10 @@ fun ConnectingScreen(
             if (it.script.isNotBlank()) append(" | Script configured")
         }
     }
+    val showTerminalSession =
+        state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SSH
+    val showTransferSession =
+        state.phase == QuickConnectPhase.SUCCESS && request != null && request.mode != ConnectionMode.SSH
 
     LaunchedEffect(renderedLogs.size) {
         if (renderedLogs.isNotEmpty()) {
@@ -222,9 +237,15 @@ fun ConnectingScreen(
         terminalEngine.applyProfile(terminalProfile)
         lastShellSnapshot = ""
         imeBridgeValue = TextFieldValue("")
-        imeCommittedText = ""
+        imeSentText = ""
         terminalFontSizeSp = terminalProfile.fontSizeSp.toFloat()
         lastResize = null
+        sftpPath = "."
+        downloadRemotePath = ""
+        downloadLocalPath = ""
+        uploadLocalPath = ""
+        uploadRemotePath = ""
+        pendingModifiers = emptySet()
         terminalViewRef?.onTerminalUpdated()
     }
     LaunchedEffect(terminalProfile.id) {
@@ -274,14 +295,16 @@ fun ConnectingScreen(
         terminalViewRef?.onTerminalUpdated()
     }
     LaunchedEffect(state.phase, request?.sessionId) {
-        if (state.phase == QuickConnectPhase.SUCCESS) {
-            keyboardFocusRequester.requestFocus()
-            keyboardController?.show()
-            keyboardFocused = true
+        if (showTerminalSession) {
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+            keyboardFocused = false
+            sessionTopBarVisible = false
         } else {
             keyboardController?.hide()
             focusManager.clearFocus(force = true)
             keyboardFocused = false
+            sessionTopBarVisible = false
         }
     }
     Box(
@@ -322,6 +345,9 @@ fun ConnectingScreen(
                                 view.bind(
                                     emulatorProvider = { externalTerminalEmulator ?: terminalEngine.emulator() },
                                     onSingleTap = {
+                                        sessionTopBarVisible = !sessionTopBarVisible
+                                    },
+                                    onDoubleTap = {
                                         if (keyboardFocused) {
                                             keyboardController?.hide()
                                             focusManager.clearFocus(force = true)
@@ -351,17 +377,53 @@ fun ConnectingScreen(
 
                     CompactKeyRow(
                         keys = compactKeys,
+                        activeModifiers = pendingModifiers,
                         onSendKey = { key ->
-                            val sent = key.keyCode?.let { keyCode ->
-                                terminalInput.sendVirtualKey(
-                                    keyCode = keyCode,
-                                    ctrlDown = key.ctrl,
-                                    altDown = key.alt,
-                                    shiftDown = key.shift
-                                )
-                            } ?: false
-                            if (!sent) {
-                                terminalInput.sendText(key.payload)
+                            if (!key.enabled) return@CompactKeyRow
+                            val action = key.action
+                            when (action.type) {
+                                KeyboardActionType.MODIFIER -> {
+                                    val modifier = action.modifier ?: return@CompactKeyRow
+                                    pendingModifiers = if (pendingModifiers.contains(modifier)) {
+                                        pendingModifiers - modifier
+                                    } else {
+                                        pendingModifiers + modifier
+                                    }
+                                }
+                                KeyboardActionType.TEXT -> {
+                                    val text = action.text
+                                    if (text.isBlank()) return@CompactKeyRow
+                                    val modifiers = pendingModifiers
+                                    terminalInput.sendText(
+                                        text = text,
+                                        ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+                                        altDown = modifiers.contains(KeyboardModifier.ALT),
+                                        shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+                                    )
+                                    pendingModifiers = emptySet()
+                                }
+                                KeyboardActionType.KEY -> {
+                                    val keyCode = action.keyCode ?: return@CompactKeyRow
+                                    val modifiers = pendingModifiers
+                                    val sent = terminalInput.sendVirtualKey(
+                                        keyCode = keyCode,
+                                        ctrlDown = modifiers.contains(KeyboardModifier.CTRL) || action.ctrl,
+                                        altDown = modifiers.contains(KeyboardModifier.ALT) || action.alt,
+                                        shiftDown = modifiers.contains(KeyboardModifier.SHIFT) || action.shift,
+                                        fallbackSequence = action.sequence.ifBlank { null }
+                                    )
+                                    if (!sent && action.sequence.isNotBlank()) {
+                                        terminalInput.sendRawSequence(action.sequence)
+                                    }
+                                    pendingModifiers = emptySet()
+                                }
+                                KeyboardActionType.SEQUENCE -> {
+                                    val sequence = action.sequence.ifBlank { action.text }
+                                    if (sequence.isNotBlank()) {
+                                        terminalInput.sendRawSequence(sequence)
+                                    }
+                                    pendingModifiers = emptySet()
+                                }
                             }
                         },
                         modifier = Modifier
@@ -372,25 +434,65 @@ fun ConnectingScreen(
                     )
                 }
 
+                if (sessionTopBarVisible) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth(),
+                        color = Color(0xE0111111)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = request?.name?.ifBlank { hostName } ?: hostName,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            IconButton(onClick = onClose) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close session",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
                 BasicTextField(
                     value = imeBridgeValue,
                     onValueChange = { next ->
                         if (next == imeBridgeValue) return@BasicTextField
                         imeBridgeValue = next
 
-                        // Keep composition local until IME commits it, then send final delta once.
-                        if (next.composition != null) return@BasicTextField
-
+                        // Send deltas immediately so IME composing text is echoed in-terminal.
                         sendImeDelta(
-                            previous = imeCommittedText,
+                            previous = imeSentText,
                             next = next.text,
-                            send = terminalInput::sendText
+                            sendBackspace = terminalInput::sendBackspace,
+                            sendInserted = { inserted ->
+                                val modifiers = pendingModifiers
+                                terminalInput.sendText(
+                                    text = inserted,
+                                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+                                    altDown = modifiers.contains(KeyboardModifier.ALT),
+                                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+                                )
+                                if (modifiers.isNotEmpty()) {
+                                    pendingModifiers = emptySet()
+                                }
+                            }
                         )
-                        imeCommittedText = next.text
+                        imeSentText = next.text
 
-                        if (imeCommittedText.length > IME_BUFFER_MAX_CHARS) {
-                            val tail = imeCommittedText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
-                            imeCommittedText = tail
+                        if (imeSentText.length > IME_BUFFER_MAX_CHARS) {
+                            val tail = imeSentText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
+                            imeSentText = tail
                             imeBridgeValue = TextFieldValue(
                                 text = tail,
                                 selection = TextRange(tail.length)
@@ -409,22 +511,139 @@ fun ConnectingScreen(
                             }
                             terminalInput.onAndroidKeyDown(keyEvent.nativeKeyEvent)
                         },
-                    singleLine = true,
+                    singleLine = false,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.Done,
+                        imeAction = ImeAction.None,
                         autoCorrect = false
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            terminalInput.sendText("\r")
-                            imeBridgeValue = TextFieldValue("")
-                            imeCommittedText = ""
-                        }
                     )
                 )
             }
-        } else {
+        } else if (showTransferSession && request != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${request.mode.name} Transfer",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close session",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                if (request.mode == ConnectionMode.SFTP) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = sftpPath,
+                            onValueChange = { sftpPath = it },
+                            label = { Text("Remote directory") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = { onSftpListDirectory(sftpPath) },
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Text("List")
+                        }
+                    }
+                }
+
+                Text("Download", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = downloadRemotePath,
+                    onValueChange = { downloadRemotePath = it },
+                    label = { Text("Remote file path") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = downloadLocalPath,
+                    onValueChange = { downloadLocalPath = it },
+                    label = { Text("Local destination (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        if (request.mode == ConnectionMode.SFTP) {
+                            onSftpDownload(downloadRemotePath, downloadLocalPath.ifBlank { null })
+                        } else {
+                            onScpDownload(downloadRemotePath, downloadLocalPath.ifBlank { null })
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Start Download")
+                }
+
+                Text("Upload", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = uploadLocalPath,
+                    onValueChange = { uploadLocalPath = it },
+                    label = { Text("Local file path") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = uploadRemotePath,
+                    onValueChange = { uploadRemotePath = it },
+                    label = { Text("Remote destination path") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        if (request.mode == ConnectionMode.SFTP) {
+                            onSftpUpload(uploadLocalPath, uploadRemotePath)
+                        } else {
+                            onScpUpload(uploadLocalPath, uploadRemotePath)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Start Upload")
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    color = Color(0xFF0F0F0F)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = shellOutput.ifBlank { "No directory listing yet. Use the controls above to transfer files." },
+                            color = Color(0xFFE5E5E5),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                        )
+                    }
+                }
+            }
+        } else if (request != null) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -497,17 +716,19 @@ fun ConnectingScreen(
             }
         }
 
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Cancel connection",
-                tint = Color.White
-            )
+        if (state.phase != QuickConnectPhase.SUCCESS) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cancel connection",
+                    tint = Color.White
+                )
+            }
         }
 
         if (state.phase == QuickConnectPhase.ERROR) {
@@ -529,36 +750,109 @@ fun ConnectingScreen(
 @Composable
 private fun CompactKeyRow(
     keys: List<CompactTerminalKey>,
+    activeModifiers: Set<KeyboardModifier>,
     onSendKey: (CompactTerminalKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (keys.isEmpty()) return
     val keyShape = RoundedCornerShape(5.dp)
-    Row(
+    Column(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        keys.forEach { key ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(18.dp)
-                    .clip(keyShape)
-                    .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
-                    .background(Color(0xFF121212))
-                    .clickable { onSendKey(key) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = key.label,
-                    color = Color(0xFFEDEDED),
-                    fontSize = 7.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+        keys
+            .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+            .take(KeyboardLayoutDefaults.SLOT_ROWS)
+            .forEach { row ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(KeyboardLayoutDefaults.SLOT_COLUMNS) { index ->
+                        val key = row.getOrNull(index)
+                        if (key == null) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+                            )
+                            return@repeat
+                        }
+                        val modifierActive = key.action.type == KeyboardActionType.MODIFIER &&
+                            key.action.modifier != null &&
+                            activeModifiers.contains(key.action.modifier)
+                        CompactKeyButton(
+                            key = key,
+                            keyShape = keyShape,
+                            modifierActive = modifierActive,
+                            onSendKey = onSendKey
+                        )
+                    }
+                }
             }
-        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalComposeUiApi::class)
+private fun RowScope.CompactKeyButton(
+    key: CompactTerminalKey,
+    keyShape: RoundedCornerShape,
+    modifierActive: Boolean,
+    onSendKey: (CompactTerminalKey) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var repeatJob by remember(key) { mutableStateOf<Job?>(null) }
+    DisposableEffect(Unit) {
+        onDispose { repeatJob?.cancel() }
+    }
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+            .clip(keyShape)
+            .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
+            .background(
+                when {
+                    modifierActive -> Color(0xFF5B3A0F)
+                    key.enabled -> Color(0xFF121212)
+                    else -> Color(0xFF090909)
+                }
+            )
+            .pointerInteropFilter { event: MotionEvent ->
+                if (!key.enabled) return@pointerInteropFilter false
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        onSendKey(key)
+                        if (key.repeatable) {
+                            repeatJob?.cancel()
+                            repeatJob = scope.launch {
+                                delay(KEY_REPEAT_INITIAL_DELAY_MS)
+                                while (isActive) {
+                                    onSendKey(key)
+                                    delay(KEY_REPEAT_INTERVAL_MS)
+                                }
+                            }
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        repeatJob?.cancel()
+                        repeatJob = null
+                        true
+                    }
+                    else -> true
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = key.label,
+            color = if (key.enabled) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+            fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -610,11 +904,9 @@ private fun ConnectionLogsPane(
 
 private data class CompactTerminalKey(
     val label: String,
-    val payload: String,
-    val keyCode: Int? = null,
-    val ctrl: Boolean = false,
-    val alt: Boolean = false,
-    val shift: Boolean = false
+    val action: KeyboardSlotAction,
+    val enabled: Boolean,
+    val repeatable: Boolean
 )
 
 private fun normalizeImeChunk(chunk: String): String {
@@ -626,7 +918,12 @@ private fun normalizeImeChunk(chunk: String): String {
     return normalized.replace('\n', '\r')
 }
 
-private fun sendImeDelta(previous: String, next: String, send: (String) -> Unit) {
+private fun sendImeDelta(
+    previous: String,
+    next: String,
+    sendBackspace: () -> Unit,
+    sendInserted: (String) -> Unit
+) {
     if (previous == next) return
 
     val prefixLength = commonPrefixLength(previous, next)
@@ -637,12 +934,12 @@ private fun sendImeDelta(previous: String, next: String, send: (String) -> Unit)
     val removed = previous.substring(prefixLength, previousMiddleEnd)
     if (removed.isNotEmpty()) {
         val deleteCount = removed.codePointCount(0, removed.length)
-        repeat(deleteCount) { send("\u007F") }
+        repeat(deleteCount) { sendBackspace() }
     }
 
     val inserted = normalizeImeChunk(next.substring(prefixLength, nextMiddleEnd))
     if (inserted.isNotEmpty()) {
-        send(inserted)
+        sendInserted(inserted)
     }
 }
 
@@ -662,3 +959,5 @@ private fun commonSuffixLength(a: String, b: String, prefixLength: Int): Int {
 
 private const val IME_BUFFER_MAX_CHARS = 512
 private const val IME_BUFFER_KEEP_TAIL_CHARS = 160
+private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L
+private const val KEY_REPEAT_INTERVAL_MS = 65L

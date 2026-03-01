@@ -1,5 +1,6 @@
-package com.sshpeaches.app.ui
+package com.majordaftapps.sshpeaches.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -98,42 +100,44 @@ import android.net.Uri
 import android.util.Base64
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.BackgroundBehavior
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.PortForwardType
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.data.model.TerminalProfileDefaults
-import com.sshpeaches.app.ui.components.AppDrawer
-import com.sshpeaches.app.ui.components.AuthChoice
-import com.sshpeaches.app.ui.components.LockScreenOverlay
-import com.sshpeaches.app.ui.navigation.Routes
-import com.sshpeaches.app.ui.navigation.drawerDestinations
-import com.sshpeaches.app.ui.screens.ConnectingScreen
-import com.sshpeaches.app.ui.screens.FavoritesScreen
-import com.sshpeaches.app.ui.screens.HostsScreen
-import com.sshpeaches.app.ui.screens.IdentitiesScreen
-import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
-import com.sshpeaches.app.ui.screens.OpenSourceLicensesScreen
-import com.sshpeaches.app.ui.screens.PortForwardScreen
-import com.sshpeaches.app.ui.screens.QuickConnectPhase
-import com.sshpeaches.app.ui.screens.QuickConnectRequest
-import com.sshpeaches.app.ui.screens.QuickConnectUiState
-import com.sshpeaches.app.ui.screens.SettingsScreen
-import com.sshpeaches.app.ui.screens.SnippetManagerScreen
-import com.sshpeaches.app.ui.state.AppUiState
-import com.sshpeaches.app.ui.state.LockTimeout
-import com.sshpeaches.app.ui.state.SortMode
-import com.sshpeaches.app.ui.state.ThemeMode
-import com.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
-import com.sshpeaches.app.ui.util.toSentenceCaseLabel
-import com.sshpeaches.app.service.SessionLogBus
-import com.sshpeaches.app.service.SessionService.HostKeyPrompt
-import com.sshpeaches.app.service.SessionService.PasswordPrompt
-import com.sshpeaches.app.service.SessionService.SessionSnapshot
-import com.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
+import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
+import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
+import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.FavoritesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.KeyboardEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.OpenSourceLicensesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.PortForwardScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectPhase
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectRequest
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectUiState
+import com.majordaftapps.sshpeaches.app.ui.screens.SettingsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
+import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
+import com.majordaftapps.sshpeaches.app.R
 import java.util.UUID
 import kotlinx.coroutines.delay
 import org.json.JSONArray
@@ -150,7 +154,7 @@ fun SSHPeachesRoot(
     onBiometricToggle: (Boolean) -> Unit,
     onLockTimeoutChange: (LockTimeout) -> Unit,
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
-    onTerminalEmulationChange: (com.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
+    onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
     onCrashReportsToggle: (Boolean) -> Unit,
     onAnalyticsToggle: (Boolean) -> Unit,
     onDiagnosticsToggle: (Boolean) -> Unit,
@@ -169,8 +173,8 @@ fun SSHPeachesRoot(
     onLockApp: () -> Unit,
     onUnlockWithPin: (String) -> Boolean,
     onBiometricUnlock: () -> Unit,
-    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
-    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
+    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     onHostDelete: (String) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
@@ -183,7 +187,7 @@ fun SSHPeachesRoot(
     onImportIdentityKey: (String, String, String) -> Boolean,
     onImportIdentityKeyPlain: (String, String) -> Boolean,
     onRemoveIdentityKey: (String) -> Unit,
-    onKeyboardSlotChange: (Int, String) -> Unit,
+    onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
     onKeyboardReset: () -> Unit,
     onSnippetAdd: (String, String, String) -> Unit,
     onSnippetUpdate: (String, String, String, String) -> Unit,
@@ -192,6 +196,11 @@ fun SSHPeachesRoot(
     onSendSessionShortcut: (String, String) -> Unit,
     onSendShellBytes: (String, ByteArray) -> Unit,
     onResizeShell: (String, Int, Int) -> Unit,
+    onListSftpDirectory: (String, String) -> Unit,
+    onSftpDownloadFile: (String, String, String?) -> Unit,
+    onSftpUploadFile: (String, String, String) -> Unit,
+    onScpDownloadFile: (String, String, String?) -> Unit,
+    onScpUploadFile: (String, String, String) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
@@ -210,12 +219,40 @@ fun SSHPeachesRoot(
     val quickConnectRequest = remember { mutableStateOf<QuickConnectRequest?>(null) }
     val quickConnectState = remember { mutableStateOf(QuickConnectUiState()) }
     val pendingConnectingNavigation = remember { mutableStateOf(false) }
+    val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.FAVORITES) }
+    val sawSnapshotForCurrentRequest = remember { mutableStateOf(false) }
     val pendingFavoriteHostId = remember { mutableStateOf<String?>(null) }
     val editMode = rememberSaveable { mutableStateOf(false) }
+    val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route ?: Routes.FAVORITES
+    val editSupportedRoutes = remember {
+        setOf(
+            Routes.FAVORITES,
+            Routes.HOSTS,
+            Routes.IDENTITIES,
+            Routes.FORWARDS,
+            Routes.SNIPPETS
+        )
+    }
+    val favoritesEmpty = uiState.favorites.hostFavorites.isEmpty() &&
+        uiState.favorites.identityFavorites.isEmpty() &&
+        uiState.favorites.portFavorites.isEmpty()
+    val routeEmptyStateVisible = when (currentRoute) {
+        Routes.FAVORITES -> emptyStateByRoute[Routes.FAVORITES] ?: favoritesEmpty
+        Routes.HOSTS -> emptyStateByRoute[Routes.HOSTS] ?: false
+        Routes.IDENTITIES -> emptyStateByRoute[Routes.IDENTITIES] ?: uiState.identities.isEmpty()
+        Routes.FORWARDS -> emptyStateByRoute[Routes.FORWARDS] ?: uiState.portForwards.isEmpty()
+        Routes.SNIPPETS -> emptyStateByRoute[Routes.SNIPPETS] ?: uiState.snippets.isEmpty()
+        else -> false
+    }
+    val showEditAction = currentRoute in editSupportedRoutes && !routeEmptyStateVisible
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
     val currentTitle = when (currentRoute) {
         Routes.FAVORITES -> "Favorites"
         Routes.CONNECTING -> "Connecting"
@@ -244,6 +281,15 @@ fun SSHPeachesRoot(
         }
     }
 
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != Routes.CONNECTING) {
+            routeBeforeConnecting.value = currentRoute
+        }
+        if (!showEditAction && editMode.value) {
+            editMode.value = false
+        }
+    }
+
     LaunchedEffect(requestedOpenSessionId, sessions, currentRoute) {
         val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == targetHostId } ?: return@LaunchedEffect
@@ -260,26 +306,27 @@ fun SSHPeachesRoot(
             mode = snapshot.mode,
             savedHostId = savedHostId,
             useMosh = host.useMosh,
+            preferredIdentityId = host.preferredIdentityId,
             forwardId = host.preferredForwardId,
             script = host.startupScript,
             terminalProfileId = host.terminalProfileId
         )
         quickConnectState.value = when (snapshot.status) {
-            com.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
                 QuickConnectUiState(
                     phase = QuickConnectPhase.CONNECTING,
                     message = snapshot.statusMessage ?: "Connecting to ${host.host}:${host.port}..."
                 )
             }
 
-            com.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
                 QuickConnectUiState(
                     phase = QuickConnectPhase.SUCCESS,
                     message = snapshot.statusMessage ?: "Connected successfully"
                 )
             }
 
-            com.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
                 QuickConnectUiState(
                     phase = QuickConnectPhase.ERROR,
                     message = snapshot.statusMessage ?: "Connection failed"
@@ -295,32 +342,53 @@ fun SSHPeachesRoot(
         onOpenSessionRequestHandled()
     }
 
-    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions) {
+    LaunchedEffect(quickConnectRequest.value?.sessionId) {
+        sawSnapshotForCurrentRequest.value = false
+    }
+
+    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute) {
         val request = quickConnectRequest.value ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == request.sessionId }
         when (snapshot?.status) {
             null -> {
-                quickConnectState.value = QuickConnectUiState(
-                    phase = QuickConnectPhase.CONNECTING,
-                    message = "Connecting to ${request.host}:${request.port}..."
-                )
+                if (sawSnapshotForCurrentRequest.value) {
+                    pendingConnectingNavigation.value = false
+                    quickConnectRequest.value = null
+                    quickConnectState.value = QuickConnectUiState()
+                    if (currentRoute == Routes.CONNECTING) {
+                        val destination = routeBeforeConnecting.value
+                            .takeIf { it != Routes.CONNECTING }
+                            ?: Routes.FAVORITES
+                        navController.navigate(destination) {
+                            popUpTo(Routes.FAVORITES)
+                        }
+                    }
+                } else {
+                    quickConnectState.value = QuickConnectUiState(
+                        phase = QuickConnectPhase.CONNECTING,
+                        message = "Connecting to ${request.host}:${request.port}..."
+                    )
+                }
             }
 
-            com.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+                sawSnapshotForCurrentRequest.value = true
                 quickConnectState.value = QuickConnectUiState(
                     phase = QuickConnectPhase.CONNECTING,
                     message = snapshot.statusMessage ?: "Connecting to ${request.host}:${request.port}..."
                 )
             }
 
-            com.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+                sawSnapshotForCurrentRequest.value = true
                 quickConnectState.value = QuickConnectUiState(
                     phase = QuickConnectPhase.SUCCESS,
                     message = snapshot.statusMessage ?: "Connected successfully"
                 )
             }
 
-            com.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+                sawSnapshotForCurrentRequest.value = true
                 quickConnectState.value = QuickConnectUiState(
                     phase = QuickConnectPhase.ERROR,
                     message = snapshot.statusMessage ?: "Connection failed"
@@ -402,19 +470,21 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 actions = {
-                                    AnimatedContent(
-                                        targetState = editMode.value,
-                                        transitionSpec = {
-                                            (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
-                                                (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
-                                        },
-                                        label = "editMode"
-                                    ) { editing ->
-                                        IconButton(onClick = { editMode.value = !editMode.value }) {
-                                            Icon(
-                                                imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                                contentDescription = if (editing) "Done editing" else "Edit"
-                                            )
+                                    if (showEditAction) {
+                                        AnimatedContent(
+                                            targetState = editMode.value,
+                                            transitionSpec = {
+                                                (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
+                                                    (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
+                                            },
+                                            label = "editMode"
+                                        ) { editing ->
+                                            IconButton(onClick = { editMode.value = !editMode.value }) {
+                                                Icon(
+                                                    imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                                    contentDescription = if (editing) "Done editing" else "Edit"
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -433,7 +503,8 @@ fun SSHPeachesRoot(
                         composable(Routes.FAVORITES) {
                             FavoritesScreen(
                                 section = uiState.favorites,
-                                onToggleFavorite = onToggleFavorite
+                                onToggleFavorite = onToggleFavorite,
+                                onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.FAVORITES] = it }
                             )
                         }
                         composable(Routes.CONNECTING) {
@@ -467,11 +538,41 @@ fun SSHPeachesRoot(
                                         onResizeShell(current.sessionId, cols, rows)
                                     }
                                 },
+                                onSftpListDirectory = { path ->
+                                    request?.let { current ->
+                                        onListSftpDirectory(current.sessionId, path)
+                                    }
+                                },
+                                onSftpDownload = { remotePath, localPath ->
+                                    request?.let { current ->
+                                        onSftpDownloadFile(current.sessionId, remotePath, localPath)
+                                    }
+                                },
+                                onSftpUpload = { localPath, remotePath ->
+                                    request?.let { current ->
+                                        onSftpUploadFile(current.sessionId, localPath, remotePath)
+                                    }
+                                },
+                                onScpDownload = { remotePath, localPath ->
+                                    request?.let { current ->
+                                        onScpDownloadFile(current.sessionId, remotePath, localPath)
+                                    }
+                                },
+                                onScpUpload = { localPath, remotePath ->
+                                    request?.let { current ->
+                                        onScpUploadFile(current.sessionId, localPath, remotePath)
+                                    }
+                                },
                                 resolveTerminalEmulator = resolveTerminalEmulator,
                                 onClose = {
                                     request?.let { onStopSession(it.sessionId) }
                                     pendingConnectingNavigation.value = false
-                                    navController.popBackStack()
+                                    val destination = routeBeforeConnecting.value
+                                        .takeIf { it != Routes.CONNECTING }
+                                        ?: Routes.FAVORITES
+                                    navController.navigate(destination) {
+                                        popUpTo(Routes.FAVORITES)
+                                    }
                                     quickConnectRequest.value = null
                                 },
                                 onRetry = {
@@ -496,16 +597,23 @@ fun SSHPeachesRoot(
                                 }
                             )
                         }
-                        composable(Routes.HOSTS) {
+                    composable(Routes.HOSTS) {
+                        val activeSshSessionHostIds = sessions
+                            .filter {
+                                it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                                    it.mode == ConnectionMode.SSH
+                            }
+                            .map { it.hostId }
+                            .toSet()
                         HostsScreen(
                             hosts = uiState.hosts,
+                            identities = uiState.identities,
                             portForwards = uiState.portForwards,
                             terminalProfiles = uiState.terminalProfiles,
                             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
                             editMode = editMode.value,
-                            pinConfigured = uiState.pinConfigured,
                             canStoreCredentials = !uiState.isLocked,
                             onImportFromQr = { showMessage("Host imported from QR") },
                             onToggleFavorite = onToggleFavorite,
@@ -525,6 +633,7 @@ fun SSHPeachesRoot(
                                     mode = mode,
                                     savedHostId = host.id,
                                     useMosh = host.useMosh,
+                                    preferredIdentityId = host.preferredIdentityId,
                                     forwardId = host.preferredForwardId,
                                     script = host.startupScript,
                                     terminalProfileId = host.terminalProfileId
@@ -539,13 +648,28 @@ fun SSHPeachesRoot(
                                     navController.navigate(Routes.CONNECTING)
                                 }
                             },
-                            onStopSession = onStopSession
+                            onStopSession = onStopSession,
+                            activeSshSessionHostIds = activeSshSessionHostIds,
+                            onRunInfoCommand = { host, command ->
+                                val hasActiveSshSession = sessions.any {
+                                    it.hostId == host.id &&
+                                        it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                                        it.mode == ConnectionMode.SSH
+                                }
+                                if (hasActiveSshSession) {
+                                    onSendSessionShortcut(host.id, command)
+                                    showMessage("Ran command on ${host.name}")
+                                    true
+                                } else {
+                                    showMessage("No active SSH session for ${host.name}")
+                                    false
+                                }
+                            }
                         )
                     }
                     composable(Routes.IDENTITIES) {
                         IdentitiesScreen(
                             items = uiState.identities,
-                            pinConfigured = uiState.pinConfigured,
                             isLocked = uiState.isLocked,
                             onAdd = onIdentityAdd,
                             onUpdate = onIdentityUpdate,
@@ -556,7 +680,8 @@ fun SSHPeachesRoot(
                             onToggleFavorite = onToggleFavorite,
                             onShowMessage = showMessage,
                             editMode = editMode.value,
-                            onImportFromQr = { showMessage("Identity imported from QR") }
+                            onImportFromQr = { showMessage("Identity imported from QR") },
+                            onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.IDENTITIES] = it }
                         )
                     }
                         composable(Routes.FORWARDS) {
@@ -568,7 +693,8 @@ fun SSHPeachesRoot(
                                 onUpdate = onPortForwardUpdate,
                                 onDelete = onPortForwardDelete,
                                 onToggleFavorite = onToggleFavorite,
-                                onImportFromQr = { showMessage("Port forward imported from QR") }
+                                onImportFromQr = { showMessage("Port forward imported from QR") },
+                                onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.FORWARDS] = it }
                             )
                         }
                         composable(Routes.SNIPPETS) {
@@ -577,6 +703,8 @@ fun SSHPeachesRoot(
                                 onAdd = onSnippetAdd,
                                 onUpdate = onSnippetUpdate,
                                 onDelete = onSnippetDelete,
+                                onImportFromQr = { showMessage("Snippet imported from QR") },
+                                onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.SNIPPETS] = it },
                                 onRun = { snippet ->
                                     val target = sessions.firstOrNull()
                                     if (target != null) {
@@ -666,9 +794,10 @@ fun SSHPeachesRoot(
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
             portForwards = uiState.portForwards,
+            identities = uiState.identities,
             terminalProfiles = uiState.terminalProfiles,
             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
-            onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, forwardId, script, terminalProfileId ->
+            onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, preferredIdentityId, forwardId, script, terminalProfileId ->
                 var savedHostId: String? = null
                 if (pinToFavorites) {
                     val pinnedId = UUID.randomUUID().toString()
@@ -683,6 +812,7 @@ fun SSHPeachesRoot(
                         "",
                         ConnectionMode.SSH,
                         useMosh,
+                        preferredIdentityId,
                         forwardId,
                         script,
                         BackgroundBehavior.INHERIT,
@@ -703,6 +833,7 @@ fun SSHPeachesRoot(
                     mode = ConnectionMode.SSH,
                     savedHostId = savedHostId,
                     useMosh = useMosh,
+                    preferredIdentityId = preferredIdentityId,
                     forwardId = forwardId,
                     script = script,
                     terminalProfileId = terminalProfileId
@@ -898,6 +1029,7 @@ private fun quickConnectHost(request: QuickConnectRequest): HostConnection =
         preferredAuth = request.auth,
         defaultMode = request.mode,
         useMosh = request.useMosh,
+        preferredIdentityId = request.preferredIdentityId,
         preferredForwardId = request.forwardId,
         startupScript = request.script,
         terminalProfileId = request.terminalProfileId
@@ -921,9 +1053,10 @@ private class MaskPasswordWithTailReveal(
 private fun QuickConnectSheet(
     onDismiss: () -> Unit,
     portForwards: List<PortForward>,
+    identities: List<Identity>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
-    onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String, String?) -> Unit
+    onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String, String?) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetMaxHeight = rememberBottomSheetMaxHeight()
@@ -939,6 +1072,8 @@ private fun QuickConnectSheet(
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
         val pinToFavorites = remember { mutableStateOf(false) }
         val useMosh = remember { mutableStateOf(false) }
+        val selectedIdentityId = remember { mutableStateOf<String?>(null) }
+        val identityExpanded = remember { mutableStateOf(false) }
         val selectedForwardId = remember { mutableStateOf<String?>(null) }
         val selectedTerminalProfileId = remember { mutableStateOf<String?>(null) }
         val terminalProfileExpanded = remember { mutableStateOf(false) }
@@ -1022,6 +1157,51 @@ private fun QuickConnectSheet(
                 AuthChoice("Password", AuthMethod.PASSWORD, auth.value) { auth.value = it }
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
                 AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
+            }
+            val identitiesWithKeys = identities.filter { it.hasPrivateKey }
+            ExposedDropdownMenuBox(
+                expanded = identityExpanded.value,
+                onExpandedChange = { identityExpanded.value = !identityExpanded.value }
+            ) {
+                val selectedIdentity = identitiesWithKeys.firstOrNull { it.id == selectedIdentityId.value }
+                TextField(
+                    value = selectedIdentity?.label ?: "None",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Identity key") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = identityExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = identityExpanded.value,
+                    onDismissRequest = { identityExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            selectedIdentityId.value = null
+                            identityExpanded.value = false
+                        }
+                    )
+                    identitiesWithKeys.forEach { identity ->
+                        DropdownMenuItem(
+                            text = { Text(identity.label) },
+                            onClick = {
+                                selectedIdentityId.value = identity.id
+                                identityExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            if (auth.value != AuthMethod.PASSWORD && selectedIdentityId.value == null) {
+                Text(
+                    "Select an identity key for identity authentication.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             if (portForwards.isNotEmpty()) {
                 Text("Forwarded port", style = MaterialTheme.typography.labelMedium)
@@ -1110,10 +1290,19 @@ private fun QuickConnectSheet(
             Button(
                 onClick = {
                     val hostValue = host.value.trim()
+                    val portValueRaw = port.value.trim()
                     val userValue = username.value.trim()
-                    val portValue = port.value.toIntOrNull() ?: 22
-                    if (hostValue.isBlank() || userValue.isBlank()) {
-                        status.value = "Host and username required"
+                    if (hostValue.isBlank() || portValueRaw.isBlank() || userValue.isBlank()) {
+                        status.value = "Host, port, and username required"
+                        return@Button
+                    }
+                    val portValue = portValueRaw.toIntOrNull()
+                    if (portValue == null || portValue !in 1..65535) {
+                        status.value = "Enter a valid port (1-65535)"
+                        return@Button
+                    }
+                    if (auth.value != AuthMethod.PASSWORD && selectedIdentityId.value == null) {
+                        status.value = "Select an identity key for identity authentication"
                         return@Button
                     }
                     hostHistory.value = (listOf(hostValue) + hostHistory.value.filterNot { it.equals(hostValue, true) }).take(5)
@@ -1126,6 +1315,7 @@ private fun QuickConnectSheet(
                         password.value,
                         pinToFavorites.value,
                         useMosh.value,
+                        selectedIdentityId.value,
                         selectedForwardId.value,
                         script.value,
                         selectedTerminalProfileId.value
@@ -1162,7 +1352,7 @@ private fun AboutDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Image(
-                    painter = painterResource(id = com.sshpeaches.app.R.drawable.sshpeaches),
+                    painter = painterResource(id = com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches),
                     contentDescription = "SSHPeaches logo",
                     modifier = Modifier
                         .size(96.dp)

@@ -1,4 +1,4 @@
-package com.sshpeaches.app.service
+package com.majordaftapps.sshpeaches.app.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,28 +10,40 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.sshpeaches.app.MainActivity
-import com.sshpeaches.app.R
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.TerminalEmulation
-import com.sshpeaches.app.data.settings.SettingsStore
-import com.sshpeaches.app.data.ssh.SshClientProvider
-import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
-import com.sshpeaches.app.security.SecurityManager
-import com.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.OsFamily
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
+import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
+import java.io.BufferedInputStream
+import java.io.File
 import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.charset.StandardCharsets
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,10 +56,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.schmizz.sshj.connection.channel.Channel
+import net.schmizz.sshj.connection.channel.OpenFailException
+import net.schmizz.sshj.connection.channel.direct.DirectConnection
+import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
+import net.schmizz.sshj.connection.channel.direct.Parameters
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
+import net.schmizz.sshj.connection.channel.forwarded.ConnectListener
+import net.schmizz.sshj.connection.channel.forwarded.RemotePortForwarder
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.sftp.FileMode
+import net.schmizz.sshj.sftp.RemoteResourceInfo
+import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
+import net.schmizz.sshj.xfer.scp.SCPFileTransfer
 
 /**
  * Foreground service that keeps SSH/Mosh sessions alive.
@@ -143,12 +166,16 @@ class SessionService : Service() {
             var client: SSHClient? = null
             var shellBinding: ShellBinding? = null
             var moshBinding: MoshBinding? = null
+            var sftpBinding: SftpBinding? = null
+            var scpBinding: ScpBinding? = null
+            var activeForwardBindings: List<PortForwardBinding> = emptyList()
+            var sessionHost = host
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
             runCatching {
-                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+                updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
                 client = SshClientProvider.createClient(
                     this@SessionService,
-                    host,
+                    sessionHost,
                     SessionLoggerFactory(host.id),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
                     onHostKeyPrompt = { prompt ->
@@ -170,36 +197,77 @@ class SessionService : Service() {
                         )
                     }
                     AuthMethod.IDENTITY -> {
-                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
-                        client!!.authPublickey(host.username)
-                    }
-                    AuthMethod.PASSWORD_AND_IDENTITY -> {
-                        runCatching { client!!.authPublickey(host.username) }
-                        authenticateWithPassword(
+                        authenticateWithIdentity(
                             client = client!!,
                             host = host,
                             mode = mode,
-                            initialPassword = initialPassword,
-                            deadlineMillis = attemptDeadlineMillis,
-                            allowPasswordSave = allowPasswordSave
+                            required = true
+                        )
+                    }
+                    AuthMethod.PASSWORD_AND_IDENTITY -> {
+                        authenticateWithIdentity(
+                            client = client!!,
+                            host = host,
+                            mode = mode,
+                            required = false
+                        )
+                        if (!client!!.isAuthenticated) {
+                            authenticateWithPassword(
+                                client = client!!,
+                                host = host,
+                                mode = mode,
+                                initialPassword = initialPassword,
+                                deadlineMillis = attemptDeadlineMillis,
+                                allowPasswordSave = allowPasswordSave
+                            )
+                        }
+                    }
+                }
+                detectRemoteOsMetadata(host.id, client!!)?.let { detected ->
+                    if (sessionHost.osMetadata != detected) {
+                        sessionHost = sessionHost.copy(osMetadata = detected)
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = host.id,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = "Detected remote OS: ${detected.toSummaryLabel()}"
+                            )
                         )
                     }
                 }
-                if (mode == ConnectionMode.SSH) {
-                    if (useMoshTransport) {
-                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting mosh-server...")
-                        val moshConnect = startMoshServer(host.id, client!!)
-                        throwIfAttemptTimedOut(attemptDeadlineMillis)
-                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting mosh client...")
-                        moshBinding = startMoshClient(
-                            hostId = host.id,
-                            host = host,
-                            moshConnect = moshConnect,
-                            terminalEmulation = terminalEmulation
+                when (mode) {
+                    ConnectionMode.SSH -> {
+                        if (useMoshTransport) {
+                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh-server...")
+                            val moshConnect = startMoshServer(host.id, client!!)
+                            throwIfAttemptTimedOut(attemptDeadlineMillis)
+                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh client...")
+                            moshBinding = startMoshClient(
+                                hostId = host.id,
+                                host = sessionHost,
+                                moshConnect = moshConnect,
+                                terminalEmulation = terminalEmulation
+                            )
+                        } else {
+                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
+                            shellBinding = openShell(host.id, client!!, terminalEmulation)
+                        }
+                    }
+                    ConnectionMode.SFTP -> {
+                        updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Opening SFTP subsystem...")
+                        sftpBinding = SftpBinding(client!!.newSFTPClient())
+                        refreshSftpDirectoryListing(host.id, sftpBinding!!.client, ".")
+                    }
+                    ConnectionMode.SCP -> {
+                        updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP transfer channel...")
+                        scpBinding = ScpBinding(client!!.newSCPFileTransfer())
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = host.id,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = "SCP ready. Use quick transfer controls to upload/download files."
+                            )
                         )
-                    } else {
-                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting shell...")
-                        shellBinding = openShell(host.id, client!!, terminalEmulation)
                     }
                 }
                 if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
@@ -234,27 +302,29 @@ class SessionService : Service() {
                     emptyList()
                 }
                 if (configuredForwards.isNotEmpty()) {
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = host.id,
-                            level = SessionLogBus.LogLevel.INFO,
-                            message = "Prepared ${configuredForwards.size} associated forward(s)"
-                        )
+                    updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting ${configuredForwards.size} port forward(s)...")
+                    activeForwardBindings = activatePortForwards(
+                        hostId = host.id,
+                        client = client!!,
+                        forwards = configuredForwards
                     )
                 }
                 activeConnections[host.id] = ActiveConnection(
-                    host = host,
+                    host = sessionHost,
                     mode = mode,
                     client = client,
                     shellBinding = shellBinding,
-                    moshBinding = moshBinding
+                    moshBinding = moshBinding,
+                    sftpBinding = sftpBinding,
+                    scpBinding = scpBinding,
+                    portForwardBindings = activeForwardBindings
                 )
                 val modeLabel = when (mode) {
                     ConnectionMode.SSH -> if (useMoshTransport) "Mosh session ready" else "Interactive shell session ready"
-                    ConnectionMode.SFTP -> "SFTP control session ready"
-                    ConnectionMode.SCP -> "SCP transfer session ready"
+                    ConnectionMode.SFTP -> "SFTP browser ready"
+                    ConnectionMode.SCP -> "SCP transfer ready"
                 }
-                updateSessionSnapshot(host, mode, SessionStatus.ACTIVE, modeLabel)
+                updateSessionSnapshot(sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
                 UiDebugLog.result("startSession", true, "hostId=${host.id}, mode=$mode")
 
                 // Keep the connection alive until user stops it.
@@ -266,7 +336,7 @@ class SessionService : Service() {
                     clearHostKeyPromptsForHost(host.id, trust = false)
                     clearPasswordPromptsForHost(host.id, password = null)
                     val statusMessage = e.message ?: "Connection failed"
-                    updateSessionSnapshot(host, mode, SessionStatus.ERROR, statusMessage)
+                    updateSessionSnapshot(sessionHost, mode, SessionStatus.ERROR, statusMessage)
                     UiDebugLog.error("startSession", e, "hostId=${host.id}, mode=$mode")
                     UiDebugLog.result("startSession", false, "hostId=${host.id}, mode=$mode")
                 }
@@ -274,6 +344,8 @@ class SessionService : Service() {
             runCatching { shellBinding?.shell?.close() }
             runCatching { shellBinding?.session?.close() }
             runCatching { moshBinding?.session?.finishIfRunning() }
+            runCatching { sftpBinding?.client?.close() }
+            runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { client?.disconnect() }
             activeConnections.remove(host.id)
             clearHostKeyPromptsForHost(host.id, trust = false)
@@ -301,6 +373,8 @@ class SessionService : Service() {
             runCatching { connection.shellBinding?.shell?.close() }
             runCatching { connection.shellBinding?.session?.close() }
             runCatching { connection.moshBinding?.session?.finishIfRunning() }
+            runCatching { connection.sftpBinding?.client?.close() }
+            runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { connection.client?.disconnect() }
         }
         activeJobs.remove(hostId)?.cancel()
@@ -486,6 +560,583 @@ class SessionService : Service() {
         }
     }
 
+    fun listSftpDirectory(hostId: String, path: String) {
+        val connection = activeConnections[hostId]
+        val sftp = connection?.sftpBinding?.client
+        if (sftp == null) {
+            UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
+            return
+        }
+        val targetPath = path.trim().ifBlank { "." }
+        serviceScope.launch {
+            runCatching {
+                refreshSftpDirectoryListing(hostId, sftp, targetPath)
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SFTP list failed for $targetPath: ${err.message ?: "unknown error"}"
+                    )
+                )
+                UiDebugLog.result("listSftpDirectory", false, "hostId=$hostId")
+            }
+        }
+    }
+
+    fun sftpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
+        val connection = activeConnections[hostId]
+        val sftp = connection?.sftpBinding?.client
+        if (sftp == null) {
+            UiDebugLog.result("sftpDownloadFile", false, "sftp-not-active hostId=$hostId")
+            return
+        }
+        val source = remotePath.trim()
+        if (source.isBlank()) {
+            UiDebugLog.result("sftpDownloadFile", false, "blank-remote-path hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                val destination = resolveDestinationFile(hostId, source, localPath)
+                destination.parentFile?.mkdirs()
+                sftp.get(source, destination.absolutePath)
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "SFTP download complete: $source -> ${destination.absolutePath}"
+                    )
+                )
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SFTP download failed for $source: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun sftpUploadFile(hostId: String, localPath: String, remotePath: String) {
+        val connection = activeConnections[hostId]
+        val sftp = connection?.sftpBinding?.client
+        if (sftp == null) {
+            UiDebugLog.result("sftpUploadFile", false, "sftp-not-active hostId=$hostId")
+            return
+        }
+        val source = localPath.trim()
+        val destination = remotePath.trim()
+        if (source.isBlank() || destination.isBlank()) {
+            UiDebugLog.result("sftpUploadFile", false, "invalid-paths hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                val sourceFile = File(source)
+                require(sourceFile.exists()) { "Local file does not exist: $source" }
+                require(sourceFile.isFile) { "Local path is not a file: $source" }
+                sftp.put(sourceFile.absolutePath, destination)
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "SFTP upload complete: ${sourceFile.absolutePath} -> $destination"
+                    )
+                )
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SFTP upload failed to $destination: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun scpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
+        val connection = activeConnections[hostId]
+        val scp = connection?.scpBinding?.transfer
+        if (scp == null) {
+            UiDebugLog.result("scpDownloadFile", false, "scp-not-active hostId=$hostId")
+            return
+        }
+        val source = remotePath.trim()
+        if (source.isBlank()) {
+            UiDebugLog.result("scpDownloadFile", false, "blank-remote-path hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                val destination = resolveDestinationFile(hostId, source, localPath)
+                destination.parentFile?.mkdirs()
+                scp.download(source, destination.absolutePath)
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "SCP download complete: $source -> ${destination.absolutePath}"
+                    )
+                )
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SCP download failed for $source: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun scpUploadFile(hostId: String, localPath: String, remotePath: String) {
+        val connection = activeConnections[hostId]
+        val scp = connection?.scpBinding?.transfer
+        if (scp == null) {
+            UiDebugLog.result("scpUploadFile", false, "scp-not-active hostId=$hostId")
+            return
+        }
+        val source = localPath.trim()
+        val destination = remotePath.trim()
+        if (source.isBlank() || destination.isBlank()) {
+            UiDebugLog.result("scpUploadFile", false, "invalid-paths hostId=$hostId")
+            return
+        }
+        serviceScope.launch {
+            runCatching {
+                val sourceFile = File(source)
+                require(sourceFile.exists()) { "Local file does not exist: $source" }
+                require(sourceFile.isFile) { "Local path is not a file: $source" }
+                scp.upload(sourceFile.absolutePath, destination)
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "SCP upload complete: ${sourceFile.absolutePath} -> $destination"
+                    )
+                )
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SCP upload failed to $destination: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun refreshSftpDirectoryListing(hostId: String, sftp: SFTPClient, path: String) {
+        val listingPath = path.trim().ifBlank { "." }
+        val canonicalPath = runCatching { sftp.canonicalize(listingPath) }.getOrDefault(listingPath)
+        val listing = sftp.ls(canonicalPath)
+            .filterNot { it.name == "." || it.name == ".." }
+            .sortedWith(
+                compareByDescending<RemoteResourceInfo> { it.isDirectory() }
+                    .thenBy { it.name.lowercase() }
+            )
+        val rendered = formatSftpListing(canonicalPath, listing)
+        setShellOutputSnapshot(hostId, rendered)
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Listed ${listing.size} item(s) in $canonicalPath"
+            )
+        )
+    }
+
+    private fun formatSftpListing(path: String, items: List<RemoteResourceInfo>): String = buildString {
+        appendLine("Path: $path")
+        appendLine("Items: ${items.size}")
+        appendLine()
+        if (items.isEmpty()) {
+            appendLine("(empty)")
+            return@buildString
+        }
+        items.forEach { entry ->
+            val attrs = entry.attributes
+            val typeTag = when (attrs.type) {
+                FileMode.Type.DIRECTORY -> "DIR "
+                FileMode.Type.REGULAR -> "FILE"
+                FileMode.Type.SYMLINK -> "LINK"
+                else -> "OTHR"
+            }
+            val size = attrs.size
+            append(typeTag)
+            append("  ")
+            append(size.toString().padStart(10, ' '))
+            append("  ")
+            append(entry.name)
+            appendLine()
+        }
+    }
+
+    private fun resolveDestinationFile(hostId: String, remotePath: String, localPath: String?): File {
+        val explicit = localPath?.trim().orEmpty()
+        if (explicit.isNotEmpty()) {
+            val destination = File(explicit)
+            if (destination.isDirectory) {
+                val fallbackName = remotePath.substringAfterLast('/').ifBlank { "download.bin" }
+                return File(destination, fallbackName)
+            }
+            return destination
+        }
+        val base = File(getExternalFilesDir(null) ?: filesDir, "transfers/$hostId")
+        base.mkdirs()
+        val filename = remotePath.substringAfterLast('/').ifBlank { "download.bin" }
+        return File(base, filename)
+    }
+
+    private fun activatePortForwards(
+        hostId: String,
+        client: SSHClient,
+        forwards: List<PortForward>
+    ): List<PortForwardBinding> {
+        val bindings = mutableListOf<PortForwardBinding>()
+        forwards.forEach { forward ->
+            if (forward.type != com.majordaftapps.sshpeaches.app.data.model.PortForwardType.LOCAL) {
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "${forward.type} forward ${forward.label} is not supported in this build. Use Local forwarding."
+                    )
+                )
+                return@forEach
+            }
+            runCatching {
+                val binding = startLocalPortForward(hostId, client, forward)
+                bindings += binding
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = binding.summary
+                    )
+                )
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "Failed to start ${forward.type} forward ${forward.label}: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+        return bindings
+    }
+
+    private fun startLocalPortForward(hostId: String, client: SSHClient, forward: PortForward): PortForwardBinding {
+        val bindHost = normalizeBindHost(forward.sourceHost)
+        val bindPort = requireValidPort(forward.sourcePort, "source")
+        val destinationHost = forward.destinationHost.ifBlank { "127.0.0.1" }
+        val destinationPort = requireValidPort(forward.destinationPort, "destination")
+        val serverSocket = ServerSocket()
+        serverSocket.reuseAddress = true
+        serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        val localForwarder = client.newLocalPortForwarder(
+            Parameters(bindHost, bindPort, destinationHost, destinationPort),
+            serverSocket
+        )
+        val listenJob = serviceScope.launch(Dispatchers.IO) {
+            runCatching {
+                localForwarder.listen(Thread.currentThread())
+            }.onFailure { err ->
+                if (activeJobs.containsKey(hostId)) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.WARN,
+                            message = "Local forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
+                        )
+                    )
+                }
+            }
+        }
+        return PortForwardBinding(
+            forwardId = forward.id,
+            summary = "Local forward active: $bindHost:$bindPort -> $destinationHost:$destinationPort",
+            close = {
+                runCatching { localForwarder.close() }
+                listenJob.cancel()
+            }
+        )
+    }
+
+    private fun startRemotePortForward(hostId: String, client: SSHClient, forward: PortForward): PortForwardBinding {
+        val bindHost = normalizeBindHost(forward.sourceHost)
+        val bindPort = requireValidPort(forward.sourcePort, "source")
+        val destinationHost = forward.destinationHost.ifBlank { "127.0.0.1" }
+        val destinationPort = requireValidPort(forward.destinationPort, "destination")
+        val remoteForwarder = client.getRemotePortForwarder()
+        val bound = remoteForwarder.bind(
+            RemotePortForwarder.Forward(bindHost, bindPort),
+            ConnectListener { chan ->
+                handleRemoteForwardConnect(
+                    hostId = hostId,
+                    channel = chan,
+                    destinationHost = destinationHost,
+                    destinationPort = destinationPort
+                )
+            }
+        )
+        val actualPort = bound.port
+        return PortForwardBinding(
+            forwardId = forward.id,
+            summary = "Remote forward active: ${bound.address}:$actualPort -> $destinationHost:$destinationPort",
+            close = { runCatching { remoteForwarder.cancel(bound) } }
+        )
+    }
+
+    private fun startDynamicSocksForward(hostId: String, client: SSHClient, forward: PortForward): PortForwardBinding {
+        val bindHost = normalizeBindHost(forward.sourceHost)
+        val bindPort = requireValidPort(forward.sourcePort, "source")
+        val serverSocket = ServerSocket()
+        serverSocket.reuseAddress = true
+        serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        val acceptJob = serviceScope.launch(Dispatchers.IO) {
+            while (isActive && !serverSocket.isClosed) {
+                val socket = runCatching { serverSocket.accept() }.getOrNull() ?: break
+                launch {
+                    handleDynamicSocksConnect(hostId, client, socket)
+                }
+            }
+        }
+        return PortForwardBinding(
+            forwardId = forward.id,
+            summary = "Dynamic SOCKS forward active: $bindHost:$bindPort",
+            close = {
+                runCatching { serverSocket.close() }
+                acceptJob.cancel()
+            }
+        )
+    }
+
+    private fun handleRemoteForwardConnect(
+        hostId: String,
+        channel: Channel.Forwarded,
+        destinationHost: String,
+        destinationPort: Int
+    ) {
+        val socket = Socket()
+        try {
+            socket.connect(InetSocketAddress(destinationHost, destinationPort), FORWARD_CONNECT_TIMEOUT_MS)
+            channel.confirm()
+        } catch (error: Throwable) {
+            runCatching {
+                channel.reject(
+                    OpenFailException.Reason.CONNECT_FAILED,
+                    "Unable to connect to local target $destinationHost:$destinationPort"
+                )
+            }
+            runCatching { socket.close() }
+            throw error
+        }
+        bridgeStreams(
+            hostId = hostId,
+            leftInput = channel.inputStream,
+            leftOutput = channel.outputStream,
+            rightInput = socket.getInputStream(),
+            rightOutput = socket.getOutputStream(),
+            closeLeft = { runCatching { channel.close() } },
+            closeRight = { runCatching { socket.close() } }
+        )
+    }
+
+    private fun handleDynamicSocksConnect(hostId: String, client: SSHClient, socket: Socket) {
+        runCatching {
+            socket.soTimeout = SOCKS_HANDSHAKE_TIMEOUT_MS
+            val request = negotiateSocks5Request(socket.getInputStream(), socket.getOutputStream()) ?: return
+            val tunnel = client.newDirectConnection(request.host, request.port)
+            writeSocksReply(
+                output = socket.getOutputStream(),
+                responseCode = SOCKS_REPLY_SUCCEEDED
+            )
+            socket.soTimeout = 0
+            bridgeStreams(
+                hostId = hostId,
+                leftInput = tunnel.inputStream,
+                leftOutput = tunnel.outputStream,
+                rightInput = socket.getInputStream(),
+                rightOutput = socket.getOutputStream(),
+                closeLeft = { runCatching { tunnel.close() } },
+                closeRight = { runCatching { socket.close() } }
+            )
+        }.onFailure { err ->
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "Dynamic forward connection failed: ${err.message ?: "unknown error"}"
+                )
+            )
+            runCatching { socket.close() }
+        }
+    }
+
+    private data class SocksConnectRequest(val host: String, val port: Int)
+
+    private fun negotiateSocks5Request(inputRaw: InputStream, output: OutputStream): SocksConnectRequest? {
+        val input = BufferedInputStream(inputRaw)
+        val version = readUnsignedByte(input)
+        if (version != SOCKS_VERSION_5) {
+            return null
+        }
+        val methodsCount = readUnsignedByte(input)
+        val methods = ByteArray(methodsCount)
+        readFully(input, methods)
+        if (!methods.contains(SOCKS_AUTH_NONE.toByte())) {
+            output.write(byteArrayOf(SOCKS_VERSION_5.toByte(), SOCKS_AUTH_NO_ACCEPTABLE.toByte()))
+            output.flush()
+            return null
+        }
+        output.write(byteArrayOf(SOCKS_VERSION_5.toByte(), SOCKS_AUTH_NONE.toByte()))
+        output.flush()
+
+        val reqVersion = readUnsignedByte(input)
+        if (reqVersion != SOCKS_VERSION_5) return null
+        val cmd = readUnsignedByte(input)
+        readUnsignedByte(input) // RSV
+        val atyp = readUnsignedByte(input)
+
+        if (cmd != SOCKS_CMD_CONNECT) {
+            writeSocksReply(output, SOCKS_REPLY_COMMAND_NOT_SUPPORTED)
+            return null
+        }
+        val host = when (atyp) {
+            SOCKS_ATYP_IPV4 -> {
+                val address = ByteArray(4)
+                readFully(input, address)
+                InetAddress.getByAddress(address).hostAddress
+            }
+            SOCKS_ATYP_DOMAIN -> {
+                val length = readUnsignedByte(input)
+                val domain = ByteArray(length)
+                readFully(input, domain)
+                String(domain, Charsets.UTF_8)
+            }
+            SOCKS_ATYP_IPV6 -> {
+                val address = ByteArray(16)
+                readFully(input, address)
+                InetAddress.getByAddress(address).hostAddress
+            }
+            else -> {
+                writeSocksReply(output, SOCKS_REPLY_ADDRESS_NOT_SUPPORTED)
+                return null
+            }
+        }
+        val portHigh = readUnsignedByte(input)
+        val portLow = readUnsignedByte(input)
+        val port = (portHigh shl 8) or portLow
+        if (port !in 1..65535) {
+            writeSocksReply(output, SOCKS_REPLY_GENERAL_FAILURE)
+            return null
+        }
+        return SocksConnectRequest(host = host, port = port)
+    }
+
+    private fun writeSocksReply(output: OutputStream, responseCode: Int) {
+        val response = byteArrayOf(
+            SOCKS_VERSION_5.toByte(),
+            responseCode.toByte(),
+            0x00,
+            SOCKS_ATYP_IPV4.toByte(),
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00
+        )
+        output.write(response)
+        output.flush()
+    }
+
+    private fun readUnsignedByte(input: InputStream): Int {
+        val value = input.read()
+        if (value < 0) throw IOException("Unexpected end of stream")
+        return value and 0xFF
+    }
+
+    private fun readFully(input: InputStream, target: ByteArray) {
+        var offset = 0
+        while (offset < target.size) {
+            val read = input.read(target, offset, target.size - offset)
+            if (read < 0) throw IOException("Unexpected end of stream")
+            offset += read
+        }
+    }
+
+    private fun bridgeStreams(
+        hostId: String,
+        leftInput: InputStream,
+        leftOutput: OutputStream,
+        rightInput: InputStream,
+        rightOutput: OutputStream,
+        closeLeft: () -> Unit,
+        closeRight: () -> Unit
+    ) {
+        val finished = AtomicBoolean(false)
+        val closeAll = {
+            if (finished.compareAndSet(false, true)) {
+                closeLeft()
+                closeRight()
+            }
+        }
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching { pumpStream(leftInput, rightOutput) }.onFailure {
+                emitBridgeWarning(hostId, it)
+            }
+            closeAll()
+        }
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching { pumpStream(rightInput, leftOutput) }.onFailure {
+                emitBridgeWarning(hostId, it)
+            }
+            closeAll()
+        }
+    }
+
+    private fun emitBridgeWarning(hostId: String, error: Throwable) {
+        val message = error.message ?: return
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.DEBUG,
+                message = "Forward stream closed: $message"
+            )
+        )
+    }
+
+    private fun pumpStream(input: InputStream, output: OutputStream) {
+        val buffer = ByteArray(16 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            if (read == 0) continue
+            output.write(buffer, 0, read)
+            output.flush()
+        }
+    }
+
+    private fun normalizeBindHost(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.isBlank()) "127.0.0.1" else trimmed
+    }
+
+    private fun requireValidPort(port: Int, label: String): Int {
+        require(port in 1..65535) { "Invalid $label port: $port" }
+        return port
+    }
+
+    private fun closePortForwardBinding(binding: PortForwardBinding) {
+        runCatching { binding.close.invoke() }
+    }
+
     private fun awaitHostKeyDecision(
         hostId: String,
         prompt: SshHostKeyPrompt,
@@ -667,6 +1318,65 @@ class SessionService : Service() {
         }
     }
 
+    private fun authenticateWithIdentity(
+        client: SSHClient,
+        host: HostConnection,
+        mode: ConnectionMode,
+        required: Boolean
+    ): Boolean {
+        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
+        val identityId = host.preferredIdentityId?.takeIf { it.isNotBlank() }
+        if (identityId == null) {
+            if (required) {
+                throw RuntimeException("No identity key selected for this host.")
+            }
+            return false
+        }
+        val privateKey = runCatching {
+            SecurityManager.getIdentityKey(identityId)
+        }.getOrNull()
+        if (privateKey.isNullOrBlank()) {
+            if (required) {
+                throw RuntimeException("Selected identity key is unavailable. Re-import the key and try again.")
+            }
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = host.id,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "Selected identity key is unavailable. Falling back to password."
+                )
+            )
+            return false
+        }
+        val tempKeyFile = writeIdentityKeyTempFile(host.id, privateKey)
+        return try {
+            client.authPublickey(host.username, tempKeyFile.absolutePath)
+            client.isAuthenticated
+        } catch (authError: UserAuthException) {
+            if (required) {
+                throw RuntimeException("Identity authentication failed.", authError)
+            }
+            false
+        } finally {
+            tempKeyFile.delete()
+        }
+    }
+
+    private fun writeIdentityKeyTempFile(hostId: String, privateKey: String): File {
+        val file = File.createTempFile("ssh_identity_${hostId}_", ".pem", cacheDir)
+        file.writeText(
+            privateKey.trim().let { key ->
+                if (key.endsWith("\n")) key else "$key\n"
+            },
+            Charsets.UTF_8
+        )
+        file.setReadable(false, false)
+        file.setWritable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(true, true)
+        return file
+    }
+
     private suspend fun startMoshServer(hostId: String, client: SSHClient): MoshConnect {
         return client.startSession().use { session ->
             val command = session.exec("LANG=en_US.UTF-8 mosh-server new -c 256")
@@ -820,6 +1530,144 @@ class SessionService : Service() {
     private fun readLineIfReady(reader: BufferedReader): String? {
         if (!reader.ready()) return null
         return runCatching { reader.readLine() }.getOrNull()
+    }
+
+    private fun detectRemoteOsMetadata(hostId: String, client: SSHClient): OsMetadata? {
+        return runCatching {
+            val osRelease = runRemoteCommand(
+                client = client,
+                command = "cat /etc/os-release 2>/dev/null || cat /usr/lib/os-release 2>/dev/null",
+                timeoutSeconds = 3
+            )
+            parseOsRelease(osRelease)?.let { return@runCatching it }
+            val uname = runRemoteCommand(client, "uname -s 2>/dev/null", timeoutSeconds = 2)
+                ?.lineSequence()
+                ?.firstOrNull()
+                ?.trim()
+                .orEmpty()
+            val unameVersion = runRemoteCommand(client, "uname -r 2>/dev/null", timeoutSeconds = 2)
+                ?.lineSequence()
+                ?.firstOrNull()
+                ?.trim()
+                .orEmpty()
+            when {
+                uname.equals("Darwin", ignoreCase = true) -> OsMetadata.Known(
+                    family = OsFamily.MAC,
+                    versionLabel = unameVersion.ifBlank { null }
+                )
+                uname.contains("FreeBSD", ignoreCase = true) ||
+                    uname.contains("OpenBSD", ignoreCase = true) ||
+                    uname.contains("NetBSD", ignoreCase = true) -> OsMetadata.Known(
+                    family = OsFamily.BSD,
+                    versionLabel = unameVersion.ifBlank { null }
+                )
+                uname.contains("Linux", ignoreCase = true) -> OsMetadata.Known(
+                    family = OsFamily.GENERIC,
+                    versionLabel = unameVersion.ifBlank { null }
+                )
+                else -> {
+                    val windowsVer = runRemoteCommand(client, "cmd.exe /c ver", timeoutSeconds = 2).orEmpty()
+                    if (windowsVer.contains("Windows", ignoreCase = true)) {
+                        OsMetadata.Known(family = OsFamily.WINDOWS)
+                    } else {
+                        null
+                    }
+                }
+            }
+        }.onFailure { err ->
+            UiDebugLog.action(
+                "detectRemoteOsMetadata",
+                "hostId=$hostId, failed=${err::class.java.simpleName}: ${err.message ?: "unknown"}"
+            )
+        }.getOrNull()
+    }
+
+    private fun runRemoteCommand(
+        client: SSHClient,
+        command: String,
+        timeoutSeconds: Long
+    ): String? {
+        return runCatching {
+            client.startSession().use { session ->
+                val cmd = session.exec(command)
+                cmd.join(timeoutSeconds, TimeUnit.SECONDS)
+                val stdout = runCatching { cmd.inputStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull().orEmpty()
+                if (stdout.isNotBlank()) {
+                    stdout
+                } else {
+                    runCatching { cmd.errorStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull()
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun parseOsRelease(raw: String?): OsMetadata? {
+        if (raw.isNullOrBlank()) return null
+        val values = mutableMapOf<String, String>()
+        raw.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isBlank() || trimmed.startsWith("#")) return@forEach
+            val index = trimmed.indexOf('=')
+            if (index <= 0) return@forEach
+            val key = trimmed.substring(0, index).trim()
+            val value = trimmed.substring(index + 1).trim().trim('"', '\'')
+            values[key] = value
+        }
+        val id = values["ID"].orEmpty()
+        val like = values["ID_LIKE"].orEmpty()
+        val version = values["VERSION_ID"].orEmpty().ifBlank { values["VERSION"].orEmpty() }
+        val family = mapOsReleaseToFamily(id, like)
+        return when {
+            family != null -> OsMetadata.Known(
+                family = family,
+                versionLabel = version.takeIf { it.isNotBlank() }
+            )
+            id.isNotBlank() || like.contains("linux", ignoreCase = true) -> OsMetadata.Known(
+                family = OsFamily.GENERIC,
+                versionLabel = version.takeIf { it.isNotBlank() }
+            )
+            else -> null
+        }
+    }
+
+    private fun mapOsReleaseToFamily(idValue: String, idLikeValue: String): OsFamily? {
+        val allCandidates = buildList {
+            add(idValue)
+            addAll(idLikeValue.split(' ', '\t'))
+        }.map { it.trim().lowercase() }.filter { it.isNotBlank() }
+        return allCandidates.firstNotNullOfOrNull { token ->
+            when {
+                token == "ubuntu" -> OsFamily.UBUNTU
+                token == "debian" -> OsFamily.DEBIAN
+                token == "fedora" -> OsFamily.FEDORA
+                token == "centos" -> OsFamily.CENTOS
+                token == "arch" || token == "archlinux" -> OsFamily.ARCH
+                token == "linuxmint" || token == "mint" -> OsFamily.MINT
+                token == "suse" || token.startsWith("opensuse") || token == "sles" -> OsFamily.SUSE
+                token == "rhel" || token == "redhat" || token.contains("redhat") -> OsFamily.REDHAT
+                token == "gentoo" -> OsFamily.GENTOO
+                token == "pop" || token == "pop_os" || token == "pop!_os" -> OsFamily.POP_OS
+                token == "manjaro" -> OsFamily.MANJARO
+                token == "elementary" || token == "elementaryos" -> OsFamily.ELEMENTARY
+                token == "peppermint" -> OsFamily.PEPPERMINT
+                token == "lite" || token == "linuxlite" -> OsFamily.LITE
+                token == "zorin" -> OsFamily.ZORIN
+                token == "rocky" || token == "rockylinux" -> OsFamily.ROCKY
+                token == "alma" || token == "almalinux" -> OsFamily.ALMA
+                token == "asahi" -> OsFamily.ASAHI
+                token == "nixos" -> OsFamily.NIXOS
+                token == "freebsd" || token == "openbsd" || token == "netbsd" || token == "bsd" -> OsFamily.BSD
+                token == "windows" || token == "msys" || token == "mingw" || token == "cygwin" -> OsFamily.WINDOWS
+                token == "linux" -> OsFamily.GENERIC
+                else -> null
+            }
+        }
+    }
+
+    private fun OsMetadata.toSummaryLabel(): String = when (this) {
+        is OsMetadata.Known -> listOfNotNull(family.displayName, versionLabel?.takeIf { it.isNotBlank() }).joinToString(" ")
+        is OsMetadata.Custom -> label
+        OsMetadata.Undetected -> "Unknown"
     }
 
     private fun openShell(
@@ -1171,17 +2019,30 @@ class SessionService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "sessions"
-        private const val GROUP_KEY_SESSIONS = "com.sshpeaches.app.group.sessions"
+        private const val GROUP_KEY_SESSIONS = "com.majordaftapps.sshpeaches.app.group.sessions"
         private const val OPEN_APP_REQUEST_CODE = 19_241
         private const val NOTIFICATION_ID = 42
-        private const val ACTION_STOP = "com.sshpeaches.app.service.ACTION_STOP"
-        const val ACTION_OPEN_SESSION = "com.sshpeaches.app.service.ACTION_OPEN_SESSION"
+        private const val ACTION_STOP = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP"
+        const val ACTION_OPEN_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSION"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
+        private const val FORWARD_CONNECT_TIMEOUT_MS = 10_000
+        private const val SOCKS_HANDSHAKE_TIMEOUT_MS = 15_000
+        private const val SOCKS_VERSION_5 = 0x05
+        private const val SOCKS_AUTH_NONE = 0x00
+        private const val SOCKS_AUTH_NO_ACCEPTABLE = 0xFF
+        private const val SOCKS_CMD_CONNECT = 0x01
+        private const val SOCKS_ATYP_IPV4 = 0x01
+        private const val SOCKS_ATYP_DOMAIN = 0x03
+        private const val SOCKS_ATYP_IPV6 = 0x04
+        private const val SOCKS_REPLY_SUCCEEDED = 0x00
+        private const val SOCKS_REPLY_GENERAL_FAILURE = 0x01
+        private const val SOCKS_REPLY_COMMAND_NOT_SUPPORTED = 0x07
+        private const val SOCKS_REPLY_ADDRESS_NOT_SUPPORTED = 0x08
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
         private const val MOSH_DEFAULT_COLUMNS = 120
         private const val MOSH_DEFAULT_ROWS = 40
@@ -1197,7 +2058,10 @@ class SessionService : Service() {
         val mode: ConnectionMode,
         val client: SSHClient?,
         val shellBinding: ShellBinding?,
-        val moshBinding: MoshBinding?
+        val moshBinding: MoshBinding?,
+        val sftpBinding: SftpBinding?,
+        val scpBinding: ScpBinding?,
+        val portForwardBindings: List<PortForwardBinding>
     )
 
     private data class ShellBinding(
@@ -1207,6 +2071,20 @@ class SessionService : Service() {
 
     private data class MoshBinding(
         val session: TerminalSession
+    )
+
+    private data class SftpBinding(
+        val client: SFTPClient
+    )
+
+    private data class ScpBinding(
+        val transfer: SCPFileTransfer
+    )
+
+    private data class PortForwardBinding(
+        val forwardId: String,
+        val summary: String,
+        val close: () -> Unit
     )
 
     private data class MoshConnect(

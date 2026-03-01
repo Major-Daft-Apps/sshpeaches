@@ -17,7 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.SSHPeaches">
         <activity
-            android:name="com.sshpeaches.app.MainActivity"
+            android:name="com.majordaftapps.sshpeaches.app.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.SSHPeaches"
             android:windowSoftInputMode="adjustResize">

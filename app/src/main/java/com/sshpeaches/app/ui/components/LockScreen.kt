@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

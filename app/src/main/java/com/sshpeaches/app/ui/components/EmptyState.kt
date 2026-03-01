@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +17,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun EmptyState(itemLabel: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    itemLabel: String,
+    modifier: Modifier = Modifier,
+    showCreateHint: Boolean = true
+) {
+    val pluralLabel = when {
+        itemLabel.endsWith("y", ignoreCase = true) && itemLabel.length > 1 -> {
+            val stem = itemLabel.dropLast(1)
+            val prev = itemLabel[itemLabel.length - 2].lowercaseChar()
+            if (prev in listOf('a', 'e', 'i', 'o', 'u')) "${itemLabel}s" else "${stem}ies"
+        }
+        else -> "${itemLabel}s"
+    }
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -30,7 +42,11 @@ fun EmptyState(itemLabel: String, modifier: Modifier = Modifier) {
             tint = Color.Gray.copy(alpha = 0.4f)
         )
         Text(
-            text = "You don't have any ${itemLabel}s. Tap \"New\" to create one.",
+            text = if (showCreateHint) {
+                "You don't have any $pluralLabel. Tap \"New\" to create one."
+            } else {
+                "You don't have any $pluralLabel."
+            },
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
         )

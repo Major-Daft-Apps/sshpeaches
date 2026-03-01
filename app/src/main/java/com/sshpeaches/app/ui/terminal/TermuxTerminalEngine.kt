@@ -1,8 +1,8 @@
-package com.sshpeaches.app.ui.terminal
+package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.graphics.Color
-import com.sshpeaches.app.data.model.TerminalCursorStyle
-import com.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalOutput
 import com.termux.terminal.TerminalSession

@@ -1,12 +1,12 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.util.Base64
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import org.json.JSONObject
+import java.util.Base64
 
 fun encodePortForwardPayload(forward: PortForward): String {
     val json = JSONObject().apply {
@@ -18,7 +18,7 @@ fun encodePortForwardPayload(forward: PortForward): String {
         put("dstHost", forward.destinationHost)
         put("dstPort", forward.destinationPort)
     }
-    return Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    return Base64.getEncoder().encodeToString(json.toString().toByteArray(Charsets.UTF_8))
 }
 
 fun generateForwardQr(forward: PortForward): Bitmap? {

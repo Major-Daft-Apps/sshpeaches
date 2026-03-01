@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.util
+package com.majordaftapps.sshpeaches.app.ui.util
 
 fun Enum<*>.toSentenceCaseLabel(): String {
     val raw = name.lowercase().replace('_', ' ')

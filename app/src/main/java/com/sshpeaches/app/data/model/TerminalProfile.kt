@@ -1,4 +1,4 @@
-package com.sshpeaches.app.data.model
+package com.majordaftapps.sshpeaches.app.data.model
 
 import java.util.UUID
 

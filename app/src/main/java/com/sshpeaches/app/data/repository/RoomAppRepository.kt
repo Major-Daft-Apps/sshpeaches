@@ -1,12 +1,12 @@
-package com.sshpeaches.app.data.repository
+package com.majordaftapps.sshpeaches.app.data.repository
 
-import com.sshpeaches.app.data.local.SshPeachesDatabase
-import com.sshpeaches.app.data.local.asEntity
-import com.sshpeaches.app.data.local.asModel
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+import com.majordaftapps.sshpeaches.app.data.local.asEntity
+import com.majordaftapps.sshpeaches.app.data.local.asModel
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

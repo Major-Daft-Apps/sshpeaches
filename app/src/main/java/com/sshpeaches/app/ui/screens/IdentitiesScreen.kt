@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.screens
+package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.net.Uri
 import android.widget.Toast
@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Star
@@ -29,12 +30,15 @@ import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,14 +50,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.ui.components.EmptyState
-import com.sshpeaches.app.ui.components.IdentityQrPayload
-import com.sshpeaches.app.ui.components.decodeIdentityFromQr
-import com.sshpeaches.app.ui.components.generateIdentityQr
-import com.sshpeaches.app.ui.util.ExportPassphraseCache
-import com.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
-import com.sshpeaches.app.util.isValidFingerprint
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
+import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrImportResult
+import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrPayload
+import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
+import com.majordaftapps.sshpeaches.app.ui.components.processIdentityQrImport
+import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
+import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.util.isValidFingerprint
 import java.util.UUID
 
 private data class IdentityOverwrite(
@@ -67,7 +72,6 @@ private data class IdentityOverwrite(
 @Composable
 fun IdentitiesScreen(
     items: List<Identity>,
-    pinConfigured: Boolean,
     isLocked: Boolean,
     onAdd: (label: String, fingerprint: String, username: String?, suppliedId: String?) -> Unit = { _, _, _, _ -> },
     onUpdate: (id: String, label: String, fingerprint: String, username: String?) -> Unit = { _, _, _, _ -> },
@@ -78,8 +82,10 @@ fun IdentitiesScreen(
     onToggleFavorite: (String) -> Unit = {},
     onShowMessage: (String) -> Unit = {},
     editMode: Boolean = false,
-    onImportFromQr: () -> Unit = {}
+    onImportFromQr: () -> Unit = {},
+    onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
+    val search = remember { mutableStateOf("") }
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
@@ -122,43 +128,39 @@ fun IdentitiesScreen(
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
-        val payload = decodeIdentityFromQr(contents)
-        val imported = payload?.identity
-        if (imported != null) {
-            val existing = items.find { it.fingerprint.equals(imported.fingerprint, true) }
-            if (existing != null) {
+        when (
+            val processed = processIdentityQrImport(
+                contents = contents,
+                existingIdentities = items
+            )
+        ) {
+            is IdentityQrImportResult.Error -> onShowMessage(processed.message)
+            is IdentityQrImportResult.NeedsOverwrite -> {
                 pendingOverwrite.value = IdentityOverwrite(
-                    targetId = existing.id,
-                    label = imported.label.ifBlank { existing.label },
-                    fingerprint = imported.fingerprint,
-                    username = imported.username ?: existing.username,
-                    keyPayload = payload.encryptedKeyPayload
+                    targetId = processed.overwrite.targetId,
+                    label = processed.overwrite.label,
+                    fingerprint = processed.overwrite.fingerprint,
+                    username = processed.overwrite.username,
+                    keyPayload = processed.overwrite.encryptedKeyPayload
                 )
-            } else {
-                val targetId = imported.id.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+            }
+            is IdentityQrImportResult.Ready -> {
+                val imported = processed.data.identity
                 onAdd(
-                    imported.label.ifBlank { "Imported Identity" },
+                    imported.label,
                     imported.fingerprint,
                     imported.username,
-                    targetId
+                    imported.id
                 )
                 onImportFromQr()
-                if (!payload.encryptedKeyPayload.isNullOrBlank()) {
-                    if (!pinConfigured) {
-                        onShowMessage("Set a PIN before importing encrypted keys.")
-                    } else if (isLocked) {
-                        onShowMessage("Unlock with your PIN before importing encrypted keys.")
-                    } else {
-                        pendingKeyImport.value = targetId to payload.encryptedKeyPayload
-                        importPassphraseState.value = ""
-                        importPassphraseError.value = null
-                    }
+                if (!processed.data.encryptedKeyPayload.isNullOrBlank()) {
+                    pendingKeyImport.value = imported.id to processed.data.encryptedKeyPayload
+                    importPassphraseState.value = ""
+                    importPassphraseError.value = null
                 } else {
                     onShowMessage("Identity imported")
                 }
             }
-        } else {
-            onShowMessage("Invalid identity QR")
         }
     }
 
@@ -175,118 +177,141 @@ fun IdentitiesScreen(
         showDialog.value = false
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Button(onClick = { openDialog(null) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Add identity")
-            }
-            Button(
-                onClick = {
-                    val options = ScanOptions().apply {
-                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                        setPrompt("Scan SSH identity QR")
-                        setBeepEnabled(false)
-                    }
-                    scanLauncher.launch(options)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                Text("Import QR")
-            }
+    val filteredItems = items.filter {
+        it.label.contains(search.value, ignoreCase = true) ||
+            it.fingerprint.contains(search.value, ignoreCase = true) ||
+            (it.username?.contains(search.value, ignoreCase = true) == true)
+    }
+    val showEmptyState = items.isEmpty() || filteredItems.isEmpty()
+    LaunchedEffect(showEmptyState) {
+        onEmptyStateVisibleChanged(showEmptyState)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = search.value,
+                onValueChange = { search.value = it },
+                placeholder = { Text("Search identities") },
+                trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+            )
         }
-        if (items.isEmpty()) {
-            item { EmptyState(itemLabel = "identity") }
-        } else {
-            items(items, key = { it.id }) { identity ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+        HorizontalDivider()
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                        Text("Add identity")
+                    }
+                    Button(
+                        onClick = {
+                            val options = ScanOptions().apply {
+                                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                setPrompt("Scan SSH identity QR")
+                                setBeepEnabled(false)
+                            }
+                            scanLauncher.launch(options)
+                        },
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Column {
-                            Text(identity.label, style = MaterialTheme.typography.titleMedium)
-                            Text(identity.fingerprint, style = MaterialTheme.typography.bodySmall)
-                            identity.username?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = if (identity.favorite) "Unfavorite" else "Favorite",
-                                tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable { onToggleFavorite(identity.id) }
-                            )
-                            if (identity.hasPrivateKey) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Text("Import QR")
+                    }
+                }
+            }
+            if (items.isEmpty()) {
+                item { EmptyState(itemLabel = "identity") }
+            } else if (filteredItems.isEmpty()) {
+                item { EmptyState(itemLabel = "result") }
+            } else {
+                items(filteredItems, key = { it.id }) { identity ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(identity.label, style = MaterialTheme.typography.titleMedium)
+                                Text(identity.fingerprint, style = MaterialTheme.typography.bodySmall)
+                                identity.username?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = if (identity.favorite) "Unfavorite" else "Favorite",
+                                    tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { onToggleFavorite(identity.id) }
+                                )
+                                if (identity.hasPrivateKey) {
+                                    Icon(
+                                        Icons.Default.VpnKey,
+                                        contentDescription = "Has private key",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Icon(
+                                    Icons.Default.QrCode,
+                                    contentDescription = "Share identity",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable {
+                                            if (identity.hasPrivateKey) {
+                                                sharePassphrasePrompt.value = identity
+                                                sharePassphraseState.value = ExportPassphraseCache.identity.orEmpty()
+                                                shareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
+                                                sharePassphraseError.value = null
+                                            } else {
+                                                shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
+                                                shareIdentity.value = identity
+                                            }
+                                        }
+                                )
                                 Icon(
                                     Icons.Default.VpnKey,
-                                    contentDescription = "Has private key",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Icon(
-                                Icons.Default.QrCode,
-                                contentDescription = "Share identity",
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable {
-                                        if (identity.hasPrivateKey) {
-                                            when {
-                                                !pinConfigured -> onShowMessage("Set a PIN before exporting private keys.")
-                                                isLocked -> onShowMessage("Unlock with your PIN before exporting.")
-                                                else -> {
-                                                    sharePassphrasePrompt.value = identity
-                                                    sharePassphraseState.value = ExportPassphraseCache.identity.orEmpty()
-                                                    shareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
-                                                    sharePassphraseError.value = null
-                                                }
+                                    contentDescription = "Import key file",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable {
+                                            if (isLocked) {
+                                                onShowMessage("Unlock the app before importing keys.")
+                                            } else {
+                                                fileImportTarget.value = identity.id
+                                                fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
                                             }
-                                        } else {
-                                            shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
-                                            shareIdentity.value = identity
                                         }
-                                    }
-                            )
-                            Icon(
-                                Icons.Default.VpnKey,
-                                contentDescription = "Import key file",
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable {
-                                        if (!pinConfigured) {
-                                            onShowMessage("Set a PIN before importing keys.")
-                                        } else if (isLocked) {
-                                            onShowMessage("Unlock with your PIN before importing keys.")
-                                        } else {
-                                            fileImportTarget.value = identity.id
-                                            fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
-                                        }
-                                    }
-                            )
-                            if (editMode) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .padding(start = 8.dp)
-                                        .clickable { openDialog(identity) }
                                 )
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable { onDelete(identity.id) }
-                                )
+                                if (editMode) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .padding(start = 8.dp)
+                                            .clickable { openDialog(identity) }
+                                    )
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable { onDelete(identity.id) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -458,7 +483,7 @@ fun IdentitiesScreen(
                                 sharePassphraseError.value = null
                                 ExportPassphraseCache.identity = phrase
                             } else {
-                                sharePassphraseError.value = "Unable to export key. Unlock the app and try again."
+                                sharePassphraseError.value = "Unable to export key. Ensure the key exists and try again."
                             }
                         }
                     }
@@ -544,13 +569,7 @@ fun IdentitiesScreen(
                     )
                     pendingOverwrite.value = null
                     if (!overwrite.keyPayload.isNullOrBlank()) {
-                        if (!pinConfigured) {
-                            Toast.makeText(context, "Set a PIN before importing encrypted keys.", Toast.LENGTH_SHORT).show()
-                        } else if (isLocked) {
-                            Toast.makeText(context, "Unlock with your PIN before importing encrypted keys.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            pendingKeyImport.value = overwrite.targetId to overwrite.keyPayload
-                        }
+                        pendingKeyImport.value = overwrite.targetId to overwrite.keyPayload
                     }
                 }) { Text("Overwrite") }
             },

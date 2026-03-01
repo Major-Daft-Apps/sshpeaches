@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.terminal
+package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.view.KeyEvent
 import com.termux.terminal.KeyHandler
@@ -10,16 +10,40 @@ class TerminalInputRouter(
     private val onWriteToRemote: (ByteArray) -> Unit
 ) {
 
-    fun sendText(text: String) {
+    fun sendText(
+        text: String,
+        ctrlDown: Boolean = false,
+        altDown: Boolean = false,
+        shiftDown: Boolean = false
+    ) {
         if (text.isEmpty()) return
-        onWriteToRemote(text.toByteArray(StandardCharsets.UTF_8))
+        if (!ctrlDown && !altDown && !shiftDown) {
+            onWriteToRemote(text.toByteArray(StandardCharsets.UTF_8))
+            return
+        }
+        var index = 0
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            sendCodePoint(codePoint, ctrlDown, altDown)
+            index += Character.charCount(codePoint)
+        }
+    }
+
+    fun sendRawSequence(sequence: String) {
+        if (sequence.isEmpty()) return
+        onWriteToRemote(sequence.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    fun sendBackspace() {
+        onWriteToRemote(byteArrayOf(0x7F))
     }
 
     fun sendVirtualKey(
         keyCode: Int,
         ctrlDown: Boolean = false,
         altDown: Boolean = false,
-        shiftDown: Boolean = false
+        shiftDown: Boolean = false,
+        fallbackSequence: String? = null
     ): Boolean {
         var keyMod = 0
         if (ctrlDown) keyMod = keyMod or KeyHandler.KEYMOD_CTRL
@@ -32,9 +56,15 @@ class TerminalInputRouter(
             emulator.isCursorKeysApplicationMode,
             emulator.isKeypadApplicationMode
         )
-        if (code.isNullOrEmpty()) return false
-        onWriteToRemote(code.toByteArray(StandardCharsets.UTF_8))
-        return true
+        if (!code.isNullOrEmpty()) {
+            onWriteToRemote(code.toByteArray(StandardCharsets.UTF_8))
+            return true
+        }
+        if (!fallbackSequence.isNullOrEmpty()) {
+            onWriteToRemote(fallbackSequence.toByteArray(StandardCharsets.UTF_8))
+            return true
+        }
+        return false
     }
 
     fun onAndroidKeyDown(event: KeyEvent): Boolean {

@@ -1,14 +1,14 @@
-package com.sshpeaches.app.data.repository
+package com.majordaftapps.sshpeaches.app.data.repository
 
-import com.sshpeaches.app.data.model.AuthMethod
-import com.sshpeaches.app.data.model.ConnectionMode
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.data.model.OsFamily
-import com.sshpeaches.app.data.model.OsMetadata
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.PortForwardType
-import com.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsFamily
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update

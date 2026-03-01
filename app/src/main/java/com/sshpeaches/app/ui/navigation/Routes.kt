@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.navigation
+package com.majordaftapps.sshpeaches.app.ui.navigation
 
 object Routes {
     const val FAVORITES = "favorites"

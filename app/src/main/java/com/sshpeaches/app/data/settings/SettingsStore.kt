@@ -1,4 +1,4 @@
-package com.sshpeaches.app.data.settings
+package com.majordaftapps.sshpeaches.app.data.settings
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -8,17 +8,20 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
-import com.sshpeaches.app.data.model.TerminalCursorStyle
-import com.sshpeaches.app.data.model.TerminalEmulation
-import com.sshpeaches.app.data.model.TerminalProfile
-import com.sshpeaches.app.data.model.TerminalProfileDefaults
-import com.sshpeaches.app.ui.state.LockTimeout
-import com.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
-import com.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "app_settings"
@@ -62,7 +65,7 @@ object SettingsStore {
         }
     }
 
-    val keyboardLayout: Flow<List<String>> by lazy {
+    val keyboardLayout: Flow<List<KeyboardSlotAction>> by lazy {
         dataStore.data.map { prefs ->
             prefs[keyboardLayoutKey]?.let { decodeKeyboardSlots(it) } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
         }
@@ -166,9 +169,24 @@ object SettingsStore {
         }
     }
 
-    suspend fun setKeyboardLayout(slots: List<String>) {
+    suspend fun setKeyboardLayout(slots: List<KeyboardSlotAction>) {
         val array = JSONArray()
-        slots.forEach { array.put(it) }
+        KeyboardLayoutDefaults.normalizeSlots(slots).forEach { slot ->
+            array.put(
+                JSONObject().apply {
+                    put("type", slot.type.name)
+                    put("label", slot.label)
+                    put("text", slot.text)
+                    put("keyCode", slot.keyCode ?: JSONObject.NULL)
+                    put("modifier", slot.modifier?.name ?: JSONObject.NULL)
+                    put("sequence", slot.sequence)
+                    put("ctrl", slot.ctrl)
+                    put("alt", slot.alt)
+                    put("shift", slot.shift)
+                    put("repeatable", slot.repeatable)
+                }
+            )
+        }
         dataStore.edit { prefs ->
             prefs[keyboardLayoutKey] = array.toString()
         }
@@ -281,13 +299,64 @@ object SettingsStore {
             return appContext.settingsDataStore
         }
 
-    private fun decodeKeyboardSlots(serialized: String): List<String> =
+    private fun decodeKeyboardSlots(serialized: String): List<KeyboardSlotAction> =
         runCatching {
             val array = JSONArray(serialized)
-            List(KeyboardLayoutDefaults.SLOT_COUNT) { index ->
-                if (index < array.length()) array.optString(index) ?: "" else ""
+            if (array.length() == 0) {
+                KeyboardLayoutDefaults.DEFAULT_SLOTS
+            } else {
+                val first = array.opt(0)
+                val parsed = when (first) {
+                    is JSONObject -> {
+                        List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+                            decodeKeyboardSlotObject(array.optJSONObject(index))
+                        }
+                    }
+                    else -> {
+                        List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+                            KeyboardLayoutDefaults.legacyStringToAction(array.optString(index, ""))
+                        }
+                    }
+                }
+                KeyboardLayoutDefaults.normalizeSlots(parsed)
             }
         }.getOrElse { KeyboardLayoutDefaults.DEFAULT_SLOTS }
+
+    private fun decodeKeyboardSlotObject(item: JSONObject?): KeyboardSlotAction {
+        if (item == null) return KeyboardLayoutDefaults.emptyAction()
+        val type = runCatching {
+            KeyboardActionType.valueOf(item.optString("type", KeyboardActionType.TEXT.name))
+        }.getOrDefault(KeyboardActionType.TEXT)
+        val label = item.optString("label", "")
+        val text = item.optString("text", "")
+        val keyCode = when {
+            !item.has("keyCode") -> null
+            item.isNull("keyCode") -> null
+            else -> item.optInt("keyCode").takeIf { it != 0 }
+        }
+        val modifier = runCatching {
+            item.optString("modifier")
+                .takeIf { it.isNotBlank() && it != "null" }
+                ?.let { KeyboardModifier.valueOf(it) }
+        }.getOrNull()
+        val sequence = item.optString("sequence", "")
+        val ctrl = item.optBoolean("ctrl", false)
+        val alt = item.optBoolean("alt", false)
+        val shift = item.optBoolean("shift", false)
+        val repeatable = item.optBoolean("repeatable", false)
+        return KeyboardSlotAction(
+            type = type,
+            label = label,
+            text = text,
+            keyCode = keyCode,
+            modifier = modifier,
+            sequence = sequence,
+            ctrl = ctrl,
+            alt = alt,
+            shift = shift,
+            repeatable = repeatable
+        )
+    }
 
     private fun mergedTerminalProfiles(serializedCustomProfiles: String?): List<TerminalProfile> {
         val builtIns = TerminalProfileDefaults.builtInProfiles

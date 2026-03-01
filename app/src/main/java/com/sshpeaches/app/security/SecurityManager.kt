@@ -1,4 +1,4 @@
-package com.sshpeaches.app.security
+package com.majordaftapps.sshpeaches.app.security
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -134,7 +134,6 @@ object SecurityManager {
 
     fun exportHostPasswordPayload(hostId: String, passphrase: String): String? {
         ensureInit()
-        ensureUnlocked("export password")
         if (passphrase.isBlank()) return null
         val password = prefs.getString(KEY_PASSWORD_PREFIX + hostId, null) ?: return null
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
@@ -155,7 +154,6 @@ object SecurityManager {
 
     fun importHostPasswordPayload(hostId: String, payload: String, passphrase: String) {
         ensureInit()
-        ensureUnlocked("import password")
         if (passphrase.isBlank()) return
         val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
         val json = JSONObject(decoded)
@@ -173,7 +171,6 @@ object SecurityManager {
 
     fun exportIdentityKeyPayload(identityId: String, passphrase: String): String? {
         ensureInit()
-        ensureUnlocked("export identity key")
         if (passphrase.isBlank()) return null
         val keyValue = prefs.getString(KEY_IDENTITY_PREFIX + identityId, null) ?: return null
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
@@ -194,7 +191,6 @@ object SecurityManager {
 
     fun importIdentityKeyPayload(identityId: String, payload: String, passphrase: String) {
         ensureInit()
-        ensureUnlocked("import identity key")
         if (passphrase.isBlank()) return
         val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
         val json = JSONObject(decoded)

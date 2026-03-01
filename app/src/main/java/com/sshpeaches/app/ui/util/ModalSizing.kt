@@ -1,4 +1,4 @@
-package com.sshpeaches.app.ui.util
+package com.majordaftapps.sshpeaches.app.ui.util
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration

@@ -1,9 +1,9 @@
-package com.sshpeaches.app.data.local
+package com.majordaftapps.sshpeaches.app.data.local
 
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.data.model.PortForward
-import com.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 
 fun HostEntity.asModel(): HostConnection = HostConnection(
     id = id,
@@ -22,6 +22,7 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     snippets = snippets,
     hasPassword = hasPassword,
     useMosh = useMosh,
+    preferredIdentityId = preferredIdentityId,
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,
@@ -45,6 +46,7 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     snippets = snippets,
     hasPassword = hasPassword,
     useMosh = useMosh,
+    preferredIdentityId = preferredIdentityId,
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,

@@ -1,13 +1,13 @@
-package com.sshpeaches.app.ui.components
+package com.majordaftapps.sshpeaches.app.ui.components
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.util.Base64
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.sshpeaches.app.data.model.Identity
-import com.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import org.json.JSONObject
+import java.util.Base64
 
 fun encodeIdentityPayload(identity: Identity, encryptedKeyPayload: String?): String {
     val json = JSONObject().apply {
@@ -18,10 +18,7 @@ fun encodeIdentityPayload(identity: Identity, encryptedKeyPayload: String?): Str
         identity.username?.let { put("user", it) }
         encryptedKeyPayload?.let { put("keyPayload", it) }
     }
-    return Base64.encodeToString(
-        json.toString().toByteArray(Charsets.UTF_8),
-        Base64.NO_WRAP
-    )
+    return Base64.getEncoder().encodeToString(json.toString().toByteArray(Charsets.UTF_8))
 }
 
 fun generateIdentityQr(identity: Identity, passphrase: String?): Bitmap? {

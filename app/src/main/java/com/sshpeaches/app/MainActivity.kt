@@ -1,4 +1,4 @@
-package com.sshpeaches.app
+package com.majordaftapps.sshpeaches.app
 
 import android.content.ComponentName
 import android.content.Context
@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -17,13 +18,14 @@ import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
-import com.sshpeaches.app.SSHPeachesApplication
-import com.sshpeaches.app.data.model.HostConnection
-import com.sshpeaches.app.service.SessionService
-import com.sshpeaches.app.ui.logging.UiDebugLog
-import com.sshpeaches.app.ui.SSHPeachesRoot
-import com.sshpeaches.app.ui.state.AppViewModel
-import com.sshpeaches.app.ui.theme.SSHPeachesTheme
+import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
+import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
+import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import com.termux.terminal.TerminalEmulator
 
 class MainActivity : FragmentActivity() {
@@ -96,7 +98,7 @@ class MainActivity : FragmentActivity() {
             val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
-            val startSession: (HostConnection, com.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
+            val startSession: (HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
                 remember(
                     sessionService,
                     uiState.portForwards,
@@ -105,7 +107,7 @@ class MainActivity : FragmentActivity() {
                     uiState.hosts,
                     uiState.terminalEmulation
                 ) {
-                { host: HostConnection, mode: com.sshpeaches.app.data.model.ConnectionMode, password: String? ->
+                { host: HostConnection, mode: com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, password: String? ->
                     UiDebugLog.action(
                         "uiStartSession",
                         "hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
@@ -168,9 +170,44 @@ class MainActivity : FragmentActivity() {
                     sessionService?.resizeShell(hostId, columns, rows)
                 }
             }
+            val listSftpDirectory: (String, String) -> Unit = remember(sessionService) {
+                { hostId: String, path: String ->
+                    sessionService?.listSftpDirectory(hostId, path)
+                }
+            }
+            val sftpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
+                { hostId: String, remotePath: String, localPath: String? ->
+                    sessionService?.sftpDownloadFile(hostId, remotePath, localPath)
+                }
+            }
+            val sftpUploadFile: (String, String, String) -> Unit = remember(sessionService) {
+                { hostId: String, localPath: String, remotePath: String ->
+                    sessionService?.sftpUploadFile(hostId, localPath, remotePath)
+                }
+            }
+            val scpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
+                { hostId: String, remotePath: String, localPath: String? ->
+                    sessionService?.scpDownloadFile(hostId, remotePath, localPath)
+                }
+            }
+            val scpUploadFile: (String, String, String) -> Unit = remember(sessionService) {
+                { hostId: String, localPath: String, remotePath: String ->
+                    sessionService?.scpUploadFile(hostId, localPath, remotePath)
+                }
+            }
             val resolveTerminalEmulator: (String) -> TerminalEmulator? = remember(sessionService) {
                 { hostId: String ->
                     sessionService?.resolveTerminalEmulator(hostId)
+                }
+            }
+            LaunchedEffect(sessionSnapshots, uiState.hosts) {
+                sessionSnapshots.forEach { snapshot ->
+                    val detected = snapshot.host.osMetadata
+                    if (detected == OsMetadata.Undetected) return@forEach
+                    val saved = uiState.hosts.firstOrNull { it.id == snapshot.hostId } ?: return@forEach
+                    if (saved.osMetadata != detected) {
+                        viewModel.updateHostOsMetadata(snapshot.hostId, detected)
+                    }
                 }
             }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
@@ -212,7 +249,7 @@ class MainActivity : FragmentActivity() {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
                         }
                     },
-                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
+                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
                         viewModel.addHost(
                             name,
                             host,
@@ -223,6 +260,7 @@ class MainActivity : FragmentActivity() {
                             notes,
                             mode,
                             useMosh,
+                            preferredIdentityId,
                             forwardId,
                             script,
                             backgroundBehavior,
@@ -231,7 +269,7 @@ class MainActivity : FragmentActivity() {
                             suppliedId
                         )
                     },
-                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, forwardId, script, backgroundBehavior, terminalProfileId, password ->
+                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -243,6 +281,7 @@ class MainActivity : FragmentActivity() {
                             notes,
                             mode,
                             useMosh,
+                            preferredIdentityId,
                             forwardId,
                             script,
                             backgroundBehavior,
@@ -271,6 +310,11 @@ class MainActivity : FragmentActivity() {
                     onSendSessionShortcut = sendSessionShortcut,
                     onSendShellBytes = sendShellBytes,
                     onResizeShell = resizeShell,
+                    onListSftpDirectory = listSftpDirectory,
+                    onSftpDownloadFile = sftpDownloadFile,
+                    onSftpUploadFile = sftpUploadFile,
+                    onScpDownloadFile = scpDownloadFile,
+                    onScpUploadFile = scpUploadFile,
                     resolveTerminalEmulator = resolveTerminalEmulator,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
