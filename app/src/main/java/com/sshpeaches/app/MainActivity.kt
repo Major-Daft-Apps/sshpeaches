@@ -7,7 +7,6 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -25,6 +24,7 @@ import com.sshpeaches.app.ui.logging.UiDebugLog
 import com.sshpeaches.app.ui.SSHPeachesRoot
 import com.sshpeaches.app.ui.state.AppViewModel
 import com.sshpeaches.app.ui.theme.SSHPeachesTheme
+import com.termux.terminal.TerminalEmulator
 
 class MainActivity : FragmentActivity() {
 
@@ -82,7 +82,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
-        enableEdgeToEdge()
         val intent = Intent(this, SessionService::class.java)
         startForegroundService(intent)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -167,6 +166,11 @@ class MainActivity : FragmentActivity() {
             val resizeShell: (String, Int, Int) -> Unit = remember(sessionService) {
                 { hostId: String, columns: Int, rows: Int ->
                     sessionService?.resizeShell(hostId, columns, rows)
+                }
+            }
+            val resolveTerminalEmulator: (String) -> TerminalEmulator? = remember(sessionService) {
+                { hostId: String ->
+                    sessionService?.resolveTerminalEmulator(hostId)
                 }
             }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
@@ -267,6 +271,7 @@ class MainActivity : FragmentActivity() {
                     onSendSessionShortcut = sendSessionShortcut,
                     onSendShellBytes = sendShellBytes,
                     onResizeShell = resizeShell,
+                    resolveTerminalEmulator = resolveTerminalEmulator,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
                     hostKeyPrompts = hostKeyPrompts,

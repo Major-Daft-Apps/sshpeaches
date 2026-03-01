@@ -44,3 +44,15 @@ app/
 - Hook up navigation destinations for Help (Custom Tabs) and Settings per the product blueprint.
 - Add ViewModel factories/DI (Hilt or Koin) to decouple the repository implementation.
 - Write UI tests for the major composables once functionality hardens.
+
+## License
+This project is licensed under the GNU General Public License v3.0.
+See `LICENSE`.
+
+## License Notices
+Open source notices are shown in-app from the About dialog.
+The Maven dependency notice inventory is generated into:
+`app/src/main/assets/licenses/maven_licenses.json`
+
+To regenerate it:
+`powershell -ExecutionPolicy Bypass -File scripts/generate_maven_license_notices.ps1`

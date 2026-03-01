@@ -184,7 +184,7 @@ fun HostCard(
                     Text("User: ${host.username}")
                     host.group?.let { Text("Group: $it") }
                     Text("Auth: ${host.preferredAuth.toSentenceCaseLabel()}")
-                    Text("Transport: ${if (host.useMosh) "Mosh (SSH fallback)" else "SSH"}")
+                    Text("Transport: ${if (host.useMosh) "Mosh" else "SSH"}")
                 }
             }
         )

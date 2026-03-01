@@ -1029,7 +1029,7 @@ class AppViewModel(
         val normalizedName = profile.name.trim().ifBlank { "Custom Profile" }.take(48)
         return profile.copy(
             name = normalizedName,
-            fontSizeSp = profile.fontSizeSp.coerceIn(9, 28)
+            fontSizeSp = profile.fontSizeSp.coerceIn(8, 28)
         )
     }
 

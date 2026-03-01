@@ -19,3 +19,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "SSHPeaches"
 include(":app")
+include(":terminal-emulator")
+include(":terminal-view")
+
+project(":terminal-emulator").projectDir = file("third_party/termux-playstore/terminal-emulator")
+project(":terminal-view").projectDir = file("third_party/termux-playstore/terminal-view")

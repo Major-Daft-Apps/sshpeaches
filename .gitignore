@@ -1,7 +1,10 @@
 # Gradle
 .gradle/
+.gradle-user-home/
+.kotlin/
 /build/
 /app/build/
+**/build/
 
 # IDE
 .idea/
@@ -13,3 +16,33 @@ local.properties
 # Misc
 .DS_Store
 Thumbs.db
+
+# Root-only local diagnostics captures (adb/logcat/ui dumps)
+/latest-logcat*.txt
+/logcat-*.txt
+/window*.xml
+/ui_*.xml
+/after-*.xml
+/before-*.xml
+/check*.xml
+/current_*.xml
+/dbg*.xml
+/field*.xml
+/fix*.xml
+/foreground-check.xml
+/loop_*.xml
+/measure_*.xml
+/menu_*.xml
+/mosh*.xml
+/ssh3_*.xml
+/now.xml
+/postfix-*.xml
+/qc*.xml
+/qctest*.xml
+/r[0-9]*.xml
+/resume*.xml
+/s[0-9]*.xml
+/state.xml
+/step*.xml
+/term0.xml
+/screen_now.png

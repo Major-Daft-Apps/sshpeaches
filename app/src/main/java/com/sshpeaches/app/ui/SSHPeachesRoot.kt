@@ -116,6 +116,7 @@ import com.sshpeaches.app.ui.screens.FavoritesScreen
 import com.sshpeaches.app.ui.screens.HostsScreen
 import com.sshpeaches.app.ui.screens.IdentitiesScreen
 import com.sshpeaches.app.ui.screens.KeyboardEditorScreen
+import com.sshpeaches.app.ui.screens.OpenSourceLicensesScreen
 import com.sshpeaches.app.ui.screens.PortForwardScreen
 import com.sshpeaches.app.ui.screens.QuickConnectPhase
 import com.sshpeaches.app.ui.screens.QuickConnectRequest
@@ -191,6 +192,7 @@ fun SSHPeachesRoot(
     onSendSessionShortcut: (String, String) -> Unit,
     onSendShellBytes: (String, ByteArray) -> Unit,
     onResizeShell: (String, Int, Int) -> Unit,
+    resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
     hostKeyPrompts: List<HostKeyPrompt>,
@@ -223,6 +225,7 @@ fun SSHPeachesRoot(
         Routes.SNIPPETS -> "Snippets"
         Routes.KEYBOARD -> "Keyboard"
         Routes.SETTINGS -> "Settings"
+        Routes.OPEN_SOURCE_LICENSES -> "Open Source Licenses"
         else -> "SSHPeaches"
     }
 
@@ -464,6 +467,7 @@ fun SSHPeachesRoot(
                                         onResizeShell(current.sessionId, cols, rows)
                                     }
                                 },
+                                resolveTerminalEmulator = resolveTerminalEmulator,
                                 onClose = {
                                     request?.let { onStopSession(it.sessionId) }
                                     pendingConnectingNavigation.value = false
@@ -640,6 +644,9 @@ fun SSHPeachesRoot(
                                 onShowMessage = showMessage
                             )
                         }
+                        composable(Routes.OPEN_SOURCE_LICENSES) {
+                            OpenSourceLicensesScreen()
+                        }
                     }
                 }
             }
@@ -718,7 +725,7 @@ fun SSHPeachesRoot(
                             SessionLogBus.Entry(
                                 hostId = request.sessionId,
                                 level = SessionLogBus.LogLevel.INFO,
-                                message = "Mosh requested. Using SSH fallback in this MVP build."
+                                message = "Mosh transport requested."
                             )
                         )
                     }
@@ -871,7 +878,13 @@ fun SSHPeachesRoot(
     }
 
     if (showAbout.value && !uiState.isLocked) {
-        AboutDialog(onDismiss = { showAbout.value = false })
+        AboutDialog(
+            onDismiss = { showAbout.value = false },
+            onOpenSourceLicenses = {
+                showAbout.value = false
+                navController.navigate(Routes.OPEN_SOURCE_LICENSES)
+            }
+        )
     }
 }
 
@@ -1128,7 +1141,10 @@ private fun QuickConnectSheet(
 }
 
 @Composable
-private fun AboutDialog(onDismiss: () -> Unit) {
+private fun AboutDialog(
+    onDismiss: () -> Unit,
+    onOpenSourceLicenses: () -> Unit
+) {
     val makerLogo = if (isSystemInDarkTheme()) {
         R.drawable.major_daft_apps_white
     } else {
@@ -1173,7 +1189,12 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                         }
                     )
                 }
-                Text("License: Apache-2.0 (draft)")
+                Text("License: GPL-3.0")
+                Text(
+                    "Open Source License Notices",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onOpenSourceLicenses() }
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Support:")
                     Text(

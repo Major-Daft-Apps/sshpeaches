@@ -19,6 +19,8 @@ class TermuxTerminalEngine(
         this,
         DEFAULT_COLUMNS,
         DEFAULT_ROWS,
+        DEFAULT_CELL_WIDTH_PX,
+        DEFAULT_CELL_HEIGHT_PX,
         DEFAULT_TRANSCRIPT_ROWS,
         this
     )
@@ -36,7 +38,7 @@ class TermuxTerminalEngine(
         @Suppress("UNUSED_VARIABLE") val unusedCellHeight = cellHeightPx
         val safeColumns = columns.coerceAtLeast(2)
         val safeRows = rows.coerceAtLeast(2)
-        emulator.resize(safeColumns, safeRows)
+        emulator.resize(safeColumns, safeRows, cellWidthPx, cellHeightPx)
     }
 
     fun reset() {
@@ -51,7 +53,6 @@ class TermuxTerminalEngine(
         emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground
         emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = background
         emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = cursor
-        emulator.setCursorBlinkingEnabled(profile.cursorBlink)
         terminalCursorStyle = when (profile.cursorStyle) {
             TerminalCursorStyle.BLOCK -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK
             TerminalCursorStyle.UNDERLINE -> TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE
@@ -111,25 +112,11 @@ class TermuxTerminalEngine(
 
     override fun onTerminalCursorStateChange(state: Boolean) {}
 
-    override fun getTerminalCursorStyle(): Int? = terminalCursorStyle
-
-    override fun logError(tag: String?, message: String?) {}
-
-    override fun logWarn(tag: String?, message: String?) {}
-
-    override fun logInfo(tag: String?, message: String?) {}
-
-    override fun logDebug(tag: String?, message: String?) {}
-
-    override fun logVerbose(tag: String?, message: String?) {}
-
-    override fun logStackTraceWithMessage(tag: String?, message: String?, e: Exception?) {}
-
-    override fun logStackTrace(tag: String?, e: Exception?) {}
-
     private companion object {
         private const val DEFAULT_COLUMNS = 120
         private const val DEFAULT_ROWS = 40
+        private const val DEFAULT_CELL_WIDTH_PX = 0
+        private const val DEFAULT_CELL_HEIGHT_PX = 0
         private const val DEFAULT_TRANSCRIPT_ROWS = 5_000
         private const val DEFAULT_FOREGROUND_COLOR = 0xFFE6E6E6.toInt()
         private const val DEFAULT_CURSOR_COLOR = 0xFFFFB74D.toInt()

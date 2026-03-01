@@ -22,6 +22,10 @@ import com.sshpeaches.app.data.ssh.SshClientProvider
 import com.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.sshpeaches.app.security.SecurityManager
 import com.sshpeaches.app.ui.logging.UiDebugLog
+import com.termux.terminal.TerminalEmulator
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
+import java.io.BufferedReader
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -39,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
@@ -124,6 +129,7 @@ class SessionService : Service() {
             UiDebugLog.result("startSession", false, "already-active hostId=${host.id}")
             return
         }
+        val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
         val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
         val initialPassword = if (needsPassword) {
             when {
@@ -136,6 +142,7 @@ class SessionService : Service() {
         val job = serviceScope.launch {
             var client: SSHClient? = null
             var shellBinding: ShellBinding? = null
+            var moshBinding: MoshBinding? = null
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
             runCatching {
                 updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
@@ -179,8 +186,21 @@ class SessionService : Service() {
                     }
                 }
                 if (mode == ConnectionMode.SSH) {
-                    updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting shell...")
-                    shellBinding = openShell(host.id, client!!, terminalEmulation)
+                    if (useMoshTransport) {
+                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting mosh-server...")
+                        val moshConnect = startMoshServer(host.id, client!!)
+                        throwIfAttemptTimedOut(attemptDeadlineMillis)
+                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting mosh client...")
+                        moshBinding = startMoshClient(
+                            hostId = host.id,
+                            host = host,
+                            moshConnect = moshConnect,
+                            terminalEmulation = terminalEmulation
+                        )
+                    } else {
+                        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Starting shell...")
+                        shellBinding = openShell(host.id, client!!, terminalEmulation)
+                    }
                 }
                 if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
                     runCatching {
@@ -225,11 +245,12 @@ class SessionService : Service() {
                 activeConnections[host.id] = ActiveConnection(
                     host = host,
                     mode = mode,
-                    client = client!!,
-                    shellBinding = shellBinding
+                    client = client,
+                    shellBinding = shellBinding,
+                    moshBinding = moshBinding
                 )
                 val modeLabel = when (mode) {
-                    ConnectionMode.SSH -> "Interactive shell session ready"
+                    ConnectionMode.SSH -> if (useMoshTransport) "Mosh session ready" else "Interactive shell session ready"
                     ConnectionMode.SFTP -> "SFTP control session ready"
                     ConnectionMode.SCP -> "SCP transfer session ready"
                 }
@@ -252,6 +273,7 @@ class SessionService : Service() {
             }
             runCatching { shellBinding?.shell?.close() }
             runCatching { shellBinding?.session?.close() }
+            runCatching { moshBinding?.session?.finishIfRunning() }
             runCatching { client?.disconnect() }
             activeConnections.remove(host.id)
             clearHostKeyPromptsForHost(host.id, trust = false)
@@ -278,7 +300,8 @@ class SessionService : Service() {
         activeConnections.remove(hostId)?.let { connection ->
             runCatching { connection.shellBinding?.shell?.close() }
             runCatching { connection.shellBinding?.session?.close() }
-            runCatching { connection.client.disconnect() }
+            runCatching { connection.moshBinding?.session?.finishIfRunning() }
+            runCatching { connection.client?.disconnect() }
         }
         activeJobs.remove(hostId)?.cancel()
         cancelHostNotification(hostId)
@@ -319,9 +342,14 @@ class SessionService : Service() {
             UiDebugLog.result("sendKeyboardShortcut", false, "unsupported-mode hostId=$hostId")
             return
         }
+        val client = connection.client
+        if (client == null) {
+            UiDebugLog.result("sendKeyboardShortcut", false, "ssh-client-not-available hostId=$hostId")
+            return
+        }
         serviceScope.launch {
             runCatching {
-                connection.client.startSession().use { session ->
+                client.startSession().use { session ->
                     val command = session.exec(shortcut)
                     command.join(8, TimeUnit.SECONDS)
                     val output = runCatching { command.inputStream.bufferedReader().readText() }.getOrNull()
@@ -361,6 +389,13 @@ class SessionService : Service() {
     fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPrompts.asStateFlow()
     fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPrompts.asStateFlow()
     fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutput.asStateFlow()
+    fun resolveTerminalEmulator(hostId: String): TerminalEmulator? {
+        return activeConnections[hostId]?.moshBinding?.session?.emulator
+    }
+
+    fun resolveMoshTerminalEmulator(hostId: String): TerminalEmulator? {
+        return resolveTerminalEmulator(hostId)
+    }
 
     fun respondToHostKeyPrompt(promptId: String, trust: Boolean) {
         hostKeyPromptWaiters.remove(promptId)?.complete(trust)
@@ -389,6 +424,23 @@ class SessionService : Service() {
             UiDebugLog.result("sendShellBytes", false, "session-not-active hostId=$hostId")
             return
         }
+        connection.moshBinding?.let { mosh ->
+            serviceScope.launch {
+                runCatching {
+                    mosh.session.write(bytes, 0, bytes.size)
+                    emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
+                }.onFailure { err ->
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.ERROR,
+                            message = "Failed to write to mosh client: ${err.message ?: "unknown error"}"
+                        )
+                    )
+                }
+            }
+            return
+        }
         val shell = connection.shellBinding?.shell
         if (connection.mode != ConnectionMode.SSH || shell == null) {
             UiDebugLog.result("sendShellBytes", false, "shell-not-available hostId=$hostId")
@@ -414,11 +466,19 @@ class SessionService : Service() {
     fun resizeShell(hostId: String, columns: Int, rows: Int) {
         if (columns <= 0 || rows <= 0) return
         val connection = activeConnections[hostId] ?: return
-        val shell = connection.shellBinding?.shell ?: return
         if (connection.mode != ConnectionMode.SSH) return
         val next = columns to rows
         if (shellSizes[hostId] == next) return
         shellSizes[hostId] = next
+        connection.moshBinding?.let { mosh ->
+            serviceScope.launch(Dispatchers.Main) {
+                runCatching {
+                    mosh.session.updateSize(columns, rows, 0, 0)
+                }
+            }
+            return
+        }
+        val shell = connection.shellBinding?.shell ?: return
         serviceScope.launch {
             runCatching {
                 shell.changeWindowDimensions(columns, rows, 0, 0)
@@ -607,6 +667,161 @@ class SessionService : Service() {
         }
     }
 
+    private suspend fun startMoshServer(hostId: String, client: SSHClient): MoshConnect {
+        return client.startSession().use { session ->
+            val command = session.exec("LANG=en_US.UTF-8 mosh-server new -c 256")
+            val stdout = command.inputStream.bufferedReader(StandardCharsets.UTF_8)
+            val stderr = command.errorStream.bufferedReader(StandardCharsets.UTF_8)
+            val combined = StringBuilder()
+            val deadlineMillis = System.currentTimeMillis() + MOSH_BOOTSTRAP_TIMEOUT_MS
+            var connect: MoshConnect? = null
+            while (connect == null && System.currentTimeMillis() < deadlineMillis) {
+                readLineIfReady(stdout)?.let { line ->
+                    combined.appendLine(line)
+                    connect = parseMoshConnectLine(line)
+                }
+                if (connect == null) {
+                    readLineIfReady(stderr)?.let { line ->
+                        combined.appendLine(line)
+                        connect = parseMoshConnectLine(line)
+                    }
+                }
+                if (connect == null) {
+                    delay(40)
+                }
+            }
+            runCatching { command.close() }
+            connect ?: run {
+                val detail = combined.toString().trim().ifBlank {
+                    "No MOSH CONNECT reply received."
+                }
+                throw RuntimeException("Failed to start mosh-server. $detail")
+            }
+        }.also { connect ->
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Mosh server ready on UDP port ${connect.port}"
+                )
+            )
+        }
+    }
+
+    private suspend fun startMoshClient(
+        hostId: String,
+        host: HostConnection,
+        moshConnect: MoshConnect,
+        terminalEmulation: TerminalEmulation
+    ): MoshBinding {
+        val runtime = MoshRuntime.prepare(this)
+        val initialSize = shellSizes[hostId] ?: (MOSH_DEFAULT_COLUMNS to MOSH_DEFAULT_ROWS)
+        val env = arrayOf(
+            "MOSH_KEY=${moshConnect.key}",
+            "TERM=${terminalEmulation.ptyName}",
+            "TERMINFO=${runtime.terminfoDir.absolutePath}",
+            "LD_LIBRARY_PATH=${runtime.libDir.absolutePath}",
+            "HOME=${filesDir.absolutePath}",
+            "TMPDIR=${cacheDir.absolutePath}",
+            "PATH=${runtime.rootDir.resolve("bin").absolutePath}:/system/bin:/system/xbin"
+        )
+        val linkerPath = "/system/bin/linker64"
+        val useLinkerLauncher = runCatching { java.io.File(linkerPath).canExecute() }.getOrDefault(false)
+        val shellPath = if (useLinkerLauncher) linkerPath else runtime.clientBinary.absolutePath
+        val args = if (useLinkerLauncher) {
+            arrayOf(
+                linkerPath,
+                runtime.clientBinary.absolutePath,
+                host.host,
+                moshConnect.port.toString()
+            )
+        } else {
+            arrayOf(
+                "mosh-client",
+                host.host,
+                moshConnect.port.toString()
+            )
+        }
+        if (useLinkerLauncher) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.DEBUG,
+                    message = "Launching mosh client via linker64."
+                )
+            )
+        }
+        val terminalClient = object : TerminalSessionClient {
+            override fun onTextChanged(changedSession: TerminalSession) {
+                val transcript = changedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+                setShellOutputSnapshot(hostId, transcript)
+            }
+
+            override fun onTitleChanged(changedSession: TerminalSession) = Unit
+
+            override fun onSessionFinished(finishedSession: TerminalSession) {
+                serviceScope.launch {
+                    val transcript = finishedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+                    val tail = transcript
+                        .lineSequence()
+                        .filter { it.isNotBlank() }
+                        .toList()
+                        .takeLast(4)
+                        .joinToString(" | ")
+                    if (tail.isNotBlank()) {
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = hostId,
+                                level = SessionLogBus.LogLevel.WARN,
+                                message = "Mosh client tail: $tail"
+                            )
+                        )
+                    }
+                    closeSessionAfterShellExit(
+                        hostId = hostId,
+                        reason = "Mosh client exited (code ${finishedSession.exitStatus})"
+                    )
+                }
+            }
+
+            override fun onCopyTextToClipboard(session: TerminalSession, text: String?) = Unit
+
+            override fun onPasteTextFromClipboard(session: TerminalSession?) = Unit
+
+            override fun onBell(session: TerminalSession) = Unit
+
+            override fun onColorsChanged(session: TerminalSession) = Unit
+
+            override fun onTerminalCursorStateChange(state: Boolean) = Unit
+        }
+        val session = withContext(Dispatchers.Main) {
+            TerminalSession(
+                shellPath,
+                runtime.rootDir.absolutePath,
+                args,
+                env,
+                MOSH_TRANSCRIPT_ROWS,
+                terminalClient
+            ).also { term ->
+                term.updateSize(initialSize.first, initialSize.second, 0, 0)
+            }
+        }
+        return MoshBinding(session = session)
+    }
+
+    private fun parseMoshConnectLine(line: String): MoshConnect? {
+        val match = MOSH_CONNECT_PATTERN.find(line) ?: return null
+        val port = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return null
+        val key = match.groupValues.getOrNull(2).orEmpty()
+        if (key.isBlank()) return null
+        return MoshConnect(port = port, key = key)
+    }
+
+    private fun readLineIfReady(reader: BufferedReader): String? {
+        if (!reader.ready()) return null
+        return runCatching { reader.readLine() }.getOrNull()
+    }
+
     private fun openShell(
         hostId: String,
         client: SSHClient,
@@ -685,6 +900,14 @@ class SessionService : Service() {
         if (text.isEmpty()) return
         val current = shellOutput.value[hostId].orEmpty()
         val next = (current + text).takeLast(MAX_SHELL_OUTPUT_CHARS)
+        val updated = shellOutput.value.toMutableMap()
+        updated[hostId] = next
+        shellOutput.value = updated
+    }
+
+    private fun setShellOutputSnapshot(hostId: String, text: String) {
+        val next = text.takeLast(MAX_SHELL_OUTPUT_CHARS)
+        if (shellOutput.value[hostId] == next) return
         val updated = shellOutput.value.toMutableMap()
         updated[hostId] = next
         shellOutput.value = updated
@@ -959,7 +1182,12 @@ class SessionService : Service() {
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
+        private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
+        private const val MOSH_DEFAULT_COLUMNS = 120
+        private const val MOSH_DEFAULT_ROWS = 40
+        private const val MOSH_TRANSCRIPT_ROWS = 2000
         private val HEX_DIGITS = "0123456789ABCDEF".toCharArray()
+        private val MOSH_CONNECT_PATTERN = Regex("""MOSH CONNECT\s+(\d+)\s+([A-Za-z0-9+/=]+)""")
     }
 
     private class ConnectionTimeoutException(message: String) : RuntimeException(message)
@@ -967,13 +1195,23 @@ class SessionService : Service() {
     private data class ActiveConnection(
         val host: HostConnection,
         val mode: ConnectionMode,
-        val client: SSHClient,
-        val shellBinding: ShellBinding?
+        val client: SSHClient?,
+        val shellBinding: ShellBinding?,
+        val moshBinding: MoshBinding?
     )
 
     private data class ShellBinding(
         val session: Session,
         val shell: Session.Shell
+    )
+
+    private data class MoshBinding(
+        val session: TerminalSession
+    )
+
+    private data class MoshConnect(
+        val port: Int,
+        val key: String
     )
 
     private data class PasswordResponse(

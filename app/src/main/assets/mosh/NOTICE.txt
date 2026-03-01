@@ -1,0 +1,12 @@
+Bundled mosh runtime components are sourced from Termux packages:
+- mosh 1.4.0
+- abseil-cpp
+- libandroid-support
+- libc++
+- libprotobuf
+- ncurses
+- openssl
+- zlib
+
+Upstream projects retain their original licenses.
+See package metadata and upstream project sites for full license texts.

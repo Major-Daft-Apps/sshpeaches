@@ -5,7 +5,7 @@ import java.util.UUID
 data class TerminalProfile(
     val id: String,
     val name: String,
-    val fontSizeSp: Int = 12,
+    val fontSizeSp: Int = 10,
     val foregroundHex: String = "#E6E6E6",
     val backgroundHex: String = "#101010",
     val cursorHex: String = "#FFB74D",
@@ -26,7 +26,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = DEFAULT_PROFILE_ID,
             name = "GNOME Dark",
-            fontSizeSp = 12,
+            fontSizeSp = 10,
             foregroundHex = "#EEEEEC",
             backgroundHex = "#2E3436",
             cursorHex = "#FCE94F",
@@ -36,7 +36,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-gnome-light",
             name = "GNOME Light",
-            fontSizeSp = 12,
+            fontSizeSp = 10,
             foregroundHex = "#2E3436",
             backgroundHex = "#FFFFFF",
             cursorHex = "#3465A4",
@@ -46,7 +46,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-solarized-dark",
             name = "Solarized Dark",
-            fontSizeSp = 12,
+            fontSizeSp = 10,
             foregroundHex = "#839496",
             backgroundHex = "#002B36",
             cursorHex = "#93A1A1",
@@ -56,7 +56,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-green-screen",
             name = "Green on Black",
-            fontSizeSp = 12,
+            fontSizeSp = 10,
             foregroundHex = "#33FF66",
             backgroundHex = "#000000",
             cursorHex = "#99FF66",
@@ -71,7 +71,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "custom-${UUID.randomUUID()}",
             name = name,
-            fontSizeSp = 12,
+            fontSizeSp = 10,
             foregroundHex = "#E6E6E6",
             backgroundHex = "#101010",
             cursorHex = "#FFB74D",
@@ -79,4 +79,3 @@ object TerminalProfileDefaults {
             cursorBlink = true
         )
 }
-

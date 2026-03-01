@@ -846,14 +846,14 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val fontSize = profileFontSizeState.value.toIntOrNull()?.coerceIn(9, 28)
+                    val fontSize = profileFontSizeState.value.toIntOrNull()?.coerceIn(8, 28)
                     when {
                         profileNameState.value.isBlank() -> {
                             profileEditorError.value = "Profile name is required."
                             return@TextButton
                         }
                         fontSize == null -> {
-                            profileEditorError.value = "Font size must be between 9 and 28."
+                            profileEditorError.value = "Font size must be between 8 and 28."
                             return@TextButton
                         }
                         !isValidHexColor(profileForegroundState.value) -> {

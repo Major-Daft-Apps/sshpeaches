@@ -2,6 +2,8 @@ package com.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +11,18 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -25,12 +32,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -122,6 +128,7 @@ fun ConnectingScreen(
     keyboardSlots: List<String>,
     onSendShellBytes: (ByteArray) -> Unit,
     onTerminalResize: (Int, Int) -> Unit,
+    resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
     onClose: () -> Unit,
     onRetry: () -> Unit
 ) {
@@ -150,7 +157,7 @@ fun ConnectingScreen(
     var imeCommittedText by remember(request?.sessionId) { mutableStateOf("") }
     var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalRenderView?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
-    var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(12f) }
+    var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(10f) }
     var lastResize by remember(request?.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val terminalKeys = remember {
@@ -195,9 +202,11 @@ fun ConnectingScreen(
 
     val hostName = request?.let { "${it.username}@${it.host}:${it.port}" } ?: "Quick Connect"
     val renderedLogs = logs.map { "[${it.level}] ${it.message}" }
+    val externalTerminalEmulator = request?.let { resolveTerminalEmulator(it.sessionId) }
+    val hasExternalTerminalEmulator = externalTerminalEmulator != null
     val detailLine = request?.let {
         buildString {
-            append(if (it.useMosh) "Mosh requested" else it.mode.name)
+            append(if (it.mode == ConnectionMode.SSH) "Terminal session" else it.mode.name)
             it.forwardId?.let { id -> append(" | Forward: $id") }
             if (it.script.isNotBlank()) append(" | Script configured")
         }
@@ -243,8 +252,12 @@ fun ConnectingScreen(
             focusManager.clearFocus(force = true)
         }
     }
-    LaunchedEffect(shellOutput, request?.sessionId) {
+    LaunchedEffect(shellOutput, request?.sessionId, hasExternalTerminalEmulator) {
         if (request == null) return@LaunchedEffect
+        if (hasExternalTerminalEmulator) {
+            terminalViewRef?.onTerminalUpdated()
+            return@LaunchedEffect
+        }
         val snapshot = shellOutput
         if (snapshot.startsWith(lastShellSnapshot)) {
             val delta = snapshot.substring(lastShellSnapshot.length)
@@ -271,7 +284,6 @@ fun ConnectingScreen(
             keyboardFocused = false
         }
     }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -279,80 +291,86 @@ fun ConnectingScreen(
             .statusBarsPadding()
     ) {
         if (state.phase == QuickConnectPhase.SUCCESS) {
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .fillMaxSize()
             ) {
-                Surface(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    color = Color(0xFF080808)
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    AndroidView(
-                        factory = {
-                            TerminalRenderView(it).apply {
-                                isFocusable = true
-                                isFocusableInTouchMode = true
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        color = Color(0xFF080808)
+                    ) {
+                        AndroidView(
+                            factory = {
+                                TerminalRenderView(it).apply {
+                                    isFocusable = true
+                                    isFocusableInTouchMode = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            update = { view ->
+                                terminalViewRef = view
+                                val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) }
+                                view.setTerminalBackgroundColor(terminalEngine.backgroundColor())
+                                view.setTerminalTextSizePx(textSizePx)
+                                view.bind(
+                                    emulatorProvider = { externalTerminalEmulator ?: terminalEngine.emulator() },
+                                    onSingleTap = {
+                                        if (keyboardFocused) {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus(force = true)
+                                            keyboardFocused = false
+                                        } else {
+                                            keyboardFocusRequester.requestFocus()
+                                            keyboardController?.show()
+                                            keyboardFocused = true
+                                        }
+                                    },
+                                    onScaleDelta = { scale ->
+                                        terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(9f, 28f)
+                                    },
+                                    onResize = { columns, rows, cellWidthPx, cellHeightPx ->
+                                        terminalEngine.resize(columns, rows, cellWidthPx, cellHeightPx)
+                                        val resize = columns to rows
+                                        if (lastResize != resize) {
+                                            lastResize = resize
+                                            onTerminalResize(columns, rows)
+                                        }
+                                    }
+                                )
+                                view.onTerminalUpdated()
+                            }
+                        )
+                    }
+
+                    CompactKeyRow(
+                        keys = compactKeys,
+                        onSendKey = { key ->
+                            val sent = key.keyCode?.let { keyCode ->
+                                terminalInput.sendVirtualKey(
+                                    keyCode = keyCode,
+                                    ctrlDown = key.ctrl,
+                                    altDown = key.alt,
+                                    shiftDown = key.shift
+                                )
+                            } ?: false
+                            if (!sent) {
+                                terminalInput.sendText(key.payload)
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
-                        update = { view ->
-                            terminalViewRef = view
-                            val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) }
-                            view.setTerminalBackgroundColor(terminalEngine.backgroundColor())
-                            view.setTerminalTextSizePx(textSizePx)
-                            view.bind(
-                                emulatorProvider = { terminalEngine.emulator() },
-                                onSingleTap = {
-                                    if (keyboardFocused) {
-                                        keyboardController?.hide()
-                                        focusManager.clearFocus(force = true)
-                                        keyboardFocused = false
-                                    } else {
-                                        keyboardFocusRequester.requestFocus()
-                                        keyboardController?.show()
-                                        keyboardFocused = true
-                                    }
-                                },
-                                onScaleDelta = { scale ->
-                                    terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(9f, 28f)
-                                },
-                                onResize = { columns, rows, cellWidthPx, cellHeightPx ->
-                                    terminalEngine.resize(columns, rows, cellWidthPx, cellHeightPx)
-                                    val resize = columns to rows
-                                    if (lastResize != resize) {
-                                        lastResize = resize
-                                        onTerminalResize(columns, rows)
-                                    }
-                                }
-                            )
-                            view.onTerminalUpdated()
-                        }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 2.dp, vertical = 0.dp)
                     )
                 }
-
-                CompactKeyRow(
-                    keys = compactKeys,
-                    onSendKey = { key ->
-                        val sent = key.keyCode?.let { keyCode ->
-                            terminalInput.sendVirtualKey(
-                                keyCode = keyCode,
-                                ctrlDown = key.ctrl,
-                                altDown = key.alt,
-                                shiftDown = key.shift
-                            )
-                        } ?: false
-                        if (!sent) {
-                            terminalInput.sendText(key.payload)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                )
 
                 BasicTextField(
                     value = imeBridgeValue,
@@ -380,8 +398,8 @@ fun ConnectingScreen(
                         }
                     },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
+                        .align(Alignment.TopStart)
+                        .size(1.dp)
                         .alpha(0f)
                         .focusRequester(keyboardFocusRequester)
                         .onFocusChanged { keyboardFocused = it.isFocused }
@@ -515,23 +533,27 @@ private fun CompactKeyRow(
     modifier: Modifier = Modifier
 ) {
     if (keys.isEmpty()) return
+    val keyShape = RoundedCornerShape(5.dp)
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         keys.forEach { key ->
-            OutlinedButton(
-                onClick = { onSendKey(key) },
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(28.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEDEDED))
+                    .height(18.dp)
+                    .clip(keyShape)
+                    .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
+                    .background(Color(0xFF121212))
+                    .clickable { onSendKey(key) },
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = key.label,
-                    fontSize = 9.sp,
+                    color = Color(0xFFEDEDED),
+                    fontSize = 7.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

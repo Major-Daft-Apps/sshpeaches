@@ -3,5 +3,7 @@
         <item name="android:windowSplashScreenBackground">@color/color_hard_black</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/sshpeaches</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/color_vanilla</item>
+        <item name="android:statusBarColor">@color/color_hard_black</item>
+        <item name="android:navigationBarColor">@color/color_hard_black</item>
     </style>
 </resources>

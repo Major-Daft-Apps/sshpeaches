@@ -330,7 +330,7 @@ object SettingsStore {
                 out += TerminalProfile(
                     id = id,
                     name = name,
-                    fontSizeSp = item.optInt("fontSizeSp", 12).coerceIn(9, 28),
+                    fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(8, 28),
                     foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
                     backgroundHex = item.optString("backgroundHex", "#101010"),
                     cursorHex = item.optString("cursorHex", "#FFB74D"),
