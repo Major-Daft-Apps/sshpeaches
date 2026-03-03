@@ -98,6 +98,7 @@ import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
+import androidx.browser.customtabs.CustomTabsIntent
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -435,8 +436,15 @@ fun SSHPeachesRoot(
                             scope.launch { drawerState.close() }
                             when (destination.route) {
                                 Routes.HELP -> {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))
-                                    context.startActivity(intent)
+                                    val helpUri = Uri.parse(helpUrl)
+                                    val customTab = CustomTabsIntent.Builder()
+                                        .setShowTitle(true)
+                                        .build()
+                                    runCatching {
+                                        customTab.launchUrl(context, helpUri)
+                                    }.onFailure {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, helpUri))
+                                    }
                                 }
                                 Routes.ABOUT -> showAbout.value = true
                                 else -> {
