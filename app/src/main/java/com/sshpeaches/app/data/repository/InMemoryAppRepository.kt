@@ -153,9 +153,11 @@ class InMemoryAppRepository : AppRepository {
             ),
             PortForward(
                 id = "pf-2",
-                label = "Dynamic socks",
-                type = PortForwardType.DYNAMIC,
-                sourcePort = 1080,
+                label = "Grafana tunnel",
+                type = PortForwardType.LOCAL,
+                sourcePort = 3000,
+                destinationHost = "grafana.internal",
+                destinationPort = 3000,
                 associatedHosts = listOf("host-1")
             )
         )

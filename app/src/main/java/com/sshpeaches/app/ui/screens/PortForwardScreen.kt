@@ -96,7 +96,7 @@ fun PortForwardScreen(
             is PortForwardQrImportResult.Ready -> {
                 val imported = processed.forward
                 if (imported.type != PortForwardType.LOCAL) {
-                    Toast.makeText(context, "Only Local forwarding is supported right now", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Only Local forwarding is supported.", Toast.LENGTH_SHORT).show()
                     return@rememberLauncherForActivityResult
                 }
                 onAdd(
@@ -199,11 +199,7 @@ fun PortForwardScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(forward.label, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = when (forward.type) {
-                                PortForwardType.LOCAL -> "Local ${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.destinationHost}:${forward.destinationPort}"
-                                PortForwardType.REMOTE -> "Unsupported type (Remote). Edit and save to migrate to Local."
-                                PortForwardType.DYNAMIC -> "Unsupported type (Dynamic). Edit and save to migrate to Local."
-                            },
+                            text = localForwardSummary(forward),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         if (forward.associatedHosts.isNotEmpty()) {
@@ -220,7 +216,7 @@ fun PortForwardScreen(
                                     onUpdate(
                                         forward.id,
                                         forward.label,
-                                        forward.type,
+                                        PortForwardType.LOCAL,
                                         forward.sourceHost,
                                         forward.sourcePort,
                                         forward.destinationHost,
@@ -444,11 +440,7 @@ fun PortForwardScreen(
                         )
                     } ?: Text("Unable to generate QR")
                     Text(
-                        when (forward.type) {
-                            PortForwardType.LOCAL -> "${forward.sourceHost}:${forward.sourcePort} → ${forward.destinationHost}:${forward.destinationPort}"
-                            PortForwardType.REMOTE -> "${forward.destinationHost}:${forward.destinationPort} ← ${forward.sourceHost}:${forward.sourcePort}"
-                            PortForwardType.DYNAMIC -> "SOCKS on ${forward.sourceHost}:${forward.sourcePort}"
-                        },
+                        localForwardSummary(forward),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -456,3 +448,6 @@ fun PortForwardScreen(
         )
     }
 }
+
+private fun localForwardSummary(forward: PortForward): String =
+    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.destinationHost}:${forward.destinationPort}"

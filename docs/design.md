@@ -34,16 +34,15 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 - Card layout mirrors Favorites view. OS icon: white glyph on colored background tied to distro (e.g., Ubuntu orange, Debian red, Fedora blue, SUSE green, Mint teal, macOS gray, BSD maroon, Arch cyan). Default desktop icon used until detection runs.
 
 ### Port Forwarding UI ↔ SSH flags
-- Each forward is a card with type badge (Local / Remote / Dynamic), label, summary of bind/destination, enable toggle, edit/delete icons.
+- Each forward is a card with a Local (`-L`) badge, label, summary of bind/destination, enable toggle, edit/delete icons.
 - “Add port forward” dialog fields:
-  - Type (Local / Remote / Dynamic/SOCKS) → `-L` / `-R` / `-D`
-  - Bind address + Port (local bind for Local/Dynamic; remote bind for Remote) → `[bind_address:]port`
-  - Destination host + port (skipped for Dynamic) → `dstHost:dstPort`
+  - Type: Local only (`-L`)
+  - Bind address + Port (local bind) → `[bind_address:]port`
+  - Destination host + port → `dstHost:dstPort`
   - Toggle “Fail if bind can’t start” → `-o ExitOnForwardFailure=yes`
   - Enabled switch (applies immediately when wired to backend)
 - Notes shown in dialog:
-  - Dynamic creates a SOCKS5 proxy on the local bind/port.
-  - Remote forwarding may require `AllowTcpForwarding` / `GatewayPorts` on the server.
+  - Remote (`-R`) and Dynamic (`-D`) forwarding are intentionally out of scope.
   - These are SSH TCP forwards, not VPN; only apps pointed at the bind port use them.
 
 ## 3. Quick Connect Sheet
@@ -118,7 +117,7 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 
 ## 8. Port Forwards Screen
 - Mirrors JuiceSSH Pro behavior.
-- Tabs for Local, Remote, Dynamic.
+- Local forwarding list only (no Remote/Dynamic tabs).
 - Each forward entry includes:
   - Title (e.g., “Local 9000 → 10.0.0.5:5432”).
   - Bind address input (default 127.0.0.1 for local/dynamic, remote host for remote).
@@ -126,9 +125,9 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
   - Manual enable/disable toggle (works even when not connected).
   - Icons: star (favorite), edit (pencil), delete (trash).
 - FAB opens “Add Port Forward” sheet with fields:
-  - Type selector (Local/Remote/Dynamic).
+  - Type selector fixed to Local (`-L`).
   - Source port + bind address.
-  - Destination host/port (for Local and Remote; dynamic only needs local bind/port).
+  - Destination host/port.
   - Host association multi-select.
   - Notes/description field.
 - During sessions, toolbar indicator shows active forwards with toggles/status badges; disabling stops the tunnel but keeps SSH session alive. Toast/notification confirms success/failure.

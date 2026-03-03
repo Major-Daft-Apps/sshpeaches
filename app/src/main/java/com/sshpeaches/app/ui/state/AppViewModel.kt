@@ -718,6 +718,9 @@ class AppViewModel(
             logResult("addPortForward", false, "validation-failed")
             return
         }
+        if (type != PortForwardType.LOCAL) {
+            logAction("addPortForward.localOnly", "requestedType=$type")
+        }
         val normalizedType = PortForwardType.LOCAL
         val forward = PortForward(
             id = UUID.randomUUID().toString(),
@@ -752,6 +755,9 @@ class AppViewModel(
         if (existing == null) {
             logResult("updatePortForward", false, "not-found")
             return
+        }
+        if (type != PortForwardType.LOCAL) {
+            logAction("updatePortForward.localOnly", "requestedType=$type")
         }
         val normalizedType = PortForwardType.LOCAL
         val updated = existing.copy(

@@ -162,7 +162,7 @@ class QrImportHandlersTest {
         val result = processPortForwardQrImport(payload)
 
         assertTrue(result is PortForwardQrImportResult.Error)
-        assertEquals("Only Local forwarding is supported right now", (result as PortForwardQrImportResult.Error).message)
+        assertEquals("Only Local forwarding is supported.", (result as PortForwardQrImportResult.Error).message)
     }
 
     @Test

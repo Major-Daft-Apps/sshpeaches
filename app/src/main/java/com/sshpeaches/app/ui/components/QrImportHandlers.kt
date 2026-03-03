@@ -108,7 +108,7 @@ fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
     return if (imported == null) {
         PortForwardQrImportResult.Error("Invalid port forward QR")
     } else if (imported.type != PortForwardType.LOCAL) {
-        PortForwardQrImportResult.Error("Only Local forwarding is supported right now")
+        PortForwardQrImportResult.Error("Only Local forwarding is supported.")
     } else {
         PortForwardQrImportResult.Ready(imported)
     }
