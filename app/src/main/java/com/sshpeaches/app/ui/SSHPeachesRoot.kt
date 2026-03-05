@@ -177,6 +177,7 @@ fun SSHPeachesRoot(
     onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
     onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     onHostDelete: (String) -> Unit,
+    onHostInfoCommandsChange: (String, List<String>) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
@@ -672,6 +673,9 @@ fun SSHPeachesRoot(
                                     showMessage("No active SSH session for ${host.name}")
                                     false
                                 }
+                            },
+                            onInfoCommandsChange = { host, commands ->
+                                onHostInfoCommandsChange(host.id, commands)
                             }
                         )
                     }

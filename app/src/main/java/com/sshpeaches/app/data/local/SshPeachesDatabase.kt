@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         PortForwardEntity::class,
         SnippetEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

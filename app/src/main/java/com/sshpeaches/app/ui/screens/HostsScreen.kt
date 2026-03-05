@@ -87,7 +87,8 @@ fun HostsScreen(
     onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
-    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false }
+    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
+    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
     val search = remember { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
@@ -314,6 +315,7 @@ fun HostsScreen(
                         onToggleFavorite = onToggleFavorite,
                         canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
                         onRunInfoCommand = onRunInfoCommand,
+                        onInfoCommandsChange = onInfoCommandsChange,
                         onAction = { selected, mode ->
                             val needsPassword = selected.preferredAuth != AuthMethod.IDENTITY
                             if (needsPassword && !selected.hasPassword) {

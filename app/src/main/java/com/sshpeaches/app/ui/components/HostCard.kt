@@ -69,7 +69,8 @@ fun HostCard(
     onToggleFavorite: (String) -> Unit = {},
     onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
     canRunInfoCommands: Boolean = false,
-    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false }
+    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
+    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
@@ -79,9 +80,21 @@ fun HostCard(
     val confirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
     val passphraseError = remember { mutableStateOf<String?>(null) }
     val qrBitmap = remember { mutableStateOf<Bitmap?>(null) }
-    val infoCommandsState = rememberSaveable(host.id) { mutableStateOf(defaultInfoCommands()) }
+    val infoCommandsState = rememberSaveable(host.id) {
+        mutableStateOf(host.infoCommands.ifEmpty { defaultInfoCommands() })
+    }
     val infoCommandDraft = rememberSaveable(host.id) { mutableStateOf("") }
     val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
+    val defaultInfoCommands = remember { defaultInfoCommands() }
+
+    fun persistInfoCommands(next: List<String>) {
+        val normalized = next.map { it.trim() }
+        infoCommandsState.value = normalized
+    }
+
+    fun commitInfoCommands() {
+        onInfoCommandsChange(host, infoCommandsState.value)
+    }
 
     LaunchedEffect(host.id) {
         showQr.value = false
@@ -91,6 +104,7 @@ fun HostCard(
         passphraseError.value = null
         qrBitmap.value = null
         infoCommandStatus.value = null
+        infoCommandsState.value = host.infoCommands.ifEmpty { defaultInfoCommands }
     }
 
     Card(
@@ -184,8 +198,16 @@ fun HostCard(
 
     if (showInfo.value) {
         AlertDialog(
-            onDismissRequest = { showInfo.value = false },
-            confirmButton = { TextButton(onClick = { showInfo.value = false }) { Text("Close") } },
+            onDismissRequest = {
+                commitInfoCommands()
+                showInfo.value = false
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    commitInfoCommands()
+                    showInfo.value = false
+                }) { Text("Close") }
+            },
             title = { Text(host.name) },
             text = {
                 Column(
@@ -206,7 +228,7 @@ fun HostCard(
                                 onValueChange = { next ->
                                     val current = infoCommandsState.value.toMutableList()
                                     current[index] = next
-                                    infoCommandsState.value = current
+                                    persistInfoCommands(current)
                                 },
                                 singleLine = true,
                                 label = { Text("Command ${index + 1}") },
@@ -230,7 +252,7 @@ fun HostCard(
                                     onClick = {
                                         val current = infoCommandsState.value.toMutableList()
                                         current.removeAt(index)
-                                        infoCommandsState.value = current
+                                        persistInfoCommands(current)
                                         if (current.isEmpty()) {
                                             infoCommandStatus.value = "Add a command to run."
                                         }
@@ -254,12 +276,20 @@ fun HostCard(
                             onClick = {
                                 val next = infoCommandDraft.value.trim()
                                 if (next.isNotBlank()) {
-                                    infoCommandsState.value = infoCommandsState.value + next
+                                    persistInfoCommands(infoCommandsState.value + next)
                                     infoCommandDraft.value = ""
                                 }
                             }
                         ) {
                             Text("Add")
+                        }
+                        TextButton(
+                            onClick = {
+                                persistInfoCommands(defaultInfoCommands)
+                                infoCommandStatus.value = "Reset to default commands."
+                            }
+                        ) {
+                            Text("Reset")
                         }
                         if (!canRunInfoCommands) {
                             Text(

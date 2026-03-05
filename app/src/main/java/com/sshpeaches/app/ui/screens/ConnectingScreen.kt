@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -187,6 +188,11 @@ fun ConnectingScreen(
     var downloadLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     var uploadLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     var uploadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var sftpCommandInput by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    val sftpConsoleLines = remember(request?.sessionId) { mutableStateListOf<String>() }
+    var lastSftpShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
+    val scpActivityLines = remember(request?.sessionId) { mutableStateListOf<String>() }
+    var lastScpShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
     var pendingModifiers by remember(request?.sessionId) { mutableStateOf(setOf<KeyboardModifier>()) }
 
     val compactKeys = remember(keyboardSlots) {
@@ -224,8 +230,10 @@ fun ConnectingScreen(
     }
     val showTerminalSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SSH
-    val showTransferSession =
-        state.phase == QuickConnectPhase.SUCCESS && request != null && request.mode != ConnectionMode.SSH
+    val showSftpConsoleSession =
+        state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SFTP
+    val showScpDualPaneSession =
+        state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SCP
 
     LaunchedEffect(renderedLogs.size) {
         if (renderedLogs.isNotEmpty()) {
@@ -245,6 +253,15 @@ fun ConnectingScreen(
         downloadLocalPath = ""
         uploadLocalPath = ""
         uploadRemotePath = ""
+        sftpCommandInput = ""
+        sftpConsoleLines.clear()
+        scpActivityLines.clear()
+        lastSftpShellSnapshot = ""
+        lastScpShellSnapshot = ""
+        if (request?.mode == ConnectionMode.SFTP) {
+            sftpConsoleLines += "Connected to ${request.host}:${request.port}"
+            sftpConsoleLines += "Type 'help' for available commands."
+        }
         pendingModifiers = emptySet()
         terminalViewRef?.onTerminalUpdated()
     }
@@ -306,6 +323,87 @@ fun ConnectingScreen(
             keyboardFocused = false
             sessionTopBarVisible = false
         }
+    }
+    LaunchedEffect(shellOutput, request?.sessionId) {
+        val activeRequest = request ?: return@LaunchedEffect
+        val snapshot = shellOutput.trimEnd()
+        if (snapshot.isBlank()) return@LaunchedEffect
+        when (activeRequest.mode) {
+            ConnectionMode.SFTP -> {
+                if (snapshot != lastSftpShellSnapshot) {
+                    sftpConsoleLines += snapshot
+                    lastSftpShellSnapshot = snapshot
+                }
+            }
+            ConnectionMode.SCP -> {
+                if (snapshot != lastScpShellSnapshot) {
+                    scpActivityLines += snapshot
+                    lastScpShellSnapshot = snapshot
+                }
+            }
+            ConnectionMode.SSH -> Unit
+        }
+    }
+
+    fun inferRemoteDestination(localPath: String, currentDir: String): String {
+        val fileName = localPath.substringAfterLast('/').substringAfterLast('\\').ifBlank { "upload.bin" }
+        val base = currentDir.trim().ifBlank { "." }
+        return if (base.endsWith("/")) "$base$fileName" else "$base/$fileName"
+    }
+
+    fun executeSftpCommand() {
+        val raw = sftpCommandInput.trim()
+        if (raw.isBlank()) return
+        sftpConsoleLines += "sftp> $raw"
+        val parts = raw.split(Regex("\\s+"))
+        val command = parts.firstOrNull()?.lowercase().orEmpty()
+        when (command) {
+            "help" -> {
+                sftpConsoleLines += "Commands: ls [path], cd <path>, pwd, get <remote> [local], put <local> [remote], clear"
+            }
+            "pwd" -> {
+                sftpConsoleLines += sftpPath
+            }
+            "cd" -> {
+                if (parts.size < 2) {
+                    sftpConsoleLines += "Usage: cd <remote-path>"
+                } else {
+                    sftpPath = parts.drop(1).joinToString(" ")
+                    sftpConsoleLines += "Remote directory set to $sftpPath"
+                }
+            }
+            "ls", "dir" -> {
+                val path = if (parts.size >= 2) parts.drop(1).joinToString(" ") else sftpPath
+                onSftpListDirectory(path)
+            }
+            "get" -> {
+                if (parts.size < 2) {
+                    sftpConsoleLines += "Usage: get <remote-path> [local-destination]"
+                } else {
+                    val remote = parts[1]
+                    val local = parts.getOrNull(2)
+                    onSftpDownload(remote, local)
+                    sftpConsoleLines += "Downloading $remote..."
+                }
+            }
+            "put" -> {
+                if (parts.size < 2) {
+                    sftpConsoleLines += "Usage: put <local-path> [remote-destination]"
+                } else {
+                    val local = parts[1]
+                    val remote = parts.getOrNull(2) ?: inferRemoteDestination(local, sftpPath)
+                    onSftpUpload(local, remote)
+                    sftpConsoleLines += "Uploading $local -> $remote..."
+                }
+            }
+            "clear" -> {
+                sftpConsoleLines.clear()
+            }
+            else -> {
+                sftpConsoleLines += "Unknown command '$command'. Type 'help'."
+            }
+        }
+        sftpCommandInput = ""
     }
     Box(
         modifier = Modifier
@@ -519,7 +617,7 @@ fun ConnectingScreen(
                     )
                 )
             }
-        } else if (showTransferSession && request != null) {
+        } else if (showSftpConsoleSession && request != null) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -532,7 +630,7 @@ fun ConnectingScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${request.mode.name} Transfer",
+                        text = "SFTP Console",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -544,83 +642,40 @@ fun ConnectingScreen(
                         )
                     }
                 }
-
-                if (request.mode == ConnectionMode.SFTP) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                OutlinedTextField(
+                    value = sftpPath,
+                    onValueChange = { sftpPath = it },
+                    label = { Text("Remote working directory") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = sftpCommandInput,
+                    onValueChange = { sftpCommandInput = it },
+                    label = { Text("sftp> command") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { executeSftpCommand() },
+                        modifier = Modifier.weight(1f)
                     ) {
-                        OutlinedTextField(
-                            value = sftpPath,
-                            onValueChange = { sftpPath = it },
-                            label = { Text("Remote directory") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = { onSftpListDirectory(sftpPath) },
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            Text("List")
-                        }
+                        Text("Run")
                     }
-                }
-
-                Text("Download", color = Color.White, style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = downloadRemotePath,
-                    onValueChange = { downloadRemotePath = it },
-                    label = { Text("Remote file path") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = downloadLocalPath,
-                    onValueChange = { downloadLocalPath = it },
-                    label = { Text("Local destination (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(
-                    onClick = {
-                        if (request.mode == ConnectionMode.SFTP) {
-                            onSftpDownload(downloadRemotePath, downloadLocalPath.ifBlank { null })
-                        } else {
-                            onScpDownload(downloadRemotePath, downloadLocalPath.ifBlank { null })
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Start Download")
-                }
-
-                Text("Upload", color = Color.White, style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = uploadLocalPath,
-                    onValueChange = { uploadLocalPath = it },
-                    label = { Text("Local file path") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = uploadRemotePath,
-                    onValueChange = { uploadRemotePath = it },
-                    label = { Text("Remote destination path") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(
-                    onClick = {
-                        if (request.mode == ConnectionMode.SFTP) {
-                            onSftpUpload(uploadLocalPath, uploadRemotePath)
-                        } else {
-                            onScpUpload(uploadLocalPath, uploadRemotePath)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Start Upload")
+                    Button(
+                        onClick = { onSftpListDirectory(sftpPath) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("ls")
+                    }
                 }
 
                 Surface(
@@ -635,8 +690,139 @@ fun ConnectingScreen(
                             .verticalScroll(rememberScrollState())
                             .padding(12.dp)
                     ) {
+                        val transcript = if (sftpConsoleLines.isEmpty()) {
+                            "No output yet. Try: ls, cd /path, get file, put file, pwd, help"
+                        } else {
+                            sftpConsoleLines.joinToString(separator = "\n")
+                        }
                         Text(
-                            text = shellOutput.ifBlank { "No directory listing yet. Use the controls above to transfer files." },
+                            text = transcript,
+                            color = Color(0xFFE5E5E5),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                        )
+                    }
+                }
+            }
+        } else if (showScpDualPaneSession && request != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SCP Dual-Pane Transfer",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close session",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFF121212)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("Local \u2192 Remote", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                            OutlinedTextField(
+                                value = uploadLocalPath,
+                                onValueChange = { uploadLocalPath = it },
+                                label = { Text("Local file path") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = uploadRemotePath,
+                                onValueChange = { uploadRemotePath = it },
+                                label = { Text("Remote destination path") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                onClick = {
+                                    onScpUpload(uploadLocalPath, uploadRemotePath)
+                                    scpActivityLines += "Upload requested: $uploadLocalPath -> $uploadRemotePath"
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Upload")
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFF121212)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("Remote \u2192 Local", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                            OutlinedTextField(
+                                value = downloadRemotePath,
+                                onValueChange = { downloadRemotePath = it },
+                                label = { Text("Remote file path") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = downloadLocalPath,
+                                onValueChange = { downloadLocalPath = it },
+                                label = { Text("Local destination path") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Button(
+                                onClick = {
+                                    onScpDownload(downloadRemotePath, downloadLocalPath.ifBlank { null })
+                                    scpActivityLines += "Download requested: $downloadRemotePath -> ${downloadLocalPath.ifBlank { "(default)" }}"
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Download")
+                            }
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    color = Color(0xFF0F0F0F)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp)
+                    ) {
+                        val activityLog = when {
+                            scpActivityLines.isNotEmpty() -> scpActivityLines.joinToString(separator = "\n")
+                            shellOutput.isNotBlank() -> shellOutput
+                            else -> "No SCP activity yet. Use the panes above to start a transfer."
+                        }
+                        Text(
+                            text = activityLog,
                             color = Color(0xFFE5E5E5),
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                         )

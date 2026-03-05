@@ -21,7 +21,8 @@ data class HostConnection(
     val preferredForwardId: String? = null,
     val startupScript: String = "",
     val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT,
-    val terminalProfileId: String? = null
+    val terminalProfileId: String? = null,
+    val infoCommands: List<String> = emptyList()
 )
 
 data class Identity(

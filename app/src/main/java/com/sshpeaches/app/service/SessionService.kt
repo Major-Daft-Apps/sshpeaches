@@ -102,7 +102,7 @@ class SessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         UiDebugLog.action("SessionService.onStartCommand", "action=${intent?.action}, startId=$startId")
         when (intent?.action) {
-            ACTION_STOP -> intent.getStringExtra(EXTRA_HOST_ID)?.let { stopSession(it) }
+            ACTION_STOP_ALL -> stopAllSessions()
         }
         UiDebugLog.result("SessionService.onStartCommand", true)
         return START_STICKY
@@ -344,7 +344,6 @@ class SessionService : Service() {
         job.invokeOnCompletion {
             activeJobs.remove(host.id)
             activeConnections.remove(host.id)
-            cancelHostNotification(host.id)
             updateSummaryNotification()
             if (it is CancellationException) {
                 removeSessionSnapshot(host.id)
@@ -367,7 +366,6 @@ class SessionService : Service() {
             runCatching { connection.client?.disconnect() }
         }
         activeJobs.remove(hostId)?.cancel()
-        cancelHostNotification(hostId)
         updateSummaryNotification()
         removeSessionSnapshot(hostId)
         clearShellOutputForHost(hostId)
@@ -1607,7 +1605,6 @@ class SessionService : Service() {
         sessionSnapshots.value = sessionSnapshots.value
             .filterNot { it.hostId == host.id } + snapshot
         if (activeJobs.containsKey(host.id)) {
-            showHostNotification(snapshot)
             updateSummaryNotification()
         }
         UiDebugLog.result(
@@ -1627,53 +1624,6 @@ class SessionService : Service() {
         nm.notify(NOTIFICATION_ID, notif)
     }
 
-    private fun showHostNotification(snapshot: SessionSnapshot) {
-        val host = snapshot.host
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            action = ACTION_OPEN_SESSION
-            putExtra(EXTRA_HOST_ID, host.id)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingOpen = PendingIntent.getActivity(
-            this,
-            host.id.hashCode() xor 0x4F50454E,
-            openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val stopIntent = Intent(this, SessionService::class.java).apply {
-            action = ACTION_STOP
-            putExtra(EXTRA_HOST_ID, host.id)
-        }
-        val pendingStop = PendingIntent.getService(
-            this,
-            host.id.hashCode(),
-            stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("${host.username}@${host.host}")
-            .setContentText(buildSessionStatusLine(snapshot))
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setGroup(GROUP_KEY_SESSIONS)
-            .setSortKey("${host.name.lowercase()}-${host.id}")
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setSubText(host.name)
-            .setContentIntent(pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Open", pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Disconnect", pendingStop)
-            .build()
-        nm.notify(host.id.hashCode(), notif)
-    }
-
-    private fun cancelHostNotification(hostId: String) {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(hostId.hashCode())
-    }
-
     private fun buildSummaryNotification(): Notification {
         val activeHostIds = activeJobs.keys
         val snapshots = sessionSnapshots.value
@@ -1684,9 +1634,8 @@ class SessionService : Service() {
         val connectingCount = snapshots.count { it.status == SessionStatus.CONNECTING }
         val text = when {
             runningCount == 0 -> "No active sessions"
-            snapshots.isEmpty() -> "$runningCount session running"
             activeCount > 0 && connectingCount > 0 -> "$activeCount connected, $connectingCount connecting"
-            activeCount > 0 -> "$activeCount connected"
+            activeCount > 0 -> "$activeCount active"
             else -> "$connectingCount connecting"
         }
         val openIntent = Intent(this, MainActivity::class.java).apply {
@@ -1698,6 +1647,15 @@ class SessionService : Service() {
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val stopAllIntent = Intent(this, SessionService::class.java).apply {
+            action = ACTION_STOP_ALL
+        }
+        val pendingStopAll = PendingIntent.getService(
+            this,
+            STOP_ALL_REQUEST_CODE,
+            stopAllIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val style = NotificationCompat.InboxStyle().also { inbox ->
             snapshots.take(6).forEach { snapshot ->
                 inbox.addLine("${snapshot.host.username}@${snapshot.host.host}  ${snapshot.status.toSummaryLabel()}")
@@ -1706,26 +1664,22 @@ class SessionService : Service() {
                 inbox.setSummaryText("+${snapshots.size - 6} more")
             }
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SSHPeaches Sessions")
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("SSHPeaches")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setGroup(GROUP_KEY_SESSIONS)
-            .setGroupSummary(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setSubText(if (runningCount == 0) "Service running" else "$runningCount session(s) in background")
             .setContentIntent(pendingOpen)
             .setStyle(style)
-            .build()
-    }
-
-    private fun buildSessionStatusLine(snapshot: SessionSnapshot): String {
-        val endpoint = "${snapshot.host.host}:${snapshot.host.port}"
-        val mode = snapshot.mode.name
-        val status = snapshot.status.toSummaryLabel()
-        return "$status | $mode | $endpoint"
+            .addAction(R.drawable.ic_launcher_foreground, "Open", pendingOpen)
+        if (runningCount > 0) {
+            builder.addAction(R.drawable.ic_launcher_foreground, "Disconnect all", pendingStopAll)
+        }
+        return builder.build()
     }
 
     private fun SessionStatus.toSummaryLabel(): String = when (this) {
@@ -1756,10 +1710,10 @@ class SessionService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "sessions"
-        private const val GROUP_KEY_SESSIONS = "com.majordaftapps.sshpeaches.app.group.sessions"
         private const val OPEN_APP_REQUEST_CODE = 19_241
+        private const val STOP_ALL_REQUEST_CODE = 19_242
         private const val NOTIFICATION_ID = 42
-        private const val ACTION_STOP = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP"
+        private const val ACTION_STOP_ALL = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_ALL"
         const val ACTION_OPEN_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSION"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L

@@ -4,10 +4,10 @@ This repository now contains an initial Jetpack Compose-based Android applicatio
 
 ## Highlights
 - **Single-module (`app`) Compose app** targeting `minSdk 26`, `compileSdk 34`, Kotlin 1.9.22, AGP 8.2.2.
-- **Repository + ViewModel pattern** with an in-memory datasource that exposes hosts, identities, port forwards, and snippets derived from the blueprint.
-- **Navigation shell** built with `ModalNavigationDrawer`, `NavHost`, and placeholder screens for Favorites, Hosts, Identities, Port Forwards, Snippets, and Settings.
+- **Repository + ViewModel pattern** with Room-backed persistence for hosts, identities, port forwards, and snippets.
+- **Navigation shell** built with `ModalNavigationDrawer`, `NavHost`, and feature screens for Favorites, Hosts, Identities, Port Forwards, Snippets, and Settings.
 - **Quick Connect bottom sheet**, **About dialog**, and **drawer shortcuts** for Help/About consistent with the product spec.
-- **Composable building blocks** such as `HostCard`, section headers, and placeholder editors that map the UX document into code.
+- **Composable building blocks** such as `HostCard`, section headers, and editor surfaces mapped to the UX document.
 - **Carbon Black (#191919) + Blazing Flame (#F15025)** palette wired through Material 3 theme helpers.
 
 ## Project Layout
@@ -16,7 +16,7 @@ app/
   build.gradle.kts          // Android + Compose configuration
   src/main/java/com/sshpeaches/app/
     MainActivity            // entry activity
-    SSHPeachesApplication   // placeholder Application class
+    SSHPeachesApplication   // app container initialization
     data/                   // models + in-memory repository
     ui/
       SSHPeachesRoot.kt     // scaffolding, drawer, quick connect, about dialog
@@ -39,9 +39,9 @@ app/
 > **Note:** The automated `./gradlew :app:assembleDebug` invocation inside the CLI failed because no Android SDK was configured in this environment. Once `local.properties` references a valid SDK, the build completes normally.
 
 ## Next steps
-- Replace the in-memory repository with real persistence (Room + encrypted storage) and wire up real actions for SSH/SFTP/SCP buttons.
-- Flesh out Quick Connect, Info panel editor, snippet editing, and QR workflows.
-- Hook up navigation destinations for Help (Custom Tabs) and Settings per the product blueprint.
+- Expand SFTP and SCP workflows (SFTP console ergonomics, SCP dual-pane file browsing).
+- Continue refining Info panel editor and snippet automation workflows.
+- Extend QR workflows beyond single payload export/import.
 - Add ViewModel factories/DI (Hilt or Koin) to decouple the repository implementation.
 - Write UI tests for the major composables once functionality hardens.
 

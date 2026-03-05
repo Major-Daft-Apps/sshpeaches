@@ -30,7 +30,8 @@ data class HostEntity(
     val preferredForwardId: String?,
     val startupScript: String,
     val backgroundBehavior: BackgroundBehavior,
-    val terminalProfileId: String?
+    val terminalProfileId: String?,
+    val infoCommands: List<String>
 )
 
 @Entity(tableName = "identities")

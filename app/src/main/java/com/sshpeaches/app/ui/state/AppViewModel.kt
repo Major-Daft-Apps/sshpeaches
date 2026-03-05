@@ -703,6 +703,15 @@ class AppViewModel(
         }
     }
 
+    fun updateHostInfoCommands(id: String, commands: List<String>) {
+        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        val normalized = commands.map { it.trim() }.filter { it.isNotBlank() }
+        if (existing.infoCommands == normalized) return
+        launchLogged("updateHostInfoCommands", "hostId=$id, count=${normalized.size}") {
+            repository.updateHost(existing.copy(infoCommands = normalized))
+        }
+    }
+
     fun addPortForward(
         label: String,
         type: PortForwardType,

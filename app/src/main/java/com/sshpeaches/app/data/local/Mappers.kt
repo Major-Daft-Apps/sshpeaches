@@ -26,7 +26,8 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,
-    terminalProfileId = terminalProfileId
+    terminalProfileId = terminalProfileId,
+    infoCommands = infoCommands
 )
 
 fun HostConnection.asEntity(): HostEntity = HostEntity(
@@ -50,7 +51,8 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     preferredForwardId = preferredForwardId,
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,
-    terminalProfileId = terminalProfileId
+    terminalProfileId = terminalProfileId,
+    infoCommands = infoCommands
 )
 
 fun IdentityEntity.asModel(): Identity = Identity(

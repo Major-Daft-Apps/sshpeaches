@@ -290,6 +290,7 @@ class MainActivity : FragmentActivity() {
                         )
                     },
                     onHostDelete = viewModel::deleteHost,
+                    onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
                     onPortForwardAdd = viewModel::addPortForward,
                     onPortForwardUpdate = viewModel::updatePortForward,
                     onPortForwardDelete = viewModel::deletePortForward,
