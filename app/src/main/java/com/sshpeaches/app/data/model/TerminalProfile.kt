@@ -25,22 +25,22 @@ object TerminalProfileDefaults {
     val builtInProfiles: List<TerminalProfile> = listOf(
         TerminalProfile(
             id = DEFAULT_PROFILE_ID,
-            name = "GNOME Dark",
+            name = "Termux",
             fontSizeSp = 10,
-            foregroundHex = "#EEEEEC",
-            backgroundHex = "#2E3436",
-            cursorHex = "#FCE94F",
+            foregroundHex = "#A9B7C6",
+            backgroundHex = "#000000",
+            cursorHex = "#00FF00",
             cursorStyle = TerminalCursorStyle.BLOCK,
             cursorBlink = true
         ),
         TerminalProfile(
             id = "builtin-gnome-light",
-            name = "GNOME Light",
+            name = "Linux Console",
             fontSizeSp = 10,
-            foregroundHex = "#2E3436",
-            backgroundHex = "#FFFFFF",
-            cursorHex = "#3465A4",
-            cursorStyle = TerminalCursorStyle.BLOCK,
+            foregroundHex = "#00AA00",
+            backgroundHex = "#000000",
+            cursorHex = "#00FF00",
+            cursorStyle = TerminalCursorStyle.UNDERLINE,
             cursorBlink = true
         ),
         TerminalProfile(
@@ -55,13 +55,13 @@ object TerminalProfileDefaults {
         ),
         TerminalProfile(
             id = "builtin-green-screen",
-            name = "Green on Black",
+            name = "Solarized Light",
             fontSizeSp = 10,
-            foregroundHex = "#33FF66",
-            backgroundHex = "#000000",
-            cursorHex = "#99FF66",
-            cursorStyle = TerminalCursorStyle.UNDERLINE,
-            cursorBlink = false
+            foregroundHex = "#657B83",
+            backgroundHex = "#FDF6E3",
+            cursorHex = "#586E75",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
         )
     )
 

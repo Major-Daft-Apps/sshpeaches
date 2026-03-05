@@ -8,6 +8,7 @@ object Routes {
     const val FORWARDS = "forwards"
     const val SNIPPETS = "snippets"
     const val KEYBOARD = "keyboard"
+    const val THEME_EDITOR = "theme_editor"
     const val SETTINGS = "settings"
     const val OPEN_SOURCE_LICENSES = "open_source_licenses"
     const val HELP = "help"

@@ -32,7 +32,7 @@ data class KeyboardSlotAction(
 
 object KeyboardLayoutDefaults {
     const val SLOT_COLUMNS = 7
-    const val SLOT_ROWS = 1
+    const val SLOT_ROWS = 2
     const val SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
     const val COMPACT_KEY_LABEL_MAX_CHARS = 6
     const val COMPACT_KEY_HEIGHT_DP = 30
@@ -40,12 +40,19 @@ object KeyboardLayoutDefaults {
 
     val DEFAULT_SLOTS: List<KeyboardSlotAction> = listOf(
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
+        textAction("/", "/"),
+        textAction("-", "-"),
+        keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true),
+        keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
+        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
         modifierAction(KeyboardModifier.ALT, "Alt"),
-        textAction("-", "-"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true),
         keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true),
-        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true)
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true),
+        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
     )
 
     val modifierPresets: List<KeyboardSlotAction> = listOf(
@@ -286,21 +293,17 @@ object KeyboardLayoutDefaults {
         if (normalized.length == 1) {
             val single = normalized[0]
             if (single in 'A'..'Z') {
-                val keyCode = KeyEvent.keyCodeFromString("KEYCODE_$single")
-                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
-                    val controlValue = single.code - 'A'.code + 1
-                    return CombinationKeySpec(
-                        keyCode = keyCode,
-                        label = single.toString(),
-                        ctrlFallback = String(charArrayOf(controlValue.toChar()))
-                    )
-                }
+                val keyCode = KeyEvent.KEYCODE_A + (single.code - 'A'.code)
+                val controlValue = single.code - 'A'.code + 1
+                return CombinationKeySpec(
+                    keyCode = keyCode,
+                    label = single.toString(),
+                    ctrlFallback = String(charArrayOf(controlValue.toChar()))
+                )
             }
             if (single in '0'..'9') {
-                val keyCode = KeyEvent.keyCodeFromString("KEYCODE_$single")
-                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
-                    return CombinationKeySpec(keyCode = keyCode, label = single.toString())
-                }
+                val keyCode = KeyEvent.KEYCODE_0 + (single.code - '0'.code)
+                return CombinationKeySpec(keyCode = keyCode, label = single.toString())
             }
         }
 

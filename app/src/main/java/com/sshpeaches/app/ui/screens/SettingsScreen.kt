@@ -12,7 +12,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -32,19 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
-import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
-import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
-import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    currentTheme: ThemeMode,
-    onThemeChange: (ThemeMode) -> Unit,
     allowBackgroundSessions: Boolean,
     onBackgroundToggle: (Boolean) -> Unit,
     biometricEnabled: Boolean,
@@ -55,11 +47,6 @@ fun SettingsScreen(
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
     terminalEmulation: TerminalEmulation,
     onTerminalEmulationChange: (TerminalEmulation) -> Unit,
-    terminalProfiles: List<TerminalProfile>,
-    defaultTerminalProfileId: String,
-    onDefaultTerminalProfileChange: (String) -> Unit,
-    onSaveTerminalProfile: (TerminalProfile) -> Unit,
-    onDeleteTerminalProfile: (String) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -89,16 +76,9 @@ fun SettingsScreen(
     onGenerateExportPayload: () -> String,
     onShowMessage: (String) -> Unit = {}
 ) {
-    val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
     val terminalExpanded = remember { mutableStateOf(false) }
-    val defaultTerminalProfileExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = remember { mutableStateOf(false) }
-    val themeOptions = listOf(
-        ThemeMode.SYSTEM to "System",
-        ThemeMode.LIGHT to "Light",
-        ThemeMode.DARK to "Dark"
-    )
     val timeoutOptions = listOf(
         LockTimeout.IMMEDIATE,
         LockTimeout.ONE_MIN,
@@ -113,37 +93,10 @@ fun SettingsScreen(
     val showDisablePinDialog = remember { mutableStateOf(false) }
     val showUnlockDialog = remember { mutableStateOf(false) }
     val showRestoreDefaultsDialog = remember { mutableStateOf(false) }
-    val showProfileEditorDialog = remember { mutableStateOf(false) }
-    val showDeleteProfileDialog = remember { mutableStateOf<String?>(null) }
-    val editingProfile = remember { mutableStateOf<TerminalProfile?>(null) }
     val unlockEntry = remember { mutableStateOf("") }
     val unlockError = remember { mutableStateOf<String?>(null) }
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
     val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    val profileNameState = remember { mutableStateOf("") }
-    val profileFontSizeState = remember { mutableStateOf("12") }
-    val profileForegroundState = remember { mutableStateOf("#E6E6E6") }
-    val profileBackgroundState = remember { mutableStateOf("#101010") }
-    val profileCursorState = remember { mutableStateOf("#FFB74D") }
-    val profileCursorStyleExpanded = remember { mutableStateOf(false) }
-    val profileCursorStyleState = remember { mutableStateOf(TerminalCursorStyle.BLOCK) }
-    val profileCursorBlinkState = remember { mutableStateOf(true) }
-    val profileEditorError = remember { mutableStateOf<String?>(null) }
-    val builtInProfileIds = remember { TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet() }
-
-    fun openProfileEditor(profile: TerminalProfile?) {
-        editingProfile.value = profile
-        val source = profile ?: TerminalProfileDefaults.customTemplate()
-        profileNameState.value = source.name
-        profileFontSizeState.value = source.fontSizeSp.toString()
-        profileForegroundState.value = source.foregroundHex
-        profileBackgroundState.value = source.backgroundHex
-        profileCursorState.value = source.cursorHex
-        profileCursorStyleState.value = source.cursorStyle
-        profileCursorBlinkState.value = source.cursorBlink
-        profileEditorError.value = null
-        showProfileEditorDialog.value = true
-    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -152,41 +105,6 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
-                ExposedDropdownMenuBox(
-                    expanded = expanded.value,
-                    onExpandedChange = { expanded.value = !expanded.value }
-                ) {
-                    TextField(
-                        value = themeOptions.first { it.first == currentTheme }.second,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Mode") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
-                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded.value,
-                        onDismissRequest = { expanded.value = false }
-                    ) {
-                        themeOptions.forEach { (mode, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    expanded.value = false
-                                    onThemeChange(mode)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
@@ -245,95 +163,6 @@ fun SettingsScreen(
                 }
                 Text(
                     "xterm is the default and recommended mode.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Terminal Profiles", style = MaterialTheme.typography.titleMedium)
-                ExposedDropdownMenuBox(
-                    expanded = defaultTerminalProfileExpanded.value,
-                    onExpandedChange = { defaultTerminalProfileExpanded.value = !defaultTerminalProfileExpanded.value }
-                ) {
-                    TextField(
-                        value = terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
-                            ?: terminalProfiles.firstOrNull()?.name.orEmpty(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Default profile") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultTerminalProfileExpanded.value)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = defaultTerminalProfileExpanded.value,
-                        onDismissRequest = { defaultTerminalProfileExpanded.value = false }
-                    ) {
-                        terminalProfiles.forEach { profile ->
-                            DropdownMenuItem(
-                                text = { Text(profile.name) },
-                                onClick = {
-                                    defaultTerminalProfileExpanded.value = false
-                                    onDefaultTerminalProfileChange(profile.id)
-                                }
-                            )
-                        }
-                    }
-                }
-                terminalProfiles.forEach { profile ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp)
-                        ) {
-                            Text(profile.name)
-                            Text(
-                                "Font ${profile.fontSizeSp}sp  ${profile.foregroundHex}/${profile.backgroundHex}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (builtInProfileIds.contains(profile.id)) {
-                            TextButton(
-                                onClick = {
-                                    openProfileEditor(
-                                        profile.copy(
-                                            id = "custom-${UUID.randomUUID()}",
-                                            name = "${profile.name} Copy"
-                                        )
-                                    )
-                                }
-                            ) {
-                                Text("Duplicate")
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(onClick = { openProfileEditor(profile) }) {
-                                    Text("Edit")
-                                }
-                                TextButton(onClick = { showDeleteProfileDialog.value = profile.id }) {
-                                    Text("Delete")
-                                }
-                            }
-                        }
-                    }
-                }
-                Button(
-                    onClick = { openProfileEditor(null) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Add Custom Profile")
-                }
-                Text(
-                    "Profiles are similar to desktop terminal profiles and can be assigned per host or per quick connect session.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -752,171 +581,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showProfileEditorDialog.value) {
-        AlertDialog(
-            onDismissRequest = { showProfileEditorDialog.value = false },
-            title = {
-                Text(if (editingProfile.value == null) "Add terminal profile" else "Edit terminal profile")
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = profileNameState.value,
-                        onValueChange = {
-                            profileNameState.value = it
-                            profileEditorError.value = null
-                        },
-                        label = { Text("Name") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = profileFontSizeState.value,
-                        onValueChange = {
-                            profileFontSizeState.value = it.filter { ch -> ch.isDigit() }.take(2)
-                            profileEditorError.value = null
-                        },
-                        label = { Text("Font size (sp)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = profileForegroundState.value,
-                        onValueChange = {
-                            profileForegroundState.value = it
-                            profileEditorError.value = null
-                        },
-                        label = { Text("Foreground color (#RRGGBB)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = profileBackgroundState.value,
-                        onValueChange = {
-                            profileBackgroundState.value = it
-                            profileEditorError.value = null
-                        },
-                        label = { Text("Background color (#RRGGBB)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = profileCursorState.value,
-                        onValueChange = {
-                            profileCursorState.value = it
-                            profileEditorError.value = null
-                        },
-                        label = { Text("Cursor color (#RRGGBB)") },
-                        singleLine = true
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = profileCursorStyleExpanded.value,
-                        onExpandedChange = { profileCursorStyleExpanded.value = !profileCursorStyleExpanded.value }
-                    ) {
-                        TextField(
-                            value = profileCursorStyleState.value.label,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Cursor style") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = profileCursorStyleExpanded.value)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = profileCursorStyleExpanded.value,
-                            onDismissRequest = { profileCursorStyleExpanded.value = false }
-                        ) {
-                            TerminalCursorStyle.values().forEach { style ->
-                                DropdownMenuItem(
-                                    text = { Text(style.label) },
-                                    onClick = {
-                                        profileCursorStyleState.value = style
-                                        profileCursorStyleExpanded.value = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Cursor blink")
-                        Switch(
-                            checked = profileCursorBlinkState.value,
-                            onCheckedChange = { profileCursorBlinkState.value = it }
-                        )
-                    }
-                    profileEditorError.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val fontSize = profileFontSizeState.value.toIntOrNull()?.coerceIn(8, 28)
-                    when {
-                        profileNameState.value.isBlank() -> {
-                            profileEditorError.value = "Profile name is required."
-                            return@TextButton
-                        }
-                        fontSize == null -> {
-                            profileEditorError.value = "Font size must be between 8 and 28."
-                            return@TextButton
-                        }
-                        !isValidHexColor(profileForegroundState.value) -> {
-                            profileEditorError.value = "Foreground must be #RRGGBB."
-                            return@TextButton
-                        }
-                        !isValidHexColor(profileBackgroundState.value) -> {
-                            profileEditorError.value = "Background must be #RRGGBB."
-                            return@TextButton
-                        }
-                        !isValidHexColor(profileCursorState.value) -> {
-                            profileEditorError.value = "Cursor must be #RRGGBB."
-                            return@TextButton
-                        }
-                    }
-                    val safeFontSize = fontSize ?: return@TextButton
-                    val existingId = editingProfile.value?.id
-                    val profile = TerminalProfile(
-                        id = existingId ?: "custom-${UUID.randomUUID()}",
-                        name = profileNameState.value.trim(),
-                        fontSizeSp = safeFontSize,
-                        foregroundHex = profileForegroundState.value.trim().uppercase(),
-                        backgroundHex = profileBackgroundState.value.trim().uppercase(),
-                        cursorHex = profileCursorState.value.trim().uppercase(),
-                        cursorStyle = profileCursorStyleState.value,
-                        cursorBlink = profileCursorBlinkState.value
-                    )
-                    onSaveTerminalProfile(profile)
-                    showProfileEditorDialog.value = false
-                    onShowMessage("Terminal profile saved.")
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showProfileEditorDialog.value = false }) { Text("Cancel") }
-            }
-        )
-    }
-
-    showDeleteProfileDialog.value?.let { profileId ->
-        val profileName = terminalProfiles.firstOrNull { it.id == profileId }?.name ?: "this profile"
-        AlertDialog(
-            onDismissRequest = { showDeleteProfileDialog.value = null },
-            title = { Text("Delete terminal profile?") },
-            text = { Text("Delete $profileName? Hosts using it will fall back to app default.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteTerminalProfile(profileId)
-                    showDeleteProfileDialog.value = null
-                    onShowMessage("Terminal profile deleted.")
-                }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteProfileDialog.value = null }) { Text("Cancel") }
-            }
-        )
-    }
-
     if (showRestoreDefaultsDialog.value) {
         AlertDialog(
             onDismissRequest = { showRestoreDefaultsDialog.value = false },
@@ -939,6 +603,3 @@ fun SettingsScreen(
         )
     }
 }
-
-private fun isValidHexColor(value: String): Boolean =
-    Regex("^#[0-9A-Fa-f]{6}$").matches(value.trim())

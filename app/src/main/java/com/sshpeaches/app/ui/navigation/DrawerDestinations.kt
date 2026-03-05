@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,6 +25,7 @@ val drawerDestinations = listOf(
     DrawerDestination(Routes.FORWARDS, "Port Forwards", Icons.Default.Bolt),
     DrawerDestination(Routes.SNIPPETS, "Snippets", Icons.Default.Code),
     DrawerDestination(Routes.KEYBOARD, "Keyboard Editor", Icons.Default.Keyboard),
+    DrawerDestination(Routes.THEME_EDITOR, "Theme Editor", Icons.Default.Palette),
     DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings),
     DrawerDestination(Routes.HELP, "Help", Icons.AutoMirrored.Filled.Help),
     DrawerDestination(Routes.ABOUT, "About", Icons.Default.Info)

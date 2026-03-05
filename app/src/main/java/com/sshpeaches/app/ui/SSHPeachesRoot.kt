@@ -128,6 +128,7 @@ import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectRequest
 import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectUiState
 import com.majordaftapps.sshpeaches.app.ui.screens.SettingsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
@@ -263,6 +264,7 @@ fun SSHPeachesRoot(
         Routes.FORWARDS -> "Port Forwards"
         Routes.SNIPPETS -> "Snippets"
         Routes.KEYBOARD -> "Keyboard"
+        Routes.THEME_EDITOR -> "Theme Editor"
         Routes.SETTINGS -> "Settings"
         Routes.OPEN_SOURCE_LICENSES -> "Open Source Licenses"
         else -> "SSHPeaches"
@@ -735,10 +737,20 @@ fun SSHPeachesRoot(
                             onReset = onKeyboardReset
                         )
                     }
+                    composable(Routes.THEME_EDITOR) {
+                        ThemeEditorScreen(
+                            currentTheme = uiState.themeMode,
+                            onThemeChange = onThemeModeChange,
+                            terminalProfiles = uiState.terminalProfiles,
+                            defaultTerminalProfileId = uiState.defaultTerminalProfileId,
+                            onDefaultTerminalProfileChange = onDefaultTerminalProfileChange,
+                            onSaveTerminalProfile = onSaveTerminalProfile,
+                            onDeleteTerminalProfile = onDeleteTerminalProfile,
+                            onShowMessage = showMessage
+                        )
+                    }
                         composable(Routes.SETTINGS) {
                             SettingsScreen(
-                                currentTheme = uiState.themeMode,
-                                onThemeChange = onThemeModeChange,
                                 allowBackgroundSessions = uiState.allowBackgroundSessions,
                                 onBackgroundToggle = onBackgroundModeChange,
                                 biometricEnabled = uiState.biometricLockEnabled,
@@ -749,11 +761,6 @@ fun SSHPeachesRoot(
                                 onCustomLockTimeoutMinutesChange = onCustomLockTimeoutMinutesChange,
                                 terminalEmulation = uiState.terminalEmulation,
                                 onTerminalEmulationChange = onTerminalEmulationChange,
-                                terminalProfiles = uiState.terminalProfiles,
-                                defaultTerminalProfileId = uiState.defaultTerminalProfileId,
-                                onDefaultTerminalProfileChange = onDefaultTerminalProfileChange,
-                                onSaveTerminalProfile = onSaveTerminalProfile,
-                                onDeleteTerminalProfile = onDeleteTerminalProfile,
                                 crashReportsEnabled = uiState.crashReportsEnabled,
                                 onCrashReportsToggle = onCrashReportsToggle,
                                 analyticsEnabled = uiState.analyticsEnabled,
@@ -1224,7 +1231,7 @@ private fun QuickConnectSheet(
                     portForwards.forEach { forward ->
                         val selected = selectedForwardId.value == forward.id
                         OutlinedButton(onClick = { selectedForwardId.value = forward.id }) {
-                            Text(if (selected) "✓ ${forward.label}" else forward.label)
+                            Text(if (selected) "[Selected] ${forward.label}" else forward.label)
                         }
                     }
                 }

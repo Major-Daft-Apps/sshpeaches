@@ -19,12 +19,12 @@ tasks.configureEach {
 
 android {
     namespace = "com.majordaftapps.sshpeaches.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         ndk {
@@ -95,18 +95,18 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.biometric:biometric:1.1.0")
-    implementation("org.slf4j:slf4j-api:2.0.7")
-    implementation("io.coil-kt:coil-compose:2.4.0")
-    implementation("io.coil-kt:coil-svg:2.4.0")
-    implementation("com.hierynomus:sshj:0.37.0")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
-    implementation("com.google.zxing:core:3.5.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
+    implementation("com.hierynomus:sshj:0.40.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    implementation("com.google.zxing:core:3.5.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation(project(":terminal-emulator"))
     implementation(project(":terminal-view"))
     implementation("com.google.guava:listenablefuture:1.0")
-    debugRuntimeOnly("org.slf4j:slf4j-simple:2.0.7")
+    debugRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
     releaseRuntimeOnly("org.slf4j:slf4j-nop:2.0.7")
 
     val roomVersion = "2.6.1"
