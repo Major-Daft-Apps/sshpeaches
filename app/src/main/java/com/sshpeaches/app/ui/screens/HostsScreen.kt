@@ -65,6 +65,7 @@ import com.majordaftapps.sshpeaches.app.util.parsePort
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,6 +116,7 @@ fun HostsScreen(
     val passwordState = remember { mutableStateOf("") }
     val clearPasswordState = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
+    val showClearHostKeyDialog = remember { mutableStateOf(false) }
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
@@ -236,11 +238,13 @@ fun HostsScreen(
         passwordState.value = ""
         clearPasswordState.value = false
         dialogError.value = null
+        showClearHostKeyDialog.value = false
     }
 
     fun closeDialog() {
         showDialog.value = false
         editingHost.value = null
+        showClearHostKeyDialog.value = false
     }
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -413,6 +417,20 @@ fun HostsScreen(
                             )
                             Text("Remove stored password")
                         }
+                    }
+                    if (editingHost.value != null) {
+                        TextButton(
+                            onClick = {
+                                dialogError.value = null
+                                showClearHostKeyDialog.value = true
+                            }
+                        ) {
+                            Text("Clear stored host key")
+                        }
+                        Text(
+                            "Use this if you hit host key verification failures after server key changes.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                     if (!canStoreCredentials) {
                         Text(
@@ -722,6 +740,52 @@ fun HostsScreen(
                         }) { Text("Delete") }
                     }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    if (showClearHostKeyDialog.value) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showClearHostKeyDialog.value = false },
+            title = { Text("Clear host key") },
+            text = {
+                Text(
+                    "Remove the saved SSH host key for ${hostState.value.trim()}:${portState.value.trim().ifBlank { "22" }}?"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val hostValue = hostState.value.trim()
+                        val portValue = parsePort(portState.value) ?: editingHost.value?.port ?: 22
+                        if (hostValue.isBlank()) {
+                            dialogError.value = "Enter a host before clearing its key."
+                        } else {
+                            val cleared = SshClientProvider.clearKnownHostEntry(
+                                context = context,
+                                host = hostValue,
+                                port = portValue
+                            )
+                            if (cleared) {
+                                Toast.makeText(
+                                    context,
+                                    "Cleared stored host key for $hostValue:$portValue",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                dialogError.value = "Couldn't clear the host key. Try again."
+                            }
+                        }
+                        showClearHostKeyDialog.value = false
+                    }
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHostKeyDialog.value = false }) {
+                    Text("Cancel")
                 }
             }
         )

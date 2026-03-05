@@ -58,6 +58,43 @@ object SshClientProvider {
         }
     }
 
+    /**
+     * Removes stored known-host entries for [host]:[port].
+     * Returns true when the operation succeeds (including when no matching entry exists).
+     */
+    fun clearKnownHostEntry(
+        context: Context,
+        host: String,
+        port: Int
+    ): Boolean {
+        val normalizedHost = host.trim()
+        if (normalizedHost.isBlank()) return false
+        val knownHostsFile = File(context.filesDir, "known_hosts")
+        if (!knownHostsFile.exists()) return true
+        return runCatching {
+            synchronized(knownHostsWriteLock) {
+                val knownHosts = OpenSSHKnownHosts(knownHostsFile)
+                val hostCandidates = buildSet {
+                    add(normalizedHost)
+                    add("[$normalizedHost]:$port")
+                }
+                val keyTypes = KeyType.values().filterNot { it == KeyType.UNKNOWN }
+                val toRemove = knownHosts.entries().filter { entry ->
+                    hostCandidates.any { candidate ->
+                        keyTypes.any { keyType ->
+                            runCatching { entry.appliesTo(keyType, candidate) }.getOrDefault(false)
+                        }
+                    }
+                }
+                if (toRemove.isNotEmpty()) {
+                    knownHosts.entries().removeAll(toRemove.toSet())
+                    knownHosts.write()
+                }
+            }
+            true
+        }.getOrElse { false }
+    }
+
     private class InteractiveKnownHosts(
         file: File,
         private val host: String,

@@ -31,26 +31,21 @@ data class KeyboardSlotAction(
 }
 
 object KeyboardLayoutDefaults {
-    const val SLOT_COLUMNS = 6
-    const val SLOT_ROWS = 2
+    const val SLOT_COLUMNS = 7
+    const val SLOT_ROWS = 1
     const val SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
     const val COMPACT_KEY_LABEL_MAX_CHARS = 6
     const val COMPACT_KEY_HEIGHT_DP = 30
     const val COMPACT_KEY_FONT_SP = 10
 
     val DEFAULT_SLOTS: List<KeyboardSlotAction> = listOf(
-        modifierAction(KeyboardModifier.CTRL, "Ctrl"),
-        modifierAction(KeyboardModifier.ALT, "Alt"),
-        modifierAction(KeyboardModifier.SHIFT, "Shift"),
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
-        keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
-        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true),
+        modifierAction(KeyboardModifier.CTRL, "Ctrl"),
+        modifierAction(KeyboardModifier.ALT, "Alt"),
+        textAction("-", "-"),
         keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true),
-        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true),
-        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true),
-        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
-        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true)
     )
 
     val modifierPresets: List<KeyboardSlotAction> = listOf(
@@ -93,6 +88,21 @@ object KeyboardLayoutDefaults {
         sequenceAction("C-C", "\u0003"),
         sequenceAction("C-D", "\u0004"),
         sequenceAction("C-Z", "\u001A")
+    )
+
+    val comboPresets: List<KeyboardSlotAction> = listOfNotNull(
+        combinationAction("A", ctrl = true),
+        combinationAction("B", ctrl = true),
+        combinationAction("C", ctrl = true),
+        combinationAction("D", ctrl = true),
+        combinationAction("E", ctrl = true),
+        combinationAction("F", ctrl = true),
+        combinationAction("K", ctrl = true),
+        combinationAction("L", ctrl = true),
+        combinationAction("R", ctrl = true),
+        combinationAction("U", ctrl = true),
+        combinationAction("W", ctrl = true),
+        combinationAction("Z", ctrl = true)
     )
 
     fun emptyAction(): KeyboardSlotAction = textAction("")
@@ -145,10 +155,39 @@ object KeyboardLayoutDefaults {
         sequence = sequence
     )
 
+    fun combinationAction(
+        keyToken: String,
+        ctrl: Boolean = false,
+        alt: Boolean = false,
+        shift: Boolean = false,
+        customLabel: String = ""
+    ): KeyboardSlotAction? {
+        val spec = parseCombinationKeyToken(keyToken) ?: return null
+        val label = customLabel.takeIf { it.isNotBlank() }
+            ?: buildCombinationLabel(spec.label, ctrl = ctrl, alt = alt, shift = shift)
+        val fallback = if (ctrl && !alt) spec.ctrlFallback.orEmpty() else ""
+        return keyAction(
+            label = label,
+            keyCode = spec.keyCode,
+            sequence = fallback,
+            ctrl = ctrl,
+            alt = alt,
+            shift = shift
+        )
+    }
+
+    fun keyTokenForAction(action: KeyboardSlotAction): String {
+        if (action.type != KeyboardActionType.KEY) return ""
+        val keyCode = action.keyCode ?: return ""
+        return keyTokenForCode(keyCode)
+    }
+
     fun legacyStringToAction(value: String): KeyboardSlotAction {
         val trimmed = value.trim()
         if (trimmed.isBlank()) return emptyAction()
         val lower = trimmed.lowercase()
+        val ctrlCombo = parseLegacyCtrlLetterCombo(lower)
+        if (ctrlCombo != null) return ctrlCombo
         return when (lower) {
             "ctrl" -> modifierAction(KeyboardModifier.CTRL, "Ctrl")
             "alt" -> modifierAction(KeyboardModifier.ALT, "Alt")
@@ -218,4 +257,121 @@ object KeyboardLayoutDefaults {
         val number = value.removePrefix("f").toIntOrNull() ?: return null
         return number.takeIf { it in 1..12 }
     }
+
+    private fun parseLegacyCtrlLetterCombo(value: String): KeyboardSlotAction? {
+        val letter = when {
+            value.startsWith("ctrl-") && value.length == 6 -> value.last()
+            value.startsWith("c-") && value.length == 3 -> value.last()
+            else -> null
+        } ?: return null
+        if (!letter.isLetter()) return null
+        return combinationAction(letter.uppercaseChar().toString(), ctrl = true)
+    }
+
+    private fun buildCombinationLabel(base: String, ctrl: Boolean, alt: Boolean, shift: Boolean): String {
+        val modifiers = mutableListOf<String>()
+        if (ctrl) modifiers += "Ctrl"
+        if (alt) modifiers += "Alt"
+        if (shift) modifiers += "Shift"
+        return if (modifiers.isEmpty()) {
+            base
+        } else {
+            "${modifiers.joinToString("+")}-$base"
+        }
+    }
+
+    private fun parseCombinationKeyToken(token: String): CombinationKeySpec? {
+        val normalized = token.trim().uppercase()
+        if (normalized.isBlank()) return null
+        if (normalized.length == 1) {
+            val single = normalized[0]
+            if (single in 'A'..'Z') {
+                val keyCode = KeyEvent.keyCodeFromString("KEYCODE_$single")
+                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+                    val controlValue = single.code - 'A'.code + 1
+                    return CombinationKeySpec(
+                        keyCode = keyCode,
+                        label = single.toString(),
+                        ctrlFallback = String(charArrayOf(controlValue.toChar()))
+                    )
+                }
+            }
+            if (single in '0'..'9') {
+                val keyCode = KeyEvent.keyCodeFromString("KEYCODE_$single")
+                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+                    return CombinationKeySpec(keyCode = keyCode, label = single.toString())
+                }
+            }
+        }
+
+        val fn = parseFunctionKey(normalized.lowercase())
+        if (fn != null) {
+            val action = functionKeyAction(fn)
+            return CombinationKeySpec(
+                keyCode = action.keyCode ?: return null,
+                label = action.label,
+                ctrlFallback = action.sequence.takeIf { it.isNotBlank() }
+            )
+        }
+
+        return when (normalized) {
+            "ESC", "ESCAPE" -> CombinationKeySpec(KeyEvent.KEYCODE_ESCAPE, "Esc")
+            "TAB" -> CombinationKeySpec(KeyEvent.KEYCODE_TAB, "Tab")
+            "ENTER", "RETURN" -> CombinationKeySpec(KeyEvent.KEYCODE_ENTER, "Enter")
+            "BACKSPACE", "BKSP", "DEL", "DELETE" -> CombinationKeySpec(KeyEvent.KEYCODE_DEL, "Bksp")
+            "SPACE" -> CombinationKeySpec(
+                keyCode = KeyEvent.KEYCODE_SPACE,
+                label = "Space",
+                ctrlFallback = String(charArrayOf(0.toChar()))
+            )
+            "UP" -> CombinationKeySpec(KeyEvent.KEYCODE_DPAD_UP, "Up")
+            "DOWN" -> CombinationKeySpec(KeyEvent.KEYCODE_DPAD_DOWN, "Down")
+            "LEFT" -> CombinationKeySpec(KeyEvent.KEYCODE_DPAD_LEFT, "Left")
+            "RIGHT" -> CombinationKeySpec(KeyEvent.KEYCODE_DPAD_RIGHT, "Right")
+            "HOME" -> CombinationKeySpec(KeyEvent.KEYCODE_MOVE_HOME, "Home")
+            "END" -> CombinationKeySpec(KeyEvent.KEYCODE_MOVE_END, "End")
+            "PGUP", "PAGEUP" -> CombinationKeySpec(KeyEvent.KEYCODE_PAGE_UP, "PgUp")
+            "PGDN", "PAGEDOWN" -> CombinationKeySpec(KeyEvent.KEYCODE_PAGE_DOWN, "PgDn")
+            else -> null
+        }
+    }
+
+    private fun keyTokenForCode(keyCode: Int): String = when (keyCode) {
+        KeyEvent.KEYCODE_ESCAPE -> "ESC"
+        KeyEvent.KEYCODE_TAB -> "TAB"
+        KeyEvent.KEYCODE_ENTER -> "ENTER"
+        KeyEvent.KEYCODE_DEL -> "BACKSPACE"
+        KeyEvent.KEYCODE_SPACE -> "SPACE"
+        KeyEvent.KEYCODE_DPAD_UP -> "UP"
+        KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
+        KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
+        KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
+        KeyEvent.KEYCODE_MOVE_HOME -> "HOME"
+        KeyEvent.KEYCODE_MOVE_END -> "END"
+        KeyEvent.KEYCODE_PAGE_UP -> "PGUP"
+        KeyEvent.KEYCODE_PAGE_DOWN -> "PGDN"
+        KeyEvent.KEYCODE_F1 -> "F1"
+        KeyEvent.KEYCODE_F2 -> "F2"
+        KeyEvent.KEYCODE_F3 -> "F3"
+        KeyEvent.KEYCODE_F4 -> "F4"
+        KeyEvent.KEYCODE_F5 -> "F5"
+        KeyEvent.KEYCODE_F6 -> "F6"
+        KeyEvent.KEYCODE_F7 -> "F7"
+        KeyEvent.KEYCODE_F8 -> "F8"
+        KeyEvent.KEYCODE_F9 -> "F9"
+        KeyEvent.KEYCODE_F10 -> "F10"
+        KeyEvent.KEYCODE_F11 -> "F11"
+        KeyEvent.KEYCODE_F12 -> "F12"
+        in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z ->
+            ('A'.code + (keyCode - KeyEvent.KEYCODE_A)).toChar().toString()
+        in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ->
+            ('0'.code + (keyCode - KeyEvent.KEYCODE_0)).toChar().toString()
+        else -> ""
+    }
+
+    private data class CombinationKeySpec(
+        val keyCode: Int,
+        val label: String,
+        val ctrlFallback: String? = null
+    )
 }

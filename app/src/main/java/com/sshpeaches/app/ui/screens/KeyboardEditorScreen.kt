@@ -59,7 +59,7 @@ fun KeyboardEditorScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to assign text, navigation keys, modifiers, functions, or sequences.")
+        Text("Tap a slot to assign text, navigation keys, modifiers, function keys, combos, or sequences.")
 
         Column(
             modifier = Modifier
@@ -181,6 +181,33 @@ private fun KeySlotDialog(
     val sequenceDraft = remember(current) {
         mutableStateOf(if (current.type == KeyboardActionType.SEQUENCE) current.sequence else "")
     }
+    val comboKeyDraft = remember(current) {
+        mutableStateOf(
+            if (current.type == KeyboardActionType.KEY) {
+                KeyboardLayoutDefaults.keyTokenForAction(current)
+            } else {
+                ""
+            }
+        )
+    }
+    val comboLabelDraft = remember(current) {
+        mutableStateOf(
+            if (current.type == KeyboardActionType.KEY && (current.ctrl || current.alt || current.shift)) {
+                current.label
+            } else {
+                ""
+            }
+        )
+    }
+    val comboCtrl = remember(current) {
+        mutableStateOf(current.type == KeyboardActionType.KEY && current.ctrl)
+    }
+    val comboAlt = remember(current) {
+        mutableStateOf(current.type == KeyboardActionType.KEY && current.alt)
+    }
+    val comboShift = remember(current) {
+        mutableStateOf(current.type == KeyboardActionType.KEY && current.shift)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -222,6 +249,54 @@ private fun KeySlotDialog(
                 Text("Function", style = MaterialTheme.typography.labelLarge)
                 PresetRow(KeyboardLayoutDefaults.functionPresets, onSelect)
 
+                Text("Combinations", style = MaterialTheme.typography.labelLarge)
+                PresetRow(KeyboardLayoutDefaults.comboPresets, onSelect)
+
+                OutlinedTextField(
+                    value = comboKeyDraft.value,
+                    onValueChange = { comboKeyDraft.value = it },
+                    label = { Text("Combo base key (A, TAB, ESC, F1...)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModifierToggle(
+                        label = "Ctrl",
+                        active = comboCtrl.value,
+                        onToggle = { comboCtrl.value = !comboCtrl.value }
+                    )
+                    ModifierToggle(
+                        label = "Alt",
+                        active = comboAlt.value,
+                        onToggle = { comboAlt.value = !comboAlt.value }
+                    )
+                    ModifierToggle(
+                        label = "Shift",
+                        active = comboShift.value,
+                        onToggle = { comboShift.value = !comboShift.value }
+                    )
+                }
+                OutlinedTextField(
+                    value = comboLabelDraft.value,
+                    onValueChange = { comboLabelDraft.value = it },
+                    label = { Text("Custom combo label (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                val comboAction = KeyboardLayoutDefaults.combinationAction(
+                    keyToken = comboKeyDraft.value,
+                    ctrl = comboCtrl.value,
+                    alt = comboAlt.value,
+                    shift = comboShift.value,
+                    customLabel = comboLabelDraft.value
+                )
+                TextButton(
+                    enabled = comboAction != null && (comboCtrl.value || comboAlt.value || comboShift.value),
+                    onClick = { comboAction?.let(onSelect) }
+                ) {
+                    Text("Use Combo")
+                }
+
                 Text("Sequences", style = MaterialTheme.typography.labelLarge)
                 PresetRow(KeyboardLayoutDefaults.sequencePresets, onSelect)
 
@@ -249,6 +324,17 @@ private fun KeySlotDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+@Composable
+private fun ModifierToggle(
+    label: String,
+    active: Boolean,
+    onToggle: () -> Unit
+) {
+    TextButton(onClick = onToggle) {
+        Text(if (active) "[x] $label" else "[ ] $label")
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
