@@ -2,6 +2,15 @@
 
 This repository now contains an initial Jetpack Compose-based Android application that mirrors the current product blueprint. The goal is to provide a working scaffold that we can iterate on rapidly while fleshing out real features.
 
+## Using The App (F-Droid / Google Play)
+
+If you installed SSHPeaches and came here to learn how to use it:
+
+- [Documentation index](docs/README.md)
+- [Getting started](docs/getting-started.md)
+- [User guide](docs/user-guide.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
 ## Highlights
 - **Single-module (`app`) Compose app** targeting `minSdk 26`, `compileSdk 34`, Kotlin 1.9.22, AGP 8.2.2.
 - **Repository + ViewModel pattern** with Room-backed persistence for hosts, identities, port forwards, and snippets.
@@ -14,10 +23,10 @@ This repository now contains an initial Jetpack Compose-based Android applicatio
 ```
 app/
   build.gradle.kts          // Android + Compose configuration
-  src/main/java/com/sshpeaches/app/
+  src/main/java/com/majordaftapps/sshpeaches/app/
     MainActivity            // entry activity
     SSHPeachesApplication   // app container initialization
-    data/                   // models + in-memory repository
+    data/                   // models + Room repository
     ui/
       SSHPeachesRoot.kt     // scaffolding, drawer, quick connect, about dialog
       components/           // Host cards, drawer content, etc.
