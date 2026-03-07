@@ -53,20 +53,23 @@ import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
+import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
 import com.majordaftapps.sshpeaches.app.util.parsePort
+import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
+import com.majordaftapps.sshpeaches.app.util.snippetReference
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +77,7 @@ fun HostsScreen(
     hosts: List<HostConnection>,
     identities: List<Identity>,
     portForwards: List<PortForward>,
+    snippets: List<Snippet>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
     sortMode: SortMode,
@@ -88,6 +92,9 @@ fun HostsScreen(
     onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
+    openSessions: List<SessionService.SessionSnapshot> = emptyList(),
+    onOpenSession: (String) -> Unit = {},
+    onDisconnectSession: (String) -> Unit = {},
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
@@ -111,6 +118,7 @@ fun HostsScreen(
     val preferredForwardIdState = remember { mutableStateOf<String?>(null) }
     val forwardExpanded = remember { mutableStateOf(false) }
     val startupScriptState = remember { mutableStateOf("") }
+    val startupSnippetExpanded = remember { mutableStateOf(false) }
     val backgroundBehaviorState = remember { mutableStateOf(BackgroundBehavior.INHERIT) }
     val backgroundExpanded = remember { mutableStateOf(false) }
     val passwordState = remember { mutableStateOf("") }
@@ -120,9 +128,6 @@ fun HostsScreen(
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
-    val pendingConnect = remember { mutableStateOf<Pair<HostConnection, ConnectionMode>?>(null) }
-    val connectPassword = remember { mutableStateOf("") }
-    val connectPasswordError = remember { mutableStateOf<String?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -233,6 +238,7 @@ fun HostsScreen(
         terminalProfileIdState.value = host?.terminalProfileId
         preferredForwardIdState.value = host?.preferredForwardId
         startupScriptState.value = host?.startupScript ?: ""
+        startupSnippetExpanded.value = false
         backgroundBehaviorState.value = host?.backgroundBehavior ?: BackgroundBehavior.INHERIT
         showDialog.value = true
         passwordState.value = ""
@@ -244,6 +250,7 @@ fun HostsScreen(
     fun closeDialog() {
         showDialog.value = false
         editingHost.value = null
+        startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
     }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -289,6 +296,46 @@ fun HostsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Open Sessions",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (openSessions.isEmpty()) {
+                        Text(
+                            text = "No open sessions.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        openSessions.forEach { session ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.name}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = session.statusMessage ?: session.status.name,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    TextButton(onClick = { onOpenSession(session.hostId) }) {
+                                        Text("Open")
+                                    }
+                                    TextButton(onClick = { onDisconnectSession(session.hostId) }) {
+                                        Text("Disconnect")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
                         Text("Add host")
@@ -316,19 +363,13 @@ fun HostsScreen(
                 ) {
                     HostCard(
                         host = host,
+                        snippets = snippets,
                         onToggleFavorite = onToggleFavorite,
                         canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
                         onRunInfoCommand = onRunInfoCommand,
                         onInfoCommandsChange = onInfoCommandsChange,
                         onAction = { selected, mode ->
-                            val needsPassword = selected.preferredAuth != AuthMethod.IDENTITY
-                            if (needsPassword && !selected.hasPassword) {
-                                pendingConnect.value = selected to mode
-                                connectPassword.value = ""
-                                connectPasswordError.value = null
-                            } else {
-                                onStartSession(selected, mode, null)
-                            }
+                            onStartSession(selected, mode, null)
                         }
                     )
                     AnimatedVisibility(
@@ -606,13 +647,86 @@ fun HostsScreen(
                             }
                         }
                     }
-                    OutlinedTextField(
-                        value = startupScriptState.value,
-                        onValueChange = { startupScriptState.value = it },
-                        label = { Text("Optional script") },
-                        minLines = 2,
-                        maxLines = 6
-                    )
+                    ExposedDropdownMenuBox(
+                        expanded = startupSnippetExpanded.value,
+                        onExpandedChange = {
+                            if (snippets.isNotEmpty()) {
+                                startupSnippetExpanded.value = !startupSnippetExpanded.value
+                            }
+                        }
+                    ) {
+                        val startupSnippetId = parseSnippetReference(startupScriptState.value)
+                        val startupSnippet = snippets.firstOrNull { it.id == startupSnippetId }
+                        val startupDisplay = when {
+                            startupScriptState.value.isBlank() -> "None"
+                            startupSnippet != null -> startupSnippet.title
+                            startupSnippetId != null -> "Missing snippet"
+                            else -> "Legacy command"
+                        }
+                        TextField(
+                            value = startupDisplay,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Startup snippet") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = startupSnippetExpanded.value)
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = startupSnippetExpanded.value,
+                            onDismissRequest = { startupSnippetExpanded.value = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None") },
+                                onClick = {
+                                    startupScriptState.value = ""
+                                    startupSnippetExpanded.value = false
+                                }
+                            )
+                            snippets.forEach { snippet ->
+                                DropdownMenuItem(
+                                    text = { Text(snippet.title) },
+                                    onClick = {
+                                        startupScriptState.value = snippetReference(snippet.id)
+                                        startupSnippetExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    val startupSnippetId = parseSnippetReference(startupScriptState.value)
+                    val startupSnippet = snippets.firstOrNull { it.id == startupSnippetId }
+                    when {
+                        startupSnippet != null -> {
+                            Text(
+                                startupSnippet.command,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        startupSnippetId != null -> {
+                            Text(
+                                "Selected startup snippet no longer exists.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        startupScriptState.value.isNotBlank() -> {
+                            Text(
+                                "Legacy startup command detected. Pick a snippet to replace it.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                startupScriptState.value,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            TextButton(onClick = { startupScriptState.value = "" }) {
+                                Text("Clear legacy command")
+                            }
+                        }
+                    }
                     ExposedDropdownMenuBox(
                         expanded = backgroundExpanded.value,
                         onExpandedChange = { backgroundExpanded.value = !backgroundExpanded.value }
@@ -733,12 +847,6 @@ fun HostsScreen(
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (editingHost.value != null) {
-                        TextButton(onClick = {
-                            editingHost.value?.let { onDeleteHost(it.id) }
-                            closeDialog()
-                        }) { Text("Delete") }
-                    }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
                 }
             }
@@ -791,45 +899,4 @@ fun HostsScreen(
         )
     }
 
-    pendingConnect.value?.let { (host, mode) ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { pendingConnect.value = null },
-            title = { Text("Enter password") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Connect to ${host.name} (${host.host})")
-                    OutlinedTextField(
-                        value = connectPassword.value,
-                        onValueChange = { connectPassword.value = it },
-                        label = { Text("Password") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true
-                    )
-                    connectPasswordError.value?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (connectPassword.value.isBlank()) {
-                        connectPasswordError.value = "Password is required."
-                        return@TextButton
-                    }
-                    val password = connectPassword.value
-                    pendingConnect.value = null
-                    connectPassword.value = ""
-                    connectPasswordError.value = null
-                    onStartSession(host, mode, password)
-                }) {
-                    Text("Connect")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingConnect.value = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }

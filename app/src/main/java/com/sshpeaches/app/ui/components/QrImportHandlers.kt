@@ -104,11 +104,13 @@ sealed interface PortForwardQrImportResult {
 }
 
 fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
+    val incomingType = decodeForwardTypeFromQr(contents) ?: return PortForwardQrImportResult.Error("Invalid port forward QR")
+    if (incomingType.isNotBlank() && incomingType != PortForwardType.LOCAL.name) {
+        return PortForwardQrImportResult.Error("Only Local forwarding is supported.")
+    }
     val imported = decodeForwardFromQr(contents)
     return if (imported == null) {
         PortForwardQrImportResult.Error("Invalid port forward QR")
-    } else if (imported.type != PortForwardType.LOCAL) {
-        PortForwardQrImportResult.Error("Only Local forwarding is supported.")
     } else {
         PortForwardQrImportResult.Ready(imported)
     }

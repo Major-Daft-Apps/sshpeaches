@@ -23,6 +23,7 @@ data class AppUiState(
     val lockTimeout: LockTimeout = LockTimeout.FIVE_MIN,
     val customLockTimeoutMinutes: Int = 30,
     val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+    val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
     val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
     val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
     val crashReportsEnabled: Boolean = false,

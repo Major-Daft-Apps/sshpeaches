@@ -130,12 +130,12 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
                 switch (item.getItemId()) {
                     case ACTION_COPY:
                         String selectedText = getSelectedText();
-                        terminalView.mTermSession.onCopyTextToClipboard(selectedText);
+                        terminalView.copyTextToClipboard(selectedText);
                         terminalView.stopTextSelectionMode();
                         break;
                     case ACTION_PASTE:
                         terminalView.stopTextSelectionMode();
-                        terminalView.mTermSession.onPasteTextFromClipboard();
+                        terminalView.pasteTextFromClipboard();
                         break;
                     case ACTION_MORE:
                         // We first store the selected text in case TerminalViewClient needs the
@@ -348,7 +348,25 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
     /** Get the currently selected text. */
     public String getSelectedText() {
-        return terminalView.mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2);
+        return terminalView.getSelectedTextForCopy(mSelX1, mSelY1, mSelX2, mSelY2);
+    }
+
+    /** Select all transcript rows and visible rows. */
+    public void selectAll() {
+        if (terminalView.mEmulator == null) return;
+        TerminalBuffer screen = terminalView.mEmulator.getScreen();
+        mSelX1 = 0;
+        mSelY1 = -screen.getActiveTranscriptRows();
+        mSelX2 = Math.max(0, terminalView.mEmulator.mColumns - 1);
+        mSelY2 = Math.max(0, terminalView.mEmulator.mRows - 1);
+        mStartHandle.positionAtCursor(mSelX1, mSelY1, true);
+        mEndHandle.positionAtCursor(mSelX2 + 1, mSelY2, true);
+        if (mActionMode == null) {
+            setActionModeCallBacks();
+        } else {
+            mActionMode.invalidate();
+        }
+        mIsSelectingText = true;
     }
 
     /** Get the selected text stored before "MORE" button was pressed on the context menu. */

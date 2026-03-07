@@ -137,8 +137,14 @@ class TerminalRenderView(context: Context) : View(context) {
         val gestureHandled = gestureDetector.onTouchEvent(event)
         if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
             scrollRemainder = 0f
+            performClick()
         }
         return scaleHandled || gestureHandled || super.onTouchEvent(event)
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     private fun updateTerminalSize() {

@@ -50,6 +50,7 @@ class AppViewModel(
     private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
     private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
     private val terminalEmulationFlow = MutableStateFlow(TerminalEmulation.XTERM)
+    private val terminalSelectionModeFlow = MutableStateFlow(TerminalSelectionMode.NATURAL)
     private val terminalProfilesFlow = MutableStateFlow(TerminalProfileDefaults.builtInProfiles)
     private val defaultTerminalProfileIdFlow = MutableStateFlow(TerminalProfileDefaults.DEFAULT_PROFILE_ID)
     private val crashReportsFlow = MutableStateFlow(false)
@@ -105,6 +106,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.terminalEmulation.collect { value ->
                 terminalEmulationFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalSelectionMode.collect { value ->
+                terminalSelectionModeFlow.value = value
             }
         }
         viewModelScope.launch {
@@ -202,6 +208,7 @@ class AppViewModel(
         val timeout: LockTimeout,
         val customTimeoutMinutes: Int,
         val terminalEmulation: TerminalEmulation,
+        val terminalSelectionMode: TerminalSelectionMode,
         val terminalProfiles: List<TerminalProfile>,
         val defaultTerminalProfileId: String,
         val crash: Boolean,
@@ -216,6 +223,7 @@ class AppViewModel(
         val timeout: LockTimeout,
         val customTimeoutMinutes: Int,
         val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+        val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
         val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
         val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID
     )
@@ -242,11 +250,13 @@ class AppViewModel(
     private val privacyPartialFlow = combine(
         privacyPartialBaseFlow,
         terminalEmulationFlow,
+        terminalSelectionModeFlow,
         terminalProfilesFlow,
         defaultTerminalProfileIdFlow
-    ) { partial, terminalEmulation, profiles, defaultProfileId ->
+    ) { partial, terminalEmulation, selectionMode, profiles, defaultProfileId ->
         partial.copy(
             terminalEmulation = terminalEmulation,
+            terminalSelectionMode = selectionMode,
             terminalProfiles = profiles,
             defaultTerminalProfileId = defaultProfileId
         )
@@ -265,6 +275,7 @@ class AppViewModel(
             timeout = partial.timeout,
             customTimeoutMinutes = partial.customTimeoutMinutes,
             terminalEmulation = partial.terminalEmulation,
+            terminalSelectionMode = partial.terminalSelectionMode,
             terminalProfiles = partial.terminalProfiles,
             defaultTerminalProfileId = partial.defaultTerminalProfileId,
             crash = crash,
@@ -304,6 +315,7 @@ class AppViewModel(
             lockTimeout = privacy.timeout,
             customLockTimeoutMinutes = privacy.customTimeoutMinutes,
             terminalEmulation = privacy.terminalEmulation,
+            terminalSelectionMode = privacy.terminalSelectionMode,
             terminalProfiles = privacy.terminalProfiles,
             defaultTerminalProfileId = privacy.defaultTerminalProfileId,
             crashReportsEnabled = privacy.crash,
@@ -380,6 +392,7 @@ class AppViewModel(
         append(state.lockTimeout).append('|')
         append(state.customLockTimeoutMinutes).append('|')
         append(state.terminalEmulation).append('|')
+        append(state.terminalSelectionMode).append('|')
         append(state.defaultTerminalProfileId).append('|')
         append(state.terminalProfiles.size).append('|')
         append(state.crashReportsEnabled).append('|')
@@ -449,6 +462,12 @@ class AppViewModel(
         }
     }
 
+    fun setTerminalSelectionMode(value: TerminalSelectionMode) {
+        launchLogged("setTerminalSelectionMode", "value=$value") {
+            SettingsStore.setTerminalSelectionMode(value)
+        }
+    }
+
     fun setDefaultTerminalProfile(profileId: String) {
         launchLogged("setDefaultTerminalProfile", "profileId=$profileId") {
             val profiles = terminalProfilesFlow.value
@@ -467,6 +486,13 @@ class AppViewModel(
             val builtInIds = TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet()
             if (builtInIds.contains(normalized.id)) {
                 logResult("saveTerminalProfile", false, "cannot-overwrite-builtin")
+                return@launchLogged
+            }
+            val duplicateName = terminalProfilesFlow.value.any {
+                it.id != normalized.id && it.name.equals(normalized.name, ignoreCase = true)
+            }
+            if (duplicateName) {
+                logResult("saveTerminalProfile", false, "duplicate-name")
                 return@launchLogged
             }
             val updated = terminalProfilesFlow.value

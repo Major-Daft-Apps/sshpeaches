@@ -25,9 +25,11 @@ data class KeyboardSlotAction(
     val ctrl: Boolean = false,
     val alt: Boolean = false,
     val shift: Boolean = false,
-    val repeatable: Boolean = false
+    val repeatable: Boolean = false,
+    val iconId: String = ""
 ) {
-    fun isEmpty(): Boolean = type == KeyboardActionType.TEXT && text.isBlank() && label.isBlank()
+    fun isEmpty(): Boolean =
+        type == KeyboardActionType.TEXT && text.isBlank() && label.isBlank() && iconId.isBlank()
 }
 
 object KeyboardLayoutDefaults {
@@ -91,7 +93,110 @@ object KeyboardLayoutDefaults {
         functionKeyAction(12)
     )
 
+    val letterPresets: List<KeyboardSlotAction> = ('A'..'Z').map { ch ->
+        val keyCode = KeyEvent.KEYCODE_A + (ch.code - 'A'.code)
+        keyAction(ch.toString(), keyCode)
+    }
+
+    val digitPresets: List<KeyboardSlotAction> = ('0'..'9').map { ch ->
+        val keyCode = KeyEvent.KEYCODE_0 + (ch.code - '0'.code)
+        keyAction(ch.toString(), keyCode)
+    }
+
+    val punctuationPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("`", KeyEvent.KEYCODE_GRAVE),
+        keyAction("~", KeyEvent.KEYCODE_GRAVE, shift = true),
+        keyAction("-", KeyEvent.KEYCODE_MINUS),
+        keyAction("_", KeyEvent.KEYCODE_MINUS, shift = true),
+        keyAction("=", KeyEvent.KEYCODE_EQUALS),
+        keyAction("+", KeyEvent.KEYCODE_EQUALS, shift = true),
+        keyAction("[", KeyEvent.KEYCODE_LEFT_BRACKET),
+        keyAction("{", KeyEvent.KEYCODE_LEFT_BRACKET, shift = true),
+        keyAction("]", KeyEvent.KEYCODE_RIGHT_BRACKET),
+        keyAction("}", KeyEvent.KEYCODE_RIGHT_BRACKET, shift = true),
+        keyAction("\\", KeyEvent.KEYCODE_BACKSLASH),
+        keyAction("|", KeyEvent.KEYCODE_BACKSLASH, shift = true),
+        keyAction(";", KeyEvent.KEYCODE_SEMICOLON),
+        keyAction(":", KeyEvent.KEYCODE_SEMICOLON, shift = true),
+        keyAction("'", KeyEvent.KEYCODE_APOSTROPHE),
+        keyAction("\"", KeyEvent.KEYCODE_APOSTROPHE, shift = true),
+        keyAction(",", KeyEvent.KEYCODE_COMMA),
+        keyAction("<", KeyEvent.KEYCODE_COMMA, shift = true),
+        keyAction(".", KeyEvent.KEYCODE_PERIOD),
+        keyAction(">", KeyEvent.KEYCODE_PERIOD, shift = true),
+        keyAction("/", KeyEvent.KEYCODE_SLASH),
+        keyAction("?", KeyEvent.KEYCODE_SLASH, shift = true)
+    )
+
+    val whitespaceEditingPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Space", KeyEvent.KEYCODE_SPACE),
+        keyAction("Tab", KeyEvent.KEYCODE_TAB),
+        keyAction("Enter", KeyEvent.KEYCODE_ENTER),
+        keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
+        keyAction("Delete", KeyEvent.KEYCODE_FORWARD_DEL, repeatable = true),
+        keyAction("Insert", KeyEvent.KEYCODE_INSERT)
+    )
+
+    val numpadPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Num0", KeyEvent.KEYCODE_NUMPAD_0),
+        keyAction("Num1", KeyEvent.KEYCODE_NUMPAD_1),
+        keyAction("Num2", KeyEvent.KEYCODE_NUMPAD_2),
+        keyAction("Num3", KeyEvent.KEYCODE_NUMPAD_3),
+        keyAction("Num4", KeyEvent.KEYCODE_NUMPAD_4),
+        keyAction("Num5", KeyEvent.KEYCODE_NUMPAD_5),
+        keyAction("Num6", KeyEvent.KEYCODE_NUMPAD_6),
+        keyAction("Num7", KeyEvent.KEYCODE_NUMPAD_7),
+        keyAction("Num8", KeyEvent.KEYCODE_NUMPAD_8),
+        keyAction("Num9", KeyEvent.KEYCODE_NUMPAD_9),
+        keyAction("Num+", KeyEvent.KEYCODE_NUMPAD_ADD),
+        keyAction("Num-", KeyEvent.KEYCODE_NUMPAD_SUBTRACT),
+        keyAction("Num*", KeyEvent.KEYCODE_NUMPAD_MULTIPLY),
+        keyAction("Num/", KeyEvent.KEYCODE_NUMPAD_DIVIDE),
+        keyAction("Num.", KeyEvent.KEYCODE_NUMPAD_DOT),
+        keyAction("NumEnt", KeyEvent.KEYCODE_NUMPAD_ENTER)
+    )
+
+    val lockSystemPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
+        keyAction("Caps", KeyEvent.KEYCODE_CAPS_LOCK),
+        keyAction("NumLk", KeyEvent.KEYCODE_NUM_LOCK),
+        keyAction("ScrLk", KeyEvent.KEYCODE_SCROLL_LOCK),
+        keyAction("PrtSc", KeyEvent.KEYCODE_SYSRQ),
+        keyAction("Pause", KeyEvent.KEYCODE_BREAK),
+        keyAction("Meta", KeyEvent.KEYCODE_META_LEFT)
+    )
+
     val sequencePresets: List<KeyboardSlotAction> = listOf(
+        sequenceAction("C-C", "\u0003"),
+        sequenceAction("C-D", "\u0004"),
+        sequenceAction("C-Z", "\u001A")
+    )
+
+    val advancedSequencePresets: List<KeyboardSlotAction> = listOf(
+        sequenceAction("Clear", "\u001B[2J\u001B[H"),
+        sequenceAction("Clr+Sb", "\u001B[3J\u001B[H\u001B[2J"),
+        sequenceAction("CurHome", "\u001B[H"),
+        sequenceAction("SaveCur", "\u001B7"),
+        sequenceAction("RestCur", "\u001B8"),
+        sequenceAction("CurHide", "\u001B[?25l"),
+        sequenceAction("CurShow", "\u001B[?25h"),
+        sequenceAction("AltOn", "\u001B[?1049h"),
+        sequenceAction("AltOff", "\u001B[?1049l"),
+        sequenceAction("BP On", "\u001B[?2004h"),
+        sequenceAction("BP Off", "\u001B[?2004l"),
+        sequenceAction("BP Start", "\u001B[200~"),
+        sequenceAction("BP End", "\u001B[201~"),
+        sequenceAction("Title", "\u001B]0;SSHPeaches\u0007"),
+        sequenceAction("OSC8 On", "\u001B]8;;https://majordaftapps.com\u001B\\"),
+        sequenceAction("OSC8 Off", "\u001B]8;;\u001B\\"),
+        sequenceAction("BoldOn", "\u001B[1m"),
+        sequenceAction("BoldOff", "\u001B[22m"),
+        sequenceAction("RevOn", "\u001B[7m"),
+        sequenceAction("RevOff", "\u001B[27m"),
+        sequenceAction("Reset", "\u001B[0m"),
+        sequenceAction("DSR", "\u001B[6n"),
+        sequenceAction("DECSTR", "\u001B[!p"),
+        sequenceAction("RIS", "\u001Bc"),
         sequenceAction("C-C", "\u0003"),
         sequenceAction("C-D", "\u0004"),
         sequenceAction("C-Z", "\u001A")

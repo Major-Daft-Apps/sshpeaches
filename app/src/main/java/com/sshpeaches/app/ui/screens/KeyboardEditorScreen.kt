@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,15 +16,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPack
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
@@ -49,8 +56,27 @@ fun KeyboardEditorScreen(
     onSlotChange: (Int, KeyboardSlotAction) -> Unit,
     onReset: () -> Unit
 ) {
-    val dialogIndex = remember { mutableStateOf<Int?>(null) }
+    val editorIndex = remember { mutableStateOf<Int?>(null) }
     val normalizedSlots = remember(slots) { KeyboardLayoutDefaults.normalizeSlots(slots) }
+    val activeEditorIndex = editorIndex.value
+
+    if (activeEditorIndex != null) {
+        val current = normalizedSlots.getOrNull(activeEditorIndex) ?: KeyboardLayoutDefaults.emptyAction()
+        KeyActionEditorVertical(
+            slotIndex = activeEditorIndex,
+            current = current,
+            onApply = { action ->
+                onSlotChange(activeEditorIndex, action)
+                editorIndex.value = null
+            },
+            onRemove = {
+                onSlotChange(activeEditorIndex, KeyboardLayoutDefaults.emptyAction())
+                editorIndex.value = null
+            },
+            onCancel = { editorIndex.value = null }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -59,7 +85,7 @@ fun KeyboardEditorScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to assign text, navigation keys, modifiers, function keys, combos, or sequences.")
+        Text("Tap a slot to open the full key-action editor vertical.")
 
         Column(
             modifier = Modifier
@@ -78,23 +104,14 @@ fun KeyboardEditorScreen(
                         row.forEachIndexed { columnIndex, action ->
                             val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
                             KeySlot(
-                                label = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
+                                action = action,
                                 active = !action.isEmpty(),
-                                onClick = { dialogIndex.value = index }
+                                onClick = { editorIndex.value = index }
                             )
                         }
                     }
                 }
         }
-
-        Text(
-            "One-shot modifiers apply to the next key or typed text, then clear automatically.",
-            style = MaterialTheme.typography.bodySmall
-        )
-        Text(
-            "Tip: add F1-F12 from the Function section for tmux, htop, and remote tooling.",
-            style = MaterialTheme.typography.bodySmall
-        )
 
         Card(
             modifier = Modifier
@@ -119,35 +136,23 @@ fun KeyboardEditorScreen(
             }
         }
 
-        TextButton(onClick = {
-            onReset()
-        }) {
+        Text(
+            "Modifier keys and combination toggles co-exist: modifiers send plain Ctrl/Alt/Shift; combination toggles apply to the next selected base key.",
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        TextButton(onClick = onReset) {
             Text("Reset layout")
         }
-    }
-
-    val handleSlotChange: (Int, KeyboardSlotAction) -> Unit = { idx, value ->
-        onSlotChange(idx, value)
-    }
-
-    dialogIndex.value?.let { idx ->
-        KeySlotDialog(
-            current = normalizedSlots.getOrNull(idx) ?: KeyboardLayoutDefaults.emptyAction(),
-            onSelect = { newKey ->
-                handleSlotChange(idx, newKey)
-                dialogIndex.value = null
-            },
-            onRemove = {
-                handleSlotChange(idx, KeyboardLayoutDefaults.emptyAction())
-                dialogIndex.value = null
-            },
-            onDismiss = { dialogIndex.value = null }
-        )
     }
 }
 
 @Composable
-private fun RowScope.KeySlot(label: String, active: Boolean, onClick: () -> Unit) {
+private fun RowScope.KeySlot(
+    action: KeyboardSlotAction,
+    active: Boolean,
+    onClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .weight(1f)
@@ -158,172 +163,247 @@ private fun RowScope.KeySlot(label: String, active: Boolean, onClick: () -> Unit
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
-            fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
-            maxLines = 1
-        )
+        val icon = KeyboardIconPack.byId(action.iconId)
+        if (icon != null) {
+            Icon(
+                imageVector = icon.icon,
+                contentDescription = icon.label,
+                tint = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+                modifier = Modifier.size(14.dp)
+            )
+        } else {
+            Text(
+                text = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
+                color = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+                fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
+                maxLines = 1
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun KeySlotDialog(
+private fun KeyActionEditorVertical(
+    slotIndex: Int,
     current: KeyboardSlotAction,
-    onSelect: (KeyboardSlotAction) -> Unit,
+    onApply: (KeyboardSlotAction) -> Unit,
     onRemove: () -> Unit,
-    onDismiss: () -> Unit
+    onCancel: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+    val comboCtrl = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.ctrl) }
+    val comboAlt = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.alt) }
+    val comboShift = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.shift) }
+    val selectedIconId = remember(current) { mutableStateOf(current.iconId) }
     val textDraft = remember(current) {
         mutableStateOf(if (current.type == KeyboardActionType.TEXT) current.text else "")
     }
     val sequenceDraft = remember(current) {
         mutableStateOf(if (current.type == KeyboardActionType.SEQUENCE) current.sequence else "")
     }
-    val comboKeyDraft = remember(current) {
-        mutableStateOf(
-            if (current.type == KeyboardActionType.KEY) {
-                KeyboardLayoutDefaults.keyTokenForAction(current)
-            } else {
-                ""
-            }
+    val advancedExpanded = remember { mutableStateOf(false) }
+
+    val applyKeyAction: (KeyboardSlotAction) -> Unit = { base ->
+        onApply(
+            withCombinationAndIcon(
+                base = base,
+                ctrl = comboCtrl.value,
+                alt = comboAlt.value,
+                shift = comboShift.value,
+                iconId = selectedIconId.value
+            )
         )
-    }
-    val comboLabelDraft = remember(current) {
-        mutableStateOf(
-            if (current.type == KeyboardActionType.KEY && (current.ctrl || current.alt || current.shift)) {
-                current.label
-            } else {
-                ""
-            }
-        )
-    }
-    val comboCtrl = remember(current) {
-        mutableStateOf(current.type == KeyboardActionType.KEY && current.ctrl)
-    }
-    val comboAlt = remember(current) {
-        mutableStateOf(current.type == KeyboardActionType.KEY && current.alt)
-    }
-    val comboShift = remember(current) {
-        mutableStateOf(current.type == KeyboardActionType.KEY && current.shift)
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (current.isEmpty()) "Add key action" else "Edit key action") },
-        text = {
-            val outerScroll = rememberScrollState()
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .verticalScroll(outerScroll)
-                    .sizeIn(maxHeight = 460.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onCancel) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Text("Edit Key Action", style = MaterialTheme.typography.headlineSmall)
+            }
+            Text("Slot ${slotIndex + 1}", style = MaterialTheme.typography.bodySmall)
+        }
+
+        Text(
+            "Current: ${fullActionLabel(current)}",
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        SectionTitle("Modifiers")
+        PresetRow(KeyboardLayoutDefaults.modifierPresets) { preset ->
+            onApply(preset.copy(iconId = selectedIconId.value))
+        }
+
+        SectionTitle("Combination")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ModifierToggle(
+                label = "Ctrl",
+                active = comboCtrl.value,
+                onToggle = { comboCtrl.value = !comboCtrl.value }
+            )
+            ModifierToggle(
+                label = "Alt",
+                active = comboAlt.value,
+                onToggle = { comboAlt.value = !comboAlt.value }
+            )
+            ModifierToggle(
+                label = "Shift",
+                active = comboShift.value,
+                onToggle = { comboShift.value = !comboShift.value }
+            )
+        }
+        Text(
+            "Pick any base key below. Active combination toggles are applied to that key.",
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        SectionTitle("Letters")
+        PresetRow(KeyboardLayoutDefaults.letterPresets, applyKeyAction)
+
+        SectionTitle("Digits")
+        PresetRow(KeyboardLayoutDefaults.digitPresets, applyKeyAction)
+
+        SectionTitle("Special Characters")
+        PresetRow(KeyboardLayoutDefaults.punctuationPresets, applyKeyAction)
+
+        SectionTitle("Whitespace/Editing")
+        PresetRow(KeyboardLayoutDefaults.whitespaceEditingPresets, applyKeyAction)
+
+        SectionTitle("Navigation")
+        PresetRow(KeyboardLayoutDefaults.navigationPresets, applyKeyAction)
+
+        SectionTitle("Function Keys")
+        PresetRow(KeyboardLayoutDefaults.functionPresets, applyKeyAction)
+
+        SectionTitle("Numpad")
+        PresetRow(KeyboardLayoutDefaults.numpadPresets, applyKeyAction)
+
+        SectionTitle("Lock/System")
+        PresetRow(KeyboardLayoutDefaults.lockSystemPresets, applyKeyAction)
+
+        SectionTitle("Text")
+        OutlinedTextField(
+            value = textDraft.value,
+            onValueChange = { textDraft.value = it },
+            label = { Text("Text payload") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        TextButton(
+            enabled = textDraft.value.isNotBlank(),
+            onClick = {
+                onApply(
+                    KeyboardLayoutDefaults.textAction(textDraft.value).copy(iconId = selectedIconId.value)
+                )
+            }
+        ) {
+            Text("Use Text")
+        }
+
+        SectionTitle("Icon")
+        IconPresetRow(
+            selectedIconId = selectedIconId.value,
+            onSelect = { selectedIconId.value = it }
+        )
+
+        TextButton(onClick = { advancedExpanded.value = !advancedExpanded.value }) {
+            Icon(
+                imageVector = if (advancedExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null
+            )
+            Text(if (advancedExpanded.value) "Advanced (hide)" else "Advanced")
+        }
+
+        if (advancedExpanded.value) {
+            SectionTitle("VT100/xterm Sequences")
+            PresetRow(KeyboardLayoutDefaults.advancedSequencePresets) { preset ->
+                onApply(preset.copy(iconId = selectedIconId.value))
+            }
+
+            OutlinedTextField(
+                value = sequenceDraft.value,
+                onValueChange = { sequenceDraft.value = it },
+                label = { Text("Custom sequence") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            TextButton(
+                enabled = sequenceDraft.value.isNotBlank(),
+                onClick = {
+                    onApply(
+                        KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value)
+                            .copy(iconId = selectedIconId.value)
+                    )
+                }
             ) {
-                Text(
-                    "Current: ${KeyboardLayoutDefaults.compactLabel(current, fallback = "Empty")}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                Text("Text", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = textDraft.value,
-                    onValueChange = { textDraft.value = it },
-                    label = { Text("Text payload") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                TextButton(
-                    enabled = textDraft.value.isNotBlank(),
-                    onClick = { onSelect(KeyboardLayoutDefaults.textAction(textDraft.value)) }
-                ) {
-                    Text("Use Text")
-                }
-
-                Text("Modifiers", style = MaterialTheme.typography.labelLarge)
-                PresetRow(KeyboardLayoutDefaults.modifierPresets, onSelect)
-
-                Text("Navigation", style = MaterialTheme.typography.labelLarge)
-                PresetRow(KeyboardLayoutDefaults.navigationPresets, onSelect)
-
-                Text("Function", style = MaterialTheme.typography.labelLarge)
-                PresetRow(KeyboardLayoutDefaults.functionPresets, onSelect)
-
-                Text("Combinations", style = MaterialTheme.typography.labelLarge)
-                PresetRow(KeyboardLayoutDefaults.comboPresets, onSelect)
-
-                OutlinedTextField(
-                    value = comboKeyDraft.value,
-                    onValueChange = { comboKeyDraft.value = it },
-                    label = { Text("Combo base key (A, TAB, ESC, F1...)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ModifierToggle(
-                        label = "Ctrl",
-                        active = comboCtrl.value,
-                        onToggle = { comboCtrl.value = !comboCtrl.value }
-                    )
-                    ModifierToggle(
-                        label = "Alt",
-                        active = comboAlt.value,
-                        onToggle = { comboAlt.value = !comboAlt.value }
-                    )
-                    ModifierToggle(
-                        label = "Shift",
-                        active = comboShift.value,
-                        onToggle = { comboShift.value = !comboShift.value }
-                    )
-                }
-                OutlinedTextField(
-                    value = comboLabelDraft.value,
-                    onValueChange = { comboLabelDraft.value = it },
-                    label = { Text("Custom combo label (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                val comboAction = KeyboardLayoutDefaults.combinationAction(
-                    keyToken = comboKeyDraft.value,
-                    ctrl = comboCtrl.value,
-                    alt = comboAlt.value,
-                    shift = comboShift.value,
-                    customLabel = comboLabelDraft.value
-                )
-                TextButton(
-                    enabled = comboAction != null && (comboCtrl.value || comboAlt.value || comboShift.value),
-                    onClick = { comboAction?.let(onSelect) }
-                ) {
-                    Text("Use Combo")
-                }
-
-                Text("Sequences", style = MaterialTheme.typography.labelLarge)
-                PresetRow(KeyboardLayoutDefaults.sequencePresets, onSelect)
-
-                OutlinedTextField(
-                    value = sequenceDraft.value,
-                    onValueChange = { sequenceDraft.value = it },
-                    label = { Text("Custom sequence") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                TextButton(
-                    enabled = sequenceDraft.value.isNotBlank(),
-                    onClick = {
-                        onSelect(KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value))
-                    }
-                ) {
-                    Text("Use Sequence")
-                }
+                Text("Use Custom Sequence")
             }
-        },
-        confirmButton = {
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onCancel) { Text("Cancel") }
             if (!current.isEmpty()) {
                 TextButton(onClick = onRemove) { Text("Remove") }
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge)
+}
+
+private fun withCombinationAndIcon(
+    base: KeyboardSlotAction,
+    ctrl: Boolean,
+    alt: Boolean,
+    shift: Boolean,
+    iconId: String
+): KeyboardSlotAction {
+    val withIcon = base.copy(iconId = iconId)
+    if (withIcon.type != KeyboardActionType.KEY) return withIcon
+    if (!ctrl && !alt && !shift) return withIcon
+
+    val modifiers = mutableListOf<String>()
+    if (ctrl) modifiers += "Ctrl"
+    if (alt) modifiers += "Alt"
+    if (shift) modifiers += "Shift"
+    val baseLabel = withIcon.label.ifBlank {
+        KeyboardLayoutDefaults.keyTokenForAction(withIcon).ifBlank { "Key" }
+    }
+    val combinedLabel = "${modifiers.joinToString("+")}-$baseLabel"
+    return withIcon.copy(
+        label = combinedLabel,
+        ctrl = withIcon.ctrl || ctrl,
+        alt = withIcon.alt || alt,
+        shift = withIcon.shift || shift
     )
+}
+
+private fun fullActionLabel(action: KeyboardSlotAction): String {
+    if (action.isEmpty()) return "Empty"
+    val label = action.label.trim()
+    if (label.isNotBlank()) return label
+    return when (action.type) {
+        KeyboardActionType.TEXT -> action.text.trim().ifBlank { "Empty" }
+        KeyboardActionType.KEY -> KeyboardLayoutDefaults.keyTokenForAction(action).ifBlank { "Key" }
+        KeyboardActionType.MODIFIER -> "Modifier"
+        KeyboardActionType.SEQUENCE -> action.sequence.trim().ifBlank { "Sequence" }
+    }
 }
 
 @Composable
@@ -349,7 +429,38 @@ private fun PresetRow(
     ) {
         presets.forEach { action ->
             TextButton(onClick = { onSelect(action) }) {
-                Text(action.label)
+                val icon = KeyboardIconPack.byId(action.iconId)
+                if (icon != null) {
+                    Icon(icon.icon, contentDescription = icon.label, modifier = Modifier.size(16.dp))
+                } else {
+                    Text(action.label)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun IconPresetRow(
+    selectedIconId: String,
+    onSelect: (String) -> Unit
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        TextButton(onClick = { onSelect("") }) {
+            Text(if (selectedIconId.isBlank()) "[x] Text" else "Text")
+        }
+        KeyboardIconPack.icons.forEach { spec ->
+            TextButton(onClick = { onSelect(spec.id) }) {
+                Icon(
+                    imageVector = spec.icon,
+                    contentDescription = spec.label,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(if (selectedIconId == spec.id) " [x]" else "")
             }
         }
     }

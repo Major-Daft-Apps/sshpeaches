@@ -2,25 +2,21 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,44 +25,34 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
-import com.majordaftapps.sshpeaches.app.ui.components.processSnippetQrImport
 import com.majordaftapps.sshpeaches.app.ui.components.SnippetQrImportResult
-import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
-import java.util.UUID
+import com.majordaftapps.sshpeaches.app.ui.components.processSnippetQrImport
 
 @Composable
 fun SnippetManagerScreen(
     snippets: List<Snippet>,
     onAdd: (title: String, description: String, command: String) -> Unit = { _, _, _ -> },
-    onUpdate: (id: String, title: String, description: String, command: String) -> Unit = { _, _, _, _ -> },
+    onCreateSnippet: () -> Unit = {},
+    onEditSnippet: (snippetId: String) -> Unit = {},
     onDelete: (id: String) -> Unit = {},
     onRun: (snippet: Snippet) -> Unit = {},
     onImportFromQr: () -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
     val search = remember { mutableStateOf("") }
-    val showDialog = remember { mutableStateOf(false) }
-    val editingId = remember { mutableStateOf<String?>(null) }
-    val titleState = remember { mutableStateOf("") }
-    val descriptionState = remember { mutableStateOf("") }
-    val commandState = remember { mutableStateOf("") }
-    val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -84,18 +70,6 @@ fun SnippetManagerScreen(
                 Toast.makeText(context, "Snippet imported", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    fun openDialog(snippet: Snippet?) {
-        editingId.value = snippet?.id
-        titleState.value = snippet?.title ?: ""
-        descriptionState.value = snippet?.description ?: ""
-        commandState.value = snippet?.command ?: ""
-        showDialog.value = true
-    }
-
-    fun closeDialog() {
-        showDialog.value = false
     }
 
     val filteredSnippets = snippets.filter {
@@ -131,7 +105,7 @@ fun SnippetManagerScreen(
         ) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                    Button(onClick = onCreateSnippet, modifier = Modifier.weight(1f)) {
                         Text("Add snippet")
                     }
                     Button(
@@ -168,7 +142,7 @@ fun SnippetManagerScreen(
                         Text(snippet.command, style = MaterialTheme.typography.bodySmall)
                         RowActions(
                             onRun = { onRun(snippet) },
-                            onEdit = { openDialog(snippet) },
+                            onEdit = { onEditSnippet(snippet.id) },
                             onDelete = { onDelete(snippet.id) }
                         )
                     }
@@ -176,74 +150,6 @@ fun SnippetManagerScreen(
             }
             }
         }
-    }
-
-    if (showDialog.value) {
-        val isEdit = editingId.value != null
-        AlertDialog(
-            onDismissRequest = { closeDialog() },
-            title = { Text(if (isEdit) "Edit snippet" else "Add snippet") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = dialogBodyMaxHeight)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = titleState.value,
-                        onValueChange = { titleState.value = it },
-                        label = { Text("Title") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = descriptionState.value,
-                        onValueChange = { descriptionState.value = it },
-                        label = { Text("Description") }
-                    )
-                    OutlinedTextField(
-                        value = commandState.value,
-                        onValueChange = { commandState.value = it },
-                        label = { Text("Command") },
-                        singleLine = false,
-                        minLines = 4,
-                        maxLines = 12,
-                        textStyle = androidx.compose.material3.LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (isEdit) {
-                        onUpdate(
-                            editingId.value!!,
-                            titleState.value.ifBlank { "Snippet" },
-                            descriptionState.value,
-                            commandState.value
-                        )
-                    } else {
-                        onAdd(
-                            titleState.value.ifBlank { "Snippet ${UUID.randomUUID()}" },
-                            descriptionState.value,
-                            commandState.value
-                        )
-                    }
-                    closeDialog()
-                }) { Text(if (isEdit) "Save" else "Add") }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isEdit) {
-                        TextButton(onClick = {
-                            onDelete(editingId.value!!)
-                            closeDialog()
-                        }) { Text("Delete") }
-                    }
-                    TextButton(onClick = { closeDialog() }) { Text("Cancel") }
-                }
-            }
-        )
     }
 }
 

@@ -13,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -36,6 +37,7 @@ object SettingsStore {
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
     private val terminalEmulationKey = stringPreferencesKey("terminal_emulation")
+    private val terminalSelectionModeKey = stringPreferencesKey("terminal_selection_mode")
     private val terminalProfilesKey = stringPreferencesKey("terminal_profiles")
     private val defaultTerminalProfileIdKey = stringPreferencesKey("default_terminal_profile_id")
     private val customLockTimeoutMinutesKey = intPreferencesKey("custom_lock_timeout_minutes")
@@ -94,6 +96,16 @@ object SettingsStore {
                     prefs[terminalEmulationKey] ?: TerminalEmulation.XTERM.name
                 )
             }.getOrDefault(TerminalEmulation.XTERM)
+        }
+    }
+
+    val terminalSelectionMode: Flow<TerminalSelectionMode> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalSelectionMode.valueOf(
+                    prefs[terminalSelectionModeKey] ?: TerminalSelectionMode.NATURAL.name
+                )
+            }.getOrDefault(TerminalSelectionMode.NATURAL)
         }
     }
 
@@ -207,6 +219,12 @@ object SettingsStore {
     suspend fun setTerminalEmulation(value: TerminalEmulation) {
         dataStore.edit { prefs ->
             prefs[terminalEmulationKey] = value.name
+        }
+    }
+
+    suspend fun setTerminalSelectionMode(value: TerminalSelectionMode) {
+        dataStore.edit { prefs ->
+            prefs[terminalSelectionModeKey] = value.name
         }
     }
 

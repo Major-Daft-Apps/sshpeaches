@@ -71,11 +71,10 @@ fun decodeIdentityFromQr(contents: String): IdentityQrPayload? = runCatching {
 
 fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
     val json = JSONObject(String(Base64.getDecoder().decode(contents), Charsets.UTF_8))
-    val type = PortForwardType.valueOf(json.optString("type", "LOCAL"))
     PortForward(
         id = json.optString("id"),
         label = json.optString("label", "QR Forward"),
-        type = type,
+        type = PortForwardType.LOCAL,
         sourceHost = json.optString("bind", "127.0.0.1"),
         sourcePort = json.optInt("srcPort", 0),
         destinationHost = json.optString("dstHost", ""),
@@ -83,6 +82,13 @@ fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
         associatedHosts = emptyList(),
         enabled = false
     )
+}.getOrNull()
+
+fun decodeForwardTypeFromQr(contents: String): String? = runCatching {
+    val json = JSONObject(String(Base64.getDecoder().decode(contents), Charsets.UTF_8))
+    json.optString("type", PortForwardType.LOCAL.name)
+        .trim()
+        .uppercase()
 }.getOrNull()
 
 fun decodeSnippetFromQr(contents: String): Snippet? = runCatching {

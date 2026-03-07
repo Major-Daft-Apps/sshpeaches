@@ -8,6 +8,8 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import java.util.Base64
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -147,16 +149,17 @@ class QrImportHandlersTest {
 
     @Test
     fun portForwardImport_nonLocalPayload_returnsError() {
-        val payload = encodePortForwardPayload(
-            PortForward(
-                id = "pf-2",
-                label = "PF Remote",
-                type = PortForwardType.REMOTE,
-                sourceHost = "0.0.0.0",
-                sourcePort = 2222,
-                destinationHost = "127.0.0.1",
-                destinationPort = 22
-            )
+        val payload = Base64.getEncoder().encodeToString(
+            JSONObject()
+                .put("id", "pf-2")
+                .put("label", "PF Remote")
+                .put("type", "REMOTE")
+                .put("bind", "0.0.0.0")
+                .put("srcPort", 2222)
+                .put("dstHost", "127.0.0.1")
+                .put("dstPort", 22)
+                .toString()
+                .toByteArray(Charsets.UTF_8)
         )
 
         val result = processPortForwardQrImport(payload)

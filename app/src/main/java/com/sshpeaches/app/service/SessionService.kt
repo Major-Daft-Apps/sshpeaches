@@ -18,12 +18,14 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -55,11 +57,11 @@ import net.schmizz.sshj.connection.channel.direct.Parameters
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.scp.SCPFileTransfer
+import kotlin.math.absoluteValue
 
 /**
  * Foreground service that keeps SSH/Mosh sessions alive.
@@ -77,9 +79,12 @@ class SessionService : Service() {
     private val passwordPrompts = MutableStateFlow<List<PasswordPrompt>>(emptyList())
     private val passwordPromptWaiters = ConcurrentHashMap<String, CompletableFuture<PasswordResponse>>()
     private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
     private val shellReadSequence = ConcurrentHashMap<String, Int>()
     private val shellWriteSequence = ConcurrentHashMap<String, Int>()
+    private var foregroundNotificationId: Int? = null
+    private val sessionNotificationIds = mutableSetOf<Int>()
     @Volatile
     private var diagnosticsEnabled: Boolean = false
 
@@ -92,10 +97,6 @@ class SessionService : Service() {
             }
         }
         createChannel()
-        startForeground(
-            NOTIFICATION_ID,
-            buildSummaryNotification()
-        )
         UiDebugLog.result("SessionService.onCreate", true)
     }
 
@@ -103,6 +104,11 @@ class SessionService : Service() {
         UiDebugLog.action("SessionService.onStartCommand", "action=${intent?.action}, startId=$startId")
         when (intent?.action) {
             ACTION_STOP_ALL -> stopAllSessions()
+            ACTION_STOP_SESSION -> intent.getStringExtra(EXTRA_HOST_ID)?.let { hostId ->
+                if (hostId.isNotBlank()) {
+                    stopSession(hostId)
+                }
+            }
         }
         UiDebugLog.result("SessionService.onStartCommand", true)
         return START_STICKY
@@ -117,6 +123,7 @@ class SessionService : Service() {
         clearAllHostKeyPrompts()
         clearAllPasswordPrompts()
         shellOutput.value = emptyMap()
+        remoteDirectories.value = emptyMap()
         shellSizes.clear()
         shellReadSequence.clear()
         shellWriteSequence.clear()
@@ -128,17 +135,19 @@ class SessionService : Service() {
         mode: ConnectionMode,
         passwordOverride: String? = null,
         availableForwards: List<PortForward> = emptyList(),
+        availableSnippets: List<Snippet> = emptyList(),
         autoStartForwards: Boolean = true,
         autoTrustUnknownHostKey: Boolean = true,
         allowPasswordSave: Boolean = false,
         terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM
     ) {
+        val sessionId = sessionIdFor(host.id, mode)
         UiDebugLog.action(
             "startSession",
-            "hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(host.id)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
+            "sessionId=$sessionId, hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(sessionId)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
         )
-        if (activeJobs.containsKey(host.id)) {
-            UiDebugLog.result("startSession", false, "already-active hostId=${host.id}")
+        if (activeJobs.containsKey(sessionId)) {
+            UiDebugLog.result("startSession", false, "already-active sessionId=$sessionId")
             return
         }
         val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
@@ -161,14 +170,14 @@ class SessionService : Service() {
             var sessionHost = host
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
             runCatching {
-                updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+                updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
                 client = SshClientProvider.createClient(
                     this@SessionService,
                     sessionHost,
-                    SessionLoggerFactory(host.id),
+                    SessionLoggerFactory(sessionId),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
                     onHostKeyPrompt = { prompt ->
-                        awaitHostKeyDecision(host.id, prompt, attemptDeadlineMillis)
+                        awaitHostKeyDecision(sessionId, prompt, attemptDeadlineMillis)
                     }
                 )
                 throwIfAttemptTimedOut(attemptDeadlineMillis)
@@ -179,6 +188,7 @@ class SessionService : Service() {
                         authenticateWithPassword(
                             client = client!!,
                             host = host,
+                            sessionId = sessionId,
                             mode = mode,
                             initialPassword = initialPassword,
                             deadlineMillis = attemptDeadlineMillis,
@@ -189,6 +199,7 @@ class SessionService : Service() {
                         authenticateWithIdentity(
                             client = client!!,
                             host = host,
+                            sessionId = sessionId,
                             mode = mode,
                             required = true
                         )
@@ -197,6 +208,7 @@ class SessionService : Service() {
                         authenticateWithIdentity(
                             client = client!!,
                             host = host,
+                            sessionId = sessionId,
                             mode = mode,
                             required = false
                         )
@@ -204,6 +216,7 @@ class SessionService : Service() {
                             authenticateWithPassword(
                                 client = client!!,
                                 host = host,
+                                sessionId = sessionId,
                                 mode = mode,
                                 initialPassword = initialPassword,
                                 deadlineMillis = attemptDeadlineMillis,
@@ -212,12 +225,12 @@ class SessionService : Service() {
                         }
                     }
                 }
-                detectRemoteOsMetadata(host.id, client!!)?.let { detected ->
+                detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
                     if (sessionHost.osMetadata != detected) {
                         sessionHost = sessionHost.copy(osMetadata = detected)
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
-                                hostId = host.id,
+                                hostId = sessionId,
                                 level = SessionLogBus.LogLevel.INFO,
                                 message = "Detected remote OS: ${detected.toSummaryLabel()}"
                             )
@@ -227,48 +240,49 @@ class SessionService : Service() {
                 when (mode) {
                     ConnectionMode.SSH -> {
                         if (useMoshTransport) {
-                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh-server...")
-                            val moshConnect = startMoshServer(host.id, client!!)
+                            updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh-server...")
+                            val moshConnect = startMoshServer(sessionId, client!!)
                             throwIfAttemptTimedOut(attemptDeadlineMillis)
-                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh client...")
+                            updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting mosh client...")
                             moshBinding = startMoshClient(
-                                hostId = host.id,
+                                hostId = sessionId,
                                 host = sessionHost,
                                 moshConnect = moshConnect,
                                 terminalEmulation = terminalEmulation
                             )
                         } else {
-                            updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
-                            shellBinding = openShell(host.id, client!!, terminalEmulation)
+                            updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
+                            shellBinding = openShell(sessionId, client!!, terminalEmulation)
                         }
                     }
                     ConnectionMode.SFTP -> {
-                        updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Opening SFTP subsystem...")
+                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SFTP subsystem...")
                         sftpBinding = SftpBinding(client!!.newSFTPClient())
-                        refreshSftpDirectoryListing(host.id, sftpBinding!!.client, ".")
+                        refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
                     }
                     ConnectionMode.SCP -> {
-                        updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP transfer channel...")
+                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP transfer channel...")
                         scpBinding = ScpBinding(client!!.newSCPFileTransfer())
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
-                                hostId = host.id,
+                                hostId = sessionId,
                                 level = SessionLogBus.LogLevel.INFO,
                                 message = "SCP ready. Use quick transfer controls to upload/download files."
                             )
                         )
                     }
                 }
-                if (host.startupScript.isNotBlank() && mode == ConnectionMode.SSH) {
+                val startupCommand = resolveStartupCommand(host.startupScript, availableSnippets)
+                if (startupCommand.isNotBlank() && mode == ConnectionMode.SSH) {
                     runCatching {
                         client!!.startSession().use { shell ->
-                            val cmd = shell.exec(host.startupScript)
+                            val cmd = shell.exec(startupCommand)
                             cmd.join(12, TimeUnit.SECONDS)
                             val output = runCatching { cmd.inputStream.bufferedReader().readText() }.getOrNull()
                             if (!output.isNullOrBlank()) {
                                 SessionLogBus.emit(
                                     SessionLogBus.Entry(
-                                        hostId = host.id,
+                                        hostId = sessionId,
                                         level = SessionLogBus.LogLevel.INFO,
                                         message = output.trim()
                                     )
@@ -278,12 +292,23 @@ class SessionService : Service() {
                     }.onFailure { err ->
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
-                                hostId = host.id,
+                                hostId = sessionId,
                                 level = SessionLogBus.LogLevel.WARN,
                                 message = "Startup script failed: ${err.message ?: "unknown error"}"
                             )
                         )
                     }
+                } else if (mode == ConnectionMode.SSH &&
+                    parseSnippetReference(host.startupScript) != null &&
+                    host.startupScript.isNotBlank()
+                ) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = sessionId,
+                            level = SessionLogBus.LogLevel.WARN,
+                            message = "Startup snippet is missing; skipped startup command."
+                        )
+                    )
                 }
                 val configuredForwards = if (autoStartForwards) {
                     availableForwards.filter { it.enabled && it.associatedHosts.contains(host.id) }
@@ -291,14 +316,14 @@ class SessionService : Service() {
                     emptyList()
                 }
                 if (configuredForwards.isNotEmpty()) {
-                    updateSessionSnapshot(sessionHost, mode, SessionStatus.CONNECTING, "Starting ${configuredForwards.size} port forward(s)...")
+                    updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting ${configuredForwards.size} port forward(s)...")
                     activeForwardBindings = activatePortForwards(
-                        hostId = host.id,
+                        hostId = sessionId,
                         client = client!!,
                         forwards = configuredForwards
                     )
                 }
-                activeConnections[host.id] = ActiveConnection(
+                activeConnections[sessionId] = ActiveConnection(
                     host = sessionHost,
                     mode = mode,
                     client = client,
@@ -313,8 +338,8 @@ class SessionService : Service() {
                     ConnectionMode.SFTP -> "SFTP browser ready"
                     ConnectionMode.SCP -> "SCP transfer ready"
                 }
-                updateSessionSnapshot(sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
-                UiDebugLog.result("startSession", true, "hostId=${host.id}, mode=$mode")
+                updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
+                UiDebugLog.result("startSession", true, "sessionId=$sessionId, mode=$mode")
 
                 // Keep the connection alive until user stops it.
                 while (currentCoroutineContext().isActive) {
@@ -322,12 +347,12 @@ class SessionService : Service() {
                 }
             }.onFailure { e ->
                 if (e !is CancellationException) {
-                    clearHostKeyPromptsForHost(host.id, trust = false)
-                    clearPasswordPromptsForHost(host.id, password = null)
+                    clearHostKeyPromptsForHost(sessionId, trust = false)
+                    clearPasswordPromptsForHost(sessionId, password = null)
                     val statusMessage = e.message ?: "Connection failed"
-                    updateSessionSnapshot(sessionHost, mode, SessionStatus.ERROR, statusMessage)
-                    UiDebugLog.error("startSession", e, "hostId=${host.id}, mode=$mode")
-                    UiDebugLog.result("startSession", false, "hostId=${host.id}, mode=$mode")
+                    updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ERROR, statusMessage)
+                    UiDebugLog.error("startSession", e, "sessionId=$sessionId, mode=$mode")
+                    UiDebugLog.result("startSession", false, "sessionId=$sessionId, mode=$mode")
                 }
             }
             runCatching { shellBinding?.shell?.close() }
@@ -336,21 +361,22 @@ class SessionService : Service() {
             runCatching { sftpBinding?.client?.close() }
             runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { client?.disconnect() }
-            activeConnections.remove(host.id)
-            clearHostKeyPromptsForHost(host.id, trust = false)
-            clearPasswordPromptsForHost(host.id, password = null)
-            clearShellOutputForHost(host.id)
+            activeConnections.remove(sessionId)
+            clearHostKeyPromptsForHost(sessionId, trust = false)
+            clearPasswordPromptsForHost(sessionId, password = null)
+            clearShellOutputForHost(sessionId)
+            clearRemoteDirectoryForHost(sessionId)
         }
         job.invokeOnCompletion {
-            activeJobs.remove(host.id)
-            activeConnections.remove(host.id)
-            updateSummaryNotification()
+            activeJobs.remove(sessionId)
+            activeConnections.remove(sessionId)
+            updateSessionNotifications()
             if (it is CancellationException) {
-                removeSessionSnapshot(host.id)
+                removeSessionSnapshot(sessionId)
             }
         }
-        activeJobs[host.id] = job
-        updateSummaryNotification()
+        activeJobs[sessionId] = job
+        updateSessionNotifications()
     }
 
     fun stopSession(hostId: String) {
@@ -366,9 +392,10 @@ class SessionService : Service() {
             runCatching { connection.client?.disconnect() }
         }
         activeJobs.remove(hostId)?.cancel()
-        updateSummaryNotification()
+        updateSessionNotifications()
         removeSessionSnapshot(hostId)
         clearShellOutputForHost(hostId)
+        clearRemoteDirectoryForHost(hostId)
         shellReadSequence.remove(hostId)
         shellWriteSequence.remove(hostId)
         UiDebugLog.result("stopSession", true, "hostId=$hostId")
@@ -450,6 +477,7 @@ class SessionService : Service() {
     fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPrompts.asStateFlow()
     fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPrompts.asStateFlow()
     fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutput.asStateFlow()
+    fun remoteDirectoryFlow(): StateFlow<Map<String, RemoteDirectorySnapshot>> = remoteDirectories.asStateFlow()
     fun resolveTerminalEmulator(hostId: String): TerminalEmulator? {
         return activeConnections[hostId]?.moshBinding?.session?.emulator
     }
@@ -548,25 +576,13 @@ class SessionService : Service() {
     }
 
     fun listSftpDirectory(hostId: String, path: String) {
-        val connection = activeConnections[hostId]
-        val sftp = connection?.sftpBinding?.client
-        if (sftp == null) {
-            UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
-            return
-        }
         val targetPath = path.trim().ifBlank { "." }
         serviceScope.launch {
-            runCatching {
+            val listed = runWithSftpClient(hostId) { sftp ->
                 refreshSftpDirectoryListing(hostId, sftp, targetPath)
-            }.onFailure { err ->
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SFTP list failed for $targetPath: ${err.message ?: "unknown error"}"
-                    )
-                )
-                UiDebugLog.result("listSftpDirectory", false, "hostId=$hostId")
+            }
+            if (!listed) {
+                UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
             }
         }
     }
@@ -719,6 +735,35 @@ class SessionService : Service() {
         }
     }
 
+    fun manageRemotePath(hostId: String, operation: String, sourcePath: String, destinationPath: String? = null) {
+        val src = sourcePath.trim()
+        if (src.isBlank()) return
+        serviceScope.launch {
+            val ok = runWithSftpClient(hostId) { sftp ->
+                when (operation.lowercase()) {
+                    "mkdir" -> sftp.mkdir(src)
+                    "delete" -> deleteRemotePathRecursively(sftp, src)
+                    "move" -> {
+                        val dest = destinationPath?.trim().orEmpty()
+                        require(dest.isNotBlank()) { "Destination is required." }
+                        sftp.rename(src, dest)
+                    }
+                    else -> error("Unsupported operation: $operation")
+                }
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "Remote $operation completed: $src${destinationPath?.let { " -> $it" } ?: ""}"
+                    )
+                )
+            }
+            if (!ok) {
+                UiDebugLog.result("manageRemotePath", false, "sftp-not-active hostId=$hostId")
+            }
+        }
+    }
+
     private fun refreshSftpDirectoryListing(hostId: String, sftp: SFTPClient, path: String) {
         val listingPath = path.trim().ifBlank { "." }
         val canonicalPath = runCatching { sftp.canonicalize(listingPath) }.getOrDefault(listingPath)
@@ -728,8 +773,20 @@ class SessionService : Service() {
                 compareByDescending<RemoteResourceInfo> { it.isDirectory() }
                     .thenBy { it.name.lowercase() }
             )
-        val rendered = formatSftpListing(canonicalPath, listing)
-        setShellOutputSnapshot(hostId, rendered)
+        val entries = listing.map { item ->
+            RemoteDirectoryEntry(
+                name = item.name,
+                isDirectory = item.isDirectory(),
+                sizeBytes = item.attributes.size
+            )
+        }
+        setRemoteDirectorySnapshot(
+            hostId,
+            RemoteDirectorySnapshot(
+                path = canonicalPath,
+                entries = entries
+            )
+        )
         SessionLogBus.emit(
             SessionLogBus.Entry(
                 hostId = hostId,
@@ -737,32 +794,6 @@ class SessionService : Service() {
                 message = "Listed ${listing.size} item(s) in $canonicalPath"
             )
         )
-    }
-
-    private fun formatSftpListing(path: String, items: List<RemoteResourceInfo>): String = buildString {
-        appendLine("Path: $path")
-        appendLine("Items: ${items.size}")
-        appendLine()
-        if (items.isEmpty()) {
-            appendLine("(empty)")
-            return@buildString
-        }
-        items.forEach { entry ->
-            val attrs = entry.attributes
-            val typeTag = when (attrs.type) {
-                FileMode.Type.DIRECTORY -> "DIR "
-                FileMode.Type.REGULAR -> "FILE"
-                FileMode.Type.SYMLINK -> "LINK"
-                else -> "OTHR"
-            }
-            val size = attrs.size
-            append(typeTag)
-            append("  ")
-            append(size.toString().padStart(10, ' '))
-            append("  ")
-            append(entry.name)
-            appendLine()
-        }
     }
 
     private fun resolveDestinationFile(hostId: String, remotePath: String, localPath: String?): File {
@@ -779,6 +810,61 @@ class SessionService : Service() {
         base.mkdirs()
         val filename = remotePath.substringAfterLast('/').ifBlank { "download.bin" }
         return File(base, filename)
+    }
+
+    private fun runWithSftpClient(hostId: String, action: (SFTPClient) -> Unit): Boolean {
+        val connection = activeConnections[hostId] ?: return false
+        val persistent = connection.sftpBinding?.client
+        if (persistent != null) {
+            runCatching { action(persistent) }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SFTP operation failed: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+            return true
+        }
+        val client = connection.client ?: return false
+        runCatching {
+            client.newSFTPClient().use { temporary ->
+                action(temporary)
+            }
+        }.onFailure { err ->
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = "SFTP operation failed: ${err.message ?: "unknown error"}"
+                )
+            )
+        }
+        return true
+    }
+
+    private fun deleteRemotePathRecursively(sftp: SFTPClient, path: String) {
+        val canonical = runCatching { sftp.canonicalize(path) }.getOrDefault(path)
+        val listing = runCatching { sftp.ls(canonical) }.getOrNull()
+        if (listing == null) {
+            sftp.rm(canonical)
+            return
+        }
+        val children = listing.filterNot { it.name == "." || it.name == ".." }
+        if (children.isEmpty()) {
+            runCatching { sftp.rmdir(canonical) }.getOrElse { sftp.rm(canonical) }
+            return
+        }
+        children.forEach { child ->
+            val childPath = if (canonical.endsWith("/")) "$canonical${child.name}" else "$canonical/${child.name}"
+            if (child.isDirectory()) {
+                deleteRemotePathRecursively(sftp, childPath)
+            } else {
+                sftp.rm(childPath)
+            }
+        }
+        runCatching { sftp.rmdir(canonical) }.getOrElse { sftp.rm(canonical) }
     }
 
     private fun activatePortForwards(
@@ -921,6 +1007,7 @@ class SessionService : Service() {
 
     private fun awaitPasswordDecision(
         host: HostConnection,
+        sessionId: String,
         mode: ConnectionMode,
         reason: String,
         deadlineMillis: Long,
@@ -930,7 +1017,7 @@ class SessionService : Service() {
         val waiter = CompletableFuture<PasswordResponse>()
         val prompt = PasswordPrompt(
             id = promptId,
-            hostId = host.id,
+            hostId = sessionId,
             host = host.host,
             port = host.port,
             username = host.username,
@@ -939,7 +1026,7 @@ class SessionService : Service() {
         )
         passwordPromptWaiters[promptId] = waiter
         passwordPrompts.value = passwordPrompts.value + prompt
-        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, reason)
+        updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, reason)
         val remainingMillis = millisUntilDeadline(deadlineMillis)
         if (remainingMillis <= 0L) {
             throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
@@ -1005,6 +1092,7 @@ class SessionService : Service() {
     private fun authenticateWithPassword(
         client: SSHClient,
         host: HostConnection,
+        sessionId: String,
         mode: ConnectionMode,
         initialPassword: String?,
         deadlineMillis: Long,
@@ -1023,6 +1111,7 @@ class SessionService : Service() {
                 }
                 val response = awaitPasswordDecision(
                     host = host,
+                    sessionId = sessionId,
                     mode = mode,
                     reason = reason,
                     deadlineMillis = deadlineMillis,
@@ -1036,7 +1125,7 @@ class SessionService : Service() {
             }
             try {
                 val currentPassword = password
-                updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating as ${host.username}...")
+                updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, "Authenticating as ${host.username}...")
                 client.authPassword(host.username, currentPassword)
                 if (savePassword) {
                     runCatching { SecurityManager.storeHostPassword(host.id, currentPassword) }
@@ -1056,10 +1145,11 @@ class SessionService : Service() {
     private fun authenticateWithIdentity(
         client: SSHClient,
         host: HostConnection,
+        sessionId: String,
         mode: ConnectionMode,
         required: Boolean
     ): Boolean {
-        updateSessionSnapshot(host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
+        updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
         val identityId = host.preferredIdentityId?.takeIf { it.isNotBlank() }
         if (identityId == null) {
             if (required) {
@@ -1076,7 +1166,7 @@ class SessionService : Service() {
             }
             SessionLogBus.emit(
                 SessionLogBus.Entry(
-                    hostId = host.id,
+                    hostId = sessionId,
                     level = SessionLogBus.LogLevel.WARN,
                     message = "Selected identity key is unavailable. Falling back to password."
                 )
@@ -1506,6 +1596,20 @@ class SessionService : Service() {
         shellWriteSequence.remove(hostId)
     }
 
+    private fun setRemoteDirectorySnapshot(hostId: String, snapshot: RemoteDirectorySnapshot) {
+        if (remoteDirectories.value[hostId] == snapshot) return
+        val updated = remoteDirectories.value.toMutableMap()
+        updated[hostId] = snapshot
+        remoteDirectories.value = updated
+    }
+
+    private fun clearRemoteDirectoryForHost(hostId: String) {
+        if (!remoteDirectories.value.containsKey(hostId)) return
+        val updated = remoteDirectories.value.toMutableMap()
+        updated.remove(hostId)
+        remoteDirectories.value = updated
+    }
+
     private fun emitShellLifecycleDiagnostic(hostId: String, message: String) {
         if (!diagnosticsEnabled) return
         val line = "SHELL-DIAG $message"
@@ -1590,103 +1694,120 @@ class SessionService : Service() {
     }
 
     private fun updateSessionSnapshot(
+        sessionId: String,
         host: HostConnection,
         mode: ConnectionMode,
         status: SessionStatus,
         message: String?
     ) {
         val snapshot = SessionSnapshot(
-            hostId = host.id,
+            hostId = sessionId,
             host = host,
             mode = mode,
             status = status,
             statusMessage = message
         )
         sessionSnapshots.value = sessionSnapshots.value
-            .filterNot { it.hostId == host.id } + snapshot
-        if (activeJobs.containsKey(host.id)) {
-            updateSummaryNotification()
+            .filterNot { it.hostId == sessionId } + snapshot
+        if (activeJobs.containsKey(sessionId)) {
+            updateSessionNotifications()
         }
         UiDebugLog.result(
             "sessionSnapshot",
             true,
-            "hostId=${host.id}, mode=$mode, status=$status, message=${message ?: "none"}"
+            "sessionId=$sessionId, mode=$mode, status=$status, message=${message ?: "none"}"
         )
     }
+
+    private fun sessionIdFor(hostId: String, mode: ConnectionMode): String =
+        "$hostId|${mode.name}"
 
     private fun removeSessionSnapshot(hostId: String) {
         sessionSnapshots.value = sessionSnapshots.value.filterNot { it.hostId == hostId }
+        updateSessionNotifications()
     }
 
-    private fun updateSummaryNotification() {
-        val notif = buildSummaryNotification()
+    private fun updateSessionNotifications() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIFICATION_ID, notif)
-    }
-
-    private fun buildSummaryNotification(): Notification {
-        val activeHostIds = activeJobs.keys
+        val activeHostIds = activeJobs.keys.toSet()
         val snapshots = sessionSnapshots.value
             .filter { activeHostIds.contains(it.hostId) }
             .sortedBy { it.host.name.lowercase() }
-        val runningCount = activeHostIds.size
-        val activeCount = snapshots.count { it.status == SessionStatus.ACTIVE }
-        val connectingCount = snapshots.count { it.status == SessionStatus.CONNECTING }
-        val text = when {
-            runningCount == 0 -> "No active sessions"
-            activeCount > 0 && connectingCount > 0 -> "$activeCount connected, $connectingCount connecting"
-            activeCount > 0 -> "$activeCount active"
-            else -> "$connectingCount connecting"
+
+        if (snapshots.isEmpty()) {
+            sessionNotificationIds.forEach { id -> nm.cancel(id) }
+            sessionNotificationIds.clear()
+            if (foregroundNotificationId != null) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                foregroundNotificationId = null
+            }
+            return
+        }
+
+        val desiredIds = snapshots.map { notificationIdForHost(it.hostId) }.toSet()
+        val staleIds = sessionNotificationIds - desiredIds
+        staleIds.forEach { id -> nm.cancel(id) }
+
+        snapshots.forEachIndexed { index, snapshot ->
+            val notificationId = notificationIdForHost(snapshot.hostId)
+            val notification = buildSessionNotification(snapshot, snapshots.size)
+            if (index == 0) {
+                startForeground(notificationId, notification)
+                foregroundNotificationId = notificationId
+            } else {
+                nm.notify(notificationId, notification)
+            }
+        }
+        sessionNotificationIds.clear()
+        sessionNotificationIds.addAll(desiredIds)
+    }
+
+    private fun buildSessionNotification(
+        snapshot: SessionSnapshot,
+        totalSessions: Int
+    ): Notification {
+        val text = when (snapshot.status) {
+            SessionStatus.ACTIVE -> snapshot.statusMessage ?: "Connected"
+            SessionStatus.CONNECTING -> snapshot.statusMessage ?: "Connecting"
+            SessionStatus.ERROR -> snapshot.statusMessage ?: "Connection error"
         }
         val openIntent = Intent(this, MainActivity::class.java).apply {
+            action = ACTION_OPEN_SESSION
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_HOST_ID, snapshot.hostId)
         }
         val pendingOpen = PendingIntent.getActivity(
             this,
-            OPEN_APP_REQUEST_CODE,
+            OPEN_APP_REQUEST_CODE + snapshot.hostId.hashCode(),
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val stopAllIntent = Intent(this, SessionService::class.java).apply {
-            action = ACTION_STOP_ALL
+        val stopIntent = Intent(this, SessionService::class.java).apply {
+            action = ACTION_STOP_SESSION
+            putExtra(EXTRA_HOST_ID, snapshot.hostId)
         }
-        val pendingStopAll = PendingIntent.getService(
+        val pendingStop = PendingIntent.getService(
             this,
-            STOP_ALL_REQUEST_CODE,
-            stopAllIntent,
+            STOP_SESSION_REQUEST_CODE + snapshot.hostId.hashCode(),
+            stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val style = NotificationCompat.InboxStyle().also { inbox ->
-            snapshots.take(6).forEach { snapshot ->
-                inbox.addLine("${snapshot.host.username}@${snapshot.host.host}  ${snapshot.status.toSummaryLabel()}")
-            }
-            if (snapshots.size > 6) {
-                inbox.setSummaryText("+${snapshots.size - 6} more")
-            }
-        }
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SSHPeaches")
+            .setContentTitle("${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setSubText(if (runningCount == 0) "Service running" else "$runningCount session(s) in background")
+            .setSubText(if (totalSessions == 1) "1 active session" else "$totalSessions active sessions")
             .setContentIntent(pendingOpen)
-            .setStyle(style)
             .addAction(R.drawable.ic_launcher_foreground, "Open", pendingOpen)
-        if (runningCount > 0) {
-            builder.addAction(R.drawable.ic_launcher_foreground, "Disconnect all", pendingStopAll)
-        }
+            .addAction(R.drawable.ic_launcher_foreground, "Disconnect", pendingStop)
         return builder.build()
     }
 
-    private fun SessionStatus.toSummaryLabel(): String = when (this) {
-        SessionStatus.CONNECTING -> "Connecting"
-        SessionStatus.ACTIVE -> "Connected"
-        SessionStatus.ERROR -> "Error"
-    }
+    private fun notificationIdForHost(hostId: String): Int = NOTIFICATION_ID_BASE + hostId.hashCode().absoluteValue
 
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -1704,6 +1825,13 @@ class SessionService : Service() {
         nm.createNotificationChannel(channel)
     }
 
+    private fun resolveStartupCommand(startupScript: String, snippets: List<Snippet>): String {
+        val raw = startupScript.trim()
+        if (raw.isBlank()) return ""
+        val snippetId = parseSnippetReference(raw) ?: return raw
+        return snippets.firstOrNull { it.id == snippetId }?.command?.trim().orEmpty()
+    }
+
     inner class SessionBinder : Binder() {
         fun getService(): SessionService = this@SessionService
     }
@@ -1711,9 +1839,10 @@ class SessionService : Service() {
     companion object {
         private const val CHANNEL_ID = "sessions"
         private const val OPEN_APP_REQUEST_CODE = 19_241
-        private const val STOP_ALL_REQUEST_CODE = 19_242
-        private const val NOTIFICATION_ID = 42
+        private const val STOP_SESSION_REQUEST_CODE = 19_243
+        private const val NOTIFICATION_ID_BASE = 42_000
         private const val ACTION_STOP_ALL = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_ALL"
+        private const val ACTION_STOP_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_SESSION"
         const val ACTION_OPEN_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSION"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
@@ -1781,6 +1910,17 @@ class SessionService : Service() {
         val mode: ConnectionMode,
         val status: SessionStatus,
         val statusMessage: String?
+    )
+
+    data class RemoteDirectorySnapshot(
+        val path: String,
+        val entries: List<RemoteDirectoryEntry>
+    )
+
+    data class RemoteDirectoryEntry(
+        val name: String,
+        val isDirectory: Boolean,
+        val sizeBytes: Long
     )
 
     data class HostKeyPrompt(

@@ -72,7 +72,7 @@ enum class TerminalEmulation(val ptyName: String, val label: String) {
     VT100("vt100", "vt100")
 }
 
-enum class PortForwardType { LOCAL, REMOTE, DYNAMIC }
+enum class PortForwardType { LOCAL }
 
 enum class BackgroundBehavior { INHERIT, ALWAYS_ALLOW, ALWAYS_STOP }
 

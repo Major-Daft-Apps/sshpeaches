@@ -1,12 +1,16 @@
 package com.majordaftapps.sshpeaches.app
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -40,6 +44,10 @@ class MainActivity : FragmentActivity() {
     private var biometricPromptInfo: BiometricPrompt.PromptInfo? = null
     private var biometricAvailable: Boolean = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            UiDebugLog.result("notificationPermissionRequest", granted)
+        }
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -81,6 +89,20 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.result("setupBiometricPrompt", true, "biometricAvailable=true")
     }
 
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            UiDebugLog.result("notificationPermissionCheck", true, "already-granted")
+            return
+        }
+        UiDebugLog.action("notificationPermissionRequest", "requesting=true")
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
@@ -89,6 +111,7 @@ class MainActivity : FragmentActivity() {
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
         UiDebugLog.result("MainActivity.onCreate", true, "requestedServiceStart=true")
         setupBiometricPrompt()
+        requestNotificationPermissionIfNeeded()
         handleSessionOpenIntent(intent)
         setContent {
             val viewModel = appViewModel
@@ -98,10 +121,12 @@ class MainActivity : FragmentActivity() {
             val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+            val remoteDirectories by sessionService?.remoteDirectoryFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val startSession: (HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
                 remember(
                     sessionService,
                     uiState.portForwards,
+                    uiState.snippets,
                     uiState.autoStartForwards,
                     uiState.autoTrustHostKey,
                     uiState.hosts,
@@ -120,6 +145,7 @@ class MainActivity : FragmentActivity() {
                             mode = mode,
                             passwordOverride = password,
                             availableForwards = uiState.portForwards,
+                            availableSnippets = uiState.snippets,
                             autoStartForwards = uiState.autoStartForwards,
                             autoTrustUnknownHostKey = uiState.autoTrustHostKey,
                             allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id },
@@ -185,6 +211,11 @@ class MainActivity : FragmentActivity() {
                     sessionService?.sftpUploadFile(hostId, localPath, remotePath)
                 }
             }
+            val manageRemotePath: (String, String, String, String?) -> Unit = remember(sessionService) {
+                { hostId: String, operation: String, sourcePath: String, destinationPath: String? ->
+                    sessionService?.manageRemotePath(hostId, operation, sourcePath, destinationPath)
+                }
+            }
             val scpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
                 { hostId: String, remotePath: String, localPath: String? ->
                     sessionService?.scpDownloadFile(hostId, remotePath, localPath)
@@ -204,9 +235,9 @@ class MainActivity : FragmentActivity() {
                 sessionSnapshots.forEach { snapshot ->
                     val detected = snapshot.host.osMetadata
                     if (detected == OsMetadata.Undetected) return@forEach
-                    val saved = uiState.hosts.firstOrNull { it.id == snapshot.hostId } ?: return@forEach
+                    val saved = uiState.hosts.firstOrNull { it.id == snapshot.host.id } ?: return@forEach
                     if (saved.osMetadata != detected) {
-                        viewModel.updateHostOsMetadata(snapshot.hostId, detected)
+                        viewModel.updateHostOsMetadata(saved.id, detected)
                     }
                 }
             }
@@ -221,6 +252,7 @@ class MainActivity : FragmentActivity() {
                     onLockTimeoutChange = viewModel::setLockTimeout,
                     onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
                     onTerminalEmulationChange = viewModel::setTerminalEmulation,
+                    onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
                     onCrashReportsToggle = viewModel::setCrashReports,
                     onAnalyticsToggle = viewModel::setAnalytics,
                     onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -314,11 +346,13 @@ class MainActivity : FragmentActivity() {
                     onListSftpDirectory = listSftpDirectory,
                     onSftpDownloadFile = sftpDownloadFile,
                     onSftpUploadFile = sftpUploadFile,
+                    onManageRemotePath = manageRemotePath,
                     onScpDownloadFile = scpDownloadFile,
                     onScpUploadFile = scpUploadFile,
                     resolveTerminalEmulator = resolveTerminalEmulator,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
+                    remoteDirectories = remoteDirectories,
                     hostKeyPrompts = hostKeyPrompts,
                     passwordPrompts = passwordPrompts,
                     requestedOpenSessionId = requestedOpenSessionHostId.value,
@@ -365,13 +399,8 @@ class MainActivity : FragmentActivity() {
         if (!isChangingConfigurations) {
             appViewModel.onAppBackgrounded()
         }
-        UiDebugLog.action("MainActivity.onStop", "allowBackground=${appViewModel.uiState.value.allowBackgroundSessions}")
-        if (!appViewModel.uiState.value.allowBackgroundSessions) {
-            sessionServiceState.value?.stopAllSessions()
-            UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=true")
-        } else {
-            UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
-        }
+        UiDebugLog.action("MainActivity.onStop", "persistSessions=true")
+        UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
     }
 
     private fun handleSessionOpenIntent(intent: Intent?) {

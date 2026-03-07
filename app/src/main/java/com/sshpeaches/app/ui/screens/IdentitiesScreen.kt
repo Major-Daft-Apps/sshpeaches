@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -32,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -58,7 +60,10 @@ import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
 import com.majordaftapps.sshpeaches.app.ui.components.processIdentityQrImport
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
 import com.majordaftapps.sshpeaches.app.util.isValidFingerprint
+import java.security.MessageDigest
+import java.util.Base64
 import java.util.UUID
 
 private data class IdentityOverwrite(
@@ -68,6 +73,11 @@ private data class IdentityOverwrite(
     val username: String?,
     val keyPayload: String?
 )
+
+private enum class DialogKeyFileType {
+    PRIVATE_KEY,
+    PUBLIC_KEY
+}
 
 @Composable
 fun IdentitiesScreen(
@@ -90,7 +100,10 @@ fun IdentitiesScreen(
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
     val fingerprintState = remember { mutableStateOf("") }
-    val usernameState = remember { mutableStateOf("") }
+    val dialogPrivateKeyState = remember { mutableStateOf("") }
+    val dialogPublicKeyState = remember { mutableStateOf("") }
+    val dialogFileType = remember { mutableStateOf<DialogKeyFileType?>(null) }
+    val dialogKeyStatus = remember { mutableStateOf<String?>(null) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val shareIdentity = remember { mutableStateOf<Identity?>(null) }
     val shareQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -107,8 +120,6 @@ fun IdentitiesScreen(
     val context = LocalContext.current
 
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val targetId = fileImportTarget.value ?: return@rememberLauncherForActivityResult
-        fileImportTarget.value = null
         if (uri == null) return@rememberLauncherForActivityResult
         val keyText = runCatching {
             context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
@@ -118,6 +129,32 @@ fun IdentitiesScreen(
             return@rememberLauncherForActivityResult
         }
         val sanitized = keyText.trim()
+        val pendingDialogType = dialogFileType.value
+        if (pendingDialogType != null) {
+            dialogFileType.value = null
+            when (pendingDialogType) {
+                DialogKeyFileType.PRIVATE_KEY -> {
+                    if (!sanitized.startsWith("-----BEGIN")) {
+                        dialogError.value = "Invalid private key format."
+                        return@rememberLauncherForActivityResult
+                    }
+                    dialogPrivateKeyState.value = sanitized
+                    if (fingerprintState.value.isBlank()) {
+                        fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
+                    }
+                    dialogKeyStatus.value = "Private key selected."
+                }
+                DialogKeyFileType.PUBLIC_KEY -> {
+                    dialogPublicKeyState.value = sanitized
+                    fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
+                    dialogKeyStatus.value = "Public key selected."
+                }
+            }
+            return@rememberLauncherForActivityResult
+        }
+
+        val targetId = fileImportTarget.value ?: return@rememberLauncherForActivityResult
+        fileImportTarget.value = null
         if (!sanitized.startsWith("-----BEGIN")) {
             onShowMessage("Invalid key format")
             return@rememberLauncherForActivityResult
@@ -168,13 +205,17 @@ fun IdentitiesScreen(
         editingId.value = identity?.id
         labelState.value = identity?.label ?: ""
         fingerprintState.value = identity?.fingerprint ?: ""
-        usernameState.value = identity?.username ?: ""
+        dialogPrivateKeyState.value = ""
+        dialogPublicKeyState.value = ""
+        dialogFileType.value = null
+        dialogKeyStatus.value = null
         dialogError.value = null
         showDialog.value = true
     }
 
     fun closeDialog() {
         showDialog.value = false
+        dialogFileType.value = null
     }
 
     val filteredItems = items.filter {
@@ -339,18 +380,55 @@ fun IdentitiesScreen(
                         label = { Text("Label") },
                         singleLine = true
                     )
-                    OutlinedTextField(
-                        value = usernameState.value,
-                        onValueChange = { usernameState.value = it },
-                        label = { Text("Username (optional)") },
-                        singleLine = true
+                    KeyInputRow(
+                        label = "Private key",
+                        value = dialogPrivateKeyState.value,
+                        onValueChange = { next ->
+                            dialogPrivateKeyState.value = next
+                            val trimmed = next.trim()
+                            if (trimmed.isNotBlank() && dialogPublicKeyState.value.isBlank()) {
+                                fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
+                            }
+                        },
+                        onBrowse = {
+                            if (isLocked) {
+                                dialogError.value = "Unlock the app before importing keys."
+                            } else {
+                                dialogFileType.value = DialogKeyFileType.PRIVATE_KEY
+                                fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                            }
+                        }
+                    )
+                    KeyInputRow(
+                        label = "Public key",
+                        value = dialogPublicKeyState.value,
+                        onValueChange = { next ->
+                            dialogPublicKeyState.value = next
+                            val trimmed = next.trim()
+                            if (trimmed.isNotBlank()) {
+                                fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
+                            } else {
+                                val privateTrimmed = dialogPrivateKeyState.value.trim()
+                                if (privateTrimmed.isNotBlank()) {
+                                    fingerprintState.value = computeFingerprintFromKeyMaterial(privateTrimmed)
+                                }
+                            }
+                        },
+                        onBrowse = {
+                            dialogFileType.value = DialogKeyFileType.PUBLIC_KEY
+                            fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                        }
                     )
                     OutlinedTextField(
                         value = fingerprintState.value,
-                        onValueChange = { fingerprintState.value = it },
+                        onValueChange = {},
                         label = { Text("Fingerprint") },
-                        singleLine = true
+                        singleLine = true,
+                        readOnly = true
                     )
+                    dialogKeyStatus.value?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall)
+                    }
                     dialogError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
                     }
@@ -360,7 +438,7 @@ fun IdentitiesScreen(
                 TextButton(onClick = {
                     val fp = fingerprintState.value.trim()
                     if (fp.isEmpty()) {
-                        dialogError.value = "Fingerprint is required."
+                        dialogError.value = "Select a key file so fingerprint can be calculated."
                         return@TextButton
                     }
                     val duplicate = items.any { it.fingerprint.equals(fp, true) && it.id != editingId.value }
@@ -373,20 +451,31 @@ fun IdentitiesScreen(
                         return@TextButton
                     }
                     dialogError.value = null
+                    val privateKey = dialogPrivateKeyState.value.trim()
                     if (isEdit) {
+                        val identityId = editingId.value!!
                         onUpdate(
-                            editingId.value!!,
+                            identityId,
                             labelState.value,
                             fp,
-                            usernameState.value.ifBlank { null }
+                            null
                         )
+                        if (privateKey.isNotBlank()) {
+                            val imported = onImportIdentityKeyPlain(identityId, privateKey)
+                            onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
+                        }
                     } else {
+                        val newId = UUID.randomUUID().toString()
                         onAdd(
                             labelState.value.ifBlank { "Identity ${UUID.randomUUID()}" },
                             fp,
-                            usernameState.value.ifBlank { null },
-                            null
+                            null,
+                            newId
                         )
+                        if (privateKey.isNotBlank()) {
+                            val imported = onImportIdentityKeyPlain(newId, privateKey)
+                            onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
+                        }
                     }
                     closeDialog()
                 }) { Text(if (editingId.value == null) "Add" else "Save") }
@@ -578,4 +667,40 @@ fun IdentitiesScreen(
             }
         )
     }
+}
+
+@Composable
+private fun KeyInputRow(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onBrowse: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            modifier = Modifier.weight(1f),
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            singleLine = true
+        )
+        IconButton(onClick = onBrowse) {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = "Browse $label"
+            )
+        }
+    }
+}
+
+private fun computeFingerprintFromKeyMaterial(keyText: String): String {
+    val publicFingerprint = computeSshPublicKeyFingerprint(keyText)
+    if (!publicFingerprint.isNullOrBlank()) return publicFingerprint
+    val digest = MessageDigest.getInstance("SHA-256").digest(keyText.toByteArray())
+    val encoded = Base64.getEncoder().withoutPadding().encodeToString(digest)
+    return "SHA256:$encoded"
 }

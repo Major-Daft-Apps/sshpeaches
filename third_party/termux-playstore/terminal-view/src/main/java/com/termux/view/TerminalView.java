@@ -108,6 +108,8 @@ public final class TerminalView extends View {
 
     /** The current AutoFill hint returned by {@link #getAutofillHints()} - null if no autofill desired. */
     private String mAutoFillHint;
+    /** If true, wrapped rows are joined when copying selected text. */
+    private boolean mSelectionJoinBackLines = true;
 
     private final boolean mAccessibilityEnabled;
 
@@ -265,6 +267,22 @@ public final class TerminalView extends View {
         // Wait with enabling the scrollbar until we have a terminal to get scroll position from.
         setVerticalScrollBarEnabled(true);
 
+        return true;
+    }
+
+    /**
+     * Attach a standalone emulator when no {@link TerminalSession} is available.
+     */
+    public boolean attachEmulator(TerminalEmulator emulator) {
+        if (emulator == null) return false;
+        if (mTermSession == null && emulator == mEmulator) return false;
+        mTopRow = 0;
+        mTermSession = null;
+        mEmulator = emulator;
+        mCombiningAccent = 0;
+        updateSize();
+        setVerticalScrollBarEnabled(true);
+        invalidate();
         return true;
     }
 
@@ -937,18 +955,25 @@ public final class TerminalView extends View {
     public void updateSize() {
         int viewWidth = getWidth();
         int viewHeight = getHeight();
-        if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
+        if (viewWidth == 0 || viewHeight == 0 || mRenderer == null) return;
 
         // Set to 80 and 24 if you want to enable vttest.
         int newColumns = Math.max(4, (int) (viewWidth / mRenderer.mFontWidth));
         int newRows = Math.max(4, (viewHeight - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);
 
-        if (mEmulator == null || (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {
+        if (mTermSession != null && (mEmulator == null || (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows))) {
             int fontWidth = (int) mRenderer.getFontWidth();
             int fontHeight = mRenderer.getFontLineSpacing();
             mTermSession.updateSize(newColumns, newRows, fontWidth, fontHeight);
             mEmulator = mTermSession.getEmulator();
 
+            mTopRow = 0;
+            scrollTo(0, 0);
+            invalidate();
+        } else if (mTermSession == null && mEmulator != null && (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {
+            int fontWidth = (int) mRenderer.getFontWidth();
+            int fontHeight = mRenderer.getFontLineSpacing();
+            mEmulator.resize(newColumns, newRows, fontWidth, fontHeight);
             mTopRow = 0;
             scrollTo(0, 0);
             invalidate();
@@ -1105,6 +1130,100 @@ public final class TerminalView extends View {
     @Nullable
     public String getStoredSelectedText() {
         return mTextSelectionCursorController != null ? mTextSelectionCursorController.getStoredSelectedText() : null;
+    }
+
+    /**
+     * Get text currently selected by handles.
+     */
+    public String getSelectedText() {
+        if (mTextSelectionCursorController == null || !mTextSelectionCursorController.isActive()) {
+            return "";
+        }
+        return mTextSelectionCursorController.getSelectedText();
+    }
+
+    /**
+     * Get text for the whole transcript + visible screen.
+     */
+    public String getFullTranscriptText() {
+        if (mEmulator == null) return "";
+        int activeRows = mEmulator.getScreen().getActiveTranscriptRows();
+        return mEmulator.getScreen().getSelectedText(
+            0,
+            -activeRows,
+            mEmulator.mColumns,
+            mEmulator.mRows - 1,
+            mSelectionJoinBackLines,
+            false
+        );
+    }
+
+    /**
+     * Start selection around center point in current viewport.
+     */
+    public void startTextSelectionAtViewportCenter() {
+        if (mEmulator == null) return;
+        long now = SystemClock.uptimeMillis();
+        MotionEvent event = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, getWidth() * 0.5f, getHeight() * 0.5f, 0);
+        startTextSelectionMode(event);
+        event.recycle();
+    }
+
+    /**
+     * Expand current selection to all transcript rows.
+     */
+    public void selectAllText() {
+        if (mEmulator == null) return;
+        if (!requestFocus()) return;
+        getTextSelectionCursorController().selectAll();
+        if (mClient != null) {
+            mClient.copyModeChanged(isSelectingText());
+        }
+        invalidate();
+    }
+
+    /**
+     * Configure wrapped-line behavior for copy/select operations.
+     */
+    public void setSelectionJoinBackLines(boolean joinBackLines) {
+        mSelectionJoinBackLines = joinBackLines;
+    }
+
+    boolean isSelectionJoinBackLines() {
+        return mSelectionJoinBackLines;
+    }
+
+    String getSelectedTextForCopy(int x1, int y1, int x2, int y2) {
+        if (mEmulator == null) return "";
+        return mEmulator.getScreen().getSelectedText(x1, y1, x2, y2, mSelectionJoinBackLines, false);
+    }
+
+    void copyTextToClipboard(String text) {
+        if (TextUtils.isEmpty(text)) return;
+        if (mTermSession != null) {
+            mTermSession.onCopyTextToClipboard(text);
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("terminal-selection", text));
+        }
+    }
+
+    void pasteTextFromClipboard() {
+        if (mTermSession != null) {
+            mTermSession.onPasteTextFromClipboard();
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip() || mEmulator == null) return;
+        ClipData clipData = clipboard.getPrimaryClip();
+        if (clipData == null || clipData.getItemCount() < 1) return;
+        ClipData.Item clipItem = clipData.getItemAt(0);
+        CharSequence text = clipItem != null ? clipItem.coerceToText(getContext()) : null;
+        if (!TextUtils.isEmpty(text)) {
+            mEmulator.paste(text.toString());
+        }
     }
 
     /**

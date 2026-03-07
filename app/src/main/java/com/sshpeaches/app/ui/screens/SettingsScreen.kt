@@ -17,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -33,10 +34,14 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    currentTheme: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
     allowBackgroundSessions: Boolean,
     onBackgroundToggle: (Boolean) -> Unit,
     biometricEnabled: Boolean,
@@ -47,6 +52,8 @@ fun SettingsScreen(
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
     terminalEmulation: TerminalEmulation,
     onTerminalEmulationChange: (TerminalEmulation) -> Unit,
+    terminalSelectionMode: TerminalSelectionMode,
+    onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -71,14 +78,19 @@ fun SettingsScreen(
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
     onClearPin: () -> Unit,
-    onLockApp: () -> Unit,
     onUnlockWithPin: (String) -> Boolean,
     onGenerateExportPayload: () -> String,
     onShowMessage: (String) -> Unit = {}
 ) {
+    val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
     val terminalExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = remember { mutableStateOf(false) }
+    val themeOptions = listOf(
+        ThemeMode.SYSTEM to "System",
+        ThemeMode.LIGHT to "Light",
+        ThemeMode.DARK to "Dark"
+    )
     val timeoutOptions = listOf(
         LockTimeout.IMMEDIATE,
         LockTimeout.ONE_MIN,
@@ -87,6 +99,7 @@ fun SettingsScreen(
         LockTimeout.CUSTOM
     )
     val terminalOptions = listOf(TerminalEmulation.XTERM, TerminalEmulation.VT100)
+    val selectionOptions = listOf(TerminalSelectionMode.NATURAL, TerminalSelectionMode.BLOCK)
     val showPinDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
     val confirmPinEntry = remember { mutableStateOf("") }
@@ -105,6 +118,41 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Theme", style = MaterialTheme.typography.titleMedium)
+                ExposedDropdownMenuBox(
+                    expanded = expanded.value,
+                    onExpandedChange = { expanded.value = !expanded.value }
+                ) {
+                    TextField(
+                        value = themeOptions.first { it.first == currentTheme }.second,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Mode") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
+                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded.value,
+                        onDismissRequest = { expanded.value = false }
+                    ) {
+                        themeOptions.forEach { (mode, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    expanded.value = false
+                                    onThemeChange(mode)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
@@ -165,6 +213,32 @@ fun SettingsScreen(
                     "xterm is the default and recommended mode.",
                     style = MaterialTheme.typography.bodySmall
                 )
+                Text(
+                    "Selection mode",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                selectionOptions.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = terminalSelectionMode == option,
+                            onClick = { onTerminalSelectionModeChange(option) }
+                        )
+                        Column(
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(option.label)
+                            Text(
+                                option.description,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
             }
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
@@ -285,10 +359,6 @@ fun SettingsScreen(
                             onClick = { showDisablePinDialog.value = true },
                             enabled = !isLocked
                         ) { Text("Disable PIN") }
-                        Button(
-                            onClick = onLockApp,
-                            enabled = !isLocked
-                        ) { Text("Lock now") }
                         Button(
                             onClick = { showUnlockDialog.value = true },
                             enabled = isLocked
