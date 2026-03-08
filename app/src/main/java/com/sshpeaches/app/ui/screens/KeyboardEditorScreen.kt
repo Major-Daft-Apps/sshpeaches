@@ -313,6 +313,18 @@ private fun KeyActionEditorVertical(
             Text("Use Text")
         }
 
+        SectionTitle("Actions")
+        TextButton(
+            onClick = {
+                val action = KeyboardLayoutDefaults.snippetPickerAction(
+                    iconId = selectedIconId.value.ifBlank { "snippet_picker" }
+                )
+                onApply(action)
+            }
+        ) {
+            Text("Snippet Picker")
+        }
+
         SectionTitle("Icon")
         IconPresetRow(
             selectedIconId = selectedIconId.value,
@@ -403,6 +415,7 @@ private fun fullActionLabel(action: KeyboardSlotAction): String {
         KeyboardActionType.KEY -> KeyboardLayoutDefaults.keyTokenForAction(action).ifBlank { "Key" }
         KeyboardActionType.MODIFIER -> "Modifier"
         KeyboardActionType.SEQUENCE -> action.sequence.trim().ifBlank { "Sequence" }
+        KeyboardActionType.SNIPPET_PICKER -> "Snippet Picker"
     }
 }
 

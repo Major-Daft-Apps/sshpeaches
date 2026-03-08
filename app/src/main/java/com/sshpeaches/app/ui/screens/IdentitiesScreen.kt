@@ -5,9 +5,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
@@ -43,28 +46,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrPayload
 import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
 import com.majordaftapps.sshpeaches.app.ui.components.processIdentityQrImport
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.util.GeneratedIdentityKeyPair
+import com.majordaftapps.sshpeaches.app.util.IdentityEcdsaCurve
+import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
+import com.majordaftapps.sshpeaches.app.util.IdentityKeyGenerationSpec
+import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
 import com.majordaftapps.sshpeaches.app.util.isValidFingerprint
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 private data class IdentityOverwrite(
     val targetId: String,
@@ -82,12 +96,16 @@ private enum class DialogKeyFileType {
 @Composable
 fun IdentitiesScreen(
     items: List<Identity>,
+    hosts: List<HostConnection>,
     isLocked: Boolean,
     onAdd: (label: String, fingerprint: String, username: String?, suppliedId: String?) -> Unit = { _, _, _, _ -> },
     onUpdate: (id: String, label: String, fingerprint: String, username: String?) -> Unit = { _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
     onImportIdentityKey: (id: String, payload: String, passphrase: String) -> Boolean = { _, _, _ -> false },
     onImportIdentityKeyPlain: (id: String, key: String) -> Boolean = { _, _ -> false },
+    onStoreIdentityPublicKey: (id: String, key: String) -> Boolean = { _, _ -> false },
+    onStoreIdentityKeyPassphrase: (id: String, passphrase: String?) -> Unit = { _, _ -> },
+    onCopyKeyToHost: suspend (identityId: String, hostId: String, hostPassword: String?, identityPassphrase: String?) -> Boolean = { _, _, _, _ -> false },
     onRemoveIdentityKey: (id: String) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onShowMessage: (String) -> Unit = {},
@@ -118,6 +136,21 @@ fun IdentitiesScreen(
     val fileImportTarget = remember { mutableStateOf<String?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val dialogKeyPassphraseState = remember { mutableStateOf("") }
+    val showGenerateDialog = remember { mutableStateOf(false) }
+    val generationAlgorithm = remember { mutableStateOf(IdentityKeyAlgorithm.ED25519) }
+    val generationRsaBits = remember { mutableStateOf(4096) }
+    val generationCurve = remember { mutableStateOf(IdentityEcdsaCurve.P256) }
+    val generationPassphrase = remember { mutableStateOf("") }
+    val generationConfirmPassphrase = remember { mutableStateOf("") }
+    val generationError = remember { mutableStateOf<String?>(null) }
+    val copyKeyIdentity = remember { mutableStateOf<Identity?>(null) }
+    val copyHostId = remember { mutableStateOf<String?>(null) }
+    val copyHostPassword = remember { mutableStateOf("") }
+    val copyIdentityPassphrase = remember { mutableStateOf("") }
+    val copyInProgress = remember { mutableStateOf(false) }
+    val copyError = remember { mutableStateOf<String?>(null) }
 
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -139,6 +172,7 @@ fun IdentitiesScreen(
                         return@rememberLauncherForActivityResult
                     }
                     dialogPrivateKeyState.value = sanitized
+                    dialogError.value = null
                     if (fingerprintState.value.isBlank()) {
                         fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
                     }
@@ -146,6 +180,7 @@ fun IdentitiesScreen(
                 }
                 DialogKeyFileType.PUBLIC_KEY -> {
                     dialogPublicKeyState.value = sanitized
+                    dialogError.value = null
                     fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
                     dialogKeyStatus.value = "Public key selected."
                 }
@@ -160,6 +195,13 @@ fun IdentitiesScreen(
             return@rememberLauncherForActivityResult
         }
         val success = onImportIdentityKeyPlain(targetId, sanitized)
+        if (success) {
+            val comment = items.firstOrNull { it.id == targetId }?.label.orEmpty()
+            val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(sanitized, comment).orEmpty()
+            if (derivedPublic.isNotBlank()) {
+                onStoreIdentityPublicKey(targetId, derivedPublic)
+            }
+        }
         onShowMessage(if (success) "Private key imported" else "Failed to import key")
     }
 
@@ -207,15 +249,19 @@ fun IdentitiesScreen(
         fingerprintState.value = identity?.fingerprint ?: ""
         dialogPrivateKeyState.value = ""
         dialogPublicKeyState.value = ""
+        dialogKeyPassphraseState.value = ""
         dialogFileType.value = null
         dialogKeyStatus.value = null
         dialogError.value = null
+        generationError.value = null
+        showGenerateDialog.value = false
         showDialog.value = true
     }
 
     fun closeDialog() {
         showDialog.value = false
         dialogFileType.value = null
+        showGenerateDialog.value = false
     }
 
     val filteredItems = items.filter {
@@ -228,7 +274,11 @@ fun IdentitiesScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_IDENTITIES)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -336,6 +386,20 @@ fun IdentitiesScreen(
                                             }
                                         }
                                 )
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy key to host",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable {
+                                            copyKeyIdentity.value = identity
+                                            copyHostId.value = hosts.firstOrNull()?.id
+                                            copyHostPassword.value = ""
+                                            copyIdentityPassphrase.value = ""
+                                            copyError.value = null
+                                            copyInProgress.value = false
+                                        }
+                                )
                                 if (editMode) {
                                     Icon(
                                         Icons.Default.Edit,
@@ -363,6 +427,7 @@ fun IdentitiesScreen(
 
     if (showDialog.value) {
         val isEdit = editingId.value != null
+        val editingIdentity = items.firstOrNull { it.id == editingId.value }
         AlertDialog(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit identity" else "Add identity") },
@@ -385,6 +450,9 @@ fun IdentitiesScreen(
                         value = dialogPrivateKeyState.value,
                         onValueChange = { next ->
                             dialogPrivateKeyState.value = next
+                            if (dialogError.value != null) {
+                                dialogError.value = null
+                            }
                             val trimmed = next.trim()
                             if (trimmed.isNotBlank() && dialogPublicKeyState.value.isBlank()) {
                                 fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
@@ -404,6 +472,9 @@ fun IdentitiesScreen(
                         value = dialogPublicKeyState.value,
                         onValueChange = { next ->
                             dialogPublicKeyState.value = next
+                            if (dialogError.value != null) {
+                                dialogError.value = null
+                            }
                             val trimmed = next.trim()
                             if (trimmed.isNotBlank()) {
                                 fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
@@ -419,6 +490,24 @@ fun IdentitiesScreen(
                             fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
                         }
                     )
+                    OutlinedTextField(
+                        value = dialogKeyPassphraseState.value,
+                        onValueChange = { dialogKeyPassphraseState.value = it },
+                        label = { Text("Key passphrase (optional)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    Button(onClick = {
+                        generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
+                        generationRsaBits.value = 4096
+                        generationCurve.value = IdentityEcdsaCurve.P256
+                        generationPassphrase.value = ""
+                        generationConfirmPassphrase.value = ""
+                        generationError.value = null
+                        showGenerateDialog.value = true
+                    }) {
+                        Text("Generate keypair")
+                    }
                     OutlinedTextField(
                         value = fingerprintState.value,
                         onValueChange = {},
@@ -452,8 +541,14 @@ fun IdentitiesScreen(
                     }
                     dialogError.value = null
                     val privateKey = dialogPrivateKeyState.value.trim()
+                    val publicKeyInput = dialogPublicKeyState.value.trim()
+                    val keyPassphrase = dialogKeyPassphraseState.value.trim().takeIf { it.isNotBlank() }
+                    val identityId = if (isEdit) {
+                        editingId.value!!
+                    } else {
+                        UUID.randomUUID().toString()
+                    }
                     if (isEdit) {
-                        val identityId = editingId.value!!
                         onUpdate(
                             identityId,
                             labelState.value,
@@ -465,23 +560,42 @@ fun IdentitiesScreen(
                             onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
                         }
                     } else {
-                        val newId = UUID.randomUUID().toString()
                         onAdd(
                             labelState.value.ifBlank { "Identity ${UUID.randomUUID()}" },
                             fp,
                             null,
-                            newId
+                            identityId
                         )
-                        if (privateKey.isNotBlank()) {
-                            val imported = onImportIdentityKeyPlain(newId, privateKey)
-                            onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
-                        }
                     }
+                    if (privateKey.isNotBlank()) {
+                        val imported = onImportIdentityKeyPlain(identityId, privateKey)
+                        onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
+                    }
+                    val publicKey = when {
+                        publicKeyInput.isNotBlank() -> publicKeyInput
+                        privateKey.isNotBlank() -> SshKeyGenerator.derivePublicKeyFromPrivate(privateKey, labelState.value.trim()).orEmpty()
+                        else -> ""
+                    }.trim()
+                    if (publicKey.isNotBlank()) {
+                        onStoreIdentityPublicKey(identityId, publicKey)
+                    }
+                    onStoreIdentityKeyPassphrase(identityId, keyPassphrase)
                     closeDialog()
                 }) { Text(if (editingId.value == null) "Add" else "Save") }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (editingId.value != null && editingIdentity?.hasPrivateKey == true) {
+                        TextButton(onClick = {
+                            if (isLocked) {
+                                onShowMessage("Unlock the app before removing keys.")
+                            } else {
+                                onRemoveIdentityKey(editingId.value!!)
+                                onShowMessage("Private key removed")
+                                closeDialog()
+                            }
+                        }) { Text("Remove key") }
+                    }
                     if (editingId.value != null) {
                         TextButton(onClick = {
                             onDelete(editingId.value!!)
@@ -490,6 +604,222 @@ fun IdentitiesScreen(
                     }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
                 }
+            }
+        )
+    }
+
+    if (showGenerateDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showGenerateDialog.value = false },
+            title = { Text("Generate keypair") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Algorithm")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        KeyGenOptionButton(
+                            label = "Ed25519",
+                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.ED25519,
+                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.ED25519 }
+                        )
+                        KeyGenOptionButton(
+                            label = "RSA",
+                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.RSA,
+                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.RSA }
+                        )
+                        KeyGenOptionButton(
+                            label = "ECDSA",
+                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.ECDSA,
+                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.ECDSA }
+                        )
+                    }
+                    if (generationAlgorithm.value == IdentityKeyAlgorithm.RSA) {
+                        Text("RSA bits")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(2048, 3072, 4096).forEach { bits ->
+                                KeyGenOptionButton(
+                                    label = bits.toString(),
+                                    selected = generationRsaBits.value == bits,
+                                    onClick = { generationRsaBits.value = bits }
+                                )
+                            }
+                        }
+                    }
+                    if (generationAlgorithm.value == IdentityKeyAlgorithm.ECDSA) {
+                        Text("Curve")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IdentityEcdsaCurve.values().forEach { curve ->
+                                KeyGenOptionButton(
+                                    label = curve.name,
+                                    selected = generationCurve.value == curve,
+                                    onClick = { generationCurve.value = curve }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = generationPassphrase.value,
+                        onValueChange = {
+                            generationPassphrase.value = it
+                            generationError.value = null
+                        },
+                        label = { Text("Key passphrase (optional)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    OutlinedTextField(
+                        value = generationConfirmPassphrase.value,
+                        onValueChange = {
+                            generationConfirmPassphrase.value = it
+                            generationError.value = null
+                        },
+                        label = { Text("Confirm passphrase") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    generationError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val phrase = generationPassphrase.value.trim()
+                    if (phrase.isNotBlank()) {
+                        if (phrase.length < 4) {
+                            generationError.value = "Passphrase must be at least 4 characters."
+                            return@TextButton
+                        }
+                        if (phrase != generationConfirmPassphrase.value) {
+                            generationError.value = "Passphrases do not match."
+                            return@TextButton
+                        }
+                    }
+                    val spec = IdentityKeyGenerationSpec(
+                        algorithm = generationAlgorithm.value,
+                        rsaBits = generationRsaBits.value,
+                        ecdsaCurve = generationCurve.value,
+                        comment = labelState.value.trim().ifBlank { "sshpeaches" },
+                        keyPassphrase = phrase.takeIf { it.isNotBlank() }
+                    )
+                    val generated = runCatching { SshKeyGenerator.generate(spec) }.getOrNull()
+                    if (generated == null) {
+                        generationError.value = "Failed to generate keypair."
+                        return@TextButton
+                    }
+                    applyGeneratedKeyPair(
+                        generated = generated,
+                        privateKeyState = dialogPrivateKeyState,
+                        publicKeyState = dialogPublicKeyState,
+                        fingerprintState = fingerprintState,
+                        passphraseState = dialogKeyPassphraseState,
+                        keyStatusState = dialogKeyStatus,
+                        passphrase = phrase
+                    )
+                    dialogError.value = null
+                    showGenerateDialog.value = false
+                    generationError.value = null
+                }) { Text("Generate") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGenerateDialog.value = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    copyKeyIdentity.value?.let { identity ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!copyInProgress.value) {
+                    copyKeyIdentity.value = null
+                }
+            },
+            title = { Text("Copy Key to Host") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (hosts.isEmpty()) {
+                        Text("Add a host first, then try copying this key.")
+                    } else {
+                        Text("Choose destination host")
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 180.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(hosts, key = { it.id }) { host ->
+                                val selected = copyHostId.value == host.id
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
+                                            shape = MaterialTheme.shapes.small
+                                        )
+                                        .clickable(enabled = !copyInProgress.value) { copyHostId.value = host.id }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(host.name.ifBlank { host.host })
+                                    if (selected) {
+                                        Text("Selected", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = copyHostPassword.value,
+                        onValueChange = { copyHostPassword.value = it },
+                        label = { Text("Host password (optional)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    OutlinedTextField(
+                        value = copyIdentityPassphrase.value,
+                        onValueChange = { copyIdentityPassphrase.value = it },
+                        label = { Text("Identity key passphrase (optional)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    copyError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !copyInProgress.value && hosts.isNotEmpty(),
+                    onClick = {
+                        val hostId = copyHostId.value
+                        if (hostId.isNullOrBlank()) {
+                            copyError.value = "Select a host."
+                            return@TextButton
+                        }
+                        copyError.value = null
+                        copyInProgress.value = true
+                        scope.launch {
+                            val success = onCopyKeyToHost(
+                                identity.id,
+                                hostId,
+                                copyHostPassword.value.trim().ifBlank { null },
+                                copyIdentityPassphrase.value.trim().ifBlank { null }
+                            )
+                            copyInProgress.value = false
+                            if (success) {
+                                onShowMessage("Key copied to host")
+                                copyKeyIdentity.value = null
+                            } else {
+                                copyError.value = "Failed to copy key. Verify authentication details."
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (copyInProgress.value) "Copying..." else "Copy")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !copyInProgress.value,
+                    onClick = { copyKeyIdentity.value = null }
+                ) { Text("Cancel") }
             }
         )
     }
@@ -695,6 +1025,36 @@ private fun KeyInputRow(
             )
         }
     }
+}
+
+@Composable
+private fun RowScope.KeyGenOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        modifier = Modifier.weight(1f),
+        onClick = onClick
+    ) {
+        Text(if (selected) "$label *" else label)
+    }
+}
+
+private fun applyGeneratedKeyPair(
+    generated: GeneratedIdentityKeyPair,
+    privateKeyState: androidx.compose.runtime.MutableState<String>,
+    publicKeyState: androidx.compose.runtime.MutableState<String>,
+    fingerprintState: androidx.compose.runtime.MutableState<String>,
+    passphraseState: androidx.compose.runtime.MutableState<String>,
+    keyStatusState: androidx.compose.runtime.MutableState<String?>,
+    passphrase: String
+) {
+    privateKeyState.value = generated.privateKey
+    publicKeyState.value = generated.publicKey
+    fingerprintState.value = generated.fingerprint
+    passphraseState.value = passphrase
+    keyStatusState.value = "Generated ${generated.publicKey.substringBefore(' ')} keypair."
 }
 
 private fun computeFingerprintFromKeyMaterial(keyText: String): String {

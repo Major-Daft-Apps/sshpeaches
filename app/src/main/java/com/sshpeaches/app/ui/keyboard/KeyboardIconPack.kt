@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Search
@@ -28,6 +29,7 @@ object KeyboardIconPack {
         KeyboardIconSpec("search", "Search", Icons.Default.Search),
         KeyboardIconSpec("build", "Tools", Icons.Default.Build),
         KeyboardIconSpec("folder", "Folder", Icons.Default.Folder),
+        KeyboardIconSpec("snippet_picker", "Snippets", Icons.Default.FormatListBulleted),
         KeyboardIconSpec("home", "Home", Icons.Default.Home),
         KeyboardIconSpec("up", "Up", Icons.Default.ArrowUpward),
         KeyboardIconSpec("down", "Down", Icons.Default.ArrowDownward),

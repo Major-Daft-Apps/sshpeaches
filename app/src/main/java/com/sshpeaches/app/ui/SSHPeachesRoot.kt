@@ -197,6 +197,9 @@ fun SSHPeachesRoot(
     onIdentityDelete: (String) -> Unit,
     onImportIdentityKey: (String, String, String) -> Boolean,
     onImportIdentityKeyPlain: (String, String) -> Boolean,
+    onStoreIdentityPublicKey: (String, String) -> Boolean,
+    onStoreIdentityKeyPassphrase: (String, String?) -> Unit,
+    onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
     onRemoveIdentityKey: (String) -> Unit,
     onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
     onKeyboardReset: () -> Unit,
@@ -503,7 +506,9 @@ fun SSHPeachesRoot(
                                 else -> {
                                     if (destination.route != currentRoute) {
                                         navController.navigate(destination.route) {
-                                            popUpTo(Routes.FAVORITES)
+                                            popUpTo(Routes.FAVORITES) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
                                     }
                                 }
@@ -580,8 +585,63 @@ fun SSHPeachesRoot(
                             .padding(padding)
                     ) {
                         composable(Routes.FAVORITES) {
+                            val activeSshSessionHostIds = sessions
+                                .filter {
+                                    it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                                        it.mode == ConnectionMode.SSH
+                                }
+                                .map { it.host.id }
+                                .toSet()
                             FavoritesScreen(
                                 section = uiState.favorites,
+                                snippets = uiState.snippets,
+                                activeSshSessionHostIds = activeSshSessionHostIds,
+                                onHostAction = { host, mode ->
+                                    pendingConnectingNavigation.value = true
+                                    quickConnectRequest.value = QuickConnectRequest(
+                                        sessionId = sessionIdFor(host.id, mode),
+                                        name = host.name,
+                                        host = host.host,
+                                        port = host.port,
+                                        username = host.username,
+                                        auth = host.preferredAuth,
+                                        password = "",
+                                        mode = mode,
+                                        savedHostId = host.id,
+                                        useMosh = host.useMosh,
+                                        preferredIdentityId = host.preferredIdentityId,
+                                        forwardId = host.preferredForwardId,
+                                        script = host.startupScript,
+                                        terminalProfileId = host.terminalProfileId
+                                    )
+                                    quickConnectState.value = QuickConnectUiState(
+                                        phase = QuickConnectPhase.CONNECTING,
+                                        message = "Connecting to ${host.host}:${host.port}..."
+                                    )
+                                    onStartSession(host, mode, null)
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.CONNECTING)
+                                    }
+                                },
+                                onRunInfoCommand = { host, command ->
+                                    val activeSshSession = sessions.firstOrNull {
+                                        it.host.id == host.id &&
+                                            it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                                            it.mode == ConnectionMode.SSH
+                                    }
+                                    if (activeSshSession != null) {
+                                        onSendSessionShortcut(activeSshSession.hostId, command)
+                                        showMessage("Ran command on ${host.name}")
+                                        true
+                                    } else {
+                                        showMessage("No active SSH session for ${host.name}")
+                                        false
+                                    }
+                                },
+                                onInfoCommandsChange = { host, commands ->
+                                    onHostInfoCommandsChange(host.id, commands)
+                                },
                                 onToggleFavorite = onToggleFavorite,
                                 onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.FAVORITES] = it }
                             )
@@ -612,6 +672,7 @@ fun SSHPeachesRoot(
                                 terminalProfile = activeTerminalProfile,
                                 terminalSelectionMode = uiState.terminalSelectionMode,
                                 keyboardSlots = uiState.keyboardSlots,
+                                snippets = uiState.snippets,
                                 onSendShellBytes = { payload ->
                                     request?.let { current ->
                                         onSendShellBytes(current.sessionId, payload)
@@ -653,9 +714,6 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 resolveTerminalEmulator = resolveTerminalEmulator,
-                                onClose = {
-                                    closeCurrentConnectingSession()
-                                },
                                 onRetry = {
                                     quickConnectRequest.value?.let { current ->
                                         onStopSession(current.sessionId)
@@ -778,12 +836,16 @@ fun SSHPeachesRoot(
                     composable(Routes.IDENTITIES) {
                         IdentitiesScreen(
                             items = uiState.identities,
+                            hosts = uiState.hosts,
                             isLocked = uiState.isLocked,
                             onAdd = onIdentityAdd,
                             onUpdate = onIdentityUpdate,
                             onDelete = onIdentityDelete,
                             onImportIdentityKey = onImportIdentityKey,
                             onImportIdentityKeyPlain = onImportIdentityKeyPlain,
+                            onStoreIdentityPublicKey = onStoreIdentityPublicKey,
+                            onStoreIdentityKeyPassphrase = onStoreIdentityKeyPassphrase,
+                            onCopyKeyToHost = onCopyIdentityKeyToHost,
                             onRemoveIdentityKey = onRemoveIdentityKey,
                             onToggleFavorite = onToggleFavorite,
                             onShowMessage = showMessage,
@@ -819,12 +881,18 @@ fun SSHPeachesRoot(
                                 onImportFromQr = { showMessage("Snippet imported from QR") },
                                 onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.SNIPPETS] = it },
                                 onRun = { snippet ->
-                                    val target = sessions.firstOrNull()
+                                    val activeSshSessions = sessions.filter {
+                                        it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                                            it.mode == ConnectionMode.SSH
+                                    }
+                                    val currentSessionId = quickConnectRequest.value?.sessionId
+                                    val target = activeSshSessions.firstOrNull { it.hostId == currentSessionId }
+                                        ?: activeSshSessions.firstOrNull()
                                     if (target != null) {
                                         onSendSessionShortcut(target.hostId, snippet.command)
                                         showMessage("Ran snippet on ${target.host.name}")
                                     } else {
-                                        showMessage("No active session to run snippet.")
+                                        showMessage("No active SSH session to run snippet.")
                                     }
                                 }
                             )
@@ -1365,12 +1433,12 @@ private fun QuickConnectSheet(
                 AuthChoice("Identity", AuthMethod.IDENTITY, auth.value) { auth.value = it }
                 AuthChoice("Both", AuthMethod.PASSWORD_AND_IDENTITY, auth.value) { auth.value = it }
             }
-            val identitiesWithKeys = identities.filter { it.hasPrivateKey }
+            val availableIdentities = identities
             ExposedDropdownMenuBox(
                 expanded = identityExpanded.value,
                 onExpandedChange = { identityExpanded.value = !identityExpanded.value }
             ) {
-                val selectedIdentity = identitiesWithKeys.firstOrNull { it.id == selectedIdentityId.value }
+                val selectedIdentity = availableIdentities.firstOrNull { it.id == selectedIdentityId.value }
                 TextField(
                     value = selectedIdentity?.label ?: "None",
                     onValueChange = {},
@@ -1392,9 +1460,17 @@ private fun QuickConnectSheet(
                             identityExpanded.value = false
                         }
                     )
-                    identitiesWithKeys.forEach { identity ->
+                    availableIdentities.forEach { identity ->
                         DropdownMenuItem(
-                            text = { Text(identity.label) },
+                            text = {
+                                Text(
+                                    if (identity.hasPrivateKey) {
+                                        identity.label
+                                    } else {
+                                        "${identity.label} (no key)"
+                                    }
+                                )
+                            },
                             onClick = {
                                 selectedIdentityId.value = identity.id
                                 identityExpanded.value = false
@@ -1409,6 +1485,15 @@ private fun QuickConnectSheet(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
+            } else if (auth.value != AuthMethod.PASSWORD) {
+                val selectedHasKey = identities.firstOrNull { it.id == selectedIdentityId.value }?.hasPrivateKey == true
+                if (!selectedHasKey) {
+                    Text(
+                        "Selected identity has no private key imported.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
             if (portForwards.isNotEmpty()) {
                 Text("Forwarded port", style = MaterialTheme.typography.labelMedium)

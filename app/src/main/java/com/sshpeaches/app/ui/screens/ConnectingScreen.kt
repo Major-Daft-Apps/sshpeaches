@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +92,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
@@ -159,6 +162,7 @@ fun ConnectingScreen(
     terminalProfile: TerminalProfile,
     terminalSelectionMode: TerminalSelectionMode,
     keyboardSlots: List<KeyboardSlotAction>,
+    snippets: List<Snippet>,
     onSendShellBytes: (ByteArray) -> Unit,
     onTerminalResize: (Int, Int) -> Unit,
     onSftpListDirectory: (String) -> Unit,
@@ -168,7 +172,6 @@ fun ConnectingScreen(
     onScpUpload: (String, String) -> Unit,
     onManageRemotePath: (operation: String, sourcePath: String, destinationPath: String?) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
-    onClose: () -> Unit,
     onRetry: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -205,16 +208,14 @@ fun ConnectingScreen(
     var uploadLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     var uploadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     val sftpConsoleLines = remember(request?.sessionId) { mutableStateListOf<String>() }
+    var sftpCommandInput by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var sftpLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var sftpPendingDirectoryEcho by remember(request?.sessionId) { mutableStateOf<String?>(null) }
+    var sftpLastRenderedDirectoryKey by remember(request?.sessionId) { mutableStateOf("") }
     val scpActivityLines = remember(request?.sessionId) { mutableStateListOf<String>() }
-    var scpLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     var scpRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
-    var scpSelectedLocalPath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
-    var scpSelectedRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
-    var scpLocalNewFolder by rememberSaveable(request?.sessionId) { mutableStateOf("") }
-    var scpRemoteNewFolder by rememberSaveable(request?.sessionId) { mutableStateOf("") }
-    var scpMoveLocalDestination by rememberSaveable(request?.sessionId) { mutableStateOf("") }
-    var scpMoveRemoteDestination by rememberSaveable(request?.sessionId) { mutableStateOf("") }
     var pendingModifiers by remember(request?.sessionId) { mutableStateOf(setOf<KeyboardModifier>()) }
+    var showSnippetPicker by remember(request?.sessionId) { mutableStateOf(false) }
 
     val compactKeys = remember(keyboardSlots) {
         KeyboardLayoutDefaults.normalizeSlots(keyboardSlots).map { action ->
@@ -251,9 +252,9 @@ fun ConnectingScreen(
     }
     val showTerminalSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SSH
-    val showSftpConsoleSession =
+    val showSftpCliSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SFTP
-    val showScpDualPaneSession =
+    val showScpTransferSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SCP
     var lastSingleTapUptimeMillis by remember(request?.sessionId) { mutableStateOf(0L) }
     val terminalViewClient = remember(request?.sessionId) {
@@ -342,24 +343,24 @@ fun ConnectingScreen(
         downloadLocalPath = ""
         uploadLocalPath = ""
         uploadRemotePath = ""
+        sftpCommandInput = ""
+        sftpLocalPath = (context.getExternalFilesDir(null) ?: context.filesDir).absolutePath
+        sftpPendingDirectoryEcho = null
+        sftpLastRenderedDirectoryKey = ""
         sftpConsoleLines.clear()
         scpActivityLines.clear()
-        scpLocalPath = (context.getExternalFilesDir(null) ?: context.filesDir).absolutePath
         scpRemotePath = "."
-        scpSelectedLocalPath = null
-        scpSelectedRemotePath = null
-        scpLocalNewFolder = ""
-        scpRemoteNewFolder = ""
-        scpMoveLocalDestination = ""
-        scpMoveRemoteDestination = ""
         if (request?.mode == ConnectionMode.SFTP) {
             sftpConsoleLines += "Connected to ${request.host}:${request.port}"
-            onSftpListDirectory(sftpPath)
+            sftpConsoleLines += "Type 'help' for SFTP commands."
+            sftpConsoleLines += ""
+            sftpConsoleLines += "Run 'ls' when you want to list files."
         }
         if (request?.mode == ConnectionMode.SCP) {
             onSftpListDirectory(scpRemotePath)
         }
         pendingModifiers = emptySet()
+        showSnippetPicker = false
         terminalViewRef?.onScreenUpdated()
     }
     LaunchedEffect(terminalProfile.id) {
@@ -453,6 +454,68 @@ fun ConnectingScreen(
         val list = runCatching { dir.listFiles()?.toList().orEmpty() }.getOrDefault(emptyList())
         return list.sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
     }
+
+    fun appendSftpConsole(line: String) {
+        sftpConsoleLines += line
+        val overflow = sftpConsoleLines.size - 500
+        if (overflow > 0) {
+            repeat(overflow) { sftpConsoleLines.removeAt(0) }
+        }
+    }
+
+    fun resolveRemotePath(current: String, raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank() || trimmed == ".") return current
+        if (trimmed == "..") return parentPath(current)
+        if (trimmed.startsWith("/")) return trimmed
+        var base = current
+        var remainder = trimmed
+        while (remainder.startsWith("../")) {
+            base = parentPath(base)
+            remainder = remainder.removePrefix("../")
+        }
+        val normalized = remainder.removePrefix("./")
+        return if (normalized.isBlank()) base else resolveChildPath(base, normalized)
+    }
+
+    LaunchedEffect(remoteDirectory?.path, remoteDirectory?.entries, request?.sessionId, request?.mode) {
+        if (request?.mode != ConnectionMode.SFTP) return@LaunchedEffect
+        val snapshot = remoteDirectory ?: return@LaunchedEffect
+        val key = buildString {
+            append(snapshot.path)
+            append('|')
+            append(snapshot.entries.size)
+            snapshot.entries.forEach {
+                append('|')
+                append(if (it.isDirectory) "d:" else "f:")
+                append(it.name)
+                append(':')
+                append(it.sizeBytes)
+            }
+        }
+        if (key == sftpLastRenderedDirectoryKey) return@LaunchedEffect
+        sftpLastRenderedDirectoryKey = key
+        if (sftpPendingDirectoryEcho == null) return@LaunchedEffect
+        appendSftpConsole("Remote directory: ${snapshot.path}")
+        if (snapshot.entries.isEmpty()) {
+            appendSftpConsole("(empty)")
+        } else {
+            snapshot.entries.forEach { entry ->
+                val label = if (entry.isDirectory) "d" else "-"
+                val size = entry.sizeBytes.toString()
+                appendSftpConsole("$label $size ${entry.name}")
+            }
+        }
+        sftpPendingDirectoryEcho = null
+    }
+
+    fun runSnippetOnCurrentSession(snippet: Snippet) {
+        val command = snippet.command.trim()
+        if (command.isBlank()) return
+        val payload = if (command.endsWith("\n") || command.endsWith("\r")) command else "$command\r"
+        terminalInput.sendRawSequence(payload)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -554,6 +617,10 @@ fun ConnectingScreen(
                                     }
                                     pendingModifiers = emptySet()
                                 }
+                                KeyboardActionType.SNIPPET_PICKER -> {
+                                    showSnippetPicker = true
+                                    pendingModifiers = emptySet()
+                                }
                             }
                         },
                         modifier = Modifier
@@ -614,15 +681,15 @@ fun ConnectingScreen(
                     singleLine = false,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Ascii,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     )
                 )
             }
-        } else if (showSftpConsoleSession && request != null) {
+        } else if (showScpTransferSession && request != null) {
             val remoteItems = remoteDirectory?.entries.orEmpty()
-            val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
+            val effectiveRemotePath = remoteDirectory?.path ?: scpRemotePath
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -630,13 +697,13 @@ fun ConnectingScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "SFTP Browser",
+                    text = "SCP Transfer",
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium
                 )
                 OutlinedTextField(
-                    value = sftpPath,
-                    onValueChange = { sftpPath = it },
+                    value = scpRemotePath,
+                    onValueChange = { scpRemotePath = it },
                     label = { Text("Remote working directory") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -653,9 +720,9 @@ fun ConnectingScreen(
                 ) {
                     Button(
                         onClick = {
-                            val target = sftpPath.trim().ifBlank { "." }
+                            val target = scpRemotePath.trim().ifBlank { "." }
                             onSftpListDirectory(target)
-                            sftpConsoleLines += "Listing $target..."
+                            scpActivityLines += "Listing $target..."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -663,10 +730,10 @@ fun ConnectingScreen(
                     }
                     Button(
                         onClick = {
-                            val parent = parentPath(effectiveSftpPath)
-                            sftpPath = parent
+                            val parent = parentPath(effectiveRemotePath)
+                            scpRemotePath = parent
                             onSftpListDirectory(parent)
-                            sftpConsoleLines += "Listing $parent..."
+                            scpActivityLines += "Listing $parent..."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -674,8 +741,8 @@ fun ConnectingScreen(
                     }
                     Button(
                         onClick = {
-                            onSftpListDirectory(effectiveSftpPath)
-                            sftpConsoleLines += "Refreshing $effectiveSftpPath..."
+                            onSftpListDirectory(effectiveRemotePath)
+                            scpActivityLines += "Refreshing $effectiveRemotePath..."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -695,7 +762,7 @@ fun ConnectingScreen(
                             .padding(12.dp)
                     ) {
                         Text(
-                            text = "Path: $effectiveSftpPath",
+                            text = "Path: $effectiveRemotePath",
                             color = Color(0xFFE5E5E5),
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                         )
@@ -712,7 +779,7 @@ fun ConnectingScreen(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 items(remoteItems, key = { "${it.name}-${it.isDirectory}" }) { item ->
-                                    val absolute = resolveChildPath(effectiveSftpPath, item.name)
+                                    val absolute = resolveChildPath(effectiveRemotePath, item.name)
                                     val selected = downloadRemotePath == absolute
                                     Row(
                                         modifier = Modifier
@@ -723,9 +790,9 @@ fun ConnectingScreen(
                                             )
                                             .clickable {
                                                 if (item.isDirectory) {
-                                                    sftpPath = absolute
+                                                    scpRemotePath = absolute
                                                     onSftpListDirectory(absolute)
-                                                    sftpConsoleLines += "Listing $absolute..."
+                                                    scpActivityLines += "Listing $absolute..."
                                                 } else {
                                                     downloadRemotePath = absolute
                                                 }
@@ -780,11 +847,11 @@ fun ConnectingScreen(
                         onClick = {
                             val remote = downloadRemotePath.trim()
                             if (remote.isBlank()) {
-                                sftpConsoleLines += "Select or enter a remote file path to download."
+                                scpActivityLines += "Select or enter a remote file path to download."
                                 return@Button
                             }
-                            onSftpDownload(remote, downloadLocalPath.trim().ifBlank { null })
-                            sftpConsoleLines += "Downloading $remote..."
+                            onScpDownload(remote, downloadLocalPath.trim().ifBlank { null })
+                            scpActivityLines += "Downloading $remote..."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -835,14 +902,14 @@ fun ConnectingScreen(
                         onClick = {
                             val local = uploadLocalPath.trim()
                             if (local.isBlank()) {
-                                sftpConsoleLines += "Enter a local file path to upload."
+                                scpActivityLines += "Enter a local file path to upload."
                                 return@Button
                             }
                             val remote = uploadRemotePath.trim().ifBlank {
-                                inferRemoteDestination(local, effectiveSftpPath)
+                                inferRemoteDestination(local, effectiveRemotePath)
                             }
-                            onSftpUpload(local, remote)
-                            sftpConsoleLines += "Uploading $local -> $remote..."
+                            onScpUpload(local, remote)
+                            scpActivityLines += "Uploading $local -> $remote..."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -850,7 +917,7 @@ fun ConnectingScreen(
                     }
                     Button(
                         onClick = {
-                            uploadRemotePath = effectiveSftpPath
+                            uploadRemotePath = effectiveRemotePath
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -870,8 +937,205 @@ fun ConnectingScreen(
                             .verticalScroll(rememberScrollState())
                             .padding(12.dp)
                     ) {
-                        val activityLog = if (sftpConsoleLines.isEmpty()) {
+                        val activityLog = if (scpActivityLines.isEmpty()) {
                             "No activity yet."
+                        } else {
+                            scpActivityLines.joinToString(separator = "\n")
+                        }
+                        Text(
+                            text = activityLog,
+                            color = Color(0xFFE5E5E5),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                        )
+                    }
+                }
+            }
+        } else if (showSftpCliSession && request != null) {
+            val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
+            val consoleScrollState = rememberScrollState()
+
+            fun resolveLocalPath(raw: String): String {
+                val candidate = File(raw)
+                return if (candidate.isAbsolute) {
+                    candidate.absolutePath
+                } else {
+                    File(sftpLocalPath, raw).absolutePath
+                }
+            }
+
+            fun runSftpCommand(input: String) {
+                val command = input.trim()
+                if (command.isEmpty()) return
+                appendSftpConsole("sftp> $command")
+                val tokens = tokenizeSftpCommand(command)
+                if (tokens.isEmpty()) return
+                val cmd = tokens.first().lowercase()
+                val args = tokens.drop(1)
+                when (cmd) {
+                    "help", "?" -> {
+                        appendSftpConsole("Commands: ls [path], cd <path>, pwd, get <remote> [local], put <local> [remote]")
+                        appendSftpConsole("          mkdir <path>, rm <path>, mv <src> <dst>, lcd <path>, lpwd, lls [path], refresh, clear")
+                    }
+                    "clear" -> sftpConsoleLines.clear()
+                    "pwd" -> appendSftpConsole(effectiveSftpPath)
+                    "lpwd" -> appendSftpConsole(sftpLocalPath)
+                    "refresh" -> {
+                        sftpPendingDirectoryEcho = effectiveSftpPath
+                        onSftpListDirectory(effectiveSftpPath)
+                    }
+                    "ls" -> {
+                        val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull().orEmpty())
+                        sftpPath = target
+                        sftpPendingDirectoryEcho = target
+                        onSftpListDirectory(target)
+                    }
+                    "cd" -> {
+                        val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull() ?: ".")
+                        sftpPath = target
+                        sftpPendingDirectoryEcho = target
+                        onSftpListDirectory(target)
+                    }
+                    "lcd" -> {
+                        val targetArg = args.firstOrNull()
+                        if (targetArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: lcd <local-path>")
+                        } else {
+                            val target = File(resolveLocalPath(targetArg))
+                            if (target.exists() && target.isDirectory) {
+                                sftpLocalPath = target.absolutePath
+                                appendSftpConsole("Local directory: ${target.absolutePath}")
+                            } else {
+                                appendSftpConsole("lcd failed: no such directory: ${target.absolutePath}")
+                            }
+                        }
+                    }
+                    "lls" -> {
+                        val target = File(
+                            resolveLocalPath(args.firstOrNull().orEmpty().ifBlank { "." })
+                        )
+                        if (!target.exists() || !target.isDirectory) {
+                            appendSftpConsole("lls failed: no such directory: ${target.absolutePath}")
+                        } else {
+                            appendSftpConsole("Local directory: ${target.absolutePath}")
+                            val entries = listLocalFiles(target.absolutePath)
+                            if (entries.isEmpty()) {
+                                appendSftpConsole("(empty)")
+                            } else {
+                                entries.forEach { item ->
+                                    appendSftpConsole(
+                                        "${if (item.isDirectory) "d" else "-"} ${item.length()} ${item.name}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    "get" -> {
+                        val remoteArg = args.firstOrNull()
+                        if (remoteArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: get <remote-path> [local-path]")
+                        } else {
+                            val remote = resolveRemotePath(effectiveSftpPath, remoteArg)
+                            val local = args.getOrNull(1)?.takeIf { it.isNotBlank() } ?: File(
+                                sftpLocalPath,
+                                remote.substringAfterLast('/').ifBlank { "download.bin" }
+                            ).absolutePath
+                            onSftpDownload(remote, local)
+                            appendSftpConsole("Downloading $remote -> $local")
+                        }
+                    }
+                    "put" -> {
+                        val localArg = args.firstOrNull()
+                        if (localArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: put <local-path> [remote-path]")
+                        } else {
+                            val local = resolveLocalPath(localArg)
+                            val remote = args.getOrNull(1)?.takeIf { it.isNotBlank() }?.let {
+                                resolveRemotePath(effectiveSftpPath, it)
+                            } ?: inferRemoteDestination(local, effectiveSftpPath)
+                            onSftpUpload(local, remote)
+                            appendSftpConsole("Uploading $local -> $remote")
+                        }
+                    }
+                    "mkdir" -> {
+                        val targetArg = args.firstOrNull()
+                        if (targetArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: mkdir <remote-path>")
+                        } else {
+                            val target = resolveRemotePath(effectiveSftpPath, targetArg)
+                            onManageRemotePath("mkdir", target, null)
+                            appendSftpConsole("Created directory: $target")
+                        }
+                    }
+                    "rm", "delete" -> {
+                        val targetArg = args.firstOrNull()
+                        if (targetArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: rm <remote-path>")
+                        } else {
+                            val target = resolveRemotePath(effectiveSftpPath, targetArg)
+                            onManageRemotePath("delete", target, null)
+                            appendSftpConsole("Deleted: $target")
+                        }
+                    }
+                    "mv", "rename" -> {
+                        val srcArg = args.getOrNull(0)
+                        val dstArg = args.getOrNull(1)
+                        if (srcArg.isNullOrBlank() || dstArg.isNullOrBlank()) {
+                            appendSftpConsole("usage: mv <remote-src> <remote-dst>")
+                        } else {
+                            val src = resolveRemotePath(effectiveSftpPath, srcArg)
+                            val dst = resolveRemotePath(effectiveSftpPath, dstArg)
+                            onManageRemotePath("move", src, dst)
+                            appendSftpConsole("Moved: $src -> $dst")
+                        }
+                    }
+                    "exit", "quit", "bye" -> {
+                        appendSftpConsole("Use the top-right close action to disconnect this session.")
+                    }
+                    else -> appendSftpConsole("Unknown command: $cmd. Type 'help' for commands.")
+                }
+            }
+
+            LaunchedEffect(sftpConsoleLines.size) {
+                if (sftpConsoleLines.isNotEmpty()) {
+                    consoleScrollState.animateScrollTo(consoleScrollState.maxValue)
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "SFTP Console",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Remote: $effectiveSftpPath",
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                )
+                Text(
+                    text = "Local: $sftpLocalPath",
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    color = Color(0xFF0F0F0F)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(consoleScrollState)
+                            .padding(12.dp)
+                    ) {
+                        val activityLog = if (sftpConsoleLines.isEmpty()) {
+                            "sftp> help"
                         } else {
                             sftpConsoleLines.joinToString(separator = "\n")
                         }
@@ -882,312 +1146,46 @@ fun ConnectingScreen(
                         )
                     }
                 }
-            }
-        } else if (showScpDualPaneSession && request != null) {
-            val remoteItems = remoteDirectory?.entries.orEmpty()
-            val effectiveRemotePath = remoteDirectory?.path ?: scpRemotePath
-            val localItems = remember(scpLocalPath) { listLocalFiles(scpLocalPath) }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        color = Color(0xFF121212)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Local", color = Color.White, style = MaterialTheme.typography.labelLarge)
-                            OutlinedTextField(
-                                value = scpLocalPath,
-                                onValueChange = { scpLocalPath = it },
-                                label = { Text("Local path") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = { scpLocalPath = parentPath(scpLocalPath) },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Up") }
-                                Button(
-                                    onClick = { scpSelectedLocalPath = null },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Clear") }
-                            }
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(220.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                items(localItems, key = { it.absolutePath }) { item ->
-                                    val selected = scpSelectedLocalPath == item.absolutePath
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                if (selected) Color(0xFF2A2A2A) else Color.Transparent,
-                                                RoundedCornerShape(6.dp)
-                                            )
-                                            .clickable {
-                                                scpSelectedLocalPath = item.absolutePath
-                                                if (item.isDirectory) {
-                                                    scpLocalPath = item.absolutePath
-                                                }
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = if (item.isDirectory) "[DIR] ${item.name}" else item.name,
-                                            color = Color(0xFFE5E5E5),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                            OutlinedTextField(
-                                value = scpLocalNewFolder,
-                                onValueChange = { scpLocalNewFolder = it },
-                                label = { Text("New folder name") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        val parent = File(scpLocalPath)
-                                        val folderName = scpLocalNewFolder.trim()
-                                        if (folderName.isNotBlank()) {
-                                            runCatching { File(parent, folderName).mkdirs() }
-                                            scpLocalNewFolder = ""
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("New") }
-                                Button(
-                                    onClick = {
-                                        scpSelectedLocalPath?.let { selected ->
-                                            runCatching {
-                                                val target = File(selected)
-                                                if (target.isDirectory) target.deleteRecursively() else target.delete()
-                                            }
-                                            scpSelectedLocalPath = null
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Delete") }
-                            }
-                            OutlinedTextField(
-                                value = scpMoveLocalDestination,
-                                onValueChange = { scpMoveLocalDestination = it },
-                                label = { Text("Move selected to path") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Button(
-                                onClick = {
-                                    val selected = scpSelectedLocalPath ?: return@Button
-                                    val destination = scpMoveLocalDestination.trim()
-                                    if (destination.isNotBlank()) {
-                                        runCatching {
-                                            File(selected).renameTo(File(destination))
-                                        }
-                                        scpMoveLocalDestination = ""
-                                        scpSelectedLocalPath = null
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Move")
-                            }
+                OutlinedTextField(
+                    value = sftpCommandInput,
+                    onValueChange = { sftpCommandInput = it },
+                    label = { Text("Command (e.g. ls, cd /, get file.txt)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done,
+                        autoCorrect = false
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            val cmd = sftpCommandInput
+                            sftpCommandInput = ""
+                            runSftpCommand(cmd)
                         }
-                    }
-
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        color = Color(0xFF121212)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Remote", color = Color.White, style = MaterialTheme.typography.labelLarge)
-                            OutlinedTextField(
-                                value = scpRemotePath,
-                                onValueChange = { scpRemotePath = it },
-                                label = { Text("Remote path") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        scpRemotePath = parentPath(effectiveRemotePath)
-                                        onSftpListDirectory(scpRemotePath)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Up") }
-                                Button(
-                                    onClick = { onSftpListDirectory(scpRemotePath) },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Refresh") }
-                            }
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(220.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                items(remoteItems, key = { "${effectiveRemotePath}/${it.name}" }) { item ->
-                                    val fullPath = resolveChildPath(effectiveRemotePath, item.name)
-                                    val selected = scpSelectedRemotePath == fullPath
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                if (selected) Color(0xFF2A2A2A) else Color.Transparent,
-                                                RoundedCornerShape(6.dp)
-                                            )
-                                            .clickable {
-                                                scpSelectedRemotePath = fullPath
-                                                if (item.isDirectory) {
-                                                    scpRemotePath = fullPath
-                                                    onSftpListDirectory(fullPath)
-                                                }
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = if (item.isDirectory) "[DIR] ${item.name}" else item.name,
-                                            color = Color(0xFFE5E5E5),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                            OutlinedTextField(
-                                value = scpRemoteNewFolder,
-                                onValueChange = { scpRemoteNewFolder = it },
-                                label = { Text("New remote folder") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        val name = scpRemoteNewFolder.trim()
-                                        if (name.isNotBlank()) {
-                                            onManageRemotePath("mkdir", resolveChildPath(effectiveRemotePath, name), null)
-                                            onSftpListDirectory(effectiveRemotePath)
-                                            scpRemoteNewFolder = ""
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("New") }
-                                Button(
-                                    onClick = {
-                                        scpSelectedRemotePath?.let { selected ->
-                                            onManageRemotePath("delete", selected, null)
-                                            onSftpListDirectory(effectiveRemotePath)
-                                            scpSelectedRemotePath = null
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Delete") }
-                            }
-                            OutlinedTextField(
-                                value = scpMoveRemoteDestination,
-                                onValueChange = { scpMoveRemoteDestination = it },
-                                label = { Text("Move selected to path") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Button(
-                                onClick = {
-                                    val selected = scpSelectedRemotePath ?: return@Button
-                                    val destination = scpMoveRemoteDestination.trim()
-                                    if (destination.isNotBlank()) {
-                                        onManageRemotePath("move", selected, destination)
-                                        onSftpListDirectory(parentPath(destination))
-                                        scpMoveRemoteDestination = ""
-                                        scpSelectedRemotePath = null
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Move")
-                            }
-                        }
-                    }
-                }
-
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = {
-                            val local = scpSelectedLocalPath ?: return@Button
-                            val source = File(local)
-                            if (!source.isFile) return@Button
-                            val remoteTarget = resolveChildPath(effectiveRemotePath, source.name)
-                            onScpUpload(source.absolutePath, remoteTarget)
-                            scpActivityLines += "Upload requested: ${source.absolutePath} -> $remoteTarget"
+                            val cmd = sftpCommandInput
+                            sftpCommandInput = ""
+                            runSftpCommand(cmd)
                         },
                         modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Copy Local -> Remote")
-                    }
+                    ) { Text("Run") }
                     Button(
-                        onClick = {
-                            val remote = scpSelectedRemotePath ?: return@Button
-                            val localDir = File(scpLocalPath)
-                            val localTarget = File(localDir, remote.substringAfterLast('/')).absolutePath
-                            onScpDownload(remote, localTarget)
-                            scpActivityLines += "Download requested: $remote -> $localTarget"
-                        },
+                        onClick = { runSftpCommand("help") },
                         modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Copy Remote -> Local")
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    color = Color(0xFF0F0F0F)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(12.dp)
-                    ) {
-                        val activityLog = when {
-                            scpActivityLines.isNotEmpty() -> scpActivityLines.joinToString(separator = "\n")
-                            else -> "No SCP activity yet. Use the panes above to start a transfer."
-                        }
-                        Text(
-                            text = activityLog,
-                            color = Color(0xFFE5E5E5),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                        )
-                    }
+                    ) { Text("Help") }
+                    Button(
+                        onClick = { runSftpCommand("refresh") },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Refresh") }
                 }
             }
         } else if (request != null) {
@@ -1263,6 +1261,70 @@ fun ConnectingScreen(
             }
         }
 
+        if (showSnippetPicker && showTerminalSession) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showSnippetPicker = false },
+                title = { Text("Run Snippet") },
+                text = {
+                    if (snippets.isEmpty()) {
+                        Text("No snippets available. Create snippets in Snippets first.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(320.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(snippets, key = { it.id }) { snippet ->
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            runSnippetOnCurrentSession(snippet)
+                                            showSnippetPicker = false
+                                        },
+                                    color = Color(0xFF111111),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = snippet.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White
+                                        )
+                                        if (snippet.description.isNotBlank()) {
+                                            Text(
+                                                text = snippet.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFFBDBDBD),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Text(
+                                            text = snippet.command,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = Color(0xFFE5E5E5),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSnippetPicker = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
         if (state.phase == QuickConnectPhase.ERROR) {
             IconButton(
                 onClick = onRetry,
@@ -1335,8 +1397,12 @@ private fun RowScope.CompactKeyButton(
 ) {
     val scope = rememberCoroutineScope()
     var repeatJob by remember(key) { mutableStateOf<Job?>(null) }
+    var pressed by remember(key) { mutableStateOf(false) }
     DisposableEffect(Unit) {
-        onDispose { repeatJob?.cancel() }
+        onDispose {
+            repeatJob?.cancel()
+            pressed = false
+        }
     }
     Box(
         modifier = Modifier
@@ -1346,6 +1412,7 @@ private fun RowScope.CompactKeyButton(
             .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
             .background(
                 when {
+                    pressed && key.enabled -> Color(0xFF2C2C2C)
                     modifierActive -> Color(0xFF5B3A0F)
                     key.enabled -> Color(0xFF121212)
                     else -> Color(0xFF090909)
@@ -1355,6 +1422,7 @@ private fun RowScope.CompactKeyButton(
                 if (!key.enabled) return@pointerInteropFilter false
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        pressed = true
                         onSendKey(key)
                         if (key.repeatable) {
                             repeatJob?.cancel()
@@ -1369,6 +1437,7 @@ private fun RowScope.CompactKeyButton(
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        pressed = false
                         repeatJob?.cancel()
                         repeatJob = null
                         true
@@ -1450,6 +1519,13 @@ private data class CompactTerminalKey(
     val enabled: Boolean,
     val repeatable: Boolean
 )
+
+private fun tokenizeSftpCommand(input: String): List<String> {
+    val tokenPattern = Regex("""[^\s"']+|"([^"]*)"|'([^']*)'""")
+    return tokenPattern.findAll(input).map { match ->
+        match.groups[1]?.value ?: match.groups[2]?.value ?: match.value
+    }.toList()
+}
 
 private fun normalizeImeChunk(chunk: String): String {
     if (chunk.isEmpty()) return chunk

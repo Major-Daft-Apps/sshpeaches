@@ -12,6 +12,8 @@ import android.os.IBinder
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.LaunchedEffect
@@ -19,18 +21,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import com.termux.terminal.TerminalEmulator
+import androidx.compose.runtime.withFrameNanos
 
 class MainActivity : FragmentActivity() {
 
@@ -40,9 +50,11 @@ class MainActivity : FragmentActivity() {
     }
     private val sessionServiceState = mutableStateOf<SessionService?>(null)
     private var serviceBound = false
+    private var serviceConnectionRequested = false
     private var biometricPrompt: BiometricPrompt? = null
     private var biometricPromptInfo: BiometricPrompt.PromptInfo? = null
     private var biometricAvailable: Boolean = false
+    private var appUiBootstrapped = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -53,12 +65,14 @@ class MainActivity : FragmentActivity() {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             sessionServiceState.value = (binder as? SessionService.SessionBinder)?.getService()
             serviceBound = true
+            serviceConnectionRequested = true
             UiDebugLog.result("SessionService.onServiceConnected", true, "bound=true")
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             sessionServiceState.value = null
             serviceBound = false
+            serviceConnectionRequested = false
             UiDebugLog.result("SessionService.onServiceDisconnected", true, "bound=false")
         }
     }
@@ -103,18 +117,62 @@ class MainActivity : FragmentActivity() {
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    private fun ensureSessionServiceConnection() {
+        if (serviceBound || serviceConnectionRequested) return
+        val serviceIntent = Intent(this, SessionService::class.java)
+        serviceConnectionRequested = true
+        val requestedServiceStart = runCatching {
+            startService(serviceIntent)
+            true
+        }.onFailure { error ->
+            UiDebugLog.error("MainActivity.startService", error)
+        }.getOrDefault(false)
+        val bindRequested = runCatching {
+            bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE)
+        }.onFailure { error ->
+            UiDebugLog.error("MainActivity.bindService", error)
+        }.getOrDefault(false)
+        if (!bindRequested) {
+            serviceConnectionRequested = false
+        }
+        UiDebugLog.result(
+            "MainActivity.ensureSessionServiceConnection",
+            requestedServiceStart || bindRequested,
+            "requestedServiceStart=$requestedServiceStart, bindRequested=$bindRequested"
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
-        val intent = Intent(this, SessionService::class.java)
-        startForegroundService(intent)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
-        UiDebugLog.result("MainActivity.onCreate", true, "requestedServiceStart=true")
+        UiDebugLog.result("MainActivity.onCreate", true)
         setupBiometricPrompt()
-        requestNotificationPermissionIfNeeded()
-        handleSessionOpenIntent(intent)
+        handleSessionOpenIntent(this.intent)
         setContent {
+            var deferHeavyUi by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                deferHeavyUi = false
+            }
+            if (deferHeavyUi) {
+                SSHPeachesTheme(themeMode = ThemeMode.SYSTEM) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "SSHPeaches",
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
+                }
+                return@setContent
+            }
             val viewModel = appViewModel
+            appUiBootstrapped = true
+            LaunchedEffect(Unit) {
+                viewModel.onAppForegrounded()
+            }
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
             val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -138,8 +196,10 @@ class MainActivity : FragmentActivity() {
                         "hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
                     )
                     if (sessionService == null) {
+                        ensureSessionServiceConnection()
                         UiDebugLog.result("uiStartSession", false, "service-not-ready")
                     } else {
+                        requestNotificationPermissionIfNeeded()
                         sessionService.startSession(
                             host = host,
                             mode = mode,
@@ -333,6 +393,22 @@ class MainActivity : FragmentActivity() {
                     onIdentityDelete = viewModel::deleteIdentity,
                     onImportIdentityKey = viewModel::importIdentityKeyFromPayload,
                     onImportIdentityKeyPlain = viewModel::importIdentityKeyPlain,
+                    onStoreIdentityPublicKey = viewModel::storeIdentityPublicKey,
+                    onStoreIdentityKeyPassphrase = viewModel::storeIdentityKeyPassphrase,
+                    onCopyIdentityKeyToHost = { identityId, hostId, hostPassword, identityPassphrase ->
+                        val host = uiState.hosts.firstOrNull { it.id == hostId }
+                        if (host == null) {
+                            false
+                        } else {
+                            IdentityKeyInstaller.install(
+                                context = this@MainActivity,
+                                host = host,
+                                identityId = identityId,
+                                hostPasswordOverride = hostPassword,
+                                identityPassphraseOverride = identityPassphrase
+                            ).success
+                        }
+                    },
                     onRemoveIdentityKey = viewModel::removeIdentityKey,
                     onKeyboardSlotChange = viewModel::updateKeyboardSlot,
                     onKeyboardReset = viewModel::resetKeyboardLayout,
@@ -374,6 +450,7 @@ class MainActivity : FragmentActivity() {
             unbindService(connection)
             serviceBound = false
         }
+        serviceConnectionRequested = false
         super.onDestroy()
         UiDebugLog.result("MainActivity.onDestroy", true)
     }
@@ -386,17 +463,21 @@ class MainActivity : FragmentActivity() {
 
     override fun onUserInteraction() {
         super.onUserInteraction()
-        appViewModel.onUserInteraction()
+        if (appUiBootstrapped) {
+            appViewModel.onUserInteraction()
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        appViewModel.onAppForegrounded()
+        window.decorView.post {
+            ensureSessionServiceConnection()
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) {
+        if (!isChangingConfigurations && appUiBootstrapped) {
             appViewModel.onAppBackgrounded()
         }
         UiDebugLog.action("MainActivity.onStop", "persistSessions=true")

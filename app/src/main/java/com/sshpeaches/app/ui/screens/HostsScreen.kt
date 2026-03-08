@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -60,6 +61,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
@@ -253,7 +255,11 @@ fun HostsScreen(
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
     }
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_HOSTS)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -337,7 +343,12 @@ fun HostsScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = { openDialog(null) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.HOST_ADD_BUTTON)
+                    ) {
                         Text("Add host")
                     }
                     Button(
@@ -404,28 +415,33 @@ fun HostsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = dialogBodyMaxHeight)
+                        .testTag(UiTestTags.HOST_DIALOG_SCROLL)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedTextField(
                         value = nameState.value,
                         onValueChange = { nameState.value = it },
-                        label = { Text("Name") }
+                        label = { Text("Name") },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_NAME_INPUT)
                     )
                     OutlinedTextField(
                         value = hostState.value,
                         onValueChange = { hostState.value = it },
-                        label = { Text("Host / IP") }
+                        label = { Text("Host / IP") },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_HOST_INPUT)
                     )
                     OutlinedTextField(
                         value = portState.value,
                         onValueChange = { portState.value = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("Port") }
+                        label = { Text("Port") },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_PORT_INPUT)
                     )
                     OutlinedTextField(
                         value = userState.value,
                         onValueChange = { userState.value = it },
-                        label = { Text("Username") }
+                        label = { Text("Username") },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT)
                     )
                     OutlinedTextField(
                         value = groupState.value,
@@ -480,7 +496,11 @@ fun HostsScreen(
                         )
                     }
                     dialogError.value?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_ERROR)
+                        )
                     }
                     ExposedDropdownMenuBox(
                         expanded = authMenuExpanded.value,
@@ -495,6 +515,7 @@ fun HostsScreen(
                             modifier = Modifier
                                 .menuAnchor()
                                 .fillMaxWidth()
+                                .testTag(UiTestTags.HOST_DIALOG_AUTH_FIELD)
                         )
                         ExposedDropdownMenu(
                             expanded = authMenuExpanded.value,
@@ -503,6 +524,7 @@ fun HostsScreen(
                             AuthMethod.values().forEach { method ->
                                 DropdownMenuItem(
                                     text = { Text(method.toSentenceCaseLabel()) },
+                                    modifier = Modifier.testTag(UiTestTags.hostDialogAuthOption(method.name)),
                                     onClick = {
                                         authState.value = method
                                         authMenuExpanded.value = false
@@ -511,12 +533,12 @@ fun HostsScreen(
                             }
                         }
                     }
-                    val identitiesWithKeys = identities.filter { it.hasPrivateKey }
+                    val availableIdentities = identities
                     ExposedDropdownMenuBox(
                         expanded = identityExpanded.value,
                         onExpandedChange = { identityExpanded.value = !identityExpanded.value }
                     ) {
-                        val selectedIdentity = identitiesWithKeys.firstOrNull { it.id == preferredIdentityIdState.value }
+                        val selectedIdentity = availableIdentities.firstOrNull { it.id == preferredIdentityIdState.value }
                         TextField(
                             value = selectedIdentity?.label ?: "None",
                             onValueChange = {},
@@ -538,9 +560,17 @@ fun HostsScreen(
                                     identityExpanded.value = false
                                 }
                             )
-                            identitiesWithKeys.forEach { identity ->
+                            availableIdentities.forEach { identity ->
                                 DropdownMenuItem(
-                                    text = { Text(identity.label) },
+                                    text = {
+                                        Text(
+                                            if (identity.hasPrivateKey) {
+                                                identity.label
+                                            } else {
+                                                "${identity.label} (no key)"
+                                            }
+                                        )
+                                    },
                                     onClick = {
                                         preferredIdentityIdState.value = identity.id
                                         identityExpanded.value = false
@@ -554,6 +584,14 @@ fun HostsScreen(
                             "Select an identity key for identity authentication.",
                             color = MaterialTheme.colorScheme.error
                         )
+                    } else if (authState.value != AuthMethod.PASSWORD) {
+                        val selectedHasKey = identities.firstOrNull { it.id == preferredIdentityIdState.value }?.hasPrivateKey == true
+                        if (!selectedHasKey) {
+                            Text(
+                                "Selected identity has no private key imported.",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -771,7 +809,8 @@ fun HostsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    onClick = {
                     val port = parsePort(portState.value) ?: run {
                         dialogError.value = "Enter a valid port between 1 and 65535."
                         return@TextButton
@@ -841,13 +880,18 @@ fun HostsScreen(
                         )
                     }
                     closeDialog()
-                }) {
+                },
+                    modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+                ) {
                     Text(if (editingHost.value == null) "Add" else "Save")
                 }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                    TextButton(
+                        onClick = { closeDialog() },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON)
+                    ) { Text("Cancel") }
                 }
             }
         )

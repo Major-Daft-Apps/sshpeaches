@@ -9,6 +9,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.R
@@ -71,8 +73,8 @@ class SessionService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val binder = SessionBinder()
-    private val activeJobs = mutableMapOf<String, Job>()
-    private val activeConnections = mutableMapOf<String, ActiveConnection>()
+    private val activeJobs = ConcurrentHashMap<String, Job>()
+    private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
     private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
     private val hostKeyPrompts = MutableStateFlow<List<HostKeyPrompt>>(emptyList())
     private val hostKeyPromptWaiters = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
@@ -83,6 +85,10 @@ class SessionService : Service() {
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
     private val shellReadSequence = ConcurrentHashMap<String, Int>()
     private val shellWriteSequence = ConcurrentHashMap<String, Int>()
+    private val pendingShellOutputChunks = ConcurrentHashMap<String, StringBuilder>()
+    private val pendingShellSnapshots = ConcurrentHashMap<String, String>()
+    private val shellOutputPublishJobs = ConcurrentHashMap<String, Job>()
+    private val moshTranscriptPublishJobs = ConcurrentHashMap<String, Job>()
     private var foregroundNotificationId: Int? = null
     private val sessionNotificationIds = mutableSetOf<Int>()
     @Volatile
@@ -122,6 +128,12 @@ class SessionService : Service() {
         stopAllSessions()
         clearAllHostKeyPrompts()
         clearAllPasswordPrompts()
+        shellOutputPublishJobs.values.forEach { it.cancel() }
+        shellOutputPublishJobs.clear()
+        moshTranscriptPublishJobs.values.forEach { it.cancel() }
+        moshTranscriptPublishJobs.clear()
+        pendingShellOutputChunks.clear()
+        pendingShellSnapshots.clear()
         shellOutput.value = emptyMap()
         remoteDirectories.value = emptyMap()
         shellSizes.clear()
@@ -383,13 +395,11 @@ class SessionService : Service() {
         UiDebugLog.action("stopSession", "hostId=$hostId")
         clearHostKeyPromptsForHost(hostId, trust = false)
         clearPasswordPromptsForHost(hostId, password = null)
-        activeConnections.remove(hostId)?.let { connection ->
-            runCatching { connection.shellBinding?.shell?.close() }
-            runCatching { connection.shellBinding?.session?.close() }
-            runCatching { connection.moshBinding?.session?.finishIfRunning() }
-            runCatching { connection.sftpBinding?.client?.close() }
-            runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
-            runCatching { connection.client?.disconnect() }
+        val connection = activeConnections.remove(hostId)
+        connection?.let {
+            serviceScope.launch {
+                closeConnectionResources(hostId, it, trigger = "stopSession")
+            }
         }
         activeJobs.remove(hostId)?.cancel()
         updateSessionNotifications()
@@ -406,6 +416,17 @@ class SessionService : Service() {
         val ids = activeJobs.keys.toList()
         ids.forEach { stopSession(it) }
         UiDebugLog.result("stopAllSessions", true)
+    }
+
+    private fun closeConnectionResources(hostId: String, connection: ActiveConnection, trigger: String) {
+        measureOperation("closeConnectionResources/$trigger", hostId, thresholdMs = 200L) {
+            runCatching { connection.shellBinding?.shell?.close() }
+            runCatching { connection.shellBinding?.session?.close() }
+            runCatching { connection.moshBinding?.session?.finishIfRunning() }
+            runCatching { connection.sftpBinding?.client?.close() }
+            runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
+            runCatching { connection.client?.disconnect() }
+        }
     }
 
     fun sendKeyboardShortcut(hostId: String, shortcut: String) {
@@ -430,25 +451,26 @@ class SessionService : Service() {
             UiDebugLog.result("sendKeyboardShortcut", false, "unsupported-mode hostId=$hostId")
             return
         }
-        val client = connection.client
-        if (client == null) {
-            UiDebugLog.result("sendKeyboardShortcut", false, "ssh-client-not-available hostId=$hostId")
-            return
-        }
+        val payload = shortcut.toShellCommandPayload()
         serviceScope.launch {
             runCatching {
-                client.startSession().use { session ->
-                    val command = session.exec(shortcut)
-                    command.join(8, TimeUnit.SECONDS)
-                    val output = runCatching { command.inputStream.bufferedReader().readText() }.getOrNull()
-                    if (!output.isNullOrBlank()) {
-                        SessionLogBus.emit(
-                            SessionLogBus.Entry(
-                                hostId = hostId,
-                                level = SessionLogBus.LogLevel.INFO,
-                                message = output.trim()
+                if (connection.moshBinding != null || connection.shellBinding != null) {
+                    sendShellBytes(hostId, payload.toByteArray(StandardCharsets.UTF_8))
+                } else {
+                    val client = connection.client ?: error("No active SSH client")
+                    client.startSession().use { session ->
+                        val command = session.exec(shortcut)
+                        command.join(8, TimeUnit.SECONDS)
+                        val output = runCatching { command.inputStream.bufferedReader().readText() }.getOrNull()
+                        if (!output.isNullOrBlank()) {
+                            SessionLogBus.emit(
+                                SessionLogBus.Entry(
+                                    hostId = hostId,
+                                    level = SessionLogBus.LogLevel.INFO,
+                                    message = output.trim()
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }.onSuccess {
@@ -471,6 +493,12 @@ class SessionService : Service() {
                 UiDebugLog.result("sendKeyboardShortcut", false, "hostId=$hostId")
             }
         }
+    }
+
+    private fun String.toShellCommandPayload(): String {
+        val trimmed = trimEnd()
+        if (trimmed.isEmpty()) return this
+        return if (trimmed.contains('\n') || trimmed.contains('\r')) this else "$trimmed\r"
     }
 
     fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
@@ -601,16 +629,18 @@ class SessionService : Service() {
         }
         serviceScope.launch {
             runCatching {
-                val destination = resolveDestinationFile(hostId, source, localPath)
-                destination.parentFile?.mkdirs()
-                sftp.get(source, destination.absolutePath)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.INFO,
-                        message = "SFTP download complete: $source -> ${destination.absolutePath}"
+                measureOperation("sftpDownloadFile", hostId) {
+                    val destination = resolveDestinationFile(hostId, source, localPath)
+                    destination.parentFile?.mkdirs()
+                    sftp.get(source, destination.absolutePath)
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "SFTP download complete: $source -> ${destination.absolutePath}"
+                        )
                     )
-                )
+                }
             }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -638,17 +668,19 @@ class SessionService : Service() {
         }
         serviceScope.launch {
             runCatching {
-                val sourceFile = File(source)
-                require(sourceFile.exists()) { "Local file does not exist: $source" }
-                require(sourceFile.isFile) { "Local path is not a file: $source" }
-                sftp.put(sourceFile.absolutePath, destination)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.INFO,
-                        message = "SFTP upload complete: ${sourceFile.absolutePath} -> $destination"
+                measureOperation("sftpUploadFile", hostId) {
+                    val sourceFile = File(source)
+                    require(sourceFile.exists()) { "Local file does not exist: $source" }
+                    require(sourceFile.isFile) { "Local path is not a file: $source" }
+                    sftp.put(sourceFile.absolutePath, destination)
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "SFTP upload complete: ${sourceFile.absolutePath} -> $destination"
+                        )
                     )
-                )
+                }
             }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -675,16 +707,18 @@ class SessionService : Service() {
         }
         serviceScope.launch {
             runCatching {
-                val destination = resolveDestinationFile(hostId, source, localPath)
-                destination.parentFile?.mkdirs()
-                scp.download(source, destination.absolutePath)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.INFO,
-                        message = "SCP download complete: $source -> ${destination.absolutePath}"
+                measureOperation("scpDownloadFile", hostId) {
+                    val destination = resolveDestinationFile(hostId, source, localPath)
+                    destination.parentFile?.mkdirs()
+                    scp.download(source, destination.absolutePath)
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "SCP download complete: $source -> ${destination.absolutePath}"
+                        )
                     )
-                )
+                }
             }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -712,17 +746,19 @@ class SessionService : Service() {
         }
         serviceScope.launch {
             runCatching {
-                val sourceFile = File(source)
-                require(sourceFile.exists()) { "Local file does not exist: $source" }
-                require(sourceFile.isFile) { "Local path is not a file: $source" }
-                scp.upload(sourceFile.absolutePath, destination)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.INFO,
-                        message = "SCP upload complete: ${sourceFile.absolutePath} -> $destination"
+                measureOperation("scpUploadFile", hostId) {
+                    val sourceFile = File(source)
+                    require(sourceFile.exists()) { "Local file does not exist: $source" }
+                    require(sourceFile.isFile) { "Local path is not a file: $source" }
+                    scp.upload(sourceFile.absolutePath, destination)
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "SCP upload complete: ${sourceFile.absolutePath} -> $destination"
+                        )
                     )
-                )
+                }
             }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -740,23 +776,25 @@ class SessionService : Service() {
         if (src.isBlank()) return
         serviceScope.launch {
             val ok = runWithSftpClient(hostId) { sftp ->
-                when (operation.lowercase()) {
-                    "mkdir" -> sftp.mkdir(src)
-                    "delete" -> deleteRemotePathRecursively(sftp, src)
-                    "move" -> {
-                        val dest = destinationPath?.trim().orEmpty()
-                        require(dest.isNotBlank()) { "Destination is required." }
-                        sftp.rename(src, dest)
+                measureOperation("manageRemotePath:$operation", hostId) {
+                    when (operation.lowercase()) {
+                        "mkdir" -> sftp.mkdir(src)
+                        "delete" -> deleteRemotePathRecursively(sftp, src)
+                        "move" -> {
+                            val dest = destinationPath?.trim().orEmpty()
+                            require(dest.isNotBlank()) { "Destination is required." }
+                            sftp.rename(src, dest)
+                        }
+                        else -> error("Unsupported operation: $operation")
                     }
-                    else -> error("Unsupported operation: $operation")
-                }
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.INFO,
-                        message = "Remote $operation completed: $src${destinationPath?.let { " -> $it" } ?: ""}"
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Remote $operation completed: $src${destinationPath?.let { " -> $it" } ?: ""}"
+                        )
                     )
-                )
+                }
             }
             if (!ok) {
                 UiDebugLog.result("manageRemotePath", false, "sftp-not-active hostId=$hostId")
@@ -765,35 +803,37 @@ class SessionService : Service() {
     }
 
     private fun refreshSftpDirectoryListing(hostId: String, sftp: SFTPClient, path: String) {
-        val listingPath = path.trim().ifBlank { "." }
-        val canonicalPath = runCatching { sftp.canonicalize(listingPath) }.getOrDefault(listingPath)
-        val listing = sftp.ls(canonicalPath)
-            .filterNot { it.name == "." || it.name == ".." }
-            .sortedWith(
-                compareByDescending<RemoteResourceInfo> { it.isDirectory() }
-                    .thenBy { it.name.lowercase() }
+        measureOperation("sftpListDirectory", hostId, thresholdMs = 200L) {
+            val listingPath = path.trim().ifBlank { "." }
+            val canonicalPath = runCatching { sftp.canonicalize(listingPath) }.getOrDefault(listingPath)
+            val listing = sftp.ls(canonicalPath)
+                .filterNot { it.name == "." || it.name == ".." }
+                .sortedWith(
+                    compareByDescending<RemoteResourceInfo> { it.isDirectory() }
+                        .thenBy { it.name.lowercase() }
+                )
+            val entries = listing.map { item ->
+                RemoteDirectoryEntry(
+                    name = item.name,
+                    isDirectory = item.isDirectory(),
+                    sizeBytes = item.attributes.size
+                )
+            }
+            setRemoteDirectorySnapshot(
+                hostId,
+                RemoteDirectorySnapshot(
+                    path = canonicalPath,
+                    entries = entries
+                )
             )
-        val entries = listing.map { item ->
-            RemoteDirectoryEntry(
-                name = item.name,
-                isDirectory = item.isDirectory(),
-                sizeBytes = item.attributes.size
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Listed ${listing.size} item(s) in $canonicalPath"
+                )
             )
         }
-        setRemoteDirectorySnapshot(
-            hostId,
-            RemoteDirectorySnapshot(
-                path = canonicalPath,
-                entries = entries
-            )
-        )
-        SessionLogBus.emit(
-            SessionLogBus.Entry(
-                hostId = hostId,
-                level = SessionLogBus.LogLevel.INFO,
-                message = "Listed ${listing.size} item(s) in $canonicalPath"
-            )
-        )
     }
 
     private fun resolveDestinationFile(hostId: String, remotePath: String, localPath: String?): File {
@@ -816,7 +856,12 @@ class SessionService : Service() {
         val connection = activeConnections[hostId] ?: return false
         val persistent = connection.sftpBinding?.client
         if (persistent != null) {
-            runCatching { action(persistent) }.onFailure { err ->
+            return runCatching {
+                measureOperation("runWithSftpClient:persistent", hostId) {
+                    action(persistent)
+                    true
+                }
+            }.onFailure { err ->
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = hostId,
@@ -824,14 +869,16 @@ class SessionService : Service() {
                         message = "SFTP operation failed: ${err.message ?: "unknown error"}"
                     )
                 )
-            }
-            return true
+            }.getOrDefault(false)
         }
         val client = connection.client ?: return false
-        runCatching {
-            client.newSFTPClient().use { temporary ->
-                action(temporary)
+        return runCatching {
+            measureOperation("runWithSftpClient:temporary", hostId) {
+                client.newSFTPClient().use { temporary ->
+                    action(temporary)
+                }
             }
+            true
         }.onFailure { err ->
             SessionLogBus.emit(
                 SessionLogBus.Entry(
@@ -840,8 +887,7 @@ class SessionService : Service() {
                     message = "SFTP operation failed: ${err.message ?: "unknown error"}"
                 )
             )
-        }
-        return true
+        }.getOrDefault(false)
     }
 
     private fun deleteRemotePathRecursively(sftp: SFTPClient, path: String) {
@@ -1160,6 +1206,9 @@ class SessionService : Service() {
         val privateKey = runCatching {
             SecurityManager.getIdentityKey(identityId)
         }.getOrNull()
+        val keyPassphrase = runCatching {
+            SecurityManager.getIdentityKeyPassphrase(identityId)
+        }.getOrNull()
         if (privateKey.isNullOrBlank()) {
             if (required) {
                 throw RuntimeException("Selected identity key is unavailable. Re-import the key and try again.")
@@ -1175,7 +1224,12 @@ class SessionService : Service() {
         }
         val tempKeyFile = writeIdentityKeyTempFile(host.id, privateKey)
         return try {
-            client.authPublickey(host.username, tempKeyFile.absolutePath)
+            val keyProvider = if (keyPassphrase.isNullOrBlank()) {
+                client.loadKeys(tempKeyFile.absolutePath)
+            } else {
+                client.loadKeys(tempKeyFile.absolutePath, keyPassphrase.toCharArray())
+            }
+            client.authPublickey(host.username, keyProvider)
             client.isAuthenticated
         } catch (authError: UserAuthException) {
             if (required) {
@@ -1288,14 +1342,14 @@ class SessionService : Service() {
         }
         val terminalClient = object : TerminalSessionClient {
             override fun onTextChanged(changedSession: TerminalSession) {
-                val transcript = changedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
-                setShellOutputSnapshot(hostId, transcript)
+                scheduleMoshTranscriptSnapshot(hostId, changedSession)
             }
 
             override fun onTitleChanged(changedSession: TerminalSession) = Unit
 
             override fun onSessionFinished(finishedSession: TerminalSession) {
                 serviceScope.launch {
+                    moshTranscriptPublishJobs.remove(hostId)?.cancel()
                     val transcript = finishedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
                     val tail = transcript
                         .lineSequence()
@@ -1342,6 +1396,16 @@ class SessionService : Service() {
             }
         }
         return MoshBinding(session = session)
+    }
+
+    private fun scheduleMoshTranscriptSnapshot(hostId: String, session: TerminalSession) {
+        if (moshTranscriptPublishJobs[hostId]?.isActive == true) return
+        moshTranscriptPublishJobs[hostId] = serviceScope.launch {
+            delay(MOSH_SNAPSHOT_PUBLISH_INTERVAL_MS)
+            val transcript = session.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+            setShellOutputSnapshot(hostId, transcript)
+            moshTranscriptPublishJobs.remove(hostId)
+        }
     }
 
     private fun parseMoshConnectLine(line: String): MoshConnect? {
@@ -1413,14 +1477,16 @@ class SessionService : Service() {
         timeoutSeconds: Long
     ): String? {
         return runCatching {
-            client.startSession().use { session ->
-                val cmd = session.exec(command)
-                cmd.join(timeoutSeconds, TimeUnit.SECONDS)
-                val stdout = runCatching { cmd.inputStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull().orEmpty()
-                if (stdout.isNotBlank()) {
-                    stdout
-                } else {
-                    runCatching { cmd.errorStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull()
+            measureOperation("runRemoteCommand", thresholdMs = 1_000L) {
+                client.startSession().use { session ->
+                    val cmd = session.exec(command)
+                    cmd.join(timeoutSeconds, TimeUnit.SECONDS)
+                    val stdout = runCatching { cmd.inputStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull().orEmpty()
+                    if (stdout.isNotBlank()) {
+                        stdout
+                    } else {
+                        runCatching { cmd.errorStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull()
+                    }
                 }
             }
         }.getOrNull()
@@ -1571,29 +1637,64 @@ class SessionService : Service() {
 
     private fun appendShellOutput(hostId: String, text: String) {
         if (text.isEmpty()) return
-        val current = shellOutput.value[hostId].orEmpty()
-        val next = (current + text).takeLast(MAX_SHELL_OUTPUT_CHARS)
-        val updated = shellOutput.value.toMutableMap()
-        updated[hostId] = next
-        shellOutput.value = updated
+        val buffer = pendingShellOutputChunks.computeIfAbsent(hostId) { StringBuilder() }
+        synchronized(buffer) {
+            buffer.append(text)
+            if (buffer.length > MAX_SHELL_OUTPUT_CHARS * 2) {
+                buffer.delete(0, buffer.length - MAX_SHELL_OUTPUT_CHARS)
+            }
+        }
+        scheduleShellOutputPublish(hostId)
     }
 
     private fun setShellOutputSnapshot(hostId: String, text: String) {
-        val next = text.takeLast(MAX_SHELL_OUTPUT_CHARS)
-        if (shellOutput.value[hostId] == next) return
-        val updated = shellOutput.value.toMutableMap()
-        updated[hostId] = next
-        shellOutput.value = updated
+        pendingShellSnapshots[hostId] = text.takeLast(MAX_SHELL_OUTPUT_CHARS)
+        scheduleShellOutputPublish(hostId)
     }
 
     private fun clearShellOutputForHost(hostId: String) {
-        if (!shellOutput.value.containsKey(hostId)) return
-        val updated = shellOutput.value.toMutableMap()
-        updated.remove(hostId)
-        shellOutput.value = updated
+        shellOutputPublishJobs.remove(hostId)?.cancel()
+        moshTranscriptPublishJobs.remove(hostId)?.cancel()
+        pendingShellSnapshots.remove(hostId)
+        pendingShellOutputChunks.remove(hostId)
+        if (shellOutput.value.containsKey(hostId)) {
+            val updated = shellOutput.value.toMutableMap()
+            updated.remove(hostId)
+            shellOutput.value = updated
+        }
         shellSizes.remove(hostId)
         shellReadSequence.remove(hostId)
         shellWriteSequence.remove(hostId)
+    }
+
+    private fun scheduleShellOutputPublish(hostId: String) {
+        if (shellOutputPublishJobs[hostId]?.isActive == true) return
+        shellOutputPublishJobs[hostId] = serviceScope.launch {
+            delay(SHELL_OUTPUT_PUBLISH_INTERVAL_MS)
+            publishShellOutput(hostId)
+            shellOutputPublishJobs.remove(hostId)
+            val hasPendingChunk = (pendingShellOutputChunks[hostId]?.length ?: 0) > 0
+            if (pendingShellSnapshots.containsKey(hostId) || hasPendingChunk) {
+                scheduleShellOutputPublish(hostId)
+            }
+        }
+    }
+
+    private fun publishShellOutput(hostId: String) {
+        val snapshot = pendingShellSnapshots.remove(hostId)
+        val chunk = pendingShellOutputChunks.remove(hostId)?.let { builder ->
+            synchronized(builder) { builder.toString() }
+        }.orEmpty()
+        val current = shellOutput.value[hostId].orEmpty()
+        val next = when {
+            snapshot != null -> snapshot
+            chunk.isNotEmpty() -> (current + chunk).takeLast(MAX_SHELL_OUTPUT_CHARS)
+            else -> current
+        }
+        if (next == current) return
+        val updated = shellOutput.value.toMutableMap()
+        updated[hostId] = next
+        shellOutput.value = updated
     }
 
     private fun setRemoteDirectorySnapshot(hostId: String, snapshot: RemoteDirectorySnapshot) {
@@ -1680,6 +1781,34 @@ class SessionService : Service() {
             }
         }
         return out.toString()
+    }
+
+    private inline fun <T> measureOperation(
+        operation: String,
+        hostId: String? = null,
+        thresholdMs: Long = SLOW_OPERATION_WARN_MS,
+        block: () -> T
+    ): T {
+        val startedAt = SystemClock.elapsedRealtime()
+        return try {
+            block()
+        } finally {
+            val elapsedMs = SystemClock.elapsedRealtime() - startedAt
+            if (elapsedMs >= thresholdMs) {
+                val suffix = hostId?.let { ", hostId=$it" }.orEmpty()
+                Log.w(PERF_TAG, "Slow operation: $operation took ${elapsedMs}ms$suffix")
+                if (diagnosticsEnabled && hostId != null) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.WARN,
+                            message = "Slow operation: $operation (${elapsedMs}ms)"
+                        )
+                    )
+                }
+                UiDebugLog.action("servicePerf", "operation=$operation, elapsedMs=$elapsedMs, hostId=${hostId ?: "n/a"}")
+            }
+        }
     }
 
     private fun throwIfAttemptTimedOut(deadlineMillis: Long) {
@@ -1837,6 +1966,7 @@ class SessionService : Service() {
     }
 
     companion object {
+        private const val PERF_TAG = "SSHPeachesPerf"
         private const val CHANNEL_ID = "sessions"
         private const val OPEN_APP_REQUEST_CODE = 19_241
         private const val STOP_SESSION_REQUEST_CODE = 19_243
@@ -1849,6 +1979,9 @@ class SessionService : Service() {
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
+        private const val SHELL_OUTPUT_PUBLISH_INTERVAL_MS = 40L
+        private const val MOSH_SNAPSHOT_PUBLISH_INTERVAL_MS = 40L
+        private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
         private const val MOSH_DEFAULT_COLUMNS = 120

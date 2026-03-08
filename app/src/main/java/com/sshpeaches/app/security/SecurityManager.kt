@@ -7,6 +7,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKeyFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,31 +24,34 @@ object SecurityManager {
     private const val KEY_PIN_SALT = "pin_salt"
     private const val KEY_PASSWORD_PREFIX = "pwd_"
     private const val KEY_IDENTITY_PREFIX = "ident_"
+    private const val KEY_IDENTITY_PUBLIC_PREFIX = "ident_pub_"
+    private const val KEY_IDENTITY_PASSPHRASE_PREFIX = "ident_pass_"
+    private const val INIT_AWAIT_TIMEOUT_SECONDS = 20L
 
-    private lateinit var prefs: SharedPreferences
+    @Volatile
+    private var appContext: Context? = null
+    @Volatile
+    private var prefs: SharedPreferences? = null
+    @Volatile
+    private var initError: Throwable? = null
+    @Volatile
+    private var initStarted = false
+
+    private val initLock = Any()
+    private val initCompleteLatch = CountDownLatch(1)
     private val lockState = MutableStateFlow(false)
+    private val pinConfiguredState = MutableStateFlow(false)
 
     fun init(context: Context) {
-        if (this::prefs.isInitialized) return
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        prefs = EncryptedSharedPreferences.create(
-            context,
-            PREF_NAME,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-        lockState.value = isPinSet()
+        appContext = context.applicationContext
+        startInitializationIfNeeded(async = true)
     }
 
-    fun isInitialized() = this::prefs.isInitialized
+    fun isInitialized() = prefs != null
 
-    fun isPinSet(): Boolean {
-        if (!this::prefs.isInitialized) return false
-        return prefs.contains(KEY_PIN_HASH)
-    }
+    fun isPinSet(): Boolean = pinConfiguredState.value
+
+    fun pinConfiguredState(): StateFlow<Boolean> = pinConfiguredState.asStateFlow()
 
     fun lockState(): StateFlow<Boolean> = lockState.asStateFlow()
 
@@ -61,29 +66,31 @@ object SecurityManager {
     }
 
     fun setPin(pin: String) {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val hash = hashPin(pin, salt)
-        prefs.edit()
+        securePrefs.edit()
             .putString(KEY_PIN_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
             .putString(KEY_PIN_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
             .apply()
+        pinConfiguredState.value = true
         lock()
     }
 
     fun clearPin() {
-        ensureInit()
-        prefs.edit()
+        val securePrefs = awaitPrefs()
+        securePrefs.edit()
             .remove(KEY_PIN_HASH)
             .remove(KEY_PIN_SALT)
             .apply()
+        pinConfiguredState.value = false
         lockState.value = false
     }
 
     fun verifyPin(pin: String): Boolean {
-        ensureInit()
-        val saltEncoded = prefs.getString(KEY_PIN_SALT, null) ?: return false
-        val hashEncoded = prefs.getString(KEY_PIN_HASH, null) ?: return false
+        val securePrefs = awaitPrefs()
+        val saltEncoded = securePrefs.getString(KEY_PIN_SALT, null) ?: return false
+        val hashEncoded = securePrefs.getString(KEY_PIN_HASH, null) ?: return false
         val salt = Base64.decode(saltEncoded, Base64.NO_WRAP)
         val expected = Base64.decode(hashEncoded, Base64.NO_WRAP)
         val actual = hashPin(pin, salt)
@@ -95,47 +102,89 @@ object SecurityManager {
     }
 
     fun storeHostPassword(hostId: String, password: String) {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         ensureUnlocked("store password")
-        prefs.edit()
+        securePrefs.edit()
             .putString(KEY_PASSWORD_PREFIX + hostId, password)
             .apply()
     }
 
     fun getHostPassword(hostId: String): String? {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         ensureUnlocked("access password")
-        return prefs.getString(KEY_PASSWORD_PREFIX + hostId, null)
+        return securePrefs.getString(KEY_PASSWORD_PREFIX + hostId, null)
     }
 
     fun clearHostPassword(hostId: String) {
-        ensureInit()
-        prefs.edit().remove(KEY_PASSWORD_PREFIX + hostId).apply()
+        awaitPrefs().edit().remove(KEY_PASSWORD_PREFIX + hostId).apply()
     }
 
     fun storeIdentityKey(identityId: String, key: String) {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         ensureUnlocked("store identity key")
-        prefs.edit()
+        securePrefs.edit()
             .putString(KEY_IDENTITY_PREFIX + identityId, key)
             .apply()
     }
 
     fun getIdentityKey(identityId: String): String? {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         ensureUnlocked("access identity key")
-        return prefs.getString(KEY_IDENTITY_PREFIX + identityId, null)
+        return securePrefs.getString(KEY_IDENTITY_PREFIX + identityId, null)
     }
 
     fun clearIdentityKey(identityId: String) {
-        ensureInit()
-        prefs.edit().remove(KEY_IDENTITY_PREFIX + identityId).apply()
+        awaitPrefs().edit()
+            .remove(KEY_IDENTITY_PREFIX + identityId)
+            .remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId)
+            .remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
+            .apply()
+    }
+
+    fun storeIdentityPublicKey(identityId: String, publicKey: String) {
+        val securePrefs = awaitPrefs()
+        ensureUnlocked("store identity public key")
+        securePrefs.edit()
+            .putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
+            .apply()
+    }
+
+    fun getIdentityPublicKey(identityId: String): String? {
+        val securePrefs = awaitPrefs()
+        ensureUnlocked("access identity public key")
+        return securePrefs.getString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, null)
+    }
+
+    fun clearIdentityPublicKey(identityId: String) {
+        awaitPrefs().edit().remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId).apply()
+    }
+
+    fun storeIdentityKeyPassphrase(identityId: String, passphrase: String?) {
+        val securePrefs = awaitPrefs()
+        ensureUnlocked("store identity key passphrase")
+        val editor = securePrefs.edit()
+        if (passphrase.isNullOrBlank()) {
+            editor.remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
+        } else {
+            editor.putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, passphrase)
+        }
+        editor.apply()
+    }
+
+    fun getIdentityKeyPassphrase(identityId: String): String? {
+        val securePrefs = awaitPrefs()
+        ensureUnlocked("access identity key passphrase")
+        return securePrefs.getString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, null)
+    }
+
+    fun clearIdentityKeyPassphrase(identityId: String) {
+        awaitPrefs().edit().remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId).apply()
     }
 
     fun exportHostPasswordPayload(hostId: String, passphrase: String): String? {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         if (passphrase.isBlank()) return null
-        val password = prefs.getString(KEY_PASSWORD_PREFIX + hostId, null) ?: return null
+        val password = securePrefs.getString(KEY_PASSWORD_PREFIX + hostId, null) ?: return null
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val key = deriveKey(passphrase, salt)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -153,7 +202,7 @@ object SecurityManager {
     }
 
     fun importHostPasswordPayload(hostId: String, payload: String, passphrase: String) {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         if (passphrase.isBlank()) return
         val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
         val json = JSONObject(decoded)
@@ -164,15 +213,15 @@ object SecurityManager {
         val secretKey = SecretKeySpec(deriveKey(passphrase, salt), "AES")
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
         val plaintext = cipher.doFinal(cipherBytes).toString(Charsets.UTF_8)
-        prefs.edit()
+        securePrefs.edit()
             .putString(KEY_PASSWORD_PREFIX + hostId, plaintext)
             .apply()
     }
 
     fun exportIdentityKeyPayload(identityId: String, passphrase: String): String? {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         if (passphrase.isBlank()) return null
-        val keyValue = prefs.getString(KEY_IDENTITY_PREFIX + identityId, null) ?: return null
+        val keyValue = securePrefs.getString(KEY_IDENTITY_PREFIX + identityId, null) ?: return null
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val key = deriveKey(passphrase, salt)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -190,7 +239,7 @@ object SecurityManager {
     }
 
     fun importIdentityKeyPayload(identityId: String, payload: String, passphrase: String) {
-        ensureInit()
+        val securePrefs = awaitPrefs()
         if (passphrase.isBlank()) return
         val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
         val json = JSONObject(decoded)
@@ -201,7 +250,7 @@ object SecurityManager {
         val secretKey = SecretKeySpec(deriveKey(passphrase, salt), "AES")
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
         val plaintext = cipher.doFinal(cipherBytes).toString(Charsets.UTF_8)
-        prefs.edit()
+        securePrefs.edit()
             .putString(KEY_IDENTITY_PREFIX + identityId, plaintext)
             .apply()
     }
@@ -213,10 +262,6 @@ object SecurityManager {
         return digest.digest()
     }
 
-    private fun ensureInit() {
-        check(this::prefs.isInitialized) { "SecurityManager not initialized" }
-    }
-
     private fun ensureUnlocked(action: String) {
         check(!lockState.value) { "Cannot $action while locked" }
     }
@@ -225,5 +270,56 @@ object SecurityManager {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, 12000, 256)
         return factory.generateSecret(spec).encoded
+    }
+
+    private fun startInitializationIfNeeded(async: Boolean) {
+        if (prefs != null) return
+        synchronized(initLock) {
+            if (prefs != null || initStarted) return
+            initStarted = true
+            val initializer = Runnable {
+                try {
+                    val context = appContext
+                        ?: error("SecurityManager.init must be called with context before use")
+                    val masterKey = MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                    val securePrefs = EncryptedSharedPreferences.create(
+                        context,
+                        PREF_NAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                    prefs = securePrefs
+                    val configured = securePrefs.contains(KEY_PIN_HASH)
+                    pinConfiguredState.value = configured
+                    lockState.value = configured
+                } catch (t: Throwable) {
+                    initError = t
+                } finally {
+                    initCompleteLatch.countDown()
+                }
+            }
+            if (async) {
+                Thread(initializer, "SSHPeaches-SecurityInit").apply {
+                    isDaemon = true
+                }.start()
+            } else {
+                initializer.run()
+            }
+        }
+    }
+
+    private fun awaitPrefs(): SharedPreferences {
+        prefs?.let { return it }
+        startInitializationIfNeeded(async = false)
+        if (prefs == null) {
+            initCompleteLatch.await(INIT_AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
+        return prefs ?: throw IllegalStateException(
+            "SecurityManager failed to initialize encrypted storage",
+            initError
+        )
     }
 }

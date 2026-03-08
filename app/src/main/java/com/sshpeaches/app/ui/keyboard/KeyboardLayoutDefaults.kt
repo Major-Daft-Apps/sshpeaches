@@ -6,7 +6,8 @@ enum class KeyboardActionType {
     TEXT,
     KEY,
     MODIFIER,
-    SEQUENCE
+    SEQUENCE,
+    SNIPPET_PICKER
 }
 
 enum class KeyboardModifier {
@@ -158,7 +159,7 @@ object KeyboardLayoutDefaults {
 
     val lockSystemPresets: List<KeyboardSlotAction> = listOf(
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
-        keyAction("Caps", KeyEvent.KEYCODE_CAPS_LOCK),
+        keyAction("CapsLk", KeyEvent.KEYCODE_CAPS_LOCK),
         keyAction("NumLk", KeyEvent.KEYCODE_NUM_LOCK),
         keyAction("ScrLk", KeyEvent.KEYCODE_SCROLL_LOCK),
         keyAction("PrtSc", KeyEvent.KEYCODE_SYSRQ),
@@ -265,6 +266,15 @@ object KeyboardLayoutDefaults {
         type = KeyboardActionType.SEQUENCE,
         label = label,
         sequence = sequence
+    )
+
+    fun snippetPickerAction(
+        label: String = "Snippets",
+        iconId: String = "snippet_picker"
+    ): KeyboardSlotAction = KeyboardSlotAction(
+        type = KeyboardActionType.SNIPPET_PICKER,
+        label = label,
+        iconId = iconId
     )
 
     fun combinationAction(

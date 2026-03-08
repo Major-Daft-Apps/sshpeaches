@@ -26,8 +26,10 @@ import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -69,6 +71,11 @@ class AppViewModel(
     private var appInBackground: Boolean = false
 
     init {
+        viewModelScope.launch {
+            SecurityManager.pinConfiguredState().collect { configured ->
+                pinConfiguredFlow.value = configured
+            }
+        }
         viewModelScope.launch {
             SecurityManager.lockState().collect { locked ->
                 lockedFlow.value = locked
@@ -345,7 +352,7 @@ class AppViewModel(
 
     init {
         if (BuildConfig.DEBUG) {
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.Default) {
                 uiState
                     .map { stateFingerprint(it) }
                     .distinctUntilChanged()
@@ -406,7 +413,8 @@ class AppViewModel(
         append(state.usageReportsEnabled).append('|')
         append(state.pinConfigured).append('|')
         append(state.isLocked).append('|')
-        append(state.keyboardSlots.joinToString(separator = ","))
+        append(state.keyboardSlots.size).append('|')
+        append(state.keyboardSlots.count { !it.isEmpty() })
     }
 
     fun setSortMode(mode: SortMode) {
@@ -1004,9 +1012,7 @@ class AppViewModel(
             return
         }
         launchLogged("deleteIdentity", "identityId=$id, hadPrivateKey=${existing.hasPrivateKey}") {
-            if (existing.hasPrivateKey) {
-                SecurityManager.clearIdentityKey(id)
-            }
+            SecurityManager.clearIdentityKey(id)
             repository.deleteIdentity(existing)
         }
     }
@@ -1035,7 +1041,13 @@ class AppViewModel(
         logAction("importIdentityKeyFromPayload", "identityId=$id, payloadLength=${payload.length}, passphraseLength=${passphrase.length}")
         val ok = runCatching {
             SecurityManager.importIdentityKeyPayload(id, payload, passphrase)
-            markIdentityHasKey(id, true)
+            SecurityManager.getIdentityKey(id)?.let { privateKey ->
+                val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(privateKey).orEmpty()
+                if (derivedPublic.isNotBlank()) {
+                    SecurityManager.storeIdentityPublicKey(id, derivedPublic)
+                }
+            }
+            markIdentityHasKeyWithRetry(id, true)
         }.onFailure { t ->
             UiDebugLog.error("importIdentityKeyFromPayload", t, "identityId=$id")
         }.isSuccess
@@ -1047,7 +1059,11 @@ class AppViewModel(
         logAction("importIdentityKeyPlain", "identityId=$id, keyLength=${key.length}")
         val ok = runCatching {
             SecurityManager.storeIdentityKey(id, key)
-            markIdentityHasKey(id, true)
+            val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(key).orEmpty()
+            if (derivedPublic.isNotBlank()) {
+                SecurityManager.storeIdentityPublicKey(id, derivedPublic)
+            }
+            markIdentityHasKeyWithRetry(id, true)
         }.onFailure { t ->
             UiDebugLog.error("importIdentityKeyPlain", t, "identityId=$id")
         }.isSuccess
@@ -1060,6 +1076,42 @@ class AppViewModel(
         SecurityManager.clearIdentityKey(id)
         markIdentityHasKey(id, false)
         logResult("removeIdentityKey", true, "identityId=$id")
+    }
+
+    fun storeIdentityPublicKey(id: String, publicKey: String): Boolean {
+        logAction("storeIdentityPublicKey", "identityId=$id, keyLength=${publicKey.length}")
+        val ok = runCatching {
+            SecurityManager.storeIdentityPublicKey(id, publicKey.trim())
+        }.isSuccess
+        logResult("storeIdentityPublicKey", ok, "identityId=$id")
+        return ok
+    }
+
+    fun storeIdentityKeyPassphrase(id: String, passphrase: String?) {
+        logAction("storeIdentityKeyPassphrase", "identityId=$id, passphraseLength=${passphrase?.length ?: 0}")
+        runCatching {
+            SecurityManager.storeIdentityKeyPassphrase(id, passphrase)
+        }.onFailure { t ->
+            UiDebugLog.error("storeIdentityKeyPassphrase", t, "identityId=$id")
+        }
+        logResult("storeIdentityKeyPassphrase", true, "identityId=$id")
+    }
+
+    private fun markIdentityHasKeyWithRetry(id: String, hasKey: Boolean) {
+        if (uiState.value.identities.any { it.id == id }) {
+            markIdentityHasKey(id, hasKey)
+            return
+        }
+        viewModelScope.launch {
+            repeat(12) {
+                delay(75)
+                if (uiState.value.identities.any { identity -> identity.id == id }) {
+                    markIdentityHasKey(id, hasKey)
+                    return@launch
+                }
+            }
+            logResult("markIdentityHasKeyWithRetry", false, "identityId=$id, hasKey=$hasKey, not-found-after-retry")
+        }
     }
 
     fun updateKeyboardSlot(index: Int, value: KeyboardSlotAction) {

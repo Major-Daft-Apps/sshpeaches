@@ -20,14 +20,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.state.FavoritesSection
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun FavoritesScreen(
     section: FavoritesSection,
+    snippets: List<Snippet> = emptyList(),
+    activeSshSessionHostIds: Set<String> = emptySet(),
+    onHostAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
+    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
     onToggleFavorite: (String) -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
@@ -39,7 +49,9 @@ fun FavoritesScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_FAVORITES),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -52,7 +64,12 @@ fun FavoritesScreen(
             items(section.hostFavorites, key = { it.id }) { host ->
                 HostCard(
                     host = host,
-                    onToggleFavorite = onToggleFavorite
+                    snippets = snippets,
+                    onToggleFavorite = onToggleFavorite,
+                    onAction = onHostAction,
+                    canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
+                    onRunInfoCommand = onRunInfoCommand,
+                    onInfoCommandsChange = onInfoCommandsChange
                 )
             }
         }
