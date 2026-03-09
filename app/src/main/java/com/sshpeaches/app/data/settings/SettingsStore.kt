@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.data.settings
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -24,6 +25,8 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "app_settings"
@@ -31,6 +34,8 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 
 object SettingsStore {
     private lateinit var appContext: Context
+    private const val startupThemePrefsName = "startup_theme_mode"
+    private const val startupThemeKey = "theme_mode"
 
     private val allowBackgroundSessionsKey = booleanPreferencesKey("allow_background_sessions")
     private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
@@ -56,6 +61,20 @@ object SettingsStore {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+    }
+
+    fun getStartupThemeMode(): ThemeMode {
+        val stored = startupThemePrefs().getString(startupThemeKey, null)
+        val cached = runCatching {
+            stored?.let { ThemeMode.valueOf(it) }
+        }.getOrNull()
+        if (cached != null) return cached
+
+        val fromDataStore = runCatching {
+            runBlocking { themeMode.first() }
+        }.getOrDefault(ThemeMode.SYSTEM)
+        startupThemePrefs().edit().putString(startupThemeKey, fromDataStore.name).apply()
+        return fromDataStore
     }
 
     val allowBackgroundSessions: Flow<Boolean> by lazy {
@@ -232,6 +251,7 @@ object SettingsStore {
         dataStore.edit { prefs ->
             prefs[themeModeKey] = mode.name
         }
+        startupThemePrefs().edit().putString(startupThemeKey, mode.name).apply()
     }
 
     suspend fun setLockTimeout(timeout: LockTimeout) {
@@ -346,6 +366,11 @@ object SettingsStore {
             check(::appContext.isInitialized) { "SettingsStore not initialized" }
             return appContext.settingsDataStore
         }
+
+    private fun startupThemePrefs(): SharedPreferences {
+        check(::appContext.isInitialized) { "SettingsStore not initialized" }
+        return appContext.getSharedPreferences(startupThemePrefsName, Context.MODE_PRIVATE)
+    }
 
     private fun decodeKeyboardSlots(serialized: String): List<KeyboardSlotAction> =
         runCatching {

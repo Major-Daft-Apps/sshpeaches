@@ -27,6 +27,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
@@ -209,6 +210,8 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val startupThemeMode = SettingsStore.getStartupThemeMode()
+        applyStartupSplashTheme(startupThemeMode)
         installSplashScreen()
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
@@ -508,6 +511,14 @@ class MainActivity : FragmentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    private fun applyStartupSplashTheme(startupThemeMode: ThemeMode) {
+        when (startupThemeMode) {
+            ThemeMode.LIGHT -> setTheme(R.style.Theme_SSHPeaches_Starting_Light)
+            ThemeMode.DARK -> setTheme(R.style.Theme_SSHPeaches_Starting_Dark)
+            ThemeMode.SYSTEM -> setTheme(R.style.Theme_SSHPeaches_Starting)
         }
     }
 
