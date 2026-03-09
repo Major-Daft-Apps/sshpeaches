@@ -19,7 +19,7 @@
         <activity
             android:name="com.majordaftapps.sshpeaches.app.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.SSHPeaches"
+            android:theme="@style/Theme.SSHPeaches.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

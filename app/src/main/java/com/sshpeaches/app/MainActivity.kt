@@ -14,11 +14,6 @@ import android.provider.Settings
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.LaunchedEffect
@@ -26,16 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
@@ -51,7 +39,6 @@ import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import com.termux.terminal.TerminalEmulator
-import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -222,6 +209,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
         UiDebugLog.result("MainActivity.onCreate", true)
@@ -234,36 +222,6 @@ class MainActivity : FragmentActivity() {
         }
         handleSessionOpenIntent(this.intent)
         setContent {
-            var deferHeavyUi by remember { mutableStateOf(true) }
-            LaunchedEffect(Unit) {
-                withFrameNanos { }
-                deferHeavyUi = false
-            }
-            if (deferHeavyUi) {
-                SSHPeachesTheme(themeMode = ThemeMode.SYSTEM) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        val splashLogo = if (isSystemInDarkTheme()) {
-                            com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_splash_white
-                        } else {
-                            com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_splash_black
-                        }
-                        Image(
-                            painter = painterResource(id = splashLogo),
-                            contentDescription = "SSHPeaches logo",
-                            modifier = Modifier.size(220.dp)
-                        )
-                        Text(
-                            text = "SSHPeaches",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                    }
-                }
-                return@setContent
-            }
             val viewModel = appViewModel
             appUiBootstrapped = true
             LaunchedEffect(Unit) {

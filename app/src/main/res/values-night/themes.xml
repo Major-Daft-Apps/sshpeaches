@@ -1,10 +1,4 @@
 <resources>
-    <style name="Theme.SSHPeaches" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowBackground">@color/color_hard_black</item>
-        <item name="android:statusBarColor">@color/color_hard_black</item>
-        <item name="android:navigationBarColor">@color/color_hard_black</item>
-    </style>
-
     <style name="Theme.SSHPeaches.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/color_hard_black</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches_splash_white</item>
