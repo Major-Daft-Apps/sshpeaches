@@ -35,6 +35,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,6 +65,9 @@ import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
@@ -87,7 +91,9 @@ fun HostCard(
     val showQr = remember { mutableStateOf(false) }
     val showPassphrasePrompt = remember { mutableStateOf(false) }
     val passphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
+    val passphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val confirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.host.orEmpty()) }
+    val confirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val passphraseError = remember { mutableStateOf<String?>(null) }
     val qrBitmap = remember { mutableStateOf<Bitmap?>(null) }
     val infoCommandsState = rememberSaveable(host.id) {
@@ -95,6 +101,8 @@ fun HostCard(
     }
     val infoSnippetExpanded = rememberSaveable(host.id) { mutableStateOf(false) }
     val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
+    AutoHidePasswordReveal(passphraseRevealIndex)
+    AutoHidePasswordReveal(confirmPassphraseRevealIndex)
 
     fun persistInfoCommands(next: List<String>) {
         val normalized = next.map { it.trim() }.filter { it.isNotBlank() }
@@ -391,20 +399,22 @@ fun HostCard(
                     OutlinedTextField(
                         value = passphraseState.value,
                         onValueChange = {
-                            passphraseState.value = it
+                            updatePasswordStateWithReveal(passphraseState, passphraseRevealIndex, it)
                             passphraseError.value = null
                         },
                         label = { Text("Passphrase") },
-                        singleLine = true
+                        singleLine = true,
+                        visualTransformation = TailRevealPasswordVisualTransformation(passphraseRevealIndex.intValue)
                     )
                     OutlinedTextField(
                         value = confirmPassphraseState.value,
                         onValueChange = {
-                            confirmPassphraseState.value = it
+                            updatePasswordStateWithReveal(confirmPassphraseState, confirmPassphraseRevealIndex, it)
                             passphraseError.value = null
                         },
                         label = { Text("Confirm passphrase") },
-                        singleLine = true
+                        singleLine = true,
+                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPassphraseRevealIndex.intValue)
                     )
                     passphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)

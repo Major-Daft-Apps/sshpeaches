@@ -143,6 +143,7 @@ class SessionService : Service() {
     }
 
     fun startSession(
+        requestedSessionId: String? = null,
         host: HostConnection,
         mode: ConnectionMode,
         passwordOverride: String? = null,
@@ -153,15 +154,19 @@ class SessionService : Service() {
         allowPasswordSave: Boolean = false,
         terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM
     ) {
-        val sessionId = sessionIdFor(host.id, mode)
+        val resolvedSessionId = requestedSessionId
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: generateSessionId(host.id, mode)
         UiDebugLog.action(
             "startSession",
-            "sessionId=$sessionId, hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(sessionId)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
+            "sessionId=$resolvedSessionId, hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(resolvedSessionId)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
         )
-        if (activeJobs.containsKey(sessionId)) {
-            UiDebugLog.result("startSession", false, "already-active sessionId=$sessionId")
+        if (activeJobs.containsKey(resolvedSessionId)) {
+            UiDebugLog.result("startSession", false, "already-active sessionId=$resolvedSessionId")
             return
         }
+        val sessionId = resolvedSessionId
         val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
         val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
         val initialPassword = if (needsPassword) {
@@ -1848,8 +1853,8 @@ class SessionService : Service() {
         )
     }
 
-    private fun sessionIdFor(hostId: String, mode: ConnectionMode): String =
-        "$hostId|${mode.name}"
+    private fun generateSessionId(hostId: String, mode: ConnectionMode): String =
+        "$hostId|${mode.name}|${UUID.randomUUID()}"
 
     private fun removeSessionSnapshot(hostId: String) {
         sessionSnapshots.value = sessionSnapshots.value.filterNot { it.hostId == hostId }
@@ -1924,15 +1929,15 @@ class SessionService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}")
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification_logo)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setSubText(if (totalSessions == 1) "1 active session" else "$totalSessions active sessions")
             .setContentIntent(pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Open", pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Disconnect", pendingStop)
+            .addAction(R.drawable.ic_notification_logo, "Open", pendingOpen)
+            .addAction(R.drawable.ic_notification_logo, "Disconnect", pendingStop)
         return builder.build()
     }
 

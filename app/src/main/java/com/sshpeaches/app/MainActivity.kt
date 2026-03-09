@@ -6,14 +6,19 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.LaunchedEffect
@@ -26,7 +31,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
@@ -36,11 +45,17 @@ import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import com.termux.terminal.TerminalEmulator
 import androidx.compose.runtime.withFrameNanos
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -56,9 +71,14 @@ class MainActivity : FragmentActivity() {
     private var biometricAvailable: Boolean = false
     private var appUiBootstrapped = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val corePermissionsRefreshTick = mutableStateOf(0)
+    private var latestAllowBackgroundSessions: Boolean = true
+    private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
+    private var backgroundSessionTimeoutJob: Job? = null
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             UiDebugLog.result("notificationPermissionRequest", granted)
+            refreshCorePermissionStatuses()
         }
 
     private val connection = object : ServiceConnection {
@@ -117,6 +137,65 @@ class MainActivity : FragmentActivity() {
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    private fun refreshCorePermissionStatuses() {
+        corePermissionsRefreshTick.value = corePermissionsRefreshTick.value + 1
+    }
+
+    private fun openAppPermissionSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+        startActivity(intent)
+    }
+
+    private fun buildCorePermissionStatuses(): List<CorePermissionStatus> {
+        val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val postNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        val notificationsGranted = postNotificationsGranted && notificationsEnabled
+
+        val foregroundServiceGranted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.FOREGROUND_SERVICE
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val foregroundServiceTypeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val dataSyncGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC
+            ) == PackageManager.PERMISSION_GRANTED
+            val connectedDeviceGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
+            ) == PackageManager.PERMISSION_GRANTED
+            dataSyncGranted && connectedDeviceGranted
+        } else {
+            true
+        }
+
+        return listOf(
+            CorePermissionStatus(
+                id = "notifications",
+                title = "Notifications",
+                description = "Required for active SSH session foreground service controls and status.",
+                granted = notificationsGranted
+            ),
+            CorePermissionStatus(
+                id = "foreground_service",
+                title = "Foreground Service",
+                description = "Required to keep SSH sessions alive in background mode.",
+                granted = foregroundServiceGranted && foregroundServiceTypeGranted
+            )
+        )
+    }
+
     private fun ensureSessionServiceConnection() {
         if (serviceBound || serviceConnectionRequested) return
         val serviceIntent = Intent(this, SessionService::class.java)
@@ -147,6 +226,12 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.action("MainActivity.onCreate")
         UiDebugLog.result("MainActivity.onCreate", true)
         setupBiometricPrompt()
+        lifecycleScope.launch {
+            appViewModel.uiState.collect { state ->
+                latestAllowBackgroundSessions = state.allowBackgroundSessions
+                latestBackgroundSessionTimeout = state.backgroundSessionTimeout
+            }
+        }
         handleSessionOpenIntent(this.intent)
         setContent {
             var deferHeavyUi by remember { mutableStateOf(true) }
@@ -156,10 +241,21 @@ class MainActivity : FragmentActivity() {
             }
             if (deferHeavyUi) {
                 SSHPeachesTheme(themeMode = ThemeMode.SYSTEM) {
-                    Box(
+                    Column(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
+                        val splashLogo = if (isSystemInDarkTheme()) {
+                            com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_splash_white
+                        } else {
+                            com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_splash_black
+                        }
+                        Image(
+                            painter = painterResource(id = splashLogo),
+                            contentDescription = "SSHPeaches logo",
+                            modifier = Modifier.size(220.dp)
+                        )
                         Text(
                             text = "SSHPeaches",
                             style = MaterialTheme.typography.headlineMedium
@@ -180,7 +276,7 @@ class MainActivity : FragmentActivity() {
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val remoteDirectories by sessionService?.remoteDirectoryFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
-            val startSession: (HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
+            val startSession: (String, HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
                 remember(
                     sessionService,
                     uiState.portForwards,
@@ -190,10 +286,10 @@ class MainActivity : FragmentActivity() {
                     uiState.hosts,
                     uiState.terminalEmulation
                 ) {
-                { host: HostConnection, mode: com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, password: String? ->
+                { sessionId: String, host: HostConnection, mode: com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, password: String? ->
                     UiDebugLog.action(
                         "uiStartSession",
-                        "hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
+                        "sessionId=$sessionId, hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
                     )
                     if (sessionService == null) {
                         ensureSessionServiceConnection()
@@ -201,6 +297,7 @@ class MainActivity : FragmentActivity() {
                     } else {
                         requestNotificationPermissionIfNeeded()
                         sessionService.startSession(
+                            requestedSessionId = sessionId,
                             host = host,
                             mode = mode,
                             passwordOverride = password,
@@ -211,7 +308,7 @@ class MainActivity : FragmentActivity() {
                             allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id },
                             terminalEmulation = uiState.terminalEmulation
                         )
-                        UiDebugLog.result("uiStartSession", true, "hostId=${host.id}")
+                        UiDebugLog.result("uiStartSession", true, "sessionId=$sessionId, hostId=${host.id}")
                     }
                 }
             }
@@ -301,6 +398,8 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
+            val permissionsTick = corePermissionsRefreshTick.value
+            val corePermissions = remember(permissionsTick) { buildCorePermissionStatuses() }
             SSHPeachesTheme(themeMode = uiState.themeMode) {
                 SSHPeachesRoot(
                     uiState = uiState,
@@ -308,9 +407,11 @@ class MainActivity : FragmentActivity() {
                     onSortModeChange = viewModel::setSortMode,
                     onThemeModeChange = viewModel::setThemeMode,
                     onBackgroundModeChange = viewModel::setBackgroundSessions,
+                    onBackgroundSessionTimeoutChange = viewModel::setBackgroundSessionTimeout,
                     onBiometricToggle = viewModel::setBiometricLock,
                     onLockTimeoutChange = viewModel::setLockTimeout,
                     onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
+                    onSnippetRunTimeoutSecondsChange = viewModel::setSnippetRunTimeoutSeconds,
                     onTerminalEmulationChange = viewModel::setTerminalEmulation,
                     onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
                     onCrashReportsToggle = viewModel::setCrashReports,
@@ -438,6 +539,14 @@ class MainActivity : FragmentActivity() {
                     },
                     onRespondToPasswordPrompt = { promptId, password, savePassword ->
                         sessionService?.respondToPasswordPrompt(promptId, password, savePassword)
+                    },
+                    corePermissions = corePermissions,
+                    onRequestCorePermissions = {
+                        requestNotificationPermissionIfNeeded()
+                        refreshCorePermissionStatuses()
+                    },
+                    onOpenAppPermissionSettings = {
+                        openAppPermissionSettings()
                     }
                 )
             }
@@ -446,6 +555,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         UiDebugLog.action("MainActivity.onDestroy", "serviceBound=$serviceBound")
+        backgroundSessionTimeoutJob?.cancel()
+        backgroundSessionTimeoutJob = null
         if (serviceBound) {
             unbindService(connection)
             serviceBound = false
@@ -470,15 +581,51 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        backgroundSessionTimeoutJob?.cancel()
+        backgroundSessionTimeoutJob = null
+        if (appUiBootstrapped) {
+            appViewModel.onAppForegrounded()
+        }
         window.decorView.post {
             ensureSessionServiceConnection()
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshCorePermissionStatuses()
+    }
+
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations && appUiBootstrapped) {
-            appViewModel.onAppBackgrounded()
+        backgroundSessionTimeoutJob?.cancel()
+        backgroundSessionTimeoutJob = null
+        if (isChangingConfigurations || !appUiBootstrapped) {
+            UiDebugLog.action("MainActivity.onStop", "persistSessions=true (config-change-or-not-ready)")
+            UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
+            return
+        }
+        appViewModel.onAppBackgrounded()
+        when {
+            !latestAllowBackgroundSessions -> {
+                sessionServiceState.value?.stopAllSessions()
+                UiDebugLog.result("MainActivity.backgroundSessionTimeout", true, "stopNow=background-disabled")
+            }
+            latestBackgroundSessionTimeout.durationMillis != null -> {
+                val timeoutMs = latestBackgroundSessionTimeout.durationMillis ?: 0L
+                backgroundSessionTimeoutJob = lifecycleScope.launch {
+                    delay(timeoutMs)
+                    sessionServiceState.value?.stopAllSessions()
+                    UiDebugLog.result(
+                        "MainActivity.backgroundSessionTimeout",
+                        true,
+                        "stopNow=timer elapsedMs=$timeoutMs"
+                    )
+                }
+            }
+            else -> {
+                UiDebugLog.result("MainActivity.backgroundSessionTimeout", true, "stopNow=never")
+            }
         }
         UiDebugLog.action("MainActivity.onStop", "persistSessions=true")
         UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")

@@ -13,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,7 @@ object SettingsStore {
     private lateinit var appContext: Context
 
     private val allowBackgroundSessionsKey = booleanPreferencesKey("allow_background_sessions")
+    private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
     private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
     private val themeModeKey = stringPreferencesKey("theme_mode")
@@ -50,6 +52,7 @@ object SettingsStore {
     private val hostKeyPromptKey = booleanPreferencesKey("host_key_prompt")
     private val autoTrustHostKey = booleanPreferencesKey("auto_trust_host_key")
     private val usageReportsKey = booleanPreferencesKey("usage_reports")
+    private val snippetRunTimeoutSecondsKey = intPreferencesKey("snippet_run_timeout_seconds")
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -70,6 +73,16 @@ object SettingsStore {
     val keyboardLayout: Flow<List<KeyboardSlotAction>> by lazy {
         dataStore.data.map { prefs ->
             prefs[keyboardLayoutKey]?.let { decodeKeyboardSlots(it) } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
+        }
+    }
+
+    val backgroundSessionTimeout: Flow<BackgroundSessionTimeout> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                BackgroundSessionTimeout.valueOf(
+                    prefs[backgroundSessionTimeoutKey] ?: BackgroundSessionTimeout.FOREVER.name
+                )
+            }.getOrDefault(BackgroundSessionTimeout.FOREVER)
         }
     }
 
@@ -169,9 +182,19 @@ object SettingsStore {
         dataStore.data.map { prefs -> prefs[usageReportsKey] ?: false }
     }
 
+    val snippetRunTimeoutSeconds: Flow<Int> by lazy {
+        dataStore.data.map { prefs -> (prefs[snippetRunTimeoutSecondsKey] ?: 10).coerceIn(1, 60) }
+    }
+
     suspend fun setAllowBackgroundSessions(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[allowBackgroundSessionsKey] = enabled
+        }
+    }
+
+    suspend fun setBackgroundSessionTimeout(timeout: BackgroundSessionTimeout) {
+        dataStore.edit { prefs ->
+            prefs[backgroundSessionTimeoutKey] = timeout.name
         }
     }
 
@@ -196,6 +219,7 @@ object SettingsStore {
                     put("alt", slot.alt)
                     put("shift", slot.shift)
                     put("repeatable", slot.repeatable)
+                    put("iconId", slot.iconId)
                 }
             )
         }
@@ -302,6 +326,12 @@ object SettingsStore {
         }
     }
 
+    suspend fun setSnippetRunTimeoutSeconds(seconds: Int) {
+        dataStore.edit { prefs ->
+            prefs[snippetRunTimeoutSecondsKey] = seconds.coerceIn(1, 60)
+        }
+    }
+
     suspend fun resetToDefaults() {
         dataStore.edit { prefs ->
             prefs.asMap().keys.toList().forEach { key ->
@@ -362,6 +392,7 @@ object SettingsStore {
         val alt = item.optBoolean("alt", false)
         val shift = item.optBoolean("shift", false)
         val repeatable = item.optBoolean("repeatable", false)
+        val iconId = item.optString("iconId", "")
         return KeyboardSlotAction(
             type = type,
             label = label,
@@ -372,7 +403,8 @@ object SettingsStore {
             ctrl = ctrl,
             alt = alt,
             shift = shift,
-            repeatable = repeatable
+            repeatable = repeatable,
+            iconId = iconId
         )
     }
 

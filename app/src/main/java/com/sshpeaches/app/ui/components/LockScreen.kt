@@ -16,15 +16,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.calculatePasswordRevealIndex
 
 @Composable
 fun LockScreenOverlay(
@@ -35,7 +38,9 @@ fun LockScreenOverlay(
     modifier: Modifier = Modifier
 ) {
     val pinState = remember { mutableStateOf("") }
+    val pinRevealIndex = remember { mutableIntStateOf(-1) }
     val errorState = remember { mutableStateOf<String?>(null) }
+    AutoHidePasswordReveal(pinRevealIndex)
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.surface,
@@ -55,7 +60,7 @@ fun LockScreenOverlay(
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Text("SSHPeaches Locked", style = MaterialTheme.typography.headlineSmall)
+            Text("SSHPeaches is locked", style = MaterialTheme.typography.headlineSmall)
             Text(
                 if (biometricEnabled && biometricAvailable) {
                     "Use your PIN or biometric to continue."
@@ -68,12 +73,15 @@ fun LockScreenOverlay(
             OutlinedTextField(
                 value = pinState.value,
                 onValueChange = { input ->
-                    pinState.value = input.filter { it.isDigit() }.take(10)
+                    val previous = pinState.value
+                    val next = input.filter { it.isDigit() }.take(10)
+                    pinState.value = next
+                    pinRevealIndex.intValue = calculatePasswordRevealIndex(previous, next)
                     errorState.value = null
                 },
                 label = { Text("PIN") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = TailRevealPasswordVisualTransformation(pinRevealIndex.intValue),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp)

@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.state.FavoritesSection
@@ -34,6 +36,9 @@ import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 fun FavoritesScreen(
     section: FavoritesSection,
     snippets: List<Snippet> = emptyList(),
+    openSessions: List<SessionService.SessionSnapshot> = emptyList(),
+    onOpenSession: (String) -> Unit = {},
+    onDisconnectSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
     onHostAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
@@ -41,11 +46,12 @@ fun FavoritesScreen(
     onToggleFavorite: (String) -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
-    val hasFavorites = section.hostFavorites.isNotEmpty() ||
+    val hasContent = openSessions.isNotEmpty() ||
+        section.hostFavorites.isNotEmpty() ||
         section.identityFavorites.isNotEmpty() ||
         section.portFavorites.isNotEmpty()
-    LaunchedEffect(hasFavorites) {
-        onEmptyStateVisibleChanged(!hasFavorites)
+    LaunchedEffect(hasContent) {
+        onEmptyStateVisibleChanged(!hasContent)
     }
 
     LazyColumn(
@@ -55,9 +61,49 @@ fun FavoritesScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (!hasFavorites) {
+        if (!hasContent) {
             item { EmptyState(itemLabel = "favorite", showCreateHint = false) }
             return@LazyColumn
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Open Sessions",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (openSessions.isEmpty()) {
+                    Text(
+                        text = "No open sessions.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    openSessions.forEach { session ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.name}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = session.statusMessage ?: session.status.name,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(onClick = { onOpenSession(session.hostId) }) {
+                                    Text("Open")
+                                }
+                                TextButton(onClick = { onDisconnectSession(session.hostId) }) {
+                                    Text("Disconnect")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         if (section.hostFavorites.isNotEmpty()) {
             item { SectionHeader("Hosts") }

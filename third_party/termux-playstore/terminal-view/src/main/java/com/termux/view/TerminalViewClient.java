@@ -26,6 +26,12 @@ public interface TerminalViewClient {
      */
     void onSingleTapUp(MotionEvent e);
 
+    /**
+     * On a double tap on the terminal.
+     */
+    default void onDoubleTap(MotionEvent e) {
+    }
+
     boolean shouldBackButtonBeMappedToEscape();
 
     boolean shouldEnforceCharBasedInput();

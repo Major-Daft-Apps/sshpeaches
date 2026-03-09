@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -40,11 +41,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
@@ -56,14 +59,18 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
 import com.majordaftapps.sshpeaches.app.util.parsePort
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
@@ -109,6 +116,10 @@ fun HostsScreen(
     val portState = remember { mutableStateOf("22") }
     val userState = remember { mutableStateOf("") }
     val groupState = remember { mutableStateOf("") }
+    val groupExpanded = remember { mutableStateOf(false) }
+    val showNewGroupDialog = remember { mutableStateOf(false) }
+    val newGroupNameState = remember { mutableStateOf("") }
+    val newGroupError = remember { mutableStateOf<String?>(null) }
     val notesState = remember { mutableStateOf("") }
     val authState = remember { mutableStateOf(AuthMethod.IDENTITY) }
     val authMenuExpanded = remember { mutableStateOf(false) }
@@ -124,14 +135,24 @@ fun HostsScreen(
     val backgroundBehaviorState = remember { mutableStateOf(BackgroundBehavior.INHERIT) }
     val backgroundExpanded = remember { mutableStateOf(false) }
     val passwordState = remember { mutableStateOf("") }
+    val passwordRevealIndex = remember { mutableIntStateOf(-1) }
     val clearPasswordState = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val showClearHostKeyDialog = remember { mutableStateOf(false) }
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
+    val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
+    AutoHidePasswordReveal(passwordRevealIndex)
+    AutoHidePasswordReveal(importPassphraseRevealIndex)
+    val availableGroups = (
+        hosts.mapNotNull { it.group?.trim()?.takeIf { group -> group.isNotBlank() } } +
+            listOfNotNull(groupState.value.trim().takeIf { it.isNotBlank() })
+        )
+        .distinctBy { it.lowercase() }
+        .sortedBy { it.lowercase() }
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
         when (val processed = processHostQrImport(contents = contents, existingHosts = hosts)) {
@@ -183,12 +204,12 @@ fun HostsScreen(
                     OutlinedTextField(
                         value = importPassphraseState.value,
                         onValueChange = {
-                            importPassphraseState.value = it
+                            updatePasswordStateWithReveal(importPassphraseState, importPassphraseRevealIndex, it)
                             importPassphraseError.value = null
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue)
                     )
                     importPassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -233,6 +254,10 @@ fun HostsScreen(
         portState.value = host?.port?.toString() ?: "22"
         userState.value = host?.username ?: ""
         groupState.value = host?.group ?: ""
+        groupExpanded.value = false
+        showNewGroupDialog.value = false
+        newGroupNameState.value = ""
+        newGroupError.value = null
         notesState.value = host?.notes ?: ""
         authState.value = host?.preferredAuth ?: AuthMethod.IDENTITY
         preferredIdentityIdState.value = host?.preferredIdentityId
@@ -252,6 +277,10 @@ fun HostsScreen(
     fun closeDialog() {
         showDialog.value = false
         editingHost.value = null
+        groupExpanded.value = false
+        showNewGroupDialog.value = false
+        newGroupNameState.value = ""
+        newGroupError.value = null
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
     }
@@ -357,6 +386,8 @@ fun HostsScreen(
                                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                 setPrompt("Scan SSH host QR")
                                 setBeepEnabled(false)
+                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                                setOrientationLocked(true)
                             }
                             scanLauncher.launch(options)
                         },
@@ -367,38 +398,42 @@ fun HostsScreen(
                     }
                 }
             }
-            items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
-                Column(
-                    modifier = Modifier.animateContentSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    HostCard(
-                        host = host,
-                        snippets = snippets,
-                        onToggleFavorite = onToggleFavorite,
-                        canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
-                        onRunInfoCommand = onRunInfoCommand,
-                        onInfoCommandsChange = onInfoCommandsChange,
-                        onAction = { selected, mode ->
-                            onStartSession(selected, mode, null)
-                        }
-                    )
-                    AnimatedVisibility(
-                        visible = editMode,
-                        enter = fadeIn(animationSpec = tween(220)) +
-                            slideInVertically(
-                                animationSpec = tween(220),
-                                initialOffsetY = { fullHeight -> fullHeight / 2 }
-                            ),
-                        exit = fadeOut(animationSpec = tween(180)) +
-                            slideOutVertically(
-                                animationSpec = tween(180),
-                                targetOffsetY = { fullHeight -> fullHeight / 2 }
-                            )
+            if (hosts.isEmpty()) {
+                item { EmptyState(itemLabel = "host") }
+            } else {
+                items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
+                    Column(
+                        modifier = Modifier.animateContentSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            TextButton(onClick = { openDialog(host) }) { Text("Edit") }
-                            TextButton(onClick = { onDeleteHost(host.id) }) { Text("Delete") }
+                        HostCard(
+                            host = host,
+                            snippets = snippets,
+                            onToggleFavorite = onToggleFavorite,
+                            canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
+                            onRunInfoCommand = onRunInfoCommand,
+                            onInfoCommandsChange = onInfoCommandsChange,
+                            onAction = { selected, mode ->
+                                onStartSession(selected, mode, null)
+                            }
+                        )
+                        AnimatedVisibility(
+                            visible = editMode,
+                            enter = fadeIn(animationSpec = tween(220)) +
+                                slideInVertically(
+                                    animationSpec = tween(220),
+                                    initialOffsetY = { fullHeight -> fullHeight / 2 }
+                                ),
+                            exit = fadeOut(animationSpec = tween(180)) +
+                                slideOutVertically(
+                                    animationSpec = tween(180),
+                                    targetOffsetY = { fullHeight -> fullHeight / 2 }
+                                )
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                TextButton(onClick = { openDialog(host) }) { Text("Edit") }
+                                TextButton(onClick = { onDeleteHost(host.id) }) { Text("Delete") }
+                            }
                         }
                     }
                 }
@@ -423,39 +458,111 @@ fun HostsScreen(
                         value = nameState.value,
                         onValueChange = { nameState.value = it },
                         label = { Text("Name") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = true,
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        ),
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_NAME_INPUT)
                     )
                     OutlinedTextField(
                         value = hostState.value,
                         onValueChange = { hostState.value = it },
                         label = { Text("Host / IP") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Ascii
+                        ),
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_HOST_INPUT)
                     )
                     OutlinedTextField(
                         value = portState.value,
                         onValueChange = { portState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Port") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Number
+                        ),
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_PORT_INPUT)
                     )
                     OutlinedTextField(
                         value = userState.value,
                         onValueChange = { userState.value = it },
                         label = { Text("Username") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Ascii
+                        ),
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT)
                     )
-                    OutlinedTextField(
-                        value = groupState.value,
-                        onValueChange = { groupState.value = it },
-                        label = { Text("Group (optional)") }
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        ExposedDropdownMenuBox(
+                            expanded = groupExpanded.value,
+                            onExpandedChange = { groupExpanded.value = !groupExpanded.value },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            TextField(
+                                value = groupState.value.ifBlank { "None" },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Group (optional)") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupExpanded.value) },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = groupExpanded.value,
+                                onDismissRequest = { groupExpanded.value = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("None") },
+                                    onClick = {
+                                        groupState.value = ""
+                                        groupExpanded.value = false
+                                    }
+                                )
+                                availableGroups.forEach { group ->
+                                    DropdownMenuItem(
+                                        text = { Text(group) },
+                                        onClick = {
+                                            groupState.value = group
+                                            groupExpanded.value = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                newGroupNameState.value = ""
+                                newGroupError.value = null
+                                showNewGroupDialog.value = true
+                            }
+                        ) {
+                            Text("New...")
+                        }
+                    }
                     OutlinedTextField(
                         value = notesState.value,
                         onValueChange = { notesState.value = it },
-                        label = { Text("Notes") }
+                        label = { Text("Notes") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Text
+                        )
                     )
                     OutlinedTextField(
                         value = passwordState.value,
-                        onValueChange = { passwordState.value = it },
+                        onValueChange = { updatePasswordStateWithReveal(passwordState, passwordRevealIndex, it) },
                         label = {
                             Text(
                                 if (editingHost.value?.hasPassword == true)
@@ -464,7 +571,12 @@ fun HostsScreen(
                                     "Password (optional)"
                             )
                         },
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(passwordRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     if (editingHost.value?.hasPassword == true) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -892,6 +1004,69 @@ fun HostsScreen(
                         onClick = { closeDialog() },
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON)
                     ) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    if (showNewGroupDialog.value) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                showNewGroupDialog.value = false
+                newGroupNameState.value = ""
+                newGroupError.value = null
+            },
+            title = { Text("New Group") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newGroupNameState.value,
+                        onValueChange = {
+                            newGroupNameState.value = it
+                            newGroupError.value = null
+                        },
+                        label = { Text("Group name") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = true,
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    newGroupError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val raw = newGroupNameState.value.trim()
+                        if (raw.isBlank()) {
+                            newGroupError.value = "Enter a group name."
+                            return@TextButton
+                        }
+                        val canonical = availableGroups.firstOrNull { it.equals(raw, ignoreCase = true) } ?: raw
+                        groupState.value = canonical
+                        groupExpanded.value = false
+                        showNewGroupDialog.value = false
+                        newGroupNameState.value = ""
+                        newGroupError.value = null
+                    }
+                ) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showNewGroupDialog.value = false
+                        newGroupNameState.value = ""
+                        newGroupError.value = null
+                    }
+                ) {
+                    Text("Cancel")
                 }
             }
         )

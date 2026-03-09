@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -243,6 +244,7 @@ fun ThemeProfileEditorScreen(
                     Text(
                         "Aa",
                         fontSize = draftSize.sp,
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -374,6 +376,7 @@ private fun ThemePreviewSample(
             text = "Aa Preview",
             color = fg,
             fontSize = fontSizePt.sp,
+            fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium
         )
     }

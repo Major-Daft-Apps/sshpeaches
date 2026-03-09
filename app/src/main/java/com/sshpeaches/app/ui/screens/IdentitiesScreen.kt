@@ -34,6 +34,10 @@ import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +48,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,7 +59,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -66,8 +70,11 @@ import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrPayload
 import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
 import com.majordaftapps.sshpeaches.app.ui.components.processIdentityQrImport
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.majordaftapps.sshpeaches.app.util.GeneratedIdentityKeyPair
 import com.majordaftapps.sshpeaches.app.util.IdentityEcdsaCurve
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
@@ -93,6 +100,7 @@ private enum class DialogKeyFileType {
     PUBLIC_KEY
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IdentitiesScreen(
     items: List<Identity>,
@@ -109,7 +117,6 @@ fun IdentitiesScreen(
     onRemoveIdentityKey: (id: String) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onShowMessage: (String) -> Unit = {},
-    editMode: Boolean = false,
     onImportFromQr: () -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
@@ -127,30 +134,48 @@ fun IdentitiesScreen(
     val shareQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val sharePassphrasePrompt = remember { mutableStateOf<Identity?>(null) }
     val sharePassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.identity.orEmpty()) }
+    val sharePassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val shareConfirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.identity.orEmpty()) }
+    val shareConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val sharePassphraseError = remember { mutableStateOf<String?>(null) }
     val pendingOverwrite = remember { mutableStateOf<IdentityOverwrite?>(null) }
     val pendingKeyImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
+    val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
     val fileImportTarget = remember { mutableStateOf<String?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dialogKeyPassphraseState = remember { mutableStateOf("") }
+    val dialogKeyPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val showGenerateDialog = remember { mutableStateOf(false) }
     val generationAlgorithm = remember { mutableStateOf(IdentityKeyAlgorithm.ED25519) }
+    val generationAlgorithmExpanded = remember { mutableStateOf(false) }
     val generationRsaBits = remember { mutableStateOf(4096) }
+    val generationRsaBitsExpanded = remember { mutableStateOf(false) }
     val generationCurve = remember { mutableStateOf(IdentityEcdsaCurve.P256) }
     val generationPassphrase = remember { mutableStateOf("") }
+    val generationPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val generationConfirmPassphrase = remember { mutableStateOf("") }
+    val generationConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val generationError = remember { mutableStateOf<String?>(null) }
     val copyKeyIdentity = remember { mutableStateOf<Identity?>(null) }
     val copyHostId = remember { mutableStateOf<String?>(null) }
     val copyHostPassword = remember { mutableStateOf("") }
+    val copyHostPasswordRevealIndex = remember { mutableIntStateOf(-1) }
     val copyIdentityPassphrase = remember { mutableStateOf("") }
+    val copyIdentityPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val copyInProgress = remember { mutableStateOf(false) }
     val copyError = remember { mutableStateOf<String?>(null) }
+    AutoHidePasswordReveal(sharePassphraseRevealIndex)
+    AutoHidePasswordReveal(shareConfirmPassphraseRevealIndex)
+    AutoHidePasswordReveal(importPassphraseRevealIndex)
+    AutoHidePasswordReveal(dialogKeyPassphraseRevealIndex)
+    AutoHidePasswordReveal(generationPassphraseRevealIndex)
+    AutoHidePasswordReveal(generationConfirmPassphraseRevealIndex)
+    AutoHidePasswordReveal(copyHostPasswordRevealIndex)
+    AutoHidePasswordReveal(copyIdentityPassphraseRevealIndex)
 
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -254,6 +279,8 @@ fun IdentitiesScreen(
         dialogKeyStatus.value = null
         dialogError.value = null
         generationError.value = null
+        generationAlgorithmExpanded.value = false
+        generationRsaBitsExpanded.value = false
         showGenerateDialog.value = false
         showDialog.value = true
     }
@@ -261,7 +288,22 @@ fun IdentitiesScreen(
     fun closeDialog() {
         showDialog.value = false
         dialogFileType.value = null
+        generationAlgorithmExpanded.value = false
+        generationRsaBitsExpanded.value = false
         showGenerateDialog.value = false
+    }
+
+    fun openCopyKeyDialog(identity: Identity) {
+        if (isLocked) {
+            onShowMessage("Unlock the app before installing keys.")
+            return
+        }
+        copyKeyIdentity.value = identity
+        copyHostId.value = hosts.firstOrNull()?.id
+        copyHostPassword.value = ""
+        copyIdentityPassphrase.value = ""
+        copyError.value = null
+        copyInProgress.value = false
     }
 
     val filteredItems = items.filter {
@@ -310,6 +352,8 @@ fun IdentitiesScreen(
                                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                 setPrompt("Scan SSH identity QR")
                                 setBeepEnabled(false)
+                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                                setOrientationLocked(true)
                             }
                             scanLauncher.launch(options)
                         },
@@ -391,32 +435,59 @@ fun IdentitiesScreen(
                                     contentDescription = "Copy key to host",
                                     modifier = Modifier
                                         .size(20.dp)
-                                        .clickable {
-                                            copyKeyIdentity.value = identity
-                                            copyHostId.value = hosts.firstOrNull()?.id
-                                            copyHostPassword.value = ""
-                                            copyIdentityPassphrase.value = ""
-                                            copyError.value = null
-                                            copyInProgress.value = false
-                                        }
+                                        .clickable { openCopyKeyDialog(identity) }
                                 )
-                                if (editMode) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .padding(start = 8.dp)
+                                        .clickable { openDialog(identity) }
+                                )
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { onDelete(identity.id) }
+                                )
+                            }
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = { openDialog(identity) }) {
                                     Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .padding(start = 8.dp)
-                                            .clickable { openDialog(identity) }
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clickable { onDelete(identity.id) }
-                                    )
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text("Edit")
                                 }
+                                TextButton(onClick = { onDelete(identity.id) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text("Delete")
+                                }
+                            }
+                            TextButton(onClick = { openCopyKeyDialog(identity) }) {
+                                Icon(
+                                    Icons.Default.VpnKey,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text("Install Key To Host")
                             }
                         }
                     }
@@ -492,10 +563,10 @@ fun IdentitiesScreen(
                     )
                     OutlinedTextField(
                         value = dialogKeyPassphraseState.value,
-                        onValueChange = { dialogKeyPassphraseState.value = it },
+                        onValueChange = { updatePasswordStateWithReveal(dialogKeyPassphraseState, dialogKeyPassphraseRevealIndex, it) },
                         label = { Text("Key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue)
                     )
                     Button(onClick = {
                         generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
@@ -614,33 +685,83 @@ fun IdentitiesScreen(
             title = { Text("Generate keypair") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Algorithm")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        KeyGenOptionButton(
-                            label = "Ed25519",
-                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.ED25519,
-                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.ED25519 }
+                    ExposedDropdownMenuBox(
+                        expanded = generationAlgorithmExpanded.value,
+                        onExpandedChange = { generationAlgorithmExpanded.value = !generationAlgorithmExpanded.value }
+                    ) {
+                        OutlinedTextField(
+                            value = when (generationAlgorithm.value) {
+                                IdentityKeyAlgorithm.ED25519 -> "Ed25519"
+                                IdentityKeyAlgorithm.RSA -> "RSA"
+                                IdentityKeyAlgorithm.ECDSA -> "ECDSA"
+                            },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Algorithm") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = generationAlgorithmExpanded.value)
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
                         )
-                        KeyGenOptionButton(
-                            label = "RSA",
-                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.RSA,
-                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.RSA }
-                        )
-                        KeyGenOptionButton(
-                            label = "ECDSA",
-                            selected = generationAlgorithm.value == IdentityKeyAlgorithm.ECDSA,
-                            onClick = { generationAlgorithm.value = IdentityKeyAlgorithm.ECDSA }
-                        )
+                        ExposedDropdownMenu(
+                            expanded = generationAlgorithmExpanded.value,
+                            onDismissRequest = { generationAlgorithmExpanded.value = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ed25519") },
+                                onClick = {
+                                    generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
+                                    generationAlgorithmExpanded.value = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("RSA") },
+                                onClick = {
+                                    generationAlgorithm.value = IdentityKeyAlgorithm.RSA
+                                    generationAlgorithmExpanded.value = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("ECDSA") },
+                                onClick = {
+                                    generationAlgorithm.value = IdentityKeyAlgorithm.ECDSA
+                                    generationAlgorithmExpanded.value = false
+                                }
+                            )
+                        }
                     }
                     if (generationAlgorithm.value == IdentityKeyAlgorithm.RSA) {
-                        Text("RSA bits")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(2048, 3072, 4096).forEach { bits ->
-                                KeyGenOptionButton(
-                                    label = bits.toString(),
-                                    selected = generationRsaBits.value == bits,
-                                    onClick = { generationRsaBits.value = bits }
-                                )
+                        ExposedDropdownMenuBox(
+                            expanded = generationRsaBitsExpanded.value,
+                            onExpandedChange = { generationRsaBitsExpanded.value = !generationRsaBitsExpanded.value }
+                        ) {
+                            OutlinedTextField(
+                                value = generationRsaBits.value.toString(),
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("RSA bits") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = generationRsaBitsExpanded.value)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = generationRsaBitsExpanded.value,
+                                onDismissRequest = { generationRsaBitsExpanded.value = false }
+                            ) {
+                                listOf(2048, 3072, 4096).forEach { bits ->
+                                    DropdownMenuItem(
+                                        text = { Text(bits.toString()) },
+                                        onClick = {
+                                            generationRsaBits.value = bits
+                                            generationRsaBitsExpanded.value = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -659,22 +780,22 @@ fun IdentitiesScreen(
                     OutlinedTextField(
                         value = generationPassphrase.value,
                         onValueChange = {
-                            generationPassphrase.value = it
+                            updatePasswordStateWithReveal(generationPassphrase, generationPassphraseRevealIndex, it)
                             generationError.value = null
                         },
                         label = { Text("Key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(generationPassphraseRevealIndex.intValue)
                     )
                     OutlinedTextField(
                         value = generationConfirmPassphrase.value,
                         onValueChange = {
-                            generationConfirmPassphrase.value = it
+                            updatePasswordStateWithReveal(generationConfirmPassphrase, generationConfirmPassphraseRevealIndex, it)
                             generationError.value = null
                         },
                         label = { Text("Confirm passphrase") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(generationConfirmPassphraseRevealIndex.intValue)
                     )
                     generationError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -767,17 +888,17 @@ fun IdentitiesScreen(
                     }
                     OutlinedTextField(
                         value = copyHostPassword.value,
-                        onValueChange = { copyHostPassword.value = it },
+                        onValueChange = { updatePasswordStateWithReveal(copyHostPassword, copyHostPasswordRevealIndex, it) },
                         label = { Text("Host password (optional)") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(copyHostPasswordRevealIndex.intValue)
                     )
                     OutlinedTextField(
                         value = copyIdentityPassphrase.value,
-                        onValueChange = { copyIdentityPassphrase.value = it },
+                        onValueChange = { updatePasswordStateWithReveal(copyIdentityPassphrase, copyIdentityPassphraseRevealIndex, it) },
                         label = { Text("Identity key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(copyIdentityPassphraseRevealIndex.intValue)
                     )
                     copyError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -863,22 +984,22 @@ fun IdentitiesScreen(
                     OutlinedTextField(
                         value = sharePassphraseState.value,
                         onValueChange = {
-                            sharePassphraseState.value = it
+                            updatePasswordStateWithReveal(sharePassphraseState, sharePassphraseRevealIndex, it)
                             sharePassphraseError.value = null
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(sharePassphraseRevealIndex.intValue)
                     )
                     OutlinedTextField(
                         value = shareConfirmPassphraseState.value,
                         onValueChange = {
-                            shareConfirmPassphraseState.value = it
+                            updatePasswordStateWithReveal(shareConfirmPassphraseState, shareConfirmPassphraseRevealIndex, it)
                             sharePassphraseError.value = null
                         },
                         label = { Text("Confirm passphrase") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(shareConfirmPassphraseRevealIndex.intValue)
                     )
                     sharePassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -931,12 +1052,12 @@ fun IdentitiesScreen(
                     OutlinedTextField(
                         value = importPassphraseState.value,
                         onValueChange = {
-                            importPassphraseState.value = it
+                            updatePasswordStateWithReveal(importPassphraseState, importPassphraseRevealIndex, it)
                             importPassphraseError.value = null
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue)
                     )
                     importPassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)

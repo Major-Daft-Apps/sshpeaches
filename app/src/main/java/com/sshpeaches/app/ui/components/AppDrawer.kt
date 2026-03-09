@@ -22,10 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun AppDrawer(
@@ -35,6 +38,12 @@ fun AppDrawer(
     onQuickConnect: () -> Unit
 ) {
     val drawerScroll = rememberScrollState()
+    val isDarkDrawer = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val activityBarLogo = if (isDarkDrawer) {
+        com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_activitybar
+    } else {
+        com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_activitybar_black
+    }
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -45,7 +54,7 @@ fun AppDrawer(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             androidx.compose.foundation.Image(
-                painter = painterResource(id = com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches),
+                painter = painterResource(id = activityBarLogo),
                 contentDescription = "SSHPeaches logo",
                 modifier = Modifier
                     .size(48.dp)
@@ -63,6 +72,7 @@ fun AppDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
+                .testTag(UiTestTags.DRAWER_QUICK_CONNECT)
                 .clickable { onQuickConnect() },
             color = MaterialTheme.colorScheme.primary
         ) {
@@ -87,6 +97,7 @@ fun AppDrawer(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(background)
+                    .testTag(UiTestTags.drawerItem(dest.route))
                     .clickable { onDestinationSelected(dest) }
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)

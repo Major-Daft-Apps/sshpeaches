@@ -7,6 +7,7 @@ enum class KeyboardActionType {
     KEY,
     MODIFIER,
     SEQUENCE,
+    PASSWORD_INJECT,
     SNIPPET_PICKER
 }
 
@@ -35,26 +36,43 @@ data class KeyboardSlotAction(
 
 object KeyboardLayoutDefaults {
     const val SLOT_COLUMNS = 7
-    const val SLOT_ROWS = 2
+    const val SLOT_ROWS = 4
     const val SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
+    private const val LEGACY_SLOT_ROWS = 2
+    private const val LEGACY_SLOT_COUNT = SLOT_COLUMNS * LEGACY_SLOT_ROWS
+    private const val EXTENDED_SLOT_COUNT = SLOT_COUNT - LEGACY_SLOT_COUNT
     const val COMPACT_KEY_LABEL_MAX_CHARS = 6
     const val COMPACT_KEY_HEIGHT_DP = 30
     const val COMPACT_KEY_FONT_SP = 10
 
     val DEFAULT_SLOTS: List<KeyboardSlotAction> = listOf(
+        functionKeyAction(1),
+        functionKeyAction(2),
+        functionKeyAction(3),
+        functionKeyAction(4),
+        functionKeyAction(5),
+        functionKeyAction(6),
+        functionKeyAction(7),
+        functionKeyAction(8),
+        functionKeyAction(9),
+        functionKeyAction(10),
+        functionKeyAction(11),
+        functionKeyAction(12),
+        snippetPickerAction(),
+        passwordInjectAction(),
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
         textAction("/", "/"),
         textAction("-", "-"),
         keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
-        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
         keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
         keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
         modifierAction(KeyboardModifier.ALT, "Alt"),
-        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true),
-        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true),
-        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
         keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
     )
 
@@ -73,10 +91,10 @@ object KeyboardLayoutDefaults {
         keyAction("End", KeyEvent.KEYCODE_MOVE_END),
         keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
         keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true),
-        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true),
-        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true),
-        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true),
-        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true)
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right")
     )
 
     val functionPresets: List<KeyboardSlotAction> = listOf(
@@ -173,6 +191,22 @@ object KeyboardLayoutDefaults {
         sequenceAction("C-Z", "\u001A")
     )
 
+    val iconAliasPresets: List<KeyboardSlotAction> = listOf(
+        snippetPickerAction(label = "Snippets", iconId = "code"),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
+        passwordInjectAction(label = "Password", iconId = "key"),
+        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
+        textAction(label = "pwd+Enter", text = "pwd\r").copy(iconId = "folder"),
+        textAction(label = "cd+Enter", text = "cd\r").copy(iconId = "home"),
+        textAction(label = "reset+Enter", text = "").copy(iconId = "reset"),
+        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard"),
+        sequenceAction(label = "Ctrl-Z", sequence = "\u001A").copy(iconId = "terminal"),
+        textAction(label = "Settings", text = "").copy(iconId = "build")
+    )
+
     val advancedSequencePresets: List<KeyboardSlotAction> = listOf(
         sequenceAction("Clear", "\u001B[2J\u001B[H"),
         sequenceAction("Clr+Sb", "\u001B[3J\u001B[H\u001B[2J"),
@@ -226,10 +260,18 @@ object KeyboardLayoutDefaults {
         return if (compact.isBlank()) fallback else compact
     }
 
-    fun normalizeSlots(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> =
-        List(SLOT_COUNT) { index ->
-            slots.getOrNull(index) ?: emptyAction()
+    fun normalizeSlots(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> {
+        if (slots.isEmpty()) return DEFAULT_SLOTS
+        val upgraded = if (slots.size == LEGACY_SLOT_COUNT) {
+            DEFAULT_SLOTS.take(EXTENDED_SLOT_COUNT) + slots
+        } else {
+            slots
         }
+        return List(SLOT_COUNT) { index ->
+            val action = upgraded.getOrNull(index) ?: DEFAULT_SLOTS.getOrNull(index) ?: emptyAction()
+            applyDirectionalIconAlias(action)
+        }
+    }
 
     fun textAction(text: String, label: String = text): KeyboardSlotAction = KeyboardSlotAction(
         type = KeyboardActionType.TEXT,
@@ -270,9 +312,18 @@ object KeyboardLayoutDefaults {
 
     fun snippetPickerAction(
         label: String = "Snippets",
-        iconId: String = "snippet_picker"
+        iconId: String = "code"
     ): KeyboardSlotAction = KeyboardSlotAction(
         type = KeyboardActionType.SNIPPET_PICKER,
+        label = label,
+        iconId = iconId
+    )
+
+    fun passwordInjectAction(
+        label: String = "Password",
+        iconId: String = "key"
+    ): KeyboardSlotAction = KeyboardSlotAction(
+        type = KeyboardActionType.PASSWORD_INJECT,
         label = label,
         iconId = iconId
     )
@@ -322,13 +373,19 @@ object KeyboardLayoutDefaults {
             "end" -> keyAction("End", KeyEvent.KEYCODE_MOVE_END)
             "pgup" -> keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true)
             "pgdn", "pgdown" -> keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
-            "up" -> keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true)
-            "dn", "down" -> keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true)
-            "lt", "left" -> keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true)
-            "rt", "right" -> keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true)
+            "up" -> keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up")
+            "dn", "down" -> keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down")
+            "lt", "left" -> keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left")
+            "rt", "right" -> keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right")
             "c-c" -> sequenceAction("C-C", "\u0003")
             "c-d" -> sequenceAction("C-D", "\u0004")
             "c-z" -> sequenceAction("C-Z", "\u001A")
+            "snippet", "snippets" -> snippetPickerAction()
+            "password", "pwd", "pass" -> passwordInjectAction()
+            "swipe", "swipenav", "swipe-nav" -> textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav")
+            "keyboard" -> textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+            "reset", "clr", "clear" -> textAction(label = "reset+Enter", text = "").copy(iconId = "reset")
+            "settings", "wrench", "tools", "tool" -> textAction(label = "Settings", text = "").copy(iconId = "build")
             else -> {
                 val fn = parseFunctionKey(lower)
                 if (fn != null) functionKeyAction(fn) else textAction(trimmed)
@@ -485,6 +542,21 @@ object KeyboardLayoutDefaults {
         in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ->
             ('0'.code + (keyCode - KeyEvent.KEYCODE_0)).toChar().toString()
         else -> ""
+    }
+
+    private fun applyDirectionalIconAlias(action: KeyboardSlotAction): KeyboardSlotAction {
+        if (action.type != KeyboardActionType.KEY) return action
+        if (action.iconId.isNotBlank()) return action
+        if (action.ctrl || action.alt || action.shift) return action
+        val keyCode = action.keyCode ?: return action
+        val iconId = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> "up"
+            KeyEvent.KEYCODE_DPAD_DOWN -> "down"
+            KeyEvent.KEYCODE_DPAD_LEFT -> "left"
+            KeyEvent.KEYCODE_DPAD_RIGHT -> "right"
+            else -> return action
+        }
+        return action.copy(iconId = iconId)
     }
 
     private data class CombinationKeySpec(

@@ -19,6 +19,7 @@ data class AppUiState(
     val sortMode: SortMode = SortMode.LAST_USED,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val allowBackgroundSessions: Boolean = true,
+    val backgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER,
     val biometricLockEnabled: Boolean = false,
     val lockTimeout: LockTimeout = LockTimeout.FIVE_MIN,
     val customLockTimeoutMinutes: Int = 30,
@@ -35,6 +36,7 @@ data class AppUiState(
     val hostKeyPromptEnabled: Boolean = true,
     val autoTrustHostKey: Boolean = true,
     val usageReportsEnabled: Boolean = false,
+    val snippetRunTimeoutSeconds: Int = 10,
     val pinConfigured: Boolean = false,
     val isLocked: Boolean = false,
     val keyboardSlots: List<KeyboardSlotAction> = KeyboardLayoutDefaults.DEFAULT_SLOTS
@@ -56,4 +58,13 @@ enum class LockTimeout(val label: String) {
     FIVE_MIN("5 minutes"),
     FIFTEEN_MIN("15 minutes"),
     CUSTOM("Custom")
+}
+
+enum class BackgroundSessionTimeout(val label: String, val durationMillis: Long?) {
+    ONE_MIN("1 minute", 60_000L),
+    FIVE_MIN("5 minutes", 300_000L),
+    TEN_MIN("10 minutes", 600_000L),
+    THIRTY_MIN("30 minutes", 1_800_000L),
+    ONE_HOUR("1 hour", 3_600_000L),
+    FOREVER("Forever", null)
 }

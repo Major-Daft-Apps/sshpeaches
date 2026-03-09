@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -28,6 +29,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -55,11 +61,13 @@ import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.PortForwardQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processPortForwardQrImport
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
 import com.majordaftapps.sshpeaches.app.util.parsePort
 import java.util.UUID
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PortForwardScreen(
     items: List<PortForward>,
@@ -82,7 +90,8 @@ fun PortForwardScreen(
     val dstPortState = remember { mutableStateOf("0") }
     val enabledState = remember { mutableStateOf(true) }
     val selectedHostsState = remember { mutableStateOf<List<String>>(emptyList()) }
-    val hostSearchState = remember { mutableStateOf(TextFieldValue("")) }
+    val selectedHostFilterId = remember { mutableStateOf<String?>(null) }
+    val hostFilterExpanded = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val shareForward = remember { mutableStateOf<PortForward?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
@@ -124,7 +133,8 @@ fun PortForwardScreen(
         dstPortState.value = forward?.destinationPort?.toString() ?: "0"
         enabledState.value = forward?.enabled ?: true
         selectedHostsState.value = forward?.associatedHosts ?: emptyList()
-        hostSearchState.value = TextFieldValue("")
+        selectedHostFilterId.value = null
+        hostFilterExpanded.value = false
         dialogError.value = null
         showDialog.value = true
     }
@@ -144,7 +154,11 @@ fun PortForwardScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_FORWARDS)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -176,6 +190,8 @@ fun PortForwardScreen(
                                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                 setPrompt("Scan port forward QR")
                                 setBeepEnabled(false)
+                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                                setOrientationLocked(true)
                             }
                             scanLauncher.launch(options)
                         },
@@ -290,40 +306,91 @@ fun PortForwardScreen(
                         value = bindState.value,
                         onValueChange = { bindState.value = it },
                         label = { Text("Local bind address") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Ascii
+                        )
                     )
                     OutlinedTextField(
                         value = srcPortState.value,
                         onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Local port") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Number
+                        )
                     )
                     OutlinedTextField(
                         value = dstHostState.value,
                         onValueChange = { dstHostState.value = it },
                         label = { Text("Destination host") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Ascii
+                        )
                     )
                     OutlinedTextField(
                         value = dstPortState.value,
                         onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Destination port") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Number
+                        )
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
                         Text("Enable now")
                     }
-                    OutlinedTextField(
-                        value = hostSearchState.value,
-                        onValueChange = { hostSearchState.value = it },
-                        label = { Text("Filter hosts") },
-                        singleLine = true
-                    )
+                    ExposedDropdownMenuBox(
+                        expanded = hostFilterExpanded.value,
+                        onExpandedChange = { hostFilterExpanded.value = !hostFilterExpanded.value }
+                    ) {
+                        TextField(
+                            value = selectedHostFilterId.value?.let { selectedId ->
+                                hosts.firstOrNull { it.id == selectedId }?.name ?: "All hosts"
+                            } ?: "All hosts",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Filter hosts") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostFilterExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = hostFilterExpanded.value,
+                            onDismissRequest = { hostFilterExpanded.value = false }
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("All hosts") },
+                                onClick = {
+                                    selectedHostFilterId.value = null
+                                    hostFilterExpanded.value = false
+                                }
+                            )
+                            hosts.forEach { host ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(host.name.ifBlank { host.host }) },
+                                    onClick = {
+                                        selectedHostFilterId.value = host.id
+                                        hostFilterExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val filtered = hosts.filter {
-                            it.name.contains(hostSearchState.value.text, ignoreCase = true) ||
-                                    it.host.contains(hostSearchState.value.text, ignoreCase = true)
+                        val filtered = hosts.filter { host ->
+                            selectedHostFilterId.value == null || host.id == selectedHostFilterId.value
                         }
                         filtered.forEach { host ->
                             Row(
@@ -352,8 +419,10 @@ fun PortForwardScreen(
                                 )
                             }
                         }
-                        if (filtered.isEmpty()) {
-                            Text("No hosts match your search", style = MaterialTheme.typography.bodySmall)
+                        if (hosts.isEmpty()) {
+                            Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
+                        } else if (filtered.isEmpty()) {
+                            Text("No hosts match selected filter", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     dialogError.value?.let {

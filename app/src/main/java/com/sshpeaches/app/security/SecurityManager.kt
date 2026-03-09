@@ -74,7 +74,8 @@ object SecurityManager {
             .putString(KEY_PIN_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
             .apply()
         pinConfiguredState.value = true
-        lock()
+        // Keep the current session unlocked after creating/changing a PIN.
+        unlock()
     }
 
     fun clearPin() {

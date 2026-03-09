@@ -48,6 +48,7 @@ class AppViewModel(
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
     private val backgroundSessionsFlow = MutableStateFlow(true)
+    private val backgroundSessionTimeoutFlow = MutableStateFlow(BackgroundSessionTimeout.FOREVER)
     private val biometricFlow = MutableStateFlow(false)
     private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
     private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
@@ -64,6 +65,7 @@ class AppViewModel(
     private val hostKeyPromptFlow = MutableStateFlow(true)
     private val autoTrustHostKeyFlow = MutableStateFlow(true)
     private val usageReportsFlow = MutableStateFlow(false)
+    private val snippetRunTimeoutSecondsFlow = MutableStateFlow(10)
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
@@ -93,6 +95,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.allowBackgroundSessions.collect { enabled ->
                 backgroundSessionsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.backgroundSessionTimeout.collect { timeout ->
+                backgroundSessionTimeoutFlow.value = timeout
             }
         }
         viewModelScope.launch {
@@ -181,6 +188,11 @@ class AppViewModel(
             }
         }
         viewModelScope.launch {
+            SettingsStore.snippetRunTimeoutSeconds.collect { seconds ->
+                snippetRunTimeoutSecondsFlow.value = seconds
+            }
+        }
+        viewModelScope.launch {
             SettingsStore.keyboardLayout.collect { slots ->
                 keyboardSlotsFlow.value = slots
             }
@@ -211,6 +223,7 @@ class AppViewModel(
     private data class PrivacyPrefs(
         val theme: ThemeMode,
         val background: Boolean,
+        val backgroundTimeout: BackgroundSessionTimeout,
         val biometric: Boolean,
         val timeout: LockTimeout,
         val customTimeoutMinutes: Int,
@@ -226,6 +239,7 @@ class AppViewModel(
     private data class PrivacyPartial(
         val theme: ThemeMode,
         val background: Boolean,
+        val backgroundTimeout: BackgroundSessionTimeout,
         val biometric: Boolean,
         val timeout: LockTimeout,
         val customTimeoutMinutes: Int,
@@ -244,14 +258,28 @@ class AppViewModel(
         val usage: Boolean
     )
 
+    private val lockPrefsFlow = combine(
+        lockTimeoutFlow,
+        customLockTimeoutMinutesFlow
+    ) { timeout, customMinutes ->
+        timeout to customMinutes
+    }
+
     private val privacyPartialBaseFlow = combine(
         themeModeFlow,
         backgroundSessionsFlow,
+        backgroundSessionTimeoutFlow,
         biometricFlow,
-        lockTimeoutFlow,
-        customLockTimeoutMinutesFlow
-    ) { theme, background, biometric, timeout, customMinutes ->
-        PrivacyPartial(theme, background, biometric, timeout, customMinutes)
+        lockPrefsFlow
+    ) { theme, background, backgroundTimeout, biometric, lockPrefs ->
+        PrivacyPartial(
+            theme = theme,
+            background = background,
+            backgroundTimeout = backgroundTimeout,
+            biometric = biometric,
+            timeout = lockPrefs.first,
+            customTimeoutMinutes = lockPrefs.second
+        )
     }
 
     private val privacyPartialFlow = combine(
@@ -278,6 +306,7 @@ class AppViewModel(
         PrivacyPrefs(
             theme = partial.theme,
             background = partial.background,
+            backgroundTimeout = partial.backgroundTimeout,
             biometric = partial.biometric,
             timeout = partial.timeout,
             customTimeoutMinutes = partial.customTimeoutMinutes,
@@ -308,7 +337,7 @@ class AppViewModel(
         base.copy(usage = usage)
     }
 
-    private val coreUiState = combine(
+    private val coreUiStateBase = combine(
         baseUiState,
         privacyPrefsFlow,
         sharePrefsFlow,
@@ -318,6 +347,7 @@ class AppViewModel(
         state.copy(
             themeMode = privacy.theme,
             allowBackgroundSessions = privacy.background,
+            backgroundSessionTimeout = privacy.backgroundTimeout,
             biometricLockEnabled = privacy.biometric,
             lockTimeout = privacy.timeout,
             customLockTimeoutMinutes = privacy.customTimeoutMinutes,
@@ -337,6 +367,13 @@ class AppViewModel(
             pinConfigured = pinSet,
             isLocked = locked
         )
+    }
+
+    private val coreUiState = combine(
+        coreUiStateBase,
+        snippetRunTimeoutSecondsFlow
+    ) { state, snippetTimeout ->
+        state.copy(snippetRunTimeoutSeconds = snippetTimeout)
     }
 
     val uiState: StateFlow<AppUiState> = combine(
@@ -395,6 +432,7 @@ class AppViewModel(
         append(state.sortMode).append('|')
         append(state.themeMode).append('|')
         append(state.allowBackgroundSessions).append('|')
+        append(state.backgroundSessionTimeout).append('|')
         append(state.biometricLockEnabled).append('|')
         append(state.lockTimeout).append('|')
         append(state.customLockTimeoutMinutes).append('|')
@@ -432,6 +470,12 @@ class AppViewModel(
     fun setBackgroundSessions(enabled: Boolean) {
         launchLogged("setBackgroundSessions", "enabled=$enabled") {
             SettingsStore.setAllowBackgroundSessions(enabled)
+        }
+    }
+
+    fun setBackgroundSessionTimeout(timeout: BackgroundSessionTimeout) {
+        launchLogged("setBackgroundSessionTimeout", "timeout=$timeout") {
+            SettingsStore.setBackgroundSessionTimeout(timeout)
         }
     }
 
@@ -584,6 +628,12 @@ class AppViewModel(
     fun setUsageReports(enabled: Boolean) {
         launchLogged("setUsageReports", "enabled=$enabled") {
             SettingsStore.setUsageReportsEnabled(enabled)
+        }
+    }
+
+    fun setSnippetRunTimeoutSeconds(seconds: Int) {
+        launchLogged("setSnippetRunTimeoutSeconds", "seconds=$seconds") {
+            SettingsStore.setSnippetRunTimeoutSeconds(seconds)
         }
     }
 

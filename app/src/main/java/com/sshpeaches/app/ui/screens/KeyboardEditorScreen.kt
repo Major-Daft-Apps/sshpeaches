@@ -24,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -85,7 +84,7 @@ fun KeyboardEditorScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to open the full key-action editor vertical.")
+        Text("Tap a slot to open the full key-action editor.")
 
         Column(
             modifier = Modifier
@@ -195,7 +194,6 @@ private fun KeyActionEditorVertical(
     val comboCtrl = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.ctrl) }
     val comboAlt = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.alt) }
     val comboShift = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.shift) }
-    val selectedIconId = remember(current) { mutableStateOf(current.iconId) }
     val textDraft = remember(current) {
         mutableStateOf(if (current.type == KeyboardActionType.TEXT) current.text else "")
     }
@@ -206,12 +204,11 @@ private fun KeyActionEditorVertical(
 
     val applyKeyAction: (KeyboardSlotAction) -> Unit = { base ->
         onApply(
-            withCombinationAndIcon(
+            withCombination(
                 base = base,
                 ctrl = comboCtrl.value,
                 alt = comboAlt.value,
-                shift = comboShift.value,
-                iconId = selectedIconId.value
+                shift = comboShift.value
             )
         )
     }
@@ -242,9 +239,16 @@ private fun KeyActionEditorVertical(
             style = MaterialTheme.typography.bodySmall
         )
 
+        SectionTitle("Icon Aliases")
+        Text(
+            "Icon entries are direct action aliases in the shell.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        PresetRow(KeyboardLayoutDefaults.iconAliasPresets, onApply)
+
         SectionTitle("Modifiers")
         PresetRow(KeyboardLayoutDefaults.modifierPresets) { preset ->
-            onApply(preset.copy(iconId = selectedIconId.value))
+            onApply(preset)
         }
 
         SectionTitle("Combination")
@@ -305,9 +309,7 @@ private fun KeyActionEditorVertical(
         TextButton(
             enabled = textDraft.value.isNotBlank(),
             onClick = {
-                onApply(
-                    KeyboardLayoutDefaults.textAction(textDraft.value).copy(iconId = selectedIconId.value)
-                )
+                onApply(KeyboardLayoutDefaults.textAction(textDraft.value))
             }
         ) {
             Text("Use Text")
@@ -316,20 +318,18 @@ private fun KeyActionEditorVertical(
         SectionTitle("Actions")
         TextButton(
             onClick = {
-                val action = KeyboardLayoutDefaults.snippetPickerAction(
-                    iconId = selectedIconId.value.ifBlank { "snippet_picker" }
-                )
-                onApply(action)
+                onApply(KeyboardLayoutDefaults.snippetPickerAction(iconId = "code"))
             }
         ) {
             Text("Snippet Picker")
         }
-
-        SectionTitle("Icon")
-        IconPresetRow(
-            selectedIconId = selectedIconId.value,
-            onSelect = { selectedIconId.value = it }
-        )
+        TextButton(
+            onClick = {
+                onApply(KeyboardLayoutDefaults.passwordInjectAction(iconId = "key"))
+            }
+        ) {
+            Text("Inject Password")
+        }
 
         TextButton(onClick = { advancedExpanded.value = !advancedExpanded.value }) {
             Icon(
@@ -342,7 +342,7 @@ private fun KeyActionEditorVertical(
         if (advancedExpanded.value) {
             SectionTitle("VT100/xterm Sequences")
             PresetRow(KeyboardLayoutDefaults.advancedSequencePresets) { preset ->
-                onApply(preset.copy(iconId = selectedIconId.value))
+                onApply(preset)
             }
 
             OutlinedTextField(
@@ -355,10 +355,7 @@ private fun KeyActionEditorVertical(
             TextButton(
                 enabled = sequenceDraft.value.isNotBlank(),
                 onClick = {
-                    onApply(
-                        KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value)
-                            .copy(iconId = selectedIconId.value)
-                    )
+                    onApply(KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value))
                 }
             ) {
                 Text("Use Custom Sequence")
@@ -379,30 +376,28 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.labelLarge)
 }
 
-private fun withCombinationAndIcon(
+private fun withCombination(
     base: KeyboardSlotAction,
     ctrl: Boolean,
     alt: Boolean,
-    shift: Boolean,
-    iconId: String
+    shift: Boolean
 ): KeyboardSlotAction {
-    val withIcon = base.copy(iconId = iconId)
-    if (withIcon.type != KeyboardActionType.KEY) return withIcon
-    if (!ctrl && !alt && !shift) return withIcon
+    if (base.type != KeyboardActionType.KEY) return base
+    if (!ctrl && !alt && !shift) return base
 
     val modifiers = mutableListOf<String>()
     if (ctrl) modifiers += "Ctrl"
     if (alt) modifiers += "Alt"
     if (shift) modifiers += "Shift"
-    val baseLabel = withIcon.label.ifBlank {
-        KeyboardLayoutDefaults.keyTokenForAction(withIcon).ifBlank { "Key" }
+    val baseLabel = base.label.ifBlank {
+        KeyboardLayoutDefaults.keyTokenForAction(base).ifBlank { "Key" }
     }
     val combinedLabel = "${modifiers.joinToString("+")}-$baseLabel"
-    return withIcon.copy(
+    return base.copy(
         label = combinedLabel,
-        ctrl = withIcon.ctrl || ctrl,
-        alt = withIcon.alt || alt,
-        shift = withIcon.shift || shift
+        ctrl = base.ctrl || ctrl,
+        alt = base.alt || alt,
+        shift = base.shift || shift
     )
 }
 
@@ -415,6 +410,7 @@ private fun fullActionLabel(action: KeyboardSlotAction): String {
         KeyboardActionType.KEY -> KeyboardLayoutDefaults.keyTokenForAction(action).ifBlank { "Key" }
         KeyboardActionType.MODIFIER -> "Modifier"
         KeyboardActionType.SEQUENCE -> action.sequence.trim().ifBlank { "Sequence" }
+        KeyboardActionType.PASSWORD_INJECT -> "Inject Password"
         KeyboardActionType.SNIPPET_PICKER -> "Snippet Picker"
     }
 }
@@ -448,32 +444,6 @@ private fun PresetRow(
                 } else {
                     Text(action.label)
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun IconPresetRow(
-    selectedIconId: String,
-    onSelect: (String) -> Unit
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        TextButton(onClick = { onSelect("") }) {
-            Text(if (selectedIconId.isBlank()) "[x] Text" else "Text")
-        }
-        KeyboardIconPack.icons.forEach { spec ->
-            TextButton(onClick = { onSelect(spec.id) }) {
-                Icon(
-                    imageVector = spec.icon,
-                    contentDescription = spec.label,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(if (selectedIconId == spec.id) " [x]" else "")
             }
         }
     }

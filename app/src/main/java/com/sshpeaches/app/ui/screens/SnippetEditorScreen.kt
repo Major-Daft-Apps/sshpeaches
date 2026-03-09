@@ -30,6 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
@@ -178,6 +182,12 @@ private fun ScriptEditorWithLineNumbers(
                     onValueChange = onValueChange,
                     textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Default,
+                        autoCorrect = false
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 200.dp)

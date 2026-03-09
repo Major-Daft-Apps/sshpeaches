@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -40,6 +42,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,43 +52,45 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -104,7 +109,10 @@ import android.net.Uri
 import android.util.Base64
 import androidx.browser.customtabs.CustomTabsIntent
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
@@ -112,6 +120,7 @@ import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -136,10 +145,15 @@ import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.majordaftapps.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
@@ -147,8 +161,8 @@ import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.util.snippetReference
 import java.util.UUID
-import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -160,9 +174,11 @@ fun SSHPeachesRoot(
     onSortModeChange: (SortMode) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onBackgroundModeChange: (Boolean) -> Unit,
+    onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
     onLockTimeoutChange: (LockTimeout) -> Unit,
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
     onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
     onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
     onCrashReportsToggle: (Boolean) -> Unit,
@@ -190,7 +206,7 @@ fun SSHPeachesRoot(
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
-    onStartSession: (HostConnection, ConnectionMode, String?) -> Unit,
+    onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
     onStopSession: (String) -> Unit,
     onIdentityAdd: (String, String, String?, String?) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
@@ -225,7 +241,10 @@ fun SSHPeachesRoot(
     requestedOpenSessionId: String?,
     onOpenSessionRequestHandled: () -> Unit,
     onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
-    onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit
+    onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
+    corePermissions: List<CorePermissionStatus>,
+    onRequestCorePermissions: () -> Unit,
+    onOpenAppPermissionSettings: () -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -237,9 +256,10 @@ fun SSHPeachesRoot(
     val pendingConnectingNavigation = remember { mutableStateOf(false) }
     val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.FAVORITES) }
     val sawSnapshotForCurrentRequest = remember { mutableStateOf(false) }
-    val pendingFavoriteHostId = remember { mutableStateOf<String?>(null) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
+    val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
+    val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.support_url)
@@ -265,6 +285,15 @@ fun SSHPeachesRoot(
         else -> false
     }
     val showEditAction = currentRoute in editSupportedRoutes && !routeEmptyStateVisible
+    val missingCorePermissions = corePermissions.filterNot { it.granted }
+    val activeSshSessions = sessions.filter {
+        it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+            it.mode == ConnectionMode.SSH
+    }
+    val snippetRunSelection = remember { mutableStateOf<Snippet?>(null) }
+    val snippetRunTargetHostId = remember { mutableStateOf<String?>(null) }
+    val snippetRunInProgress = remember { mutableStateOf(false) }
+    val snippetRunResult = remember { mutableStateOf<SnippetRunResult?>(null) }
 
     fun quickStateFromSnapshot(
         snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
@@ -315,8 +344,24 @@ fun SSHPeachesRoot(
         )
     }
 
+    fun navigateBackFromConnecting() {
+        pendingConnectingNavigation.value = false
+        val popped = navController.popBackStack()
+        if (!popped) {
+            val destination = routeBeforeConnecting.value
+                .takeIf { it != Routes.CONNECTING }
+                ?: Routes.FAVORITES
+            navController.navigate(destination) {
+                popUpTo(Routes.FAVORITES)
+            }
+        }
+    }
+
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
+    }
+    BackHandler(enabled = currentRoute == Routes.CONNECTING && !drawerState.isOpen) {
+        navigateBackFromConnecting()
     }
     val activeSessionRequest = quickConnectRequest.value
     val currentTitle = when (currentRoute) {
@@ -341,14 +386,6 @@ fun SSHPeachesRoot(
         if (uiState.isLocked) {
             showQuickConnect.value = false
             showAbout.value = false
-        }
-    }
-
-    LaunchedEffect(uiState.hosts, pendingFavoriteHostId.value) {
-        val pendingId = pendingFavoriteHostId.value ?: return@LaunchedEffect
-        if (uiState.hosts.any { it.id == pendingId }) {
-            onToggleFavorite(pendingId)
-            pendingFavoriteHostId.value = null
         }
     }
 
@@ -379,6 +416,7 @@ fun SSHPeachesRoot(
 
     LaunchedEffect(quickConnectRequest.value?.sessionId) {
         sawSnapshotForCurrentRequest.value = false
+        connectedHostBarCollapsed.value = false
     }
 
     LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute) {
@@ -459,6 +497,156 @@ fun SSHPeachesRoot(
         }
     }
 
+    fun resetSessionLogs(sessionId: String) {
+        sessionLogs.removeAll { it.hostId == sessionId }
+    }
+
+    fun importTransferPayloadFromQr(encodedPayload: String): String {
+        val payload = runCatching {
+            String(Base64.decode(encodedPayload.trim(), Base64.DEFAULT), Charsets.UTF_8)
+        }.getOrNull() ?: return "Invalid export QR payload."
+        val root = runCatching { JSONObject(payload) }.getOrNull() ?: return "Invalid export QR payload."
+
+        var importedHosts = 0
+        var importedIdentities = 0
+        var importedForwards = 0
+        var privateKeysMissing = 0
+        var settingsApplied = false
+
+        val existingIdentityFingerprints = uiState.identities.map { it.fingerprint.trim() }.toMutableSet()
+        val existingForwardKeys = uiState.portForwards.map {
+            "${it.label}|${it.sourceHost}|${it.sourcePort}|${it.destinationHost}|${it.destinationPort}"
+        }.toMutableSet()
+
+        root.optJSONArray("hosts")?.let { hosts ->
+            for (index in 0 until hosts.length()) {
+                val item = hosts.optJSONObject(index) ?: continue
+                val name = item.optString("name").trim()
+                val host = item.optString("host").trim()
+                val username = item.optString("username").trim()
+                if (name.isBlank() || host.isBlank() || username.isBlank()) continue
+                val port = item.optInt("port", 22).coerceIn(1, 65_535)
+                val auth = runCatching {
+                    AuthMethod.valueOf(item.optString("auth", AuthMethod.PASSWORD.name))
+                }.getOrDefault(AuthMethod.PASSWORD)
+                val defaultMode = runCatching {
+                    ConnectionMode.valueOf(item.optString("defaultMode", ConnectionMode.SSH.name))
+                }.getOrDefault(ConnectionMode.SSH)
+                val terminalProfileId = item.optString("terminalProfileId").trim().ifBlank { null }
+                val suppliedId = item.optString("id").trim().ifBlank { null }
+                onHostAdd(
+                    name,
+                    host,
+                    port,
+                    username,
+                    auth,
+                    item.optString("group").trim().ifBlank { null },
+                    item.optString("notes"),
+                    defaultMode,
+                    false,
+                    null,
+                    null,
+                    "",
+                    BackgroundBehavior.INHERIT,
+                    terminalProfileId,
+                    null,
+                    suppliedId
+                )
+                importedHosts += 1
+            }
+        }
+
+        root.optJSONArray("identities")?.let { identities ->
+            for (index in 0 until identities.length()) {
+                val item = identities.optJSONObject(index) ?: continue
+                val fingerprint = item.optString("fingerprint").trim()
+                if (fingerprint.isBlank() || existingIdentityFingerprints.contains(fingerprint)) continue
+                onIdentityAdd(
+                    item.optString("label").ifBlank { "Identity" },
+                    fingerprint,
+                    item.optString("username").trim().ifBlank { null },
+                    item.optString("id").trim().ifBlank { null }
+                )
+                existingIdentityFingerprints += fingerprint
+                importedIdentities += 1
+                if (item.optBoolean("hasPrivateKey", false)) {
+                    privateKeysMissing += 1
+                }
+            }
+        }
+
+        root.optJSONObject("settings")?.let { settings ->
+            settingsApplied = true
+            runCatching {
+                ThemeMode.valueOf(settings.optString("themeMode", uiState.themeMode.name))
+            }.getOrNull()?.let(onThemeModeChange)
+            onBackgroundModeChange(settings.optBoolean("allowBackgroundSessions", uiState.allowBackgroundSessions))
+            runCatching {
+                BackgroundSessionTimeout.valueOf(
+                    settings.optString("backgroundSessionTimeout", uiState.backgroundSessionTimeout.name)
+                )
+            }.getOrNull()?.let(onBackgroundSessionTimeoutChange)
+            onBiometricToggle(settings.optBoolean("biometricLockEnabled", uiState.biometricLockEnabled))
+            runCatching {
+                LockTimeout.valueOf(settings.optString("lockTimeout", uiState.lockTimeout.name))
+            }.getOrNull()?.let(onLockTimeoutChange)
+            onCustomLockTimeoutMinutesChange(
+                settings.optInt("customLockTimeoutMinutes", uiState.customLockTimeoutMinutes).coerceIn(1, 180)
+            )
+            onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
+            onHostKeyPromptToggle(settings.optBoolean("hostKeyPromptEnabled", uiState.hostKeyPromptEnabled))
+            onAutoTrustHostKeyToggle(settings.optBoolean("autoTrustHostKey", uiState.autoTrustHostKey))
+        }
+
+        root.optJSONArray("portForwards")?.let { forwards ->
+            for (index in 0 until forwards.length()) {
+                val item = forwards.optJSONObject(index) ?: continue
+                val label = item.optString("label").trim().ifBlank { "Imported Forward" }
+                val sourceHost = item.optString("sourceHost").trim().ifBlank { "127.0.0.1" }
+                val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
+                val destinationHost = item.optString("destinationHost").trim()
+                val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
+                if (destinationHost.isBlank()) continue
+                val forwardKey = "$label|$sourceHost|$sourcePort|$destinationHost|$destinationPort"
+                if (existingForwardKeys.contains(forwardKey)) continue
+                val type = runCatching {
+                    PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
+                }.getOrDefault(PortForwardType.LOCAL)
+                val associatedHosts = item.optJSONArray("associatedHosts")?.let { associated ->
+                    buildList {
+                        for (i in 0 until associated.length()) {
+                            associated.optString(i).trim().ifBlank { null }?.let { add(it) }
+                        }
+                    }
+                }.orEmpty()
+                onPortForwardAdd(
+                    label,
+                    type,
+                    sourceHost,
+                    sourcePort,
+                    destinationHost,
+                    destinationPort,
+                    item.optBoolean("enabled", true),
+                    associatedHosts
+                )
+                existingForwardKeys += forwardKey
+                importedForwards += 1
+            }
+        }
+
+        val parts = mutableListOf<String>()
+        parts += "$importedHosts hosts"
+        parts += "$importedIdentities identities"
+        parts += "$importedForwards forwards"
+        if (settingsApplied) parts += "settings applied"
+        val summary = "Import complete: ${parts.joinToString(", ")}."
+        return if (privateKeysMissing > 0) {
+            "$summary $privateKeysMissing identity entries referenced private keys, but key material is not included in transfer QR."
+        } else {
+            summary
+        }
+    }
+
     fun closeCurrentConnectingSession() {
         val request = quickConnectRequest.value
         if (request != null) {
@@ -478,7 +666,7 @@ fun SSHPeachesRoot(
     Box {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            gesturesEnabled = true,
+            gesturesEnabled = currentRoute != Routes.CONNECTING,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -527,53 +715,82 @@ fun SSHPeachesRoot(
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        TopAppBar(
-                            title = { Text(currentTitle) },
-                            navigationIcon = {
-                                if (currentRoute != Routes.CONNECTING) {
-                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        val showTopBar = currentRoute != Routes.CONNECTING || !connectedHostBarCollapsed.value
+                        AnimatedVisibility(
+                            visible = showTopBar,
+                            enter = fadeIn(animationSpec = tween(120)) + expandVertically(
+                                animationSpec = tween(150),
+                                expandFrom = Alignment.Top
+                            ),
+                            exit = fadeOut(animationSpec = tween(90)) + shrinkVertically(
+                                animationSpec = tween(120),
+                                shrinkTowards = Alignment.Top
+                            )
+                        ) {
+                            TopAppBar(
+                                title = { Text(currentTitle) },
+                                navigationIcon = {
+                                    if (currentRoute == Routes.CONNECTING) {
+                                        IconButton(onClick = { navigateBackFromConnecting() }) {
+                                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                                        }
+                                    } else {
+                                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                        }
                                     }
-                                }
-                            },
-                            actions = {
-                                if (currentRoute == Routes.CONNECTING) {
-                                    IconButton(onClick = { closeCurrentConnectingSession() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Close session"
-                                        )
-                                    }
-                                } else if (uiState.pinConfigured) {
-                                    IconButton(
-                                        onClick = onLockApp,
-                                        enabled = !uiState.isLocked
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Lock,
-                                            contentDescription = "Lock app"
-                                        )
-                                    }
-                                }
-                                if (showEditAction) {
-                                    AnimatedContent(
-                                        targetState = editMode.value,
-                                        transitionSpec = {
-                                            (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
-                                                (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
-                                        },
-                                        label = "editMode"
-                                    ) { editing ->
-                                        IconButton(onClick = { editMode.value = !editMode.value }) {
+                                },
+                                actions = {
+                                    if (currentRoute == Routes.CONNECTING) {
+                                        if (activeSessionRequest?.mode == ConnectionMode.SSH) {
+                                            IconButton(
+                                                onClick = {
+                                                    connectingFindRequestToken.intValue += 1
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Search,
+                                                    contentDescription = "Find"
+                                                )
+                                            }
+                                        }
+                                        IconButton(onClick = { closeCurrentConnectingSession() }) {
                                             Icon(
-                                                imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                                contentDescription = if (editing) "Done editing" else "Edit"
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Close session"
+                                            )
+                                        }
+                                    } else if (uiState.pinConfigured) {
+                                        IconButton(
+                                            onClick = onLockApp,
+                                            enabled = !uiState.isLocked
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Lock app"
                                             )
                                         }
                                     }
+                                    if (showEditAction) {
+                                        AnimatedContent(
+                                            targetState = editMode.value,
+                                            transitionSpec = {
+                                                (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
+                                                    (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
+                                            },
+                                            label = "editMode"
+                                        ) { editing ->
+                                            IconButton(onClick = { editMode.value = !editMode.value }) {
+                                                Icon(
+                                                    imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
+                                                    contentDescription = if (editing) "Done editing" else "Edit"
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 ) { padding ->
                     NavHost(
@@ -595,11 +812,32 @@ fun SSHPeachesRoot(
                             FavoritesScreen(
                                 section = uiState.favorites,
                                 snippets = uiState.snippets,
+                                openSessions = sessions,
+                                onOpenSession = { sessionId ->
+                                    sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
+                                        quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
+                                        quickConnectState.value = quickStateFromSnapshot(snapshot, snapshot.host)
+                                        pendingConnectingNavigation.value = false
+                                        scope.launch {
+                                            drawerState.close()
+                                            navController.navigate(Routes.CONNECTING)
+                                        }
+                                    }
+                                },
+                                onDisconnectSession = { sessionId ->
+                                    onStopSession(sessionId)
+                                    if (quickConnectRequest.value?.sessionId == sessionId) {
+                                        quickConnectRequest.value = null
+                                        quickConnectState.value = QuickConnectUiState()
+                                    }
+                                },
                                 activeSshSessionHostIds = activeSshSessionHostIds,
                                 onHostAction = { host, mode ->
+                                    val sessionId = sessionIdFor(host.id, mode)
+                                    resetSessionLogs(sessionId)
                                     pendingConnectingNavigation.value = true
                                     quickConnectRequest.value = QuickConnectRequest(
-                                        sessionId = sessionIdFor(host.id, mode),
+                                        sessionId = sessionId,
                                         name = host.name,
                                         host = host.host,
                                         port = host.port,
@@ -618,7 +856,7 @@ fun SSHPeachesRoot(
                                         phase = QuickConnectPhase.CONNECTING,
                                         message = "Connecting to ${host.host}:${host.port}..."
                                     )
-                                    onStartSession(host, mode, null)
+                                    onStartSession(sessionId, host, mode, null)
                                     scope.launch {
                                         drawerState.close()
                                         navController.navigate(Routes.CONNECTING)
@@ -726,18 +964,29 @@ fun SSHPeachesRoot(
                                                 sessionId = sessionIdFor(current.savedHostId, current.mode)
                                             )
                                         }
+                                        resetSessionLogs(next.sessionId)
                                         quickConnectRequest.value = next
                                         quickConnectState.value = QuickConnectUiState(
                                             phase = QuickConnectPhase.CONNECTING,
                                             message = "Connecting to ${next.host}:${next.port}..."
                                         )
                                         onStartSession(
+                                            next.sessionId,
                                             quickConnectHost(next),
                                             next.mode,
                                             next.password
                                         )
                                     }
-                                }
+                                },
+                                onToggleConnectedHostBar = {
+                                    connectedHostBarCollapsed.value = !connectedHostBarCollapsed.value
+                                },
+                                onOpenSettings = {
+                                    if (currentRoute != Routes.SETTINGS) {
+                                        navController.navigate(Routes.SETTINGS)
+                                    }
+                                },
+                                findRequestToken = connectingFindRequestToken.intValue
                             )
                         }
                     composable(Routes.HOSTS) {
@@ -765,9 +1014,11 @@ fun SSHPeachesRoot(
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
                             onStartSession = { host, mode, password ->
+                                val sessionId = sessionIdFor(host.id, mode)
+                                resetSessionLogs(sessionId)
                                 pendingConnectingNavigation.value = true
                                 quickConnectRequest.value = QuickConnectRequest(
-                                    sessionId = sessionIdFor(host.id, mode),
+                                    sessionId = sessionId,
                                     name = host.name,
                                     host = host.host,
                                     port = host.port,
@@ -786,7 +1037,7 @@ fun SSHPeachesRoot(
                                     phase = QuickConnectPhase.CONNECTING,
                                     message = "Connecting to ${host.host}:${host.port}..."
                                 )
-                                onStartSession(host, mode, password)
+                                onStartSession(sessionId, host, mode, password)
                                 scope.launch {
                                     drawerState.close()
                                     navController.navigate(Routes.CONNECTING)
@@ -849,7 +1100,6 @@ fun SSHPeachesRoot(
                             onRemoveIdentityKey = onRemoveIdentityKey,
                             onToggleFavorite = onToggleFavorite,
                             onShowMessage = showMessage,
-                            editMode = editMode.value,
                             onImportFromQr = { showMessage("Identity imported from QR") },
                             onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.IDENTITIES] = it }
                         )
@@ -881,18 +1131,15 @@ fun SSHPeachesRoot(
                                 onImportFromQr = { showMessage("Snippet imported from QR") },
                                 onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.SNIPPETS] = it },
                                 onRun = { snippet ->
-                                    val activeSshSessions = sessions.filter {
-                                        it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
-                                            it.mode == ConnectionMode.SSH
-                                    }
-                                    val currentSessionId = quickConnectRequest.value?.sessionId
-                                    val target = activeSshSessions.firstOrNull { it.hostId == currentSessionId }
-                                        ?: activeSshSessions.firstOrNull()
-                                    if (target != null) {
-                                        onSendSessionShortcut(target.hostId, snippet.command)
-                                        showMessage("Ran snippet on ${target.host.name}")
-                                    } else {
+                                    if (activeSshSessions.isEmpty()) {
                                         showMessage("No active SSH session to run snippet.")
+                                    } else {
+                                        val preferredSessionId = quickConnectRequest.value?.sessionId
+                                        snippetRunTargetHostId.value = activeSshSessions
+                                            .firstOrNull { it.hostId == preferredSessionId }
+                                            ?.hostId
+                                            ?: activeSshSessions.first().hostId
+                                        snippetRunSelection.value = snippet
                                     }
                                 }
                             )
@@ -999,12 +1246,16 @@ fun SSHPeachesRoot(
                                 onThemeChange = onThemeModeChange,
                                 allowBackgroundSessions = uiState.allowBackgroundSessions,
                                 onBackgroundToggle = onBackgroundModeChange,
+                                backgroundSessionTimeout = uiState.backgroundSessionTimeout,
+                                onBackgroundSessionTimeoutChange = onBackgroundSessionTimeoutChange,
                                 biometricEnabled = uiState.biometricLockEnabled,
                                 onBiometricToggle = onBiometricToggle,
                                 lockTimeout = uiState.lockTimeout,
                                 onLockTimeoutChange = onLockTimeoutChange,
                                 customLockTimeoutMinutes = uiState.customLockTimeoutMinutes,
                                 onCustomLockTimeoutMinutesChange = onCustomLockTimeoutMinutesChange,
+                                snippetRunTimeoutSeconds = uiState.snippetRunTimeoutSeconds,
+                                onSnippetRunTimeoutSecondsChange = onSnippetRunTimeoutSecondsChange,
                                 terminalEmulation = uiState.terminalEmulation,
                                 onTerminalEmulationChange = onTerminalEmulationChange,
                                 terminalSelectionMode = uiState.terminalSelectionMode,
@@ -1033,9 +1284,11 @@ fun SSHPeachesRoot(
                                 biometricAvailable = biometricAvailable,
                                 onSetPin = onSetPin,
                                 onClearPin = onClearPin,
-                                onUnlockWithPin = onUnlockWithPin,
                                 onGenerateExportPayload = { buildExportPayload(uiState) },
-                                onShowMessage = showMessage
+                                onImportFromQrPayload = ::importTransferPayloadFromQr,
+                                onShowMessage = showMessage,
+                                corePermissions = corePermissions,
+                                onManagePermissions = onOpenAppPermissionSettings
                             )
                         }
                         composable(Routes.OPEN_SOURCE_LICENSES) {
@@ -1056,16 +1309,44 @@ fun SSHPeachesRoot(
         }
     }
 
+    if (missingCorePermissions.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Permissions Required") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "SSHPeaches needs these permissions to work properly, including background SSH sessions and session notifications."
+                    )
+                    missingCorePermissions.forEach { permission ->
+                        Text("- ${permission.title}")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onOpenAppPermissionSettings) {
+                    Text("Manage permissions")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onRequestCorePermissions) {
+                    Text("Request now")
+                }
+            }
+        )
+    }
+
     if (showQuickConnect.value && !uiState.isLocked) {
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
             portForwards = uiState.portForwards,
             identities = uiState.identities,
+            snippets = uiState.snippets,
             terminalProfiles = uiState.terminalProfiles,
             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
-            onConnect = { host, port, username, auth, password, pinToFavorites, useMosh, preferredIdentityId, forwardId, script, terminalProfileId ->
+            onConnect = { host, port, username, auth, password, saveToHosts, useMosh, preferredIdentityId, forwardId, script, terminalProfileId ->
                 var savedHostId: String? = null
-                if (pinToFavorites) {
+                if (saveToHosts) {
                     val pinnedId = UUID.randomUUID().toString()
                     savedHostId = pinnedId
                     onHostAdd(
@@ -1086,7 +1367,6 @@ fun SSHPeachesRoot(
                         password,
                         pinnedId
                     )
-                    pendingFavoriteHostId.value = pinnedId
                 }
                 quickConnectRequest.value = QuickConnectRequest(
                     sessionId = sessionIdFor(
@@ -1108,6 +1388,7 @@ fun SSHPeachesRoot(
                     terminalProfileId = terminalProfileId
                 )
                 quickConnectRequest.value?.let { request ->
+                    resetSessionLogs(request.sessionId)
                     pendingConnectingNavigation.value = true
                     quickConnectState.value = QuickConnectUiState(
                         phase = QuickConnectPhase.CONNECTING,
@@ -1139,6 +1420,7 @@ fun SSHPeachesRoot(
                         )
                     }
                     onStartSession(
+                        request.sessionId,
                         quickConnectHost(request),
                         request.mode,
                         request.password
@@ -1199,9 +1481,11 @@ fun SSHPeachesRoot(
         )
     }
     val promptPassword = remember(passwordPrompt?.id) { mutableStateOf("") }
+    val promptPasswordRevealIndex = remember(passwordPrompt?.id) { mutableIntStateOf(-1) }
     val promptSavePassword = remember(passwordPrompt?.id) { mutableStateOf(false) }
     val passwordFocusRequester = remember(passwordPrompt?.id) { FocusRequester() }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    AutoHidePasswordReveal(promptPasswordRevealIndex)
     LaunchedEffect(passwordPrompt?.id) {
         if (passwordPrompt != null) {
             passwordFocusRequester.requestFocus()
@@ -1218,10 +1502,10 @@ fun SSHPeachesRoot(
                     Text("${prompt.username}@${prompt.host}:${prompt.port}", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = promptPassword.value,
-                        onValueChange = { promptPassword.value = it },
+                        onValueChange = { updatePasswordStateWithReveal(promptPassword, promptPasswordRevealIndex, it) },
                         label = { Text("Password") },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
+                        visualTransformation = TailRevealPasswordVisualTransformation(promptPasswordRevealIndex.intValue),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Done
@@ -1277,6 +1561,186 @@ fun SSHPeachesRoot(
         )
     }
 
+    snippetRunSelection.value?.let { snippet ->
+        val selectedSession = activeSshSessions.firstOrNull { it.hostId == snippetRunTargetHostId.value }
+            ?: activeSshSessions.firstOrNull()
+        AlertDialog(
+            onDismissRequest = {
+                if (!snippetRunInProgress.value) {
+                    snippetRunSelection.value = null
+                }
+            },
+            title = { Text("Run Snippet") },
+            text = {
+                val snippetTitle = snippet.title.ifBlank { "Snippet" }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Run \"$snippetTitle\" on:")
+                    if (activeSshSessions.isEmpty()) {
+                        Text(
+                            "No active SSH sessions available.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            activeSshSessions.forEach { session ->
+                                val selected = session.hostId == snippetRunTargetHostId.value
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable(enabled = !snippetRunInProgress.value) {
+                                            snippetRunTargetHostId.value = session.hostId
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = selected,
+                                        onClick = {
+                                            if (!snippetRunInProgress.value) {
+                                                snippetRunTargetHostId.value = session.hostId
+                                            }
+                                        },
+                                        enabled = !snippetRunInProgress.value
+                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(start = 8.dp)
+                                            .weight(1f)
+                                    ) {
+                                        Text(session.host.name)
+                                        Text(
+                                            "${session.host.username}@${session.host.host}:${session.host.port}",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = !snippetRunInProgress.value && selectedSession != null,
+                    onClick = {
+                        val target = activeSshSessions.firstOrNull { it.hostId == snippetRunTargetHostId.value }
+                            ?: activeSshSessions.firstOrNull()
+                        if (target == null) {
+                            snippetRunSelection.value = null
+                            showMessage("No active SSH session to run snippet.")
+                            return@Button
+                        }
+                        val marker = "__SSHPEACHES_SNIPPET_DONE_${UUID.randomUUID().toString().replace("-", "")}__"
+                        val payload = buildSnippetRunCommandPayload(snippet.command, marker)
+                        if (payload.isBlank()) {
+                            snippetRunSelection.value = null
+                            showMessage("Snippet command is empty.")
+                            return@Button
+                        }
+                        scope.launch {
+                            snippetRunInProgress.value = true
+                            try {
+                                val timeoutSeconds = uiState.snippetRunTimeoutSeconds.coerceIn(1, 60)
+                                val baselineOutput = shellOutputs[target.hostId].orEmpty()
+                                var latestDelta = ""
+                                onSendSessionShortcut(target.hostId, payload)
+                                val deltaUntilMarker = withTimeoutOrNull(timeoutSeconds * 1_000L) {
+                                    snapshotFlow { shellOutputs[target.hostId].orEmpty() }
+                                        .map { output ->
+                                            extractShellDelta(
+                                                previousOutput = baselineOutput,
+                                                latestOutput = output
+                                            ).also { delta -> latestDelta = delta }
+                                        }
+                                        .first { it.contains(marker) }
+                                }
+                                val rawOutput = if (deltaUntilMarker != null) {
+                                    deltaUntilMarker.substringBefore(marker)
+                                } else {
+                                    latestDelta
+                                }
+                                val hostLabel = target.host.name.ifBlank {
+                                    "${target.host.username}@${target.host.host}"
+                                }
+                                snippetRunResult.value = SnippetRunResult(
+                                    snippetTitle = snippet.title.ifBlank { "Snippet" },
+                                    hostLabel = hostLabel,
+                                    output = sanitizeSnippetOutput(rawOutput).ifBlank { "(no output)" },
+                                    timedOut = deltaUntilMarker == null,
+                                    timeoutSeconds = timeoutSeconds
+                                )
+                            } catch (error: Throwable) {
+                                showMessage("Failed to run snippet: ${error.message ?: "unknown error"}")
+                            } finally {
+                                snippetRunInProgress.value = false
+                                snippetRunSelection.value = null
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (snippetRunInProgress.value) "Running..." else "Run")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !snippetRunInProgress.value,
+                    onClick = { snippetRunSelection.value = null }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    snippetRunResult.value?.let { result ->
+        AlertDialog(
+            onDismissRequest = { snippetRunResult.value = null },
+            title = { Text(if (result.timedOut) "Snippet Timed Out" else "Snippet Result") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${result.snippetTitle} on ${result.hostLabel}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (result.timedOut) {
+                        Text(
+                            "Command did not finish in ${result.timeoutSeconds}s.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp),
+                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = result.output,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .verticalScroll(rememberScrollState())
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { snippetRunResult.value = null }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     if (showAbout.value && !uiState.isLocked) {
         AboutDialog(
             onDismiss = { showAbout.value = false },
@@ -1289,7 +1753,7 @@ fun SSHPeachesRoot(
 }
 
 private fun sessionIdFor(hostId: String, mode: ConnectionMode): String =
-    "$hostId|${mode.name}"
+    "$hostId|${mode.name}|${UUID.randomUUID()}"
 
 private fun baseHostIdFromSessionId(sessionId: String): String =
     sessionId.substringBefore('|')
@@ -1310,17 +1774,42 @@ private fun quickConnectHost(request: QuickConnectRequest): HostConnection =
         terminalProfileId = request.terminalProfileId
     )
 
-private class MaskPasswordWithTailReveal(
-    private val revealedIndex: Int
-) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val transformed = buildString(text.length) {
-            text.text.forEachIndexed { index, char ->
-                append(if (index == revealedIndex) char else '\u2022')
-            }
-        }
-        return TransformedText(AnnotatedString(transformed), OffsetMapping.Identity)
+private data class SnippetRunResult(
+    val snippetTitle: String,
+    val hostLabel: String,
+    val output: String,
+    val timedOut: Boolean,
+    val timeoutSeconds: Int
+)
+
+private fun buildSnippetRunCommandPayload(command: String, marker: String): String {
+    val trimmedCommand = command.trimEnd()
+    if (trimmedCommand.isBlank()) return ""
+    return buildString {
+        append(trimmedCommand)
+        append("\n")
+        append("printf \"\\n")
+        append(marker)
+        append("\\n\"\n")
     }
+}
+
+private fun extractShellDelta(previousOutput: String, latestOutput: String): String {
+    return if (latestOutput.startsWith(previousOutput)) {
+        latestOutput.substring(previousOutput.length)
+    } else {
+        latestOutput
+    }
+}
+
+private val ansiEscapeRegex = Regex("\\u001B\\[[;?0-9]*[ -/]*[@-~]")
+
+private fun sanitizeSnippetOutput(value: String): String {
+    return value
+        .replace("\u0000", "")
+        .replace("\r", "")
+        .replace(ansiEscapeRegex, "")
+        .trim()
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -1329,6 +1818,7 @@ private fun QuickConnectSheet(
     onDismiss: () -> Unit,
     portForwards: List<PortForward>,
     identities: List<Identity>,
+    snippets: List<Snippet>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
     onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String, String?) -> Unit
@@ -1343,31 +1833,22 @@ private fun QuickConnectSheet(
         val port = remember { mutableStateOf("22") }
         val username = remember { mutableStateOf("") }
         val password = remember { mutableStateOf("") }
-        val revealPasswordIndex = remember { mutableStateOf(-1) }
+        val revealPasswordIndex = remember { mutableIntStateOf(-1) }
         val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
-        val pinToFavorites = remember { mutableStateOf(false) }
+        val saveToHosts = remember { mutableStateOf(false) }
         val useMosh = remember { mutableStateOf(false) }
         val selectedIdentityId = remember { mutableStateOf<String?>(null) }
         val identityExpanded = remember { mutableStateOf(false) }
         val selectedForwardId = remember { mutableStateOf<String?>(null) }
+        val selectedStartupSnippetId = remember { mutableStateOf<String?>(null) }
+        val startupSnippetExpanded = remember { mutableStateOf(false) }
         val selectedTerminalProfileId = remember { mutableStateOf<String?>(null) }
         val terminalProfileExpanded = remember { mutableStateOf(false) }
-        val script = remember { mutableStateOf("") }
         val hostHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
         val userHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
         val status = remember { mutableStateOf<String?>(null) }
 
-        LaunchedEffect(password.value) {
-            if (password.value.isEmpty()) {
-                revealPasswordIndex.value = -1
-                return@LaunchedEffect
-            }
-            revealPasswordIndex.value = password.value.lastIndex
-            delay(700)
-            if (revealPasswordIndex.value == password.value.lastIndex) {
-                revealPasswordIndex.value = -1
-            }
-        }
+        AutoHidePasswordReveal(revealPasswordIndex)
 
         Column(
             modifier = Modifier
@@ -1384,6 +1865,12 @@ private fun QuickConnectSheet(
                 onValueChange = { host.value = it },
                 label = { Text("Host / IP") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Next,
+                    autoCorrect = false
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -1391,6 +1878,12 @@ private fun QuickConnectSheet(
                 onValueChange = { port.value = it },
                 label = { Text("Port") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Next,
+                    autoCorrect = false
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -1398,14 +1891,26 @@ private fun QuickConnectSheet(
                 onValueChange = { username.value = it },
                 label = { Text("Username") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Next,
+                    autoCorrect = false
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = password.value,
-                onValueChange = { password.value = it },
+                onValueChange = { next -> updatePasswordStateWithReveal(password, revealPasswordIndex, next) },
                 label = { Text("Password") },
                 singleLine = true,
-                visualTransformation = MaskPasswordWithTailReveal(revealPasswordIndex.value),
+                visualTransformation = TailRevealPasswordVisualTransformation(revealPasswordIndex.intValue),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                    autoCorrect = false
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
             if (hostHistory.value.isNotEmpty()) {
@@ -1548,14 +2053,61 @@ private fun QuickConnectSheet(
                     }
                 }
             }
-            OutlinedTextField(
-                value = script.value,
-                onValueChange = { script.value = it },
-                label = { Text("Optional script") },
-                minLines = 2,
-                maxLines = 6,
-                modifier = Modifier.fillMaxWidth()
-            )
+            ExposedDropdownMenuBox(
+                expanded = startupSnippetExpanded.value,
+                onExpandedChange = {
+                    if (snippets.isNotEmpty()) {
+                        startupSnippetExpanded.value = !startupSnippetExpanded.value
+                    }
+                }
+            ) {
+                val selectedSnippet = snippets.firstOrNull { it.id == selectedStartupSnippetId.value }
+                TextField(
+                    value = selectedSnippet?.title ?: "None",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Startup command") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = startupSnippetExpanded.value)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = startupSnippetExpanded.value,
+                    onDismissRequest = { startupSnippetExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            selectedStartupSnippetId.value = null
+                            startupSnippetExpanded.value = false
+                        }
+                    )
+                    snippets.forEach { snippet ->
+                        DropdownMenuItem(
+                            text = { Text(snippet.title) },
+                            onClick = {
+                                selectedStartupSnippetId.value = snippet.id
+                                startupSnippetExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            val selectedStartupSnippet = snippets.firstOrNull { it.id == selectedStartupSnippetId.value }
+            if (selectedStartupSnippet != null) {
+                Text(
+                    selectedStartupSnippet.command,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else if (snippets.isEmpty()) {
+                Text(
+                    "No snippets available for startup command.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1572,10 +2124,10 @@ private fun QuickConnectSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Pin to Favorites")
+                Text("Save to Hosts")
                 androidx.compose.material3.Switch(
-                    checked = pinToFavorites.value,
-                    onCheckedChange = { pinToFavorites.value = it }
+                    checked = saveToHosts.value,
+                    onCheckedChange = { saveToHosts.value = it }
                 )
             }
             status.value?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
@@ -1605,11 +2157,11 @@ private fun QuickConnectSheet(
                         userValue,
                         auth.value,
                         password.value,
-                        pinToFavorites.value,
+                        saveToHosts.value,
                         useMosh.value,
                         selectedIdentityId.value,
                         selectedForwardId.value,
-                        script.value,
+                        selectedStartupSnippetId.value?.let { snippetReference(it) }.orEmpty(),
                         selectedTerminalProfileId.value
                     )
                 },
@@ -1627,7 +2179,7 @@ private fun AboutDialog(
     onDismiss: () -> Unit,
     onOpenSourceLicenses: () -> Unit
 ) {
-    val makerLogo = if (isSystemInDarkTheme()) {
+    val makerLogo = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
         R.drawable.major_daft_apps_white
     } else {
         R.drawable.major_daft_apps_black
@@ -1637,7 +2189,13 @@ private fun AboutDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
         },
-        title = { Text("About SSHPeaches") },
+        title = {
+            Text(
+                text = "About SSHPeaches",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
         text = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1754,6 +2312,7 @@ private fun buildExportPayload(state: AppUiState): String {
             put("settings", JSONObject().apply {
                 put("themeMode", state.themeMode.name)
                 put("allowBackgroundSessions", state.allowBackgroundSessions)
+                put("backgroundSessionTimeout", state.backgroundSessionTimeout.name)
                 put("biometricLockEnabled", state.biometricLockEnabled)
                 put("lockTimeout", state.lockTimeout.name)
                 put("customLockTimeoutMinutes", state.customLockTimeoutMinutes)

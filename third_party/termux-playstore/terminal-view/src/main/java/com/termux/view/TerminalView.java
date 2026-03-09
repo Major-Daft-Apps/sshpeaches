@@ -110,6 +110,11 @@ public final class TerminalView extends View {
     private String mAutoFillHint;
     /** If true, wrapped rows are joined when copying selected text. */
     private boolean mSelectionJoinBackLines = true;
+    private boolean mSearchHighlightActive = false;
+    private int mSearchSelectionY1 = -1;
+    private int mSearchSelectionY2 = -1;
+    private int mSearchSelectionX1 = -1;
+    private int mSearchSelectionX2 = -1;
 
     private final boolean mAccessibilityEnabled;
 
@@ -222,8 +227,10 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onDoubleTap(MotionEvent event) {
-                // Do not treat is as a single confirmed tap - it may be followed by zoom.
-                return false;
+                if (mEmulator == null) return true;
+                mClient.onDoubleTap(event);
+                // Do not treat this as a single confirmed tap.
+                return true;
             }
 
             @Override
@@ -991,11 +998,17 @@ public final class TerminalView extends View {
         int selectionY2 = -1;
         int selectionX1 = -1;
         int selectionX2 = -1;
-        if (mTextSelectionCursorController != null) {
+        boolean hasActiveTextSelection = mTextSelectionCursorController != null && mTextSelectionCursorController.isActive();
+        if (hasActiveTextSelection) {
             selectionY1 = mTextSelectionCursorController.mSelY1;
             selectionY2 = mTextSelectionCursorController.mSelY2;
             selectionX1 = mTextSelectionCursorController.mSelX1;
             selectionX2 = mTextSelectionCursorController.mSelX2;
+        } else if (mSearchHighlightActive) {
+            selectionY1 = mSearchSelectionY1;
+            selectionY2 = mSearchSelectionY2;
+            selectionX1 = mSearchSelectionX1;
+            selectionX2 = mSearchSelectionX2;
         }
 
         mRenderer.render(
@@ -1046,6 +1059,43 @@ public final class TerminalView extends View {
 
     public void setTopRow(int mTopRow) {
         this.mTopRow = mTopRow;
+    }
+
+    public void setSearchHighlight(int startRow, int startColumn, int endRow, int endColumn) {
+        if (mEmulator == null) return;
+        int normalizedStartRow = Math.min(startRow, endRow);
+        int normalizedEndRow = Math.max(startRow, endRow);
+        int normalizedStartColumn = Math.max(0, startColumn);
+        int normalizedEndColumn = Math.max(normalizedStartColumn, endColumn);
+        mSearchSelectionY1 = normalizedStartRow;
+        mSearchSelectionY2 = normalizedEndRow;
+        mSearchSelectionX1 = normalizedStartColumn;
+        mSearchSelectionX2 = normalizedEndColumn;
+        mSearchHighlightActive = true;
+        invalidate();
+    }
+
+    public void clearSearchHighlight() {
+        mSearchHighlightActive = false;
+        mSearchSelectionY1 = -1;
+        mSearchSelectionY2 = -1;
+        mSearchSelectionX1 = -1;
+        mSearchSelectionX2 = -1;
+        invalidate();
+    }
+
+    public void revealTranscriptRow(int row) {
+        if (mEmulator == null) return;
+        int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
+        int minTop = -rowsInHistory;
+        int maxTop = 0;
+        int centeredTop = row - (mEmulator.mRows / 2);
+        if (centeredTop < minTop) centeredTop = minTop;
+        if (centeredTop > maxTop) centeredTop = maxTop;
+        if (mTopRow != centeredTop) {
+            mTopRow = centeredTop;
+            invalidate();
+        }
     }
 
     public void requestAutoFill(String autoFillHint) {

@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
@@ -16,6 +20,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -24,18 +29,28 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.calculatePasswordRevealIndex
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,12 +59,16 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     allowBackgroundSessions: Boolean,
     onBackgroundToggle: (Boolean) -> Unit,
+    backgroundSessionTimeout: BackgroundSessionTimeout,
+    onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
     biometricEnabled: Boolean,
     onBiometricToggle: (Boolean) -> Unit,
     lockTimeout: LockTimeout,
     onLockTimeoutChange: (LockTimeout) -> Unit,
     customLockTimeoutMinutes: Int,
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    snippetRunTimeoutSeconds: Int,
+    onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
     terminalEmulation: TerminalEmulation,
     onTerminalEmulationChange: (TerminalEmulation) -> Unit,
     terminalSelectionMode: TerminalSelectionMode,
@@ -78,12 +97,15 @@ fun SettingsScreen(
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
     onClearPin: () -> Unit,
-    onUnlockWithPin: (String) -> Boolean,
     onGenerateExportPayload: () -> String,
-    onShowMessage: (String) -> Unit = {}
+    onImportFromQrPayload: (String) -> String = { "Invalid export QR." },
+    onShowMessage: (String) -> Unit = {},
+    corePermissions: List<CorePermissionStatus> = emptyList(),
+    onManagePermissions: () -> Unit = {}
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
+    val backgroundTimeoutExpanded = remember { mutableStateOf(false) }
     val terminalExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = remember { mutableStateOf(false) }
     val themeOptions = listOf(
@@ -98,26 +120,77 @@ fun SettingsScreen(
         LockTimeout.FIFTEEN_MIN,
         LockTimeout.CUSTOM
     )
+    val backgroundTimeoutOptions = listOf(
+        BackgroundSessionTimeout.ONE_MIN,
+        BackgroundSessionTimeout.FIVE_MIN,
+        BackgroundSessionTimeout.TEN_MIN,
+        BackgroundSessionTimeout.THIRTY_MIN,
+        BackgroundSessionTimeout.ONE_HOUR,
+        BackgroundSessionTimeout.FOREVER
+    )
     val terminalOptions = listOf(TerminalEmulation.XTERM, TerminalEmulation.VT100)
     val selectionOptions = listOf(TerminalSelectionMode.NATURAL, TerminalSelectionMode.BLOCK)
     val showPinDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
+    val pinRevealIndex = remember { mutableIntStateOf(-1) }
     val confirmPinEntry = remember { mutableStateOf("") }
+    val confirmPinRevealIndex = remember { mutableIntStateOf(-1) }
     val showDisablePinDialog = remember { mutableStateOf(false) }
-    val showUnlockDialog = remember { mutableStateOf(false) }
     val showRestoreDefaultsDialog = remember { mutableStateOf(false) }
-    val unlockEntry = remember { mutableStateOf("") }
-    val unlockError = remember { mutableStateOf<String?>(null) }
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
+    val snippetTimeoutState = remember(snippetRunTimeoutSeconds) { mutableStateOf(snippetRunTimeoutSeconds.toString()) }
     val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val scanLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
+        val contents = result.contents.orEmpty()
+        if (contents.isBlank()) {
+            onShowMessage("QR scan cancelled.")
+        } else {
+            onShowMessage(onImportFromQrPayload(contents))
+        }
+    }
+    AutoHidePasswordReveal(pinRevealIndex)
+    AutoHidePasswordReveal(confirmPinRevealIndex)
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .testTag(UiTestTags.SCREEN_SETTINGS)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Permissions", style = MaterialTheme.typography.titleMedium)
+                corePermissions.forEach { permission ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(permission.title)
+                            Text(
+                                permission.description,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (!permission.granted) {
+                            Icon(
+                                imageVector = Icons.Default.ErrorOutline,
+                                contentDescription = "Missing permission",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+                Button(
+                    onClick = onManagePermissions,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Manage permissions")
+                }
+            }
+        }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
@@ -135,6 +208,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .menuAnchor()
                             .fillMaxWidth()
+                            .testTag(UiTestTags.SETTINGS_THEME_MODE_FIELD)
                     )
                     ExposedDropdownMenu(
                         expanded = expanded.value,
@@ -173,8 +247,52 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    Switch(checked = allowBackgroundSessions, onCheckedChange = onBackgroundToggle)
+                    Switch(
+                        checked = allowBackgroundSessions,
+                        onCheckedChange = onBackgroundToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
+                    )
                 }
+                ExposedDropdownMenuBox(
+                    expanded = backgroundTimeoutExpanded.value,
+                    onExpandedChange = {
+                        if (allowBackgroundSessions) {
+                            backgroundTimeoutExpanded.value = !backgroundTimeoutExpanded.value
+                        }
+                    }
+                ) {
+                    TextField(
+                        value = backgroundSessionTimeout.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = allowBackgroundSessions,
+                        label = { Text("Background connection timeout") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundTimeoutExpanded.value)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = backgroundTimeoutExpanded.value,
+                        onDismissRequest = { backgroundTimeoutExpanded.value = false }
+                    ) {
+                        backgroundTimeoutOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    backgroundTimeoutExpanded.value = false
+                                    onBackgroundSessionTimeoutChange(option)
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "When app is backgrounded, sessions are stopped after this timeout.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
@@ -193,6 +311,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor()
+                            .testTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD)
                     )
                     ExposedDropdownMenu(
                         expanded = terminalExpanded.value,
@@ -346,7 +465,7 @@ fun SettingsScreen(
                     Switch(checked = autoTrustHostKey, onCheckedChange = onAutoTrustHostKeyToggle)
                 }
                 Text(
-                    if (pinConfigured) "PIN lock configured. Status: ${if (isLocked) "Locked" else "Unlocked"}"
+                    if (pinConfigured) "PIN lock configured."
                     else "PIN lock not configured.",
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -359,10 +478,6 @@ fun SettingsScreen(
                             onClick = { showDisablePinDialog.value = true },
                             enabled = !isLocked
                         ) { Text("Disable PIN") }
-                        Button(
-                            onClick = { showUnlockDialog.value = true },
-                            enabled = isLocked
-                        ) { Text("Unlock (PIN)") }
                     }
                 }
                 if (pinConfigured && isLocked) {
@@ -372,6 +487,30 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Snippets", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = snippetTimeoutState.value,
+                    onValueChange = { next ->
+                        val digits = next.filter { it.isDigit() }.take(2)
+                        snippetTimeoutState.value = digits
+                        val parsed = digits.toIntOrNull()
+                        if (parsed != null) {
+                            val clamped = parsed.coerceIn(1, 60)
+                            snippetTimeoutState.value = clamped.toString()
+                            onSnippetRunTimeoutSecondsChange(clamped)
+                        }
+                    },
+                    label = { Text("Run timeout (seconds)") },
+                    supportingText = {
+                        Text("Used when running snippets on an open SSH session.")
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
@@ -420,7 +559,11 @@ fun SettingsScreen(
                         Text("Session diagnostics")
                         Text("Capture anonymized session logs", style = MaterialTheme.typography.bodySmall)
                     }
-                    Switch(checked = diagnosticsLoggingEnabled, onCheckedChange = onDiagnosticsToggle)
+                    Switch(
+                        checked = diagnosticsLoggingEnabled,
+                        onCheckedChange = onDiagnosticsToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+                    )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -465,6 +608,22 @@ fun SettingsScreen(
                 ) {
                     Text("Export via QR")
                 }
+                Button(
+                    onClick = {
+                        val options = ScanOptions().apply {
+                            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                            setPrompt("Scan SSHPeaches export QR")
+                            setBeepEnabled(false)
+                            setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                            setOrientationLocked(true)
+                        }
+                        scanLauncher.launch(options)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Text("Import via QR")
+                }
             }
         }
     }
@@ -482,7 +641,11 @@ fun SettingsScreen(
                             Text("Include identities")
                             Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
                         }
-                        Switch(checked = includeIdentities, onCheckedChange = onIncludeIdentitiesToggle)
+                        Switch(
+                            checked = includeIdentities,
+                            onCheckedChange = onIncludeIdentitiesToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_IDENTITIES_SWITCH)
+                        )
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -492,7 +655,11 @@ fun SettingsScreen(
                             Text("Include settings")
                             Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
                         }
-                        Switch(checked = includeSettings, onCheckedChange = onIncludeSettingsToggle)
+                        Switch(
+                            checked = includeSettings,
+                            onCheckedChange = onIncludeSettingsToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SETTINGS_SWITCH)
+                        )
                     }
                     Text("Next: generate a QR code that bundles your selections.")
                 }
@@ -560,15 +727,27 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = pinEntry.value,
-                        onValueChange = { pinEntry.value = it.filter { ch -> ch.isDigit() } },
+                        onValueChange = {
+                            val previous = pinEntry.value
+                            val next = it.filter { ch -> ch.isDigit() }
+                            pinEntry.value = next
+                            pinRevealIndex.intValue = calculatePasswordRevealIndex(previous, next)
+                        },
                         label = { Text("Enter PIN") },
-                        singleLine = true
+                        singleLine = true,
+                        visualTransformation = TailRevealPasswordVisualTransformation(pinRevealIndex.intValue)
                     )
                     OutlinedTextField(
                         value = confirmPinEntry.value,
-                        onValueChange = { confirmPinEntry.value = it.filter { ch -> ch.isDigit() } },
+                        onValueChange = {
+                            val previous = confirmPinEntry.value
+                            val next = it.filter { ch -> ch.isDigit() }
+                            confirmPinEntry.value = next
+                            confirmPinRevealIndex.intValue = calculatePasswordRevealIndex(previous, next)
+                        },
                         label = { Text("Confirm PIN") },
-                        singleLine = true
+                        singleLine = true,
+                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPinRevealIndex.intValue)
                     )
                 }
             },
@@ -586,47 +765,6 @@ fun SettingsScreen(
                     showPinDialog.value = false
                     pinEntry.value = ""
                     confirmPinEntry.value = ""
-                }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showUnlockDialog.value) {
-        AlertDialog(
-            onDismissRequest = {
-                showUnlockDialog.value = false
-                unlockEntry.value = ""
-                unlockError.value = null
-            },
-            title = { Text("Unlock with PIN") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = unlockEntry.value,
-                        onValueChange = { unlockEntry.value = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("PIN") },
-                        singleLine = true
-                    )
-                    unlockError.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val ok = onUnlockWithPin(unlockEntry.value)
-                    if (ok) {
-                        unlockEntry.value = ""
-                        unlockError.value = null
-                        showUnlockDialog.value = false
-                    } else {
-                        unlockError.value = "Incorrect PIN"
-                    }
-                }) { Text("Unlock") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showUnlockDialog.value = false
-                    unlockEntry.value = ""
-                    unlockError.value = null
                 }) { Text("Cancel") }
             }
         )

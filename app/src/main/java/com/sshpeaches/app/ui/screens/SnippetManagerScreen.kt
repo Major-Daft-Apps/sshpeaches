@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -40,6 +41,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.SnippetQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processSnippetQrImport
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun SnippetManagerScreen(
@@ -82,7 +84,11 @@ fun SnippetManagerScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_SNIPPETS)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -114,6 +120,8 @@ fun SnippetManagerScreen(
                                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                 setPrompt("Scan snippet QR")
                                 setBeepEnabled(false)
+                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                                setOrientationLocked(true)
                             }
                             scanLauncher.launch(options)
                         },
