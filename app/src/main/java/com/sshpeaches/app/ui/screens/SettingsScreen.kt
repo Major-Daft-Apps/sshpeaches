@@ -2,11 +2,13 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -153,49 +155,55 @@ fun SettingsScreen(
     }
     AutoHidePasswordReveal(pinRevealIndex)
     AutoHidePasswordReveal(confirmPinRevealIndex)
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .testTag(UiTestTags.SCREEN_SETTINGS)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Permissions", style = MaterialTheme.typography.titleMedium)
-                corePermissions.forEach { permission ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(permission.title)
-                            Text(
-                                permission.description,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (!permission.granted) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = "Missing permission",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+        Column(
+            modifier = Modifier
+                .widthIn(max = 980.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall)
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Permissions", style = MaterialTheme.typography.titleMedium)
+                    corePermissions.forEach { permission ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(permission.title)
+                                Text(
+                                    permission.description,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (!permission.granted) {
+                                Icon(
+                                    imageVector = Icons.Default.ErrorOutline,
+                                    contentDescription = "Missing permission",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
-                }
-                Button(
-                    onClick = onManagePermissions,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Manage permissions")
+                    Button(
+                        onClick = onManagePermissions,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Manage permissions")
+                    }
                 }
             }
-        }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
                 ExposedDropdownMenuBox(
                     expanded = expanded.value,
@@ -629,6 +637,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
     }
     if (showTransferDialog.value) {
         androidx.compose.material3.AlertDialog(

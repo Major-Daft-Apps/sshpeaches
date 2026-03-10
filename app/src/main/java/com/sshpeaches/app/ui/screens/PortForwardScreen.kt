@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -154,130 +156,137 @@ fun PortForwardScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(UiTestTags.SCREEN_FORWARDS)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .widthIn(max = 980.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
         ) {
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = search.value,
-                onValueChange = { search.value = it },
-                placeholder = { Text("Search port forwards") },
-                trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
-            )
-        }
-        HorizontalDivider()
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
-                        Text("Add port forward")
-                    }
-                    Button(
-                        onClick = {
-                            val options = ScanOptions().apply {
-                                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                setPrompt("Scan port forward QR")
-                                setBeepEnabled(false)
-                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                                setOrientationLocked(true)
-                            }
-                            scanLauncher.launch(options)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                        Text("Import QR")
-                    }
-                }
-            }
-            if (items.isEmpty()) {
-                item { EmptyState(itemLabel = "port forward") }
-            } else if (filteredItems.isEmpty()) {
-                item { EmptyState(itemLabel = "result") }
-            } else {
-                items(filteredItems, key = { it.id }) { forward ->
-                Card(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextField(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(forward.label, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = localForwardSummary(forward),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        if (forward.associatedHosts.isNotEmpty()) {
-                            val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
-                            Text(
-                                text = "Hosts: ${names.joinToString()}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                    value = search.value,
+                    onValueChange = { search.value = it },
+                    placeholder = { Text("Search port forwards") },
+                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                )
+            }
+            HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                            Text("Add port forward")
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Switch(
-                                checked = forward.enabled,
-                                onCheckedChange = {
-                                    onUpdate(
-                                        forward.id,
-                                        forward.label,
-                                        PortForwardType.LOCAL,
-                                        forward.sourceHost,
-                                        forward.sourcePort,
-                                        forward.destinationHost,
-                                        forward.destinationPort,
-                                        it,
-                                        forward.associatedHosts
+                        Button(
+                            onClick = {
+                                val options = ScanOptions().apply {
+                                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    setPrompt("Scan port forward QR")
+                                    setBeepEnabled(false)
+                                    setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                                    setOrientationLocked(true)
+                                }
+                                scanLauncher.launch(options)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Text("Import QR")
+                        }
+                    }
+                }
+                if (items.isEmpty()) {
+                    item { EmptyState(itemLabel = "port forward") }
+                } else if (filteredItems.isEmpty()) {
+                    item { EmptyState(itemLabel = "result") }
+                } else {
+                    items(filteredItems, key = { it.id }) { forward ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(forward.label, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = localForwardSummary(forward),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (forward.associatedHosts.isNotEmpty()) {
+                                val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
+                                Text(
+                                    text = "Hosts: ${names.joinToString()}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Switch(
+                                    checked = forward.enabled,
+                                    onCheckedChange = {
+                                        onUpdate(
+                                            forward.id,
+                                            forward.label,
+                                            PortForwardType.LOCAL,
+                                            forward.sourceHost,
+                                            forward.sourcePort,
+                                            forward.destinationHost,
+                                            forward.destinationPort,
+                                            it,
+                                            forward.associatedHosts
+                                        )
+                                    },
+                                    enabled = editMode
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
+                                    tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier
+                                        .clickable { onToggleFavorite(forward.id) }
+                                        .padding(4.dp)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.QrCode,
+                                    contentDescription = "Share",
+                                    modifier = Modifier
+                                        .clickable { shareForward.value = forward }
+                                        .padding(4.dp)
+                                )
+                                if (editMode) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier
+                                            .clickable { openDialog(forward) }
+                                            .padding(4.dp)
                                     )
-                                },
-                                enabled = editMode
-                            )
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
-                                tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                modifier = Modifier
-                                    .clickable { onToggleFavorite(forward.id) }
-                                    .padding(4.dp)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.QrCode,
-                                contentDescription = "Share",
-                                modifier = Modifier
-                                    .clickable { shareForward.value = forward }
-                                    .padding(4.dp)
-                            )
-                            if (editMode) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    modifier = Modifier
-                                        .clickable { openDialog(forward) }
-                                        .padding(4.dp)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    modifier = Modifier
-                                        .clickable { onDelete(forward.id) }
-                                        .padding(4.dp)
-                                )
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        modifier = Modifier
+                                            .clickable { onDelete(forward.id) }
+                                            .padding(4.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
+                }
             }
         }
     }

@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -128,6 +132,7 @@ import android.view.MotionEvent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import java.io.File
+import java.io.Serializable
 import java.nio.charset.StandardCharsets
 import java.net.URLEncoder
 import kotlin.math.abs
@@ -151,7 +156,7 @@ data class QuickConnectRequest(
     val forwardId: String? = null,
     val script: String = "",
     val terminalProfileId: String? = null
-)
+) : Serializable
 
 enum class QuickConnectPhase {
     IDLE,
@@ -163,7 +168,7 @@ enum class QuickConnectPhase {
 data class QuickConnectUiState(
     val phase: QuickConnectPhase = QuickConnectPhase.IDLE,
     val message: String = ""
-)
+) : Serializable
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -828,7 +833,12 @@ fun ConnectingScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.ime
+                                .exclude(WindowInsets.navigationBars)
+                                .only(WindowInsetsSides.Bottom)
+                        ),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Surface(
@@ -940,232 +950,236 @@ fun ConnectingScreen(
                         )
                     }
 
-                    if (showFindDialog) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 2.dp),
-                            color = Color(0xFF101010),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (showFindDialog) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                color = Color(0xFF101010),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(34.dp)
-                                            .border(
-                                                width = 1.dp,
-                                                color = Color(0xFF2D2D2D),
-                                                shape = RoundedCornerShape(6.dp)
-                                            ),
-                                        color = Color(0xFF161616),
-                                        shape = RoundedCornerShape(6.dp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
+                                        Surface(
                                             modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(horizontal = 8.dp),
-                                            contentAlignment = Alignment.CenterStart
+                                                .weight(1f)
+                                                .height(34.dp)
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = Color(0xFF2D2D2D),
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ),
+                                            color = Color(0xFF161616),
+                                            shape = RoundedCornerShape(6.dp)
                                         ) {
-                                            BasicTextField(
-                                                value = findQuery,
-                                                onValueChange = { findQuery = it },
-                                                singleLine = true,
-                                                textStyle = MaterialTheme.typography.bodySmall.copy(
-                                                    fontFamily = FontFamily.Monospace,
-                                                    color = Color(0xFFEDEDED)
-                                                ),
-                                                keyboardOptions = KeyboardOptions(
-                                                    capitalization = KeyboardCapitalization.None,
-                                                    keyboardType = KeyboardType.Password,
-                                                    imeAction = ImeAction.Search,
-                                                    autoCorrect = false
-                                                ),
-                                                modifier = Modifier.fillMaxWidth(),
-                                                decorationBox = { inner ->
-                                                    if (findQuery.isBlank()) {
-                                                        Text(
-                                                            text = "Find",
-                                                            maxLines = 1,
-                                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                                fontFamily = FontFamily.Monospace,
-                                                                color = Color(0xFF8C8C8C)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(horizontal = 8.dp),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                BasicTextField(
+                                                    value = findQuery,
+                                                    onValueChange = { findQuery = it },
+                                                    singleLine = true,
+                                                    textStyle = MaterialTheme.typography.bodySmall.copy(
+                                                        fontFamily = FontFamily.Monospace,
+                                                        color = Color(0xFFEDEDED)
+                                                    ),
+                                                    keyboardOptions = KeyboardOptions(
+                                                        capitalization = KeyboardCapitalization.None,
+                                                        keyboardType = KeyboardType.Password,
+                                                        imeAction = ImeAction.Search,
+                                                        autoCorrect = false
+                                                    ),
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    decorationBox = { inner ->
+                                                        if (findQuery.isBlank()) {
+                                                            Text(
+                                                                text = "Find",
+                                                                maxLines = 1,
+                                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                                    fontFamily = FontFamily.Monospace,
+                                                                    color = Color(0xFF8C8C8C)
+                                                                )
                                                             )
-                                                        )
+                                                        }
+                                                        inner()
                                                     }
-                                                    inner()
+                                                )
+                                            }
+                                        }
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clickable { findCaseSensitive = !findCaseSensitive },
+                                            color = if (findCaseSensitive) Color(0xFF5B3A0F) else Color(0xFF1B1B1B),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = "Aa",
+                                                    color = Color(0xFFEDEDED),
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                if (findMatches.isNotEmpty()) {
+                                                    val size = findMatches.size
+                                                    findMatchIndex = ((findMatchIndex - 1) % size + size) % size
                                                 }
+                                            },
+                                            enabled = findMatches.isNotEmpty(),
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowUp,
+                                                contentDescription = "Previous result",
+                                                tint = Color(0xFFDEDEDE)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                if (findMatches.isNotEmpty()) {
+                                                    val size = findMatches.size
+                                                    findMatchIndex = (findMatchIndex + 1).mod(size)
+                                                }
+                                            },
+                                            enabled = findMatches.isNotEmpty(),
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowDown,
+                                                contentDescription = "Next result",
+                                                tint = Color(0xFFDEDEDE)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                showFindDialog = false
+                                                terminalViewRef?.clearSearchHighlight()
+                                            },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Close find",
+                                                tint = Color(0xFFBDBDBD)
                                             )
                                         }
                                     }
-                                    Surface(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clickable { findCaseSensitive = !findCaseSensitive },
-                                        color = if (findCaseSensitive) Color(0xFF5B3A0F) else Color(0xFF1B1B1B),
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = "Aa",
-                                                color = Color(0xFFEDEDED),
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                        }
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (findMatches.isNotEmpty()) {
-                                                val size = findMatches.size
-                                                findMatchIndex = ((findMatchIndex - 1) % size + size) % size
+                                    Text(
+                                        text = when {
+                                            findQuery.isBlank() -> "Enter search text"
+                                            findMatches.isEmpty() -> "No matches"
+                                            else -> {
+                                                val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
+                                                val active = activeFindMatch
+                                                if (active != null) {
+                                                    "${activeIndex + 1}/${findMatches.size} line ${active.line}: ${active.preview}"
+                                                } else {
+                                                    "${activeIndex + 1}/${findMatches.size}"
+                                                }
                                             }
                                         },
-                                        enabled = findMatches.isNotEmpty(),
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowUp,
-                                            contentDescription = "Previous result",
-                                            tint = Color(0xFFDEDEDE)
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (findMatches.isNotEmpty()) {
-                                                val size = findMatches.size
-                                                findMatchIndex = (findMatchIndex + 1).mod(size)
-                                            }
-                                        },
-                                        enabled = findMatches.isNotEmpty(),
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Next result",
-                                            tint = Color(0xFFDEDEDE)
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            showFindDialog = false
-                                            terminalViewRef?.clearSearchHighlight()
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Close find",
-                                            tint = Color(0xFFBDBDBD)
-                                        )
-                                    }
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                        color = Color(0xFFBDBDBD),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                                Text(
-                                    text = when {
-                                        findQuery.isBlank() -> "Enter search text"
-                                        findMatches.isEmpty() -> "No matches"
-                                        else -> {
-                                            val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
-                                            val active = activeFindMatch
-                                            if (active != null) {
-                                                "${activeIndex + 1}/${findMatches.size} line ${active.line}: ${active.preview}"
-                                            } else {
-                                                "${activeIndex + 1}/${findMatches.size}"
-                                            }
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = Color(0xFFBDBDBD),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
                             }
                         }
-                    }
 
-                    CompactKeyRow(
-                        keys = compactKeys,
-                        activeModifiers = pendingModifiers,
-                        activeAliasIcons = activeAliasIcons,
-                        onSendKey = { key ->
-                            if (!key.enabled) return@CompactKeyRow
-                            val action = key.action
-                            if (handleIconAlias(action)) {
-                                pendingModifiers = emptySet()
-                                return@CompactKeyRow
-                            }
-                            when (action.type) {
-                                KeyboardActionType.MODIFIER -> {
-                                    val modifier = action.modifier ?: return@CompactKeyRow
-                                    pendingModifiers = if (pendingModifiers.contains(modifier)) {
-                                        pendingModifiers - modifier
-                                    } else {
-                                        pendingModifiers + modifier
-                                    }
-                                }
-                                KeyboardActionType.TEXT -> {
-                                    val text = action.text
-                                    if (text.isBlank()) return@CompactKeyRow
-                                    val modifiers = pendingModifiers
-                                    terminalInput.sendText(
-                                        text = text,
-                                        ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
-                                        altDown = modifiers.contains(KeyboardModifier.ALT),
-                                        shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
-                                    )
+                        CompactKeyRow(
+                            keys = compactKeys,
+                            activeModifiers = pendingModifiers,
+                            activeAliasIcons = activeAliasIcons,
+                            onSendKey = { key ->
+                                if (!key.enabled) return@CompactKeyRow
+                                val action = key.action
+                                if (handleIconAlias(action)) {
                                     pendingModifiers = emptySet()
+                                    return@CompactKeyRow
                                 }
-                                KeyboardActionType.KEY -> {
-                                    val keyCode = action.keyCode ?: return@CompactKeyRow
-                                    val modifiers = pendingModifiers
-                                    val sent = terminalInput.sendVirtualKey(
-                                        keyCode = keyCode,
-                                        ctrlDown = modifiers.contains(KeyboardModifier.CTRL) || action.ctrl,
-                                        altDown = modifiers.contains(KeyboardModifier.ALT) || action.alt,
-                                        shiftDown = modifiers.contains(KeyboardModifier.SHIFT) || action.shift,
-                                        fallbackSequence = action.sequence.ifBlank { null }
-                                    )
-                                    if (!sent && action.sequence.isNotBlank()) {
-                                        terminalInput.sendRawSequence(action.sequence)
+                                when (action.type) {
+                                    KeyboardActionType.MODIFIER -> {
+                                        val modifier = action.modifier ?: return@CompactKeyRow
+                                        pendingModifiers = if (pendingModifiers.contains(modifier)) {
+                                            pendingModifiers - modifier
+                                        } else {
+                                            pendingModifiers + modifier
+                                        }
                                     }
-                                    pendingModifiers = emptySet()
-                                }
-                                KeyboardActionType.SEQUENCE -> {
-                                    val sequence = action.sequence.ifBlank { action.text }
-                                    if (sequence.isNotBlank()) {
-                                        terminalInput.sendRawSequence(sequence)
-                                    }
-                                    pendingModifiers = emptySet()
-                                }
-                                KeyboardActionType.PASSWORD_INJECT -> {
-                                    val password = resolveInjectPassword()
-                                    if (password.isNotEmpty()) {
+                                    KeyboardActionType.TEXT -> {
+                                        val text = action.text
+                                        if (text.isBlank()) return@CompactKeyRow
+                                        val modifiers = pendingModifiers
                                         terminalInput.sendText(
-                                            text = password,
-                                            ctrlDown = false,
-                                            altDown = false,
-                                            shiftDown = false
+                                            text = text,
+                                            ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+                                            altDown = modifiers.contains(KeyboardModifier.ALT),
+                                            shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
                                         )
+                                        pendingModifiers = emptySet()
                                     }
-                                    pendingModifiers = emptySet()
+                                    KeyboardActionType.KEY -> {
+                                        val keyCode = action.keyCode ?: return@CompactKeyRow
+                                        val modifiers = pendingModifiers
+                                        val sent = terminalInput.sendVirtualKey(
+                                            keyCode = keyCode,
+                                            ctrlDown = modifiers.contains(KeyboardModifier.CTRL) || action.ctrl,
+                                            altDown = modifiers.contains(KeyboardModifier.ALT) || action.alt,
+                                            shiftDown = modifiers.contains(KeyboardModifier.SHIFT) || action.shift,
+                                            fallbackSequence = action.sequence.ifBlank { null }
+                                        )
+                                        if (!sent && action.sequence.isNotBlank()) {
+                                            terminalInput.sendRawSequence(action.sequence)
+                                        }
+                                        pendingModifiers = emptySet()
+                                    }
+                                    KeyboardActionType.SEQUENCE -> {
+                                        val sequence = action.sequence.ifBlank { action.text }
+                                        if (sequence.isNotBlank()) {
+                                            terminalInput.sendRawSequence(sequence)
+                                        }
+                                        pendingModifiers = emptySet()
+                                    }
+                                    KeyboardActionType.PASSWORD_INJECT -> {
+                                        val password = resolveInjectPassword()
+                                        if (password.isNotEmpty()) {
+                                            terminalInput.sendText(
+                                                text = password,
+                                                ctrlDown = false,
+                                                altDown = false,
+                                                shiftDown = false
+                                            )
+                                        }
+                                        pendingModifiers = emptySet()
+                                    }
+                                    KeyboardActionType.SNIPPET_PICKER -> {
+                                        showSnippetPicker = true
+                                        pendingModifiers = emptySet()
+                                    }
                                 }
-                                KeyboardActionType.SNIPPET_PICKER -> {
-                                    showSnippetPicker = true
-                                    pendingModifiers = emptySet()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp)
-                    )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                        )
+                    }
                 }
 
                 BasicTextField(

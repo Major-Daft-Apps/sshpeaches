@@ -251,11 +251,11 @@ fun SSHPeachesRoot(
     val scope = rememberCoroutineScope()
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
-    val quickConnectRequest = remember { mutableStateOf<QuickConnectRequest?>(null) }
-    val quickConnectState = remember { mutableStateOf(QuickConnectUiState()) }
-    val pendingConnectingNavigation = remember { mutableStateOf(false) }
+    val quickConnectRequest = rememberSaveable { mutableStateOf<QuickConnectRequest?>(null) }
+    val quickConnectState = rememberSaveable { mutableStateOf(QuickConnectUiState()) }
+    val pendingConnectingNavigation = rememberSaveable { mutableStateOf(false) }
     val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.FAVORITES) }
-    val sawSnapshotForCurrentRequest = remember { mutableStateOf(false) }
+    val sawSnapshotForCurrentRequest = rememberSaveable { mutableStateOf(false) }
     val editMode = rememberSaveable { mutableStateOf(false) }
     val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }

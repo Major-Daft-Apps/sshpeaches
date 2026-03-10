@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -176,43 +176,62 @@ fun HostCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                HostActionButton(
-                    label = "SSH",
-                    selected = true,
-                    onClick = { onAction(host, ConnectionMode.SSH) }
-                )
-                HostActionButton(
-                    label = "SFTP",
-                    selected = false,
-                    onClick = { onAction(host, ConnectionMode.SFTP) }
-                )
-                HostActionButton(
-                    label = "SCP",
-                    selected = false,
-                    onClick = { onAction(host, ConnectionMode.SCP) }
-                )
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = "Info",
-                    modifier = Modifier.clickable { showInfo.value = true }
-                )
-                Icon(
-                    Icons.Default.QrCode,
-                    contentDescription = "Share",
-                    modifier = Modifier.clickable {
-                        if (host.hasPassword) {
-                            showPassphrasePrompt.value = true
-                        } else {
-                            qrBitmap.value = generateQr(host, passphrase = null)
-                            if (qrBitmap.value != null) {
-                                showQr.value = true
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HostActionButton(
+                        label = "SSH",
+                        selected = true,
+                        onClick = { onAction(host, ConnectionMode.SSH) }
+                    )
+                    HostActionButton(
+                        label = "SFTP",
+                        selected = false,
+                        onClick = { onAction(host, ConnectionMode.SFTP) }
+                    )
+                    HostActionButton(
+                        label = "SCP",
+                        selected = false,
+                        onClick = { onAction(host, ConnectionMode.SCP) }
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showInfo.value = true }) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Info"
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            if (host.hasPassword) {
+                                showPassphrasePrompt.value = true
                             } else {
-                                Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
+                                qrBitmap.value = generateQr(host, passphrase = null)
+                                if (qrBitmap.value != null) {
+                                    showQr.value = true
+                                } else {
+                                    Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
+                    ) {
+                        Icon(
+                            Icons.Default.QrCode,
+                            contentDescription = "Share"
+                        )
                     }
-                )
+                }
             }
         }
     }

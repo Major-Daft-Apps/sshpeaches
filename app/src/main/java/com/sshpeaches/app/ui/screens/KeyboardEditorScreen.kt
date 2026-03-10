@@ -6,17 +6,19 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +62,7 @@ fun KeyboardEditorScreen(
 ) {
     val editorIndex = remember { mutableStateOf<Int?>(null) }
     val normalizedSlots = remember(slots) { KeyboardLayoutDefaults.normalizeSlots(slots) }
+    val keyBlockHeightPx = remember { mutableIntStateOf(0) }
     val activeEditorIndex = editorIndex.value
 
     if (activeEditorIndex != null) {
@@ -77,68 +83,89 @@ fun KeyboardEditorScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
-        Text("Tap a slot to open the full key-action editor.")
-
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
-                .padding(horizontal = 6.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+                .widthIn(max = 980.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            normalizedSlots
-                .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
-                .forEachIndexed { rowIndex, row ->
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        row.forEachIndexed { columnIndex, action ->
-                            val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
-                            KeySlot(
-                                action = action,
-                                active = !action.isEmpty(),
-                                onClick = { editorIndex.value = index }
-                            )
-                        }
-                    }
-                }
-        }
+            Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
+            Text("Tap a slot to open the full key-action editor.")
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.6f),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-        ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.TopCenter
+                    .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
+                    .onSizeChanged { keyBlockHeightPx.intValue = it.height }
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.keyboard),
-                    contentDescription = "Keyboard illustration",
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.5f)
-                )
+                normalizedSlots
+                    .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+                    .forEachIndexed { rowIndex, row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            row.forEachIndexed { columnIndex, action ->
+                                val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
+                                KeySlot(
+                                    action = action,
+                                    active = !action.isEmpty(),
+                                    onClick = { editorIndex.value = index }
+                                )
+                            }
+                        }
+                    }
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    val density = LocalDensity.current
+                    val keyBlockHeight = with(density) {
+                        if (keyBlockHeightPx.intValue > 0) keyBlockHeightPx.intValue.toDp()
+                        else KEYBOARD_ILLUSTRATION_FALLBACK_HEIGHT
+                    }
+                    val maxIllustrationHeight = keyBlockHeight * KEYBOARD_ILLUSTRATION_MAX_HEIGHT_MULTIPLIER
+                    val illustrationWidth = maxWidth.coerceAtMost(KEYBOARD_ILLUSTRATION_MAX_WIDTH)
+                    val naturalHeight = illustrationWidth / KEYBOARD_ILLUSTRATION_ASPECT_RATIO
+                    val illustrationHeight = naturalHeight.coerceIn(
+                        minimumValue = keyBlockHeight,
+                        maximumValue = maxIllustrationHeight
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .width(illustrationWidth)
+                            .height(illustrationHeight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.keyboard),
+                            contentDescription = "Keyboard illustration",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            TextButton(onClick = onReset) {
+                Text("Reset layout")
             }
         }
-
-        TextButton(onClick = onReset) {
-            Text("Reset layout")
-        }
-
     }
 }
 
@@ -209,13 +236,18 @@ private fun KeyActionEditorVertical(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 980.dp)
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -365,6 +397,7 @@ private fun KeyActionEditorVertical(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -444,3 +477,8 @@ private fun PresetRow(
         }
     }
 }
+
+private const val KEYBOARD_ILLUSTRATION_ASPECT_RATIO = 2160f / 1126f
+private val KEYBOARD_ILLUSTRATION_FALLBACK_HEIGHT = 180.dp
+private val KEYBOARD_ILLUSTRATION_MAX_WIDTH = 980.dp
+private const val KEYBOARD_ILLUSTRATION_MAX_HEIGHT_MULTIPLIER = 2f

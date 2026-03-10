@@ -10,12 +10,14 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -44,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -289,52 +292,58 @@ fun HostsScreen(
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
     }
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(UiTestTags.SCREEN_HOSTS)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .widthIn(max = 980.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
         ) {
-            TextField(
-                modifier = Modifier.weight(1f),
-                value = search.value,
-                onValueChange = { search.value = it },
-                placeholder = { Text("Search hosts") },
-                trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
-            )
-            Column {
-                IconButton(onClick = { showMenu.value = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Sort")
-                }
-                DropdownMenu(expanded = showMenu.value, onDismissRequest = { showMenu.value = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Last Used", fontWeight = if (sortMode == SortMode.LAST_USED) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = {
-                            showMenu.value = false
-                            onSortModeChange(SortMode.LAST_USED)
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Alphabetical", fontWeight = if (sortMode == SortMode.ALPHABETICAL) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = {
-                            showMenu.value = false
-                            onSortModeChange(SortMode.ALPHABETICAL)
-                        }
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextField(
+                    modifier = Modifier.weight(1f),
+                    value = search.value,
+                    onValueChange = { search.value = it },
+                    placeholder = { Text("Search hosts") },
+                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                )
+                Column {
+                    IconButton(onClick = { showMenu.value = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Sort")
+                    }
+                    DropdownMenu(expanded = showMenu.value, onDismissRequest = { showMenu.value = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Last Used", fontWeight = if (sortMode == SortMode.LAST_USED) FontWeight.Bold else FontWeight.Normal) },
+                            onClick = {
+                                showMenu.value = false
+                                onSortModeChange(SortMode.LAST_USED)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Alphabetical", fontWeight = if (sortMode == SortMode.ALPHABETICAL) FontWeight.Bold else FontWeight.Normal) },
+                            onClick = {
+                                showMenu.value = false
+                                onSortModeChange(SortMode.ALPHABETICAL)
+                            }
+                        )
+                    }
                 }
             }
-        }
-        HorizontalDivider()
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+            HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -442,6 +451,7 @@ fun HostsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
