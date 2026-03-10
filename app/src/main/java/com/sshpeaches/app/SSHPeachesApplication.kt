@@ -1,8 +1,6 @@
 package com.majordaftapps.sshpeaches.app
 
 import android.app.Application
-import android.app.UiModeManager
-import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import com.majordaftapps.sshpeaches.app.data.repository.AppContainer
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
@@ -35,15 +33,5 @@ class SSHPeachesApplication : Application() {
             ThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
         AppCompatDelegate.setDefaultNightMode(mode)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val uiModeManager = getSystemService(UiModeManager::class.java)
-            val apiMode = when (themeMode) {
-                ThemeMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
-                ThemeMode.DARK -> UiModeManager.MODE_NIGHT_YES
-                ThemeMode.SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
-            }
-            uiModeManager?.setApplicationNightMode(apiMode)
-        }
     }
 }

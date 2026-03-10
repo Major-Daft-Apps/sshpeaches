@@ -9,9 +9,11 @@ class KeyboardLayoutDefaultsTest {
     @Test
     fun defaultLayout_matchesTermuxStyleRows() {
         val labels = KeyboardLayoutDefaults.DEFAULT_SLOTS.map { it.label }
-        assertEquals(14, labels.size)
+        assertEquals(28, labels.size)
 
         val expected = listOf(
+            "F1", "F2", "F3", "F4", "F5", "F6", "F7",
+            "F8", "F9", "F10", "F11", "F12", "Snippets", "Password",
             "Esc", "/", "-", "Home", "Up", "End", "PgUp",
             "Tab", "Ctrl", "Alt", "Left", "Down", "Right", "PgDn"
         )
@@ -25,4 +27,3 @@ class KeyboardLayoutDefaultsTest {
         assertTrue(labels.contains("Ctrl-B"))
     }
 }
-

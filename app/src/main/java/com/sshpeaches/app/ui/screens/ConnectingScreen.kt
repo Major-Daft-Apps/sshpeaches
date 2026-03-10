@@ -35,9 +35,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -116,6 +120,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -227,6 +233,7 @@ fun ConnectingScreen(
     val scpActivityLines = remember(request?.sessionId) { mutableStateListOf<String>() }
     var scpRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     var scpPendingListPath by remember(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpLastListedPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     var pendingModifiers by remember(request?.sessionId) { mutableStateOf(setOf<KeyboardModifier>()) }
     var showSnippetPicker by remember(request?.sessionId) { mutableStateOf(false) }
     var keyboardVisibleRequested by remember(request?.sessionId) { mutableStateOf(false) }
@@ -417,6 +424,7 @@ fun ConnectingScreen(
         scpActivityLines.clear()
         scpRemotePath = "."
         scpPendingListPath = null
+        scpLastListedPath = "."
         if (request?.mode == ConnectionMode.SFTP) {
             sftpConsoleLines += "Connected to ${request.host}:${request.port}"
             sftpConsoleLines += "Type 'help' for SFTP commands."
@@ -558,7 +566,10 @@ fun ConnectingScreen(
         val path = remoteDirectory?.path ?: return@LaunchedEffect
         when (request?.mode) {
             ConnectionMode.SFTP -> sftpPath = path
-            ConnectionMode.SCP -> scpRemotePath = path
+            ConnectionMode.SCP -> {
+                scpRemotePath = path
+                scpLastListedPath = path
+            }
             ConnectionMode.SSH, null -> Unit
         }
     }
@@ -683,15 +694,16 @@ fun ConnectingScreen(
         terminalInput.sendRawSequence("$command\r")
     }
 
-    fun sendArrowKey(keyCode: Int) {
-        terminalInput.sendVirtualKey(
-            keyCode = keyCode,
-            ctrlDown = false,
-            altDown = false,
-            shiftDown = false,
-            fallbackSequence = null
-        )
-    }
+    fun sendArrowKey(keyCode: Int): Boolean =
+        runCatching {
+            terminalInput.sendVirtualKey(
+                keyCode = keyCode,
+                ctrlDown = false,
+                altDown = false,
+                shiftDown = false,
+                fallbackSequence = null
+            )
+        }.getOrDefault(false)
 
     fun stopSwipeRepeat() {
         swipeRepeatJob?.cancel()
@@ -705,11 +717,17 @@ fun ConnectingScreen(
         }
         swipeRepeatJob?.cancel()
         swipeRepeatKeyCode = keyCode
-        sendArrowKey(keyCode)
+        if (!sendArrowKey(keyCode)) {
+            stopSwipeRepeat()
+            return
+        }
         swipeRepeatJob = scope.launch {
             delay(SWIPE_NAV_REPEAT_INITIAL_DELAY_MS)
             while (isActive) {
-                sendArrowKey(keyCode)
+                if (!sendArrowKey(keyCode)) {
+                    stopSwipeRepeat()
+                    break
+                }
                 delay(SWIPE_NAV_REPEAT_INTERVAL_MS)
             }
         }
@@ -859,7 +877,7 @@ fun ConnectingScreen(
                                                 timestampMs = event.eventTime
                                             )
                                             swipeIntercepting = false
-                                            false
+                                            true
                                         }
                                         MotionEvent.ACTION_MOVE -> {
                                             val start = swipeStart
@@ -883,7 +901,7 @@ fun ConnectingScreen(
                                                     startSwipeRepeat(keyCode)
                                                 }
                                             }
-                                            swipeIntercepting
+                                            true
                                         }
                                         MotionEvent.ACTION_UP -> {
                                             val start = swipeStart
@@ -901,19 +919,19 @@ fun ConnectingScreen(
                                             }
                                             stopSwipeRepeat()
                                             swipeStart = null
-                                            val consumed = swipeIntercepting
+                                            val consumed = true
                                             swipeIntercepting = false
                                             consumed
                                         }
                                         MotionEvent.ACTION_CANCEL -> {
                                             stopSwipeRepeat()
                                             swipeStart = null
-                                            val consumed = swipeIntercepting
+                                            val consumed = true
                                             swipeIntercepting = false
                                             consumed
                                         }
                                         else -> {
-                                            swipeIntercepting
+                                            true
                                         }
                                     }
                                 }
@@ -1209,6 +1227,9 @@ fun ConnectingScreen(
         } else if (showScpTransferSession && request != null) {
             val remoteItems = remoteDirectory?.entries.orEmpty()
             val effectiveRemotePath = remoteDirectory?.path ?: scpRemotePath
+            val normalizedRemoteInput = scpRemotePath.trim().ifBlank { "." }
+            val normalizedLastListedPath = scpLastListedPath.trim().ifBlank { "." }
+            val canOpenRemotePath = normalizedRemoteInput != normalizedLastListedPath
             val scpUploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
                 val cachedFile = copyUriToLocalCache(context, uri, "scp_upload")
@@ -1218,9 +1239,19 @@ fun ConnectingScreen(
                 }
                 uploadLocalPath = cachedFile.absolutePath
                 if (uploadRemotePath.isBlank()) {
-                    uploadRemotePath = inferRemoteDestination(cachedFile.absolutePath, effectiveRemotePath)
+                    uploadRemotePath = inferRemoteDestination(cachedFile.absolutePath, scpRemotePath.trim().ifBlank { effectiveRemotePath })
                 }
                 appendScpActivity("Selected file: ${cachedFile.name}", clearFirst = true)
+            }
+            val scpDownloadFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                val resolvedPath = resolveDocumentTreePath(uri)
+                if (resolvedPath.isNullOrBlank()) {
+                    appendScpActivity("Unable to resolve selected folder path.", clearFirst = true)
+                    return@rememberLauncherForActivityResult
+                }
+                downloadLocalPath = resolvedPath
+                appendScpActivity("Download destination set: $resolvedPath", clearFirst = true)
             }
             Column(
                 modifier = Modifier
@@ -1244,43 +1275,45 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    val parent = parentPath(scpRemotePath.trim().ifBlank { effectiveRemotePath })
+                                    scpRemotePath = parent
+                                    scpLastListedPath = parent
+                                    onSftpListDirectory(parent)
+                                    appendScpActivity("Browsing $parent...", clearFirst = true)
+                                }
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = "Up")
+                            }
+                            IconButton(
+                                onClick = {
+                                    val target = scpRemotePath.trim().ifBlank { effectiveRemotePath }
+                                    scpLastListedPath = target
+                                    scpPendingListPath = target
+                                    appendScpActivity("Listing $target...", clearFirst = true)
+                                    onSftpListDirectory(target)
+                                }
+                            ) {
+                                Icon(Icons.Default.Terminal, contentDescription = "List")
+                            }
+                            IconButton(
+                                enabled = canOpenRemotePath,
+                                onClick = {
+                                    val target = scpRemotePath.trim().ifBlank { "." }
+                                    scpLastListedPath = target
+                                    onSftpListDirectory(target)
+                                    appendScpActivity("Browsing $target...", clearFirst = true)
+                                }
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Open")
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            val target = scpRemotePath.trim().ifBlank { "." }
-                            onSftpListDirectory(target)
-                            appendScpActivity("Browsing $target...", clearFirst = true)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Open")
-                    }
-                    Button(
-                        onClick = {
-                            val parent = parentPath(effectiveRemotePath)
-                            scpRemotePath = parent
-                            onSftpListDirectory(parent)
-                            appendScpActivity("Browsing $parent...", clearFirst = true)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Up")
-                    }
-                    Button(
-                        onClick = {
-                            onSftpListDirectory(effectiveRemotePath)
-                            appendScpActivity("Refreshing $effectiveRemotePath...", clearFirst = true)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Refresh")
-                    }
-                }
 
                 Surface(
                     modifier = Modifier
@@ -1323,6 +1356,7 @@ fun ConnectingScreen(
                                             .clickable {
                                                 if (item.isDirectory) {
                                                     scpRemotePath = absolute
+                                                    scpLastListedPath = absolute
                                                     onSftpListDirectory(absolute)
                                                     appendScpActivity("Browsing $absolute...", clearFirst = true)
                                                 } else {
@@ -1356,6 +1390,29 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    val current = downloadRemotePath.trim()
+                                    downloadRemotePath = parentPath(current.ifBlank { scpRemotePath.trim().ifBlank { effectiveRemotePath } })
+                                }
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = "Up")
+                            }
+                            IconButton(
+                                onClick = {
+                                    val target = downloadRemotePath.trim().ifBlank { scpRemotePath.trim().ifBlank { effectiveRemotePath } }
+                                    scpLastListedPath = target
+                                    scpPendingListPath = target
+                                    appendScpActivity("Listing $target...", clearFirst = true)
+                                    onSftpListDirectory(target)
+                                }
+                            ) {
+                                Icon(Icons.Default.Terminal, contentDescription = "List")
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -1369,37 +1426,26 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    trailingIcon = {
+                        IconButton(onClick = { scpDownloadFolderPicker.launch(null) }) {
+                            Icon(Icons.Default.Folder, contentDescription = "Browse")
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Button(
+                    onClick = {
+                        val remote = downloadRemotePath.trim()
+                        if (remote.isBlank()) {
+                            appendScpActivity("Select or enter a remote file path to download.", clearFirst = true)
+                            return@Button
+                        }
+                        onScpDownload(remote, downloadLocalPath.trim().ifBlank { null })
+                        appendScpActivity("Downloading $remote...", clearFirst = true)
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Button(
-                        onClick = {
-                            val remote = downloadRemotePath.trim()
-                            if (remote.isBlank()) {
-                                appendScpActivity("Select or enter a remote file path to download.", clearFirst = true)
-                                return@Button
-                            }
-                            onScpDownload(remote, downloadLocalPath.trim().ifBlank { null })
-                            appendScpActivity("Downloading $remote...", clearFirst = true)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Download")
-                    }
-                    Button(
-                        onClick = {
-                            val target = scpRemotePath.trim().ifBlank { effectiveRemotePath }
-                            scpPendingListPath = target
-                            appendScpActivity("Listing $target...", clearFirst = true)
-                            onSftpListDirectory(target)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("List folder")
-                    }
+                    Text("Download")
                 }
 
                 OutlinedTextField(
@@ -1413,6 +1459,11 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    trailingIcon = {
+                        IconButton(onClick = { scpUploadPicker.launch(arrayOf("*/*")) }) {
+                            Icon(Icons.Default.Folder, contentDescription = "Browse")
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -1426,37 +1477,47 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    val current = uploadRemotePath.trim()
+                                    uploadRemotePath = parentPath(current.ifBlank { scpRemotePath.trim().ifBlank { effectiveRemotePath } })
+                                }
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = "Up")
+                            }
+                            IconButton(
+                                onClick = {
+                                    val target = uploadRemotePath.trim().ifBlank { scpRemotePath.trim().ifBlank { effectiveRemotePath } }
+                                    scpLastListedPath = target
+                                    scpPendingListPath = target
+                                    appendScpActivity("Listing $target...", clearFirst = true)
+                                    onSftpListDirectory(target)
+                                }
+                            ) {
+                                Icon(Icons.Default.Terminal, contentDescription = "List")
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Button(
+                    onClick = {
+                        val local = uploadLocalPath.trim()
+                        if (local.isBlank()) {
+                            appendScpActivity("Enter a local file path to upload.", clearFirst = true)
+                            return@Button
+                        }
+                        val remote = uploadRemotePath.trim().ifBlank {
+                            inferRemoteDestination(local, scpRemotePath.trim().ifBlank { effectiveRemotePath })
+                        }
+                        onScpUpload(local, remote)
+                        appendScpActivity("Uploading $local -> $remote...", clearFirst = true)
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Button(
-                        onClick = {
-                            val local = uploadLocalPath.trim()
-                            if (local.isBlank()) {
-                                appendScpActivity("Enter a local file path to upload.", clearFirst = true)
-                                return@Button
-                            }
-                            val remote = uploadRemotePath.trim().ifBlank {
-                                inferRemoteDestination(local, effectiveRemotePath)
-                            }
-                            onScpUpload(local, remote)
-                            appendScpActivity("Uploading $local -> $remote...", clearFirst = true)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Upload")
-                    }
-                    Button(
-                        onClick = {
-                            scpUploadPicker.launch(arrayOf("*/*"))
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Browse")
-                    }
+                    Text("Upload")
                 }
 
                 Surface(
@@ -2306,8 +2367,11 @@ private fun copyUriToLocalCache(context: Context, uri: Uri, prefix: String): Fil
             if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
         }
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: "selected_file"
-    val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-    val target = File(context.cacheDir, "${prefix}_${System.currentTimeMillis()}_$safeName")
+    val safeName = displayName
+        .replace('/', '_')
+        .replace('\\', '_')
+    val cacheSubDir = File(context.cacheDir, prefix).apply { mkdirs() }
+    val target = File(cacheSubDir, safeName)
     return runCatching {
         contentResolver.openInputStream(uri)?.use { input ->
             target.outputStream().use { output ->
@@ -2316,6 +2380,25 @@ private fun copyUriToLocalCache(context: Context, uri: Uri, prefix: String): Fil
         } ?: error("Unable to read selected file stream")
         target
     }.getOrNull()
+}
+
+private fun resolveDocumentTreePath(uri: Uri): String? {
+    val treeId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull() ?: return null
+    val separator = treeId.indexOf(':')
+    if (separator <= 0) return null
+    val volume = treeId.substring(0, separator)
+    val relativePath = treeId.substring(separator + 1).trim('/')
+    return when (volume.lowercase()) {
+        "primary" -> {
+            val base = Environment.getExternalStorageDirectory()
+            if (relativePath.isBlank()) base.absolutePath else File(base, relativePath).absolutePath
+        }
+
+        else -> {
+            val base = File("/storage/$volume")
+            if (relativePath.isBlank()) base.absolutePath else File(base, relativePath).absolutePath
+        }
+    }
 }
 
 private fun tokenizeSftpCommand(input: String): List<String> {

@@ -46,8 +46,11 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
 import android.content.Intent
 import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
@@ -404,7 +407,12 @@ fun HostCard(
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(passphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(passphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     OutlinedTextField(
                         value = confirmPassphraseState.value,
@@ -414,7 +422,12 @@ fun HostCard(
                         },
                         label = { Text("Confirm passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     passphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)

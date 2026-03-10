@@ -36,5 +36,31 @@
             android:name=".service.SessionService"
             android:foregroundServiceType="dataSync|connectedDevice"
             android:exported="false" />
+        <receiver
+            android:name=".widget.QuickConnectWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_CONNECT" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_OPEN" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_DISCONNECT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_connect_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.SessionsWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_CONNECT" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_OPEN" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_DISCONNECT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_sessions_info" />
+        </receiver>
     </application>
 </manifest>

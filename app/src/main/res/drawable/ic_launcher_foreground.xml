@@ -1,6 +1,6 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Solid backdrop to prevent launcher tint/halo from showing through -->
-    <item android:drawable="@color/color_vanilla" />
+    <item android:drawable="@color/ic_launcher_background" />
 
     <!-- Inset the artwork heavily to avoid cropping and ring artifacts -->
     <item

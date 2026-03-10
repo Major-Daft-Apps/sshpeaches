@@ -27,7 +27,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
-import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
@@ -37,10 +37,11 @@ import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
-import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.termux.terminal.TerminalEmulator
 import androidx.lifecycle.lifecycleScope
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -59,6 +60,8 @@ class MainActivity : FragmentActivity() {
     private var biometricAvailable: Boolean = false
     private var appUiBootstrapped = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
+    private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
     private val corePermissionsRefreshTick = mutableStateOf(0)
     private var latestAllowBackgroundSessions: Boolean = true
     private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
@@ -210,8 +213,6 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val startupThemeMode = SettingsStore.getStartupThemeMode()
-        applyStartupSplashTheme(startupThemeMode)
         installSplashScreen()
         super.onCreate(savedInstanceState)
         UiDebugLog.action("MainActivity.onCreate")
@@ -223,7 +224,7 @@ class MainActivity : FragmentActivity() {
                 latestBackgroundSessionTimeout = state.backgroundSessionTimeout
             }
         }
-        handleSessionOpenIntent(this.intent)
+        handleIncomingIntent(this.intent)
         setContent {
             val viewModel = appViewModel
             appUiBootstrapped = true
@@ -237,6 +238,9 @@ class MainActivity : FragmentActivity() {
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val remoteDirectories by sessionService?.remoteDirectoryFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+            LaunchedEffect(uiState.hosts) {
+                HostWidgets.updateAll(this@MainActivity)
+            }
             val startSession: (String, HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
                 remember(
                     sessionService,
@@ -272,6 +276,32 @@ class MainActivity : FragmentActivity() {
                         UiDebugLog.result("uiStartSession", true, "sessionId=$sessionId, hostId=${host.id}")
                     }
                 }
+            }
+            LaunchedEffect(
+                pendingWidgetConnectHostId.value,
+                pendingWidgetConnectMode.value,
+                uiState.hosts,
+                sessionService
+            ) {
+                val hostId = pendingWidgetConnectHostId.value ?: return@LaunchedEffect
+                val mode = pendingWidgetConnectMode.value ?: return@LaunchedEffect
+                if (sessionService == null) {
+                    ensureSessionServiceConnection()
+                    return@LaunchedEffect
+                }
+                val host = uiState.hosts.firstOrNull { it.id == hostId }
+                if (host == null) {
+                    UiDebugLog.result("widgetStartSession", false, "host-not-found hostId=$hostId")
+                    pendingWidgetConnectHostId.value = null
+                    pendingWidgetConnectMode.value = null
+                    return@LaunchedEffect
+                }
+                val sessionId = "$hostId|${mode.name}|${UUID.randomUUID()}"
+                startSession(sessionId, host, mode, null)
+                requestedOpenSessionHostId.value = sessionId
+                pendingWidgetConnectHostId.value = null
+                pendingWidgetConnectMode.value = null
+                UiDebugLog.result("widgetStartSession", true, "sessionId=$sessionId")
             }
             val stopSession: (String) -> Unit = remember(sessionService) {
                 { id: String ->
@@ -514,14 +544,6 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun applyStartupSplashTheme(startupThemeMode: ThemeMode) {
-        when (startupThemeMode) {
-            ThemeMode.LIGHT -> setTheme(R.style.Theme_SSHPeaches_Starting_Light)
-            ThemeMode.DARK -> setTheme(R.style.Theme_SSHPeaches_Starting_Dark)
-            ThemeMode.SYSTEM -> setTheme(R.style.Theme_SSHPeaches_Starting)
-        }
-    }
-
     override fun onDestroy() {
         UiDebugLog.action("MainActivity.onDestroy", "serviceBound=$serviceBound")
         backgroundSessionTimeoutJob?.cancel()
@@ -538,7 +560,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleSessionOpenIntent(intent)
+        handleIncomingIntent(intent)
     }
 
     override fun onUserInteraction() {
@@ -600,14 +622,37 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
     }
 
-    private fun handleSessionOpenIntent(intent: Intent?) {
-        if (intent?.action != SessionService.ACTION_OPEN_SESSION) return
-        val hostId = intent.getStringExtra(SessionService.EXTRA_HOST_ID).orEmpty()
-        if (hostId.isBlank()) {
-            UiDebugLog.result("handleSessionOpenIntent", false, "missing-host-id")
-            return
+    private fun handleIncomingIntent(intent: Intent?) {
+        when (intent?.action) {
+            SessionService.ACTION_OPEN_SESSION -> {
+                val hostId = intent.getStringExtra(SessionService.EXTRA_HOST_ID).orEmpty()
+                if (hostId.isBlank()) {
+                    UiDebugLog.result("handleSessionOpenIntent", false, "missing-host-id")
+                    return
+                }
+                requestedOpenSessionHostId.value = hostId
+                UiDebugLog.result("handleSessionOpenIntent", true, "hostId=$hostId")
+            }
+
+            ACTION_WIDGET_CONNECT -> {
+                val hostId = intent.getStringExtra(EXTRA_WIDGET_HOST_ID).orEmpty()
+                val mode = runCatching {
+                    ConnectionMode.valueOf(intent.getStringExtra(EXTRA_WIDGET_MODE).orEmpty())
+                }.getOrDefault(ConnectionMode.SSH)
+                if (hostId.isBlank()) {
+                    UiDebugLog.result("handleWidgetConnectIntent", false, "missing-host-id")
+                    return
+                }
+                pendingWidgetConnectHostId.value = hostId
+                pendingWidgetConnectMode.value = mode
+                UiDebugLog.result("handleWidgetConnectIntent", true, "hostId=$hostId, mode=$mode")
+            }
         }
-        requestedOpenSessionHostId.value = hostId
-        UiDebugLog.result("handleSessionOpenIntent", true, "hostId=$hostId")
+    }
+
+    companion object {
+        const val ACTION_WIDGET_CONNECT = "com.majordaftapps.sshpeaches.app.action.WIDGET_CONNECT"
+        const val EXTRA_WIDGET_HOST_ID = "extra_widget_host_id"
+        const val EXTRA_WIDGET_MODE = "extra_widget_mode"
     }
 }

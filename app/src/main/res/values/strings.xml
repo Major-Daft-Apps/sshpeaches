@@ -5,4 +5,13 @@
     <string name="project_website">https://majordaftapps.com</string>
     <string name="support_url">https://majordaftapps.com/sshpeaches-support</string>
     <string name="privacy_policy_url">https://majordaftapps.com/privacy</string>
+    <string name="widget_quick_connect_name">Hosts Quick Connect</string>
+    <string name="widget_sessions_name">Hosts and Sessions</string>
+    <string name="widget_hosts_title">Hosts</string>
+    <string name="widget_open_sessions_title">Open Sessions</string>
+    <string name="widget_no_hosts">No hosts saved.</string>
+    <string name="widget_no_open_sessions">No open sessions.</string>
+    <string name="widget_more_hosts">+%1$d more hosts</string>
+    <string name="widget_open">Open</string>
+    <string name="widget_disconnect">Disconnect</string>
 </resources>

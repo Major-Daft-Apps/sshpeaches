@@ -27,6 +27,8 @@ import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
+import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
@@ -64,6 +66,7 @@ import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.scp.SCPFileTransfer
 import kotlin.math.absoluteValue
+import kotlin.math.min
 
 /**
  * Foreground service that keeps SSH/Mosh sessions alive.
@@ -89,6 +92,7 @@ class SessionService : Service() {
     private val pendingShellSnapshots = ConcurrentHashMap<String, String>()
     private val shellOutputPublishJobs = ConcurrentHashMap<String, Job>()
     private val moshTranscriptPublishJobs = ConcurrentHashMap<String, Job>()
+    private val moshReconnectJobs = ConcurrentHashMap<String, Job>()
     private var foregroundNotificationId: Int? = null
     private val sessionNotificationIds = mutableSetOf<Int>()
     @Volatile
@@ -132,6 +136,8 @@ class SessionService : Service() {
         shellOutputPublishJobs.clear()
         moshTranscriptPublishJobs.values.forEach { it.cancel() }
         moshTranscriptPublishJobs.clear()
+        moshReconnectJobs.values.forEach { it.cancel() }
+        moshReconnectJobs.clear()
         pendingShellOutputChunks.clear()
         pendingShellSnapshots.clear()
         shellOutput.value = emptyMap()
@@ -400,6 +406,7 @@ class SessionService : Service() {
         UiDebugLog.action("stopSession", "hostId=$hostId")
         clearHostKeyPromptsForHost(hostId, trust = false)
         clearPasswordPromptsForHost(hostId, password = null)
+        moshReconnectJobs.remove(hostId)?.cancel()
         val connection = activeConnections.remove(hostId)
         connection?.let {
             serviceScope.launch {
@@ -1353,29 +1360,7 @@ class SessionService : Service() {
             override fun onTitleChanged(changedSession: TerminalSession) = Unit
 
             override fun onSessionFinished(finishedSession: TerminalSession) {
-                serviceScope.launch {
-                    moshTranscriptPublishJobs.remove(hostId)?.cancel()
-                    val transcript = finishedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
-                    val tail = transcript
-                        .lineSequence()
-                        .filter { it.isNotBlank() }
-                        .toList()
-                        .takeLast(4)
-                        .joinToString(" | ")
-                    if (tail.isNotBlank()) {
-                        SessionLogBus.emit(
-                            SessionLogBus.Entry(
-                                hostId = hostId,
-                                level = SessionLogBus.LogLevel.WARN,
-                                message = "Mosh client tail: $tail"
-                            )
-                        )
-                    }
-                    closeSessionAfterShellExit(
-                        hostId = hostId,
-                        reason = "Mosh client exited (code ${finishedSession.exitStatus})"
-                    )
-                }
+                handleMoshClientFinished(hostId, finishedSession)
             }
 
             override fun onCopyTextToClipboard(session: TerminalSession, text: String?) = Unit
@@ -1400,7 +1385,107 @@ class SessionService : Service() {
                 term.updateSize(initialSize.first, initialSize.second, 0, 0)
             }
         }
-        return MoshBinding(session = session)
+        return MoshBinding(
+            session = session,
+            moshConnect = moshConnect,
+            terminalEmulation = terminalEmulation
+        )
+    }
+
+    private fun handleMoshClientFinished(hostId: String, finishedSession: TerminalSession) {
+        serviceScope.launch {
+            moshTranscriptPublishJobs.remove(hostId)?.cancel()
+            val transcript = finishedSession.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+            val tail = transcript
+                .lineSequence()
+                .filter { it.isNotBlank() }
+                .toList()
+                .takeLast(4)
+                .joinToString(" | ")
+            if (tail.isNotBlank()) {
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Mosh client tail: $tail"
+                    )
+                )
+            }
+            if (!activeJobs.containsKey(hostId)) return@launch
+            val connection = activeConnections[hostId] ?: return@launch
+            val moshBinding = connection.moshBinding ?: return@launch
+            if (moshBinding.session !== finishedSession) return@launch
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "Mosh client exited (code ${finishedSession.exitStatus}). Reconnecting..."
+                )
+            )
+            updateSessionSnapshot(
+                sessionId = hostId,
+                host = connection.host,
+                mode = ConnectionMode.SSH,
+                status = SessionStatus.CONNECTING,
+                message = "Mosh disconnected. Reconnecting..."
+            )
+            scheduleMoshReconnect(hostId)
+        }
+    }
+
+    private fun scheduleMoshReconnect(hostId: String) {
+        if (moshReconnectJobs[hostId]?.isActive == true) return
+        moshReconnectJobs[hostId] = serviceScope.launch {
+            var attempt = 0
+            try {
+                while (isActive && activeJobs.containsKey(hostId)) {
+                    val connection = activeConnections[hostId] ?: break
+                    val moshBinding = connection.moshBinding ?: break
+                    attempt += 1
+                    if (attempt > 1) {
+                        val backoff = min(
+                            MOSH_RECONNECT_MAX_DELAY_MS,
+                            MOSH_RECONNECT_BASE_DELAY_MS * (1L shl (attempt - 2).coerceAtMost(6))
+                        )
+                        delay(backoff)
+                    }
+                    val newBinding = runCatching {
+                        startMoshClient(
+                            hostId = hostId,
+                            host = connection.host,
+                            moshConnect = moshBinding.moshConnect,
+                            terminalEmulation = moshBinding.terminalEmulation
+                        )
+                    }.onFailure { error ->
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = hostId,
+                                level = SessionLogBus.LogLevel.WARN,
+                                message = "Mosh reconnect attempt $attempt failed: ${error.message ?: "unknown error"}"
+                            )
+                        )
+                    }.getOrNull() ?: continue
+                    activeConnections[hostId] = connection.copy(moshBinding = newBinding)
+                    updateSessionSnapshot(
+                        sessionId = hostId,
+                        host = connection.host,
+                        mode = ConnectionMode.SSH,
+                        status = SessionStatus.ACTIVE,
+                        message = "Mosh session reconnected"
+                    )
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = hostId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Mosh reconnected after $attempt attempt(s)."
+                        )
+                    )
+                    return@launch
+                }
+            } finally {
+                moshReconnectJobs.remove(hostId)
+            }
+        }
     }
 
     private fun scheduleMoshTranscriptSnapshot(hostId: String, session: TerminalSession) {
@@ -1846,6 +1931,7 @@ class SessionService : Service() {
         if (activeJobs.containsKey(sessionId)) {
             updateSessionNotifications()
         }
+        publishWidgetSessionState()
         UiDebugLog.result(
             "sessionSnapshot",
             true,
@@ -1859,6 +1945,12 @@ class SessionService : Service() {
     private fun removeSessionSnapshot(hostId: String) {
         sessionSnapshots.value = sessionSnapshots.value.filterNot { it.hostId == hostId }
         updateSessionNotifications()
+        publishWidgetSessionState()
+    }
+
+    private fun publishWidgetSessionState() {
+        WidgetSessionStore.write(this, sessionSnapshots.value)
+        HostWidgets.updateAll(this)
     }
 
     private fun updateSessionNotifications() {
@@ -1977,7 +2069,7 @@ class SessionService : Service() {
         private const val STOP_SESSION_REQUEST_CODE = 19_243
         private const val NOTIFICATION_ID_BASE = 42_000
         private const val ACTION_STOP_ALL = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_ALL"
-        private const val ACTION_STOP_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_SESSION"
+        const val ACTION_STOP_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_SESSION"
         const val ACTION_OPEN_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSION"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
@@ -1992,6 +2084,8 @@ class SessionService : Service() {
         private const val MOSH_DEFAULT_COLUMNS = 120
         private const val MOSH_DEFAULT_ROWS = 40
         private const val MOSH_TRANSCRIPT_ROWS = 2000
+        private const val MOSH_RECONNECT_BASE_DELAY_MS = 1_000L
+        private const val MOSH_RECONNECT_MAX_DELAY_MS = 15_000L
         private val HEX_DIGITS = "0123456789ABCDEF".toCharArray()
         private val MOSH_CONNECT_PATTERN = Regex("""MOSH CONNECT\s+(\d+)\s+([A-Za-z0-9+/=]+)""")
     }
@@ -2015,7 +2109,9 @@ class SessionService : Service() {
     )
 
     private data class MoshBinding(
-        val session: TerminalSession
+        val session: TerminalSession,
+        val moshConnect: MoshConnect,
+        val terminalEmulation: TerminalEmulation
     )
 
     private data class SftpBinding(

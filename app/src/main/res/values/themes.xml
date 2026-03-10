@@ -5,36 +5,10 @@
         <item name="android:navigationBarColor">@color/color_vanilla</item>
     </style>
 
-    <style name="Theme.SSHPeaches.PostLight" parent="Theme.Material3.Light.NoActionBar">
-        <item name="android:windowBackground">@color/color_vanilla</item>
-        <item name="android:statusBarColor">@color/color_vanilla</item>
-        <item name="android:navigationBarColor">@color/color_vanilla</item>
-    </style>
-
-    <style name="Theme.SSHPeaches.PostDark" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="android:windowBackground">@color/color_hard_black</item>
-        <item name="android:statusBarColor">@color/color_hard_black</item>
-        <item name="android:navigationBarColor">@color/color_hard_black</item>
-    </style>
-
     <style name="Theme.SSHPeaches.Starting" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">@color/color_vanilla</item>
-        <item name="windowSplashScreenBackground">@color/color_vanilla</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches_splash_black</item>
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches</item>
         <item name="postSplashScreenTheme">@style/Theme.SSHPeaches</item>
-    </style>
-
-    <style name="Theme.SSHPeaches.Starting.Light" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">@color/color_vanilla</item>
-        <item name="windowSplashScreenBackground">@color/color_vanilla</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches_splash_black</item>
-        <item name="postSplashScreenTheme">@style/Theme.SSHPeaches.PostLight</item>
-    </style>
-
-    <style name="Theme.SSHPeaches.Starting.Dark" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">@color/color_hard_black</item>
-        <item name="windowSplashScreenBackground">@color/color_hard_black</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches_splash_white</item>
-        <item name="postSplashScreenTheme">@style/Theme.SSHPeaches.PostDark</item>
     </style>
 </resources>

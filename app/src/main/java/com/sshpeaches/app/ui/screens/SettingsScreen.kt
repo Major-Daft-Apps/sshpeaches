@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -36,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -109,7 +112,7 @@ fun SettingsScreen(
     val terminalExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = remember { mutableStateOf(false) }
     val themeOptions = listOf(
-        ThemeMode.SYSTEM to "System",
+        ThemeMode.SYSTEM to "Automatic",
         ThemeMode.LIGHT to "Light",
         ThemeMode.DARK to "Dark"
     )
@@ -735,7 +738,12 @@ fun SettingsScreen(
                         },
                         label = { Text("Enter PIN") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(pinRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(pinRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.NumberPassword
+                        )
                     )
                     OutlinedTextField(
                         value = confirmPinEntry.value,
@@ -747,7 +755,12 @@ fun SettingsScreen(
                         },
                         label = { Text("Confirm PIN") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPinRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(confirmPinRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.NumberPassword
+                        )
                     )
                 }
             },

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -23,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
@@ -82,6 +85,11 @@ fun LockScreenOverlay(
                 label = { Text("PIN") },
                 singleLine = true,
                 visualTransformation = TailRevealPasswordVisualTransformation(pinRevealIndex.intValue),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.NumberPassword
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp)
