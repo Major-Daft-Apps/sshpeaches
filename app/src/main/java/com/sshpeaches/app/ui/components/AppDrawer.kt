@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -38,12 +39,9 @@ fun AppDrawer(
     onQuickConnect: () -> Unit
 ) {
     val drawerScroll = rememberScrollState()
-    val isDarkDrawer = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val activityBarLogo = if (isDarkDrawer) {
-        com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_activitybar
-    } else {
-        com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_activitybar_black
-    }
+    val isDarkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val activityBarLogo = com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches_activitybar
+    val logoTint = if (isDarkSurface) null else Color(0xFFFA992A)
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -56,6 +54,7 @@ fun AppDrawer(
             androidx.compose.foundation.Image(
                 painter = painterResource(id = activityBarLogo),
                 contentDescription = "SSHPeaches logo",
+                colorFilter = logoTint?.let { ColorFilter.tint(it) },
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(12.dp))

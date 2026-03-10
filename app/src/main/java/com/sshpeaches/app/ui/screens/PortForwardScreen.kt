@@ -299,7 +299,12 @@ fun PortForwardScreen(
                         value = labelState.value,
                         onValueChange = { labelState.value = it },
                         label = { Text("Label") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        )
                     )
                     Text("Type: Local (SSH -L)", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(

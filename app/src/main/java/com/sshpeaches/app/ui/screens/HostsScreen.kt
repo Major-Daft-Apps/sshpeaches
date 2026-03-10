@@ -121,7 +121,7 @@ fun HostsScreen(
     val newGroupNameState = remember { mutableStateOf("") }
     val newGroupError = remember { mutableStateOf<String?>(null) }
     val notesState = remember { mutableStateOf("") }
-    val authState = remember { mutableStateOf(AuthMethod.IDENTITY) }
+    val authState = remember { mutableStateOf(AuthMethod.PASSWORD) }
     val authMenuExpanded = remember { mutableStateOf(false) }
     val preferredIdentityIdState = remember { mutableStateOf<String?>(null) }
     val identityExpanded = remember { mutableStateOf(false) }
@@ -209,7 +209,12 @@ fun HostsScreen(
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     importPassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -259,7 +264,7 @@ fun HostsScreen(
         newGroupNameState.value = ""
         newGroupError.value = null
         notesState.value = host?.notes ?: ""
-        authState.value = host?.preferredAuth ?: AuthMethod.IDENTITY
+        authState.value = host?.preferredAuth ?: AuthMethod.PASSWORD
         preferredIdentityIdState.value = host?.preferredIdentityId
         useMoshState.value = host?.useMosh ?: false
         terminalProfileIdState.value = host?.terminalProfileId
@@ -459,7 +464,7 @@ fun HostsScreen(
                         onValueChange = { nameState.value = it },
                         label = { Text("Name") },
                         keyboardOptions = KeyboardOptions(
-                            autoCorrect = true,
+                            autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
                             keyboardType = KeyboardType.Text
                         ),
@@ -560,6 +565,37 @@ fun HostsScreen(
                             keyboardType = KeyboardType.Text
                         )
                     )
+                    ExposedDropdownMenuBox(
+                        expanded = authMenuExpanded.value,
+                        onExpandedChange = { authMenuExpanded.value = !authMenuExpanded.value }
+                    ) {
+                        TextField(
+                            value = authState.value.toSentenceCaseLabel(),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Authentication") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authMenuExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.HOST_DIALOG_AUTH_FIELD)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = authMenuExpanded.value,
+                            onDismissRequest = { authMenuExpanded.value = false }
+                        ) {
+                            AuthMethod.values().forEach { method ->
+                                DropdownMenuItem(
+                                    text = { Text(method.toSentenceCaseLabel()) },
+                                    modifier = Modifier.testTag(UiTestTags.hostDialogAuthOption(method.name)),
+                                    onClick = {
+                                        authState.value = method
+                                        authMenuExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = passwordState.value,
                         onValueChange = { updatePasswordStateWithReveal(passwordState, passwordRevealIndex, it) },
@@ -613,37 +649,6 @@ fun HostsScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_ERROR)
                         )
-                    }
-                    ExposedDropdownMenuBox(
-                        expanded = authMenuExpanded.value,
-                        onExpandedChange = { authMenuExpanded.value = !authMenuExpanded.value }
-                    ) {
-                        TextField(
-                            value = authState.value.toSentenceCaseLabel(),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Authentication") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authMenuExpanded.value) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                                .testTag(UiTestTags.HOST_DIALOG_AUTH_FIELD)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = authMenuExpanded.value,
-                            onDismissRequest = { authMenuExpanded.value = false }
-                        ) {
-                            AuthMethod.values().forEach { method ->
-                                DropdownMenuItem(
-                                    text = { Text(method.toSentenceCaseLabel()) },
-                                    modifier = Modifier.testTag(UiTestTags.hostDialogAuthOption(method.name)),
-                                    onClick = {
-                                        authState.value = method
-                                        authMenuExpanded.value = false
-                                    }
-                                )
-                            }
-                        }
                     }
                     val availableIdentities = identities
                     ExposedDropdownMenuBox(
@@ -1028,7 +1033,7 @@ fun HostsScreen(
                         label = { Text("Group name") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
-                            autoCorrect = true,
+                            autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
                             keyboardType = KeyboardType.Text
                         ),

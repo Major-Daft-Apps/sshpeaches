@@ -135,14 +135,10 @@ fun KeyboardEditorScreen(
             }
         }
 
-        Text(
-            "Modifier keys and combination toggles co-exist: modifiers send plain Ctrl/Alt/Shift; combination toggles apply to the next selected base key.",
-            style = MaterialTheme.typography.bodySmall
-        )
-
         TextButton(onClick = onReset) {
             Text("Reset layout")
         }
+
     }
 }
 

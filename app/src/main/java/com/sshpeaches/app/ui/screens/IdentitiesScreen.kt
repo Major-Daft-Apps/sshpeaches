@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -59,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -437,58 +440,17 @@ fun IdentitiesScreen(
                                         .size(20.dp)
                                         .clickable { openCopyKeyDialog(identity) }
                                 )
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .padding(start = 8.dp)
-                                        .clickable { openDialog(identity) }
-                                )
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable { onDelete(identity.id) }
-                                )
                             }
                         }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(onClick = { openDialog(identity) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.size(4.dp))
-                                    Text("Edit")
-                                }
-                                TextButton(onClick = { onDelete(identity.id) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.size(4.dp))
-                                    Text("Delete")
-                                }
-                            }
-                            TextButton(onClick = { openCopyKeyDialog(identity) }) {
-                                Icon(
-                                    Icons.Default.VpnKey,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.size(4.dp))
-                                Text("Install Key To Host")
-                            }
+                            TextButton(onClick = { openDialog(identity) }) { Text("Edit") }
+                            TextButton(onClick = { onDelete(identity.id) }) { Text("Delete") }
+                            TextButton(onClick = { openCopyKeyDialog(identity) }) { Text("Install Key To Host") }
                         }
                     }
                 }
@@ -514,7 +476,12 @@ fun IdentitiesScreen(
                         value = labelState.value,
                         onValueChange = { labelState.value = it },
                         label = { Text("Label") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        )
                     )
                     KeyInputRow(
                         label = "Private key",
@@ -566,7 +533,12 @@ fun IdentitiesScreen(
                         onValueChange = { updatePasswordStateWithReveal(dialogKeyPassphraseState, dialogKeyPassphraseRevealIndex, it) },
                         label = { Text("Key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     Button(onClick = {
                         generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
@@ -785,7 +757,12 @@ fun IdentitiesScreen(
                         },
                         label = { Text("Key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(generationPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(generationPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     OutlinedTextField(
                         value = generationConfirmPassphrase.value,
@@ -795,7 +772,12 @@ fun IdentitiesScreen(
                         },
                         label = { Text("Confirm passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(generationConfirmPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(generationConfirmPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     generationError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -891,14 +873,24 @@ fun IdentitiesScreen(
                         onValueChange = { updatePasswordStateWithReveal(copyHostPassword, copyHostPasswordRevealIndex, it) },
                         label = { Text("Host password (optional)") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(copyHostPasswordRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(copyHostPasswordRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     OutlinedTextField(
                         value = copyIdentityPassphrase.value,
                         onValueChange = { updatePasswordStateWithReveal(copyIdentityPassphrase, copyIdentityPassphraseRevealIndex, it) },
                         label = { Text("Identity key passphrase (optional)") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(copyIdentityPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(copyIdentityPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     copyError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -989,7 +981,12 @@ fun IdentitiesScreen(
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(sharePassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(sharePassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     OutlinedTextField(
                         value = shareConfirmPassphraseState.value,
@@ -999,7 +996,12 @@ fun IdentitiesScreen(
                         },
                         label = { Text("Confirm passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(shareConfirmPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(shareConfirmPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     sharePassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -1057,7 +1059,12 @@ fun IdentitiesScreen(
                         },
                         label = { Text("Passphrase") },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue)
+                        visualTransformation = TailRevealPasswordVisualTransformation(importPassphraseRevealIndex.intValue),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
                     )
                     importPassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
