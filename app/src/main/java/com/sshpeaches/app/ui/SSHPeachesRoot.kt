@@ -161,6 +161,7 @@ import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.util.snippetReference
 import java.util.UUID
 import org.json.JSONArray
@@ -2209,7 +2210,11 @@ private fun AboutDialog(
                         .clip(RoundedCornerShape(16.dp)),
                     contentScale = ContentScale.Crop
                 )
-                val appVersion = stringResource(id = R.string.app_version)
+                val appVersion = if (BuildConfig.DEBUG) {
+                    "${BuildConfig.VERSION_NAME} (debug)"
+                } else {
+                    BuildConfig.VERSION_NAME
+                }
                 Text(
                     stringResource(id = R.string.about_version, appVersion),
                     style = MaterialTheme.typography.titleMedium
