@@ -9,9 +9,14 @@
 # IDE
 .idea/
 *.iml
+.firebase/
+functions/node_modules/
+functions/.env*
 
 # Android local config
 local.properties
+.keystore/
+app/release/
 
 # Misc
 .DS_Store
