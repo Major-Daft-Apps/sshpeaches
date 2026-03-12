@@ -24,6 +24,9 @@ interface HostDao {
 
     @Query("UPDATE hosts SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean)
+
+    @Query("SELECT COUNT(*) FROM hosts")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -42,6 +45,9 @@ interface IdentityDao {
 
     @Query("UPDATE identities SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean)
+
+    @Query("SELECT COUNT(*) FROM identities")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -60,6 +66,9 @@ interface PortForwardDao {
 
     @Query("UPDATE port_forwards SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean)
+
+    @Query("SELECT COUNT(*) FROM port_forwards")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -78,4 +87,7 @@ interface SnippetDao {
 
     @Query("UPDATE snippets SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean)
+
+    @Query("SELECT COUNT(*) FROM snippets")
+    suspend fun countAll(): Int
 }
