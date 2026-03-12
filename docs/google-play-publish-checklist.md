@@ -1,6 +1,6 @@
 # Google Play Publish Checklist (SSHPeaches)
 
-Last updated: 2026-03-07
+Last updated: 2026-03-11
 
 ## Status Legend
 - `DONE`: Completed and verified
@@ -19,11 +19,11 @@ Last updated: 2026-03-07
 |---|---|---|---|---|---|---|
 | GP-01 | Build | Target API level meets Play requirement | Engineering | DONE | `app/build.gradle.kts` (`targetSdk = 36`) | Keep target API current each cycle |
 | GP-02 | Build | App ID and versioning set | Engineering | DONE | `applicationId`, `versionCode`, `versionName` in `app/build.gradle.kts` | Increment `versionCode` per release |
-| GP-03 | Build | Produce release AAB (`:app:bundleRelease`) | Engineering | BLOCKED | Build attempts failed in local env (`NO_RELEASE_BUNDLE_OUTPUT`) | Fix release task stability and generate signed `.aab` |
-| GP-04 | Build | Release signing/upload key configured | Engineering | TODO | No `signingConfigs` found in `app/build.gradle.kts` | Add keystore strategy and verify upload flow |
+| GP-03 | Build | Produce release AAB (`:app:bundleRelease`) | Engineering | DONE | `app\\release\\app-release.aab` exists | Verify signature + upload to internal test track |
+| GP-04 | Build | Release signing/upload key configured | Engineering | PARTIAL | `.keystore\\sshpeaches` exists; signing config wired in `app/build.gradle.kts` | Set `SSHPEACHES_*` keystore properties and verify signed AAB |
 | GP-05 | Build | Manifest export rules valid | Engineering | DONE | `MainActivity exported=true`, `SessionService exported=false` in `app/src/main/AndroidManifest.xml` | Re-check after manifest changes |
 | GP-06 | Permissions | Runtime notification permission flow present | Engineering | DONE | Request logic in `app/src/main/java/com/sshpeaches/app/MainActivity.kt` | Keep Android version guards intact |
-| GP-07 | Permissions | Permission set is least-privilege and justified | Engineering | PARTIAL | Camera + foreground service + network perms declared | Re-validate every permission before release cut |
+| GP-07 | Permissions | Permission set is least-privilege and justified | Engineering | PARTIAL | AD ID + AdServices permissions removed in `app/src/main/AndroidManifest.xml` | Re-validate remaining permissions before release cut |
 | GP-08 | Privacy | Privacy policy URL exists in app | Policy | DONE | `privacy_policy_url` in `app/src/main/res/values/strings.xml` | Ensure Play listing uses same URL |
 | GP-09 | Privacy | Telemetry defaults to opt-in | Engineering | DONE | Defaults false in `SettingsStore`; gated init in release telemetry | Keep defaults false unless policy changes |
 | GP-10 | Privacy | Data safety form completed in Play Console | Policy | TODO | Console-only | Fill data types, handling, sharing, and security sections |
@@ -45,9 +45,8 @@ Last updated: 2026-03-07
 | GP-26 | Ops | Post-release monitoring owner assigned | Engineering | PARTIAL | Crashlytics wired for release | Define on-call owner and response thresholds |
 
 ## Priority Next Actions
-1. Fix `:app:bundleRelease` so a release `.aab` is consistently produced.
-2. Configure release signing/upload key and verify Play App Signing workflow.
+1. Configure release signing/upload key and verify Play App Signing workflow.
+2. Make sure the release `.aab` is signed and uploadable (current path: `app\\release\\app-release.aab`).
 3. Complete Play Console App content: Data safety, Ads, App access, Content rating, Target audience.
 4. Finalize listing assets/text and support contact details.
 5. Run release-candidate validation: instrumented tests, lint, pre-launch report.
-
