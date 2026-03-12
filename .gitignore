@@ -17,6 +17,7 @@ functions/.env*
 local.properties
 .keystore/
 app/release/
+app/google-services.json
 
 # Misc
 .DS_Store
