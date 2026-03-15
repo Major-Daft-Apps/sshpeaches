@@ -53,3 +53,11 @@ docs/user-wiki/developer/Google-Play-Publish-Checklist.md
 /step*.xml
 /term0.xml
 /screen_now.png
+
+# Root-level local image assets (keep local, do not track)
+/banner.png
+/keyboard.png
+/major-daft-apps-white.png
+/major-daft-apps.png
+/sshpeaches-activitybar.png
+/sshpeaches.png
