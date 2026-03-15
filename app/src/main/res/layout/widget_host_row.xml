@@ -15,49 +15,37 @@
         android:maxLines="1"
         android:textSize="12sp" />
 
-    <Button
+    <ImageButton
         android:id="@+id/widget_btn_ssh"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:layout_marginStart="4dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="2dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="2dp"
-        android:text="SSH"
-        android:textAllCaps="false"
-        android:textSize="11sp" />
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/widget_action_ssh"
+        android:padding="6dp"
+        android:src="@drawable/ic_widget_terminal"
+        android:tint="?android:attr/textColorPrimary" />
 
-    <Button
+    <ImageButton
         android:id="@+id/widget_btn_sftp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:layout_marginStart="4dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="2dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="2dp"
-        android:text="SFTP"
-        android:textAllCaps="false"
-        android:textSize="11sp" />
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/widget_action_sftp"
+        android:padding="6dp"
+        android:src="@drawable/ic_widget_drive_file_move"
+        android:tint="?android:attr/textColorPrimary" />
 
-    <Button
+    <ImageButton
         android:id="@+id/widget_btn_scp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:layout_marginStart="4dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="2dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="2dp"
-        android:text="SCP"
-        android:textAllCaps="false"
-        android:textSize="11sp" />
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/widget_action_scp"
+        android:padding="6dp"
+        android:src="@drawable/ic_widget_save"
+        android:tint="?android:attr/textColorPrimary" />
 
 </LinearLayout>

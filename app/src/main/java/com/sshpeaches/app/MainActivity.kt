@@ -29,11 +29,18 @@ import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
@@ -60,6 +67,7 @@ class MainActivity : FragmentActivity() {
     private var biometricAvailable: Boolean = false
     private var appUiBootstrapped = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val requestedStartupRoute = mutableStateOf<String?>(null)
     private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
     private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
     private val corePermissionsRefreshTick = mutableStateOf(0)
@@ -124,6 +132,7 @@ class MainActivity : FragmentActivity() {
             UiDebugLog.result("notificationPermissionCheck", true, "already-granted")
             return
         }
+        markNotificationPermissionRequested()
         UiDebugLog.action("notificationPermissionRequest", "requesting=true")
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
@@ -151,6 +160,7 @@ class MainActivity : FragmentActivity() {
             true
         }
         val notificationsGranted = postNotificationsGranted && notificationsEnabled
+        val notificationsRemediation = notificationPermissionRemediation(postNotificationsGranted)
 
         val foregroundServiceGranted = ContextCompat.checkSelfPermission(
             this,
@@ -162,11 +172,7 @@ class MainActivity : FragmentActivity() {
                 this,
                 Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC
             ) == PackageManager.PERMISSION_GRANTED
-            val connectedDeviceGranted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
-            ) == PackageManager.PERMISSION_GRANTED
-            dataSyncGranted && connectedDeviceGranted
+            dataSyncGranted
         } else {
             true
         }
@@ -176,15 +182,42 @@ class MainActivity : FragmentActivity() {
                 id = "notifications",
                 title = "Notifications",
                 description = "Required for active SSH session foreground service controls and status.",
-                granted = notificationsGranted
+                granted = notificationsGranted,
+                remediation = notificationsRemediation
             ),
             CorePermissionStatus(
                 id = "foreground_service",
                 title = "Foreground Service",
                 description = "Required to keep SSH sessions alive in background mode.",
-                granted = foregroundServiceGranted && foregroundServiceTypeGranted
+                granted = foregroundServiceGranted && foregroundServiceTypeGranted,
+                remediation = CorePermissionRemediation.SETTINGS
             )
         )
+    }
+
+    private fun notificationPermissionRemediation(postNotificationsGranted: Boolean): CorePermissionRemediation {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || postNotificationsGranted) {
+            return CorePermissionRemediation.REQUEST
+        }
+        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+            return CorePermissionRemediation.REQUEST
+        }
+        return if (wasNotificationPermissionRequested()) {
+            CorePermissionRemediation.SETTINGS
+        } else {
+            CorePermissionRemediation.REQUEST
+        }
+    }
+
+    private fun wasNotificationPermissionRequested(): Boolean =
+        getSharedPreferences(CORE_PERMISSION_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)
+
+    private fun markNotificationPermissionRequested() {
+        getSharedPreferences(CORE_PERMISSION_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true)
+            .apply()
     }
 
     private fun ensureSessionServiceConnection() {
@@ -218,6 +251,7 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.action("MainActivity.onCreate")
         UiDebugLog.result("MainActivity.onCreate", true)
         setupBiometricPrompt()
+        restorePendingIntentState(savedInstanceState)
         lifecycleScope.launch {
             appViewModel.uiState.collect { state ->
                 latestAllowBackgroundSessions = state.allowBackgroundSessions
@@ -247,6 +281,7 @@ class MainActivity : FragmentActivity() {
                     uiState.portForwards,
                     uiState.snippets,
                     uiState.autoStartForwards,
+                    uiState.hostKeyPromptEnabled,
                     uiState.autoTrustHostKey,
                     uiState.hosts,
                     uiState.terminalEmulation
@@ -270,6 +305,7 @@ class MainActivity : FragmentActivity() {
                             availableSnippets = uiState.snippets,
                             autoStartForwards = uiState.autoStartForwards,
                             autoTrustUnknownHostKey = uiState.autoTrustHostKey,
+                            hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
                             allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id },
                             terminalEmulation = uiState.terminalEmulation
                         )
@@ -408,8 +444,7 @@ class MainActivity : FragmentActivity() {
                     onCrashReportsToggle = viewModel::setCrashReports,
                     onAnalyticsToggle = viewModel::setAnalytics,
                     onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
-                    onIncludeIdentitiesToggle = viewModel::setIncludeIdentities,
-                    onIncludeSettingsToggle = viewModel::setIncludeSettings,
+                    onIncludeSecretsInQrToggle = viewModel::setIncludeSecretsInQr,
                     onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
                     onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
                     onAutoTrustHostKeyToggle = viewModel::setAutoTrustHostKey,
@@ -474,19 +509,26 @@ class MainActivity : FragmentActivity() {
                         )
                     },
                     onHostDelete = viewModel::deleteHost,
+                    onImportHost = viewModel::importHost,
+                    onHostOsMetadataImported = viewModel::updateHostOsMetadata,
                     onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
                     onPortForwardAdd = viewModel::addPortForward,
+                    onImportPortForward = viewModel::importPortForward,
                     onPortForwardUpdate = viewModel::updatePortForward,
                     onPortForwardDelete = viewModel::deletePortForward,
                     onStartSession = startSession,
                     onStopSession = stopSession,
                     onIdentityAdd = viewModel::addIdentity,
+                    onImportIdentity = viewModel::importIdentity,
                     onIdentityUpdate = viewModel::updateIdentity,
                     onIdentityDelete = viewModel::deleteIdentity,
+                    onImportHostPasswordPayload = viewModel::importHostPasswordPayload,
                     onImportIdentityKey = viewModel::importIdentityKeyFromPayload,
                     onImportIdentityKeyPlain = viewModel::importIdentityKeyPlain,
                     onStoreIdentityPublicKey = viewModel::storeIdentityPublicKey,
+                    onImportIdentityPublicKey = viewModel::importIdentityPublicKey,
                     onStoreIdentityKeyPassphrase = viewModel::storeIdentityKeyPassphrase,
+                    onImportIdentityKeyPassphrasePayload = viewModel::importIdentityKeyPassphrasePayload,
                     onCopyIdentityKeyToHost = { identityId, hostId, hostPassword, identityPassphrase ->
                         val host = uiState.hosts.firstOrNull { it.id == hostId }
                         if (host == null) {
@@ -503,8 +545,11 @@ class MainActivity : FragmentActivity() {
                     },
                     onRemoveIdentityKey = viewModel::removeIdentityKey,
                     onKeyboardSlotChange = viewModel::updateKeyboardSlot,
+                    onImportKeyboardLayout = viewModel::importKeyboardLayout,
                     onKeyboardReset = viewModel::resetKeyboardLayout,
+                    onImportTerminalProfiles = viewModel::importTerminalProfiles,
                     onSnippetAdd = viewModel::addSnippet,
+                    onImportSnippet = viewModel::importSnippet,
                     onSnippetUpdate = viewModel::updateSnippet,
                     onSnippetDelete = viewModel::deleteSnippet,
                     onToggleFavorite = viewModel::toggleFavorite,
@@ -538,10 +583,22 @@ class MainActivity : FragmentActivity() {
                     },
                     onOpenAppPermissionSettings = {
                         openAppPermissionSettings()
+                    },
+                    requestedStartupRoute = requestedStartupRoute.value,
+                    onStartupRouteHandled = {
+                        requestedStartupRoute.value = null
                     }
                 )
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_REQUESTED_OPEN_SESSION_ID, requestedOpenSessionHostId.value)
+        outState.putString(STATE_REQUESTED_STARTUP_ROUTE, requestedStartupRoute.value)
+        outState.putString(STATE_PENDING_WIDGET_HOST_ID, pendingWidgetConnectHostId.value)
+        outState.putString(STATE_PENDING_WIDGET_MODE, pendingWidgetConnectMode.value?.name)
     }
 
     override fun onDestroy() {
@@ -623,6 +680,9 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_START_ROUTE)
+            ?.takeIf(::isSupportedStartupRoute)
+            ?.let { requestedStartupRoute.value = it }
         when (intent?.action) {
             SessionService.ACTION_OPEN_SESSION -> {
                 val hostId = intent.getStringExtra(SessionService.EXTRA_HOST_ID).orEmpty()
@@ -650,9 +710,42 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun restorePendingIntentState(savedInstanceState: Bundle?) {
+        if (savedInstanceState == null) return
+        requestedOpenSessionHostId.value =
+            savedInstanceState.getString(STATE_REQUESTED_OPEN_SESSION_ID)
+        requestedStartupRoute.value =
+            savedInstanceState.getString(STATE_REQUESTED_STARTUP_ROUTE)
+                ?.takeIf(::isSupportedStartupRoute)
+        pendingWidgetConnectHostId.value =
+            savedInstanceState.getString(STATE_PENDING_WIDGET_HOST_ID)
+        pendingWidgetConnectMode.value =
+            savedInstanceState.getString(STATE_PENDING_WIDGET_MODE)
+                ?.let { value -> runCatching { ConnectionMode.valueOf(value) }.getOrNull() }
+    }
+
+    private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
+        Routes.FAVORITES,
+        Routes.HOSTS,
+        Routes.IDENTITIES,
+        Routes.FORWARDS,
+        Routes.SNIPPETS,
+        Routes.KEYBOARD,
+        Routes.THEME_EDITOR,
+        Routes.SETTINGS,
+        Routes.OPEN_SOURCE_LICENSES
+    )
+
     companion object {
         const val ACTION_WIDGET_CONNECT = "com.majordaftapps.sshpeaches.app.action.WIDGET_CONNECT"
         const val EXTRA_WIDGET_HOST_ID = "extra_widget_host_id"
         const val EXTRA_WIDGET_MODE = "extra_widget_mode"
+        const val EXTRA_START_ROUTE = "extra_start_route"
+        private const val CORE_PERMISSION_PREFS = "core_permission_state"
+        private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
+        private const val STATE_REQUESTED_OPEN_SESSION_ID = "state_requested_open_session_id"
+        private const val STATE_REQUESTED_STARTUP_ROUTE = "state_requested_startup_route"
+        private const val STATE_PENDING_WIDGET_HOST_ID = "state_pending_widget_host_id"
+        private const val STATE_PENDING_WIDGET_MODE = "state_pending_widget_mode"
     }
 }

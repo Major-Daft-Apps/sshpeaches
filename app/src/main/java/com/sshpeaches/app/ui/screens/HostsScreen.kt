@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +98,7 @@ fun HostsScreen(
     editMode: Boolean = false,
     canStoreCredentials: Boolean,
     onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
@@ -110,7 +112,7 @@ fun HostsScreen(
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
-    val search = remember { mutableStateOf("") }
+    val search = rememberSaveable { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
     val showDialog = remember { mutableStateOf(false) }
     val editingHost = remember { mutableStateOf<HostConnection?>(null) }
@@ -179,7 +181,7 @@ fun HostsScreen(
                     imported.startupScript,
                     imported.backgroundBehavior,
                     imported.terminalProfileId,
-                    processed.data.legacyPassword,
+                    null,
                     processed.data.targetId
                 )
                 if (processed.data.encryptedPasswordPayload != null) {
@@ -228,11 +230,15 @@ fun HostsScreen(
                 TextButton(onClick = {
                     val phrase = importPassphraseState.value
                     when {
-                        phrase.length < 4 -> importPassphraseError.value = "Enter the export passphrase."
+                        phrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH ->
+                            importPassphraseError.value =
+                                "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         payload.isBlank() -> importPassphraseError.value = "Encrypted payload missing."
                         else -> {
                             runCatching {
-                                SecurityManager.importHostPasswordPayload(targetId, payload, phrase)
+                                check(onImportPasswordPayload(targetId, payload, phrase)) {
+                                    "Incorrect passphrase."
+                                }
                             }.onSuccess {
                                 Toast.makeText(context, "Password imported", Toast.LENGTH_SHORT).show()
                                 pendingEncryptedImport.value = null
@@ -310,14 +316,19 @@ fun HostsScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TextField(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(UiTestTags.HOST_SEARCH_INPUT),
                     value = search.value,
                     onValueChange = { search.value = it },
                     placeholder = { Text("Search hosts") },
                     trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
                 )
                 Column {
-                    IconButton(onClick = { showMenu.value = true }) {
+                    IconButton(
+                        onClick = { showMenu.value = true },
+                        modifier = Modifier.testTag(UiTestTags.HOST_SORT_FIELD)
+                    ) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Sort")
                     }
                     DropdownMenu(expanded = showMenu.value, onDismissRequest = { showMenu.value = false }) {
@@ -372,10 +383,20 @@ fun HostsScreen(
                                     )
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    TextButton(onClick = { onOpenSession(session.hostId) }) {
+                                    TextButton(
+                                        onClick = { onOpenSession(session.hostId) },
+                                        modifier = Modifier.testTag(
+                                            UiTestTags.openSessionAction(session.hostId, "open")
+                                        )
+                                    ) {
                                         Text("Open")
                                     }
-                                    TextButton(onClick = { onDisconnectSession(session.hostId) }) {
+                                    TextButton(
+                                        onClick = { onDisconnectSession(session.hostId) },
+                                        modifier = Modifier.testTag(
+                                            UiTestTags.openSessionAction(session.hostId, "disconnect")
+                                        )
+                                    ) {
                                         Text("Disconnect")
                                     }
                                 }

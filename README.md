@@ -1,67 +1,64 @@
-# SSHPeaches Android Draft
+# SSHPeaches for Android
 
-This repository now contains an initial Jetpack Compose-based Android application that mirrors the current product blueprint. The goal is to provide a working scaffold that we can iterate on rapidly while fleshing out real features.
+SSHPeaches is an Android SSH client for connecting to servers, managing saved hosts and keys, transferring files, and reusing common connection settings from one place.
 
-## Using The App (F-Droid / Google Play)
+If you installed SSHPeaches from F-Droid or Google Play, this repository includes the guides you need to get started and troubleshoot common issues.
 
-If you installed SSHPeaches and came here to learn how to use it:
+## Start Here
 
+- [User wiki home](docs/user-wiki/Home.md)
+- [Getting started](docs/user-wiki/Getting-Started.md)
+- [User guide](docs/user-wiki/User-Guide.md)
+- [Troubleshooting](docs/user-wiki/Troubleshooting.md)
 - [Documentation index](docs/README.md)
-- [Getting started](docs/getting-started.md)
-- [User guide](docs/user-guide.md)
-- [Troubleshooting](docs/troubleshooting.md)
 
-## Highlights
-- **Single-module (`app`) Compose app** targeting `minSdk 26`, `compileSdk 34`, Kotlin 1.9.22, AGP 8.2.2.
-- **Repository + ViewModel pattern** with Room-backed persistence for hosts, identities, port forwards, and snippets.
-- **Navigation shell** built with `ModalNavigationDrawer`, `NavHost`, and feature screens for Favorites, Hosts, Identities, Port Forwards, Snippets, and Settings.
-- **Quick Connect bottom sheet**, **About dialog**, and **drawer shortcuts** for Help/About consistent with the product spec.
-- **Composable building blocks** such as `HostCard`, section headers, and editor surfaces mapped to the UX document.
-- **Carbon Black (#191919) + Blazing Flame (#F15025)** palette wired through Material 3 theme helpers.
+## What You Can Do With SSHPeaches
 
-## Project Layout
-```
-app/
-  build.gradle.kts          // Android + Compose configuration
-  src/main/java/com/majordaftapps/sshpeaches/app/
-    MainActivity            // entry activity
-    SSHPeachesApplication   // app container initialization
-    data/                   // models + Room repository
-    ui/
-      SSHPeachesRoot.kt     // scaffolding, drawer, quick connect, about dialog
-      components/           // Host cards, drawer content, etc.
-      screens/              // Favorites, Hosts, Identities, Port forwards, Snippets
-      theme/                // Compose color + typography setup
-      navigation/           // drawer destinations + routes constants
-      state/                // AppUiState + ViewModel
-```
+- Open SSH terminal sessions
+- Browse and transfer files with SFTP
+- Copy files with SCP
+- Save hosts for one-tap reuse
+- Manage SSH identities and private keys
+- Set up local port forwards
+- Share or import hosts, identities, and forwards with QR codes
+- Save snippets for repeated commands
 
-## Running the project
-1. Install Android Studio Giraffe+ (or command-line tools) with Android SDK 34.
-2. Clone this repo and open it in Android Studio.
-3. Create a `local.properties` file at repo root pointing to your SDK, e.g.
-   ```
-   sdk.dir=/home/you/Android/Sdk
-   ```
-4. Sync Gradle; run `./gradlew assembleDebug` or hit *Run* in Android Studio.
+Minimum supported Android version: Android 8.0 (API 26).
 
-> **Note:** The automated `./gradlew :app:assembleDebug` invocation inside the CLI failed because no Android SDK was configured in this environment. Once `local.properties` references a valid SDK, the build completes normally.
+## Quick Start
 
-## Next steps
-- Expand SFTP and SCP workflows (SFTP console ergonomics, SCP dual-pane file browsing).
-- Continue refining Info panel editor and snippet automation workflows.
-- Extend QR workflows beyond single payload export/import.
-- Add ViewModel factories/DI (Hilt or Koin) to decouple the repository implementation.
-- Write UI tests for the major composables once functionality hardens.
+1. Open SSHPeaches.
+2. Use **Quick Connect** for a fast one-time connection, or open **Hosts** to save a server.
+3. Enter your host name or IP address, port, username, and authentication method.
+4. Connect and verify the server fingerprint if SSHPeaches prompts you.
+5. Save the host if you want to reuse it later for SSH, SFTP, or SCP.
+
+## Main Areas Of The App
+
+- **Favorites**: quick access to your starred hosts, identities, and forwards
+- **Hosts**: save servers and launch SSH, SFTP, or SCP
+- **Identities**: import and manage SSH keys
+- **Port Forwards**: create and manage local forwards
+- **Snippets**: store reusable commands
+- **Settings**: security, theme, terminal, and transfer preferences
+
+## Security Notes
+
+- Review host key fingerprints before trusting a server.
+- Set a PIN and enable biometric unlock in **Settings** if you want extra protection.
+- Private-key and password data exported through QR can be protected with an export passphrase.
+
+## Need Help?
+
+- Open the in-app drawer and tap **Help**
+- Read the [troubleshooting guide](docs/user-wiki/Troubleshooting.md)
+- Visit the support page: <https://majordaftapps.com/sshpeaches-support>
+- Report bugs or request features through this repository's GitHub issues
 
 ## License
-This project is licensed under the GNU General Public License v3.0.
-See `LICENSE`.
 
-## License Notices
-Open source notices are shown in-app from the About dialog.
-The Maven dependency notice inventory is generated into:
-`app/src/main/assets/licenses/maven_licenses.json`
+SSHPeaches is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
 
-To regenerate it:
-`powershell -ExecutionPolicy Bypass -File scripts/generate_maven_license_notices.ps1`
+## Open Source Notices
+
+Open source license notices are available in the app from **About**.

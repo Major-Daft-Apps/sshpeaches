@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
@@ -112,6 +113,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPack
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouter
 import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
 import com.termux.view.TerminalView
@@ -347,8 +349,8 @@ fun ConnectingScreen(
     val terminalViewClient = remember(request?.sessionId) {
         object : TerminalViewClient {
             override fun onScale(scale: Float): Float {
-                terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(9f, 28f)
-                terminalViewRef?.setTextSize(with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) })
+                terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(6f, 28f)
+                terminalViewRef?.setTextSize(with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) })
                 return 1f
             }
 
@@ -461,7 +463,7 @@ fun ConnectingScreen(
     }
     LaunchedEffect(terminalProfile.id) {
         terminalEngine.applyProfile(terminalProfile)
-        terminalViewRef?.setTextSize(with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) })
+        terminalViewRef?.setTextSize(with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) })
         terminalViewRef?.onScreenUpdated()
     }
     DisposableEffect(request?.sessionId) {
@@ -825,6 +827,7 @@ fun ConnectingScreen(
             .fillMaxSize()
             .background(Color.Black)
             .statusBarsPadding()
+            .testTag(UiTestTags.SCREEN_CONNECTING)
     ) {
         if (showTerminalSession) {
             Box(
@@ -844,7 +847,8 @@ fun ConnectingScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .weight(1f)
+                            .testTag(UiTestTags.CONNECTING_TERMINAL_PANEL),
                         color = Color(0xFF080808)
                     ) {
                         AndroidView(
@@ -864,7 +868,7 @@ fun ConnectingScreen(
                                 )
                                 val emulator = externalTerminalEmulator ?: terminalEngine.emulator()
                                 view.attachEmulator(emulator)
-                                val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(8) }
+                                val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) }
                                 view.setTextSize(textSizePx)
                                 view.updateSize()
                                 val resize = emulator.mColumns to emulator.mRows
@@ -1003,7 +1007,9 @@ fun ConnectingScreen(
                                                         imeAction = ImeAction.Search,
                                                         autoCorrect = false
                                                     ),
-                                                    modifier = Modifier.fillMaxWidth(),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .testTag(UiTestTags.CONNECTING_FIND_INPUT),
                                                     decorationBox = { inner ->
                                                         if (findQuery.isBlank()) {
                                                             Text(
@@ -1098,7 +1104,8 @@ fun ConnectingScreen(
                                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                         color = Color(0xFFBDBDBD),
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
                                     )
                                 }
                             }
@@ -1270,6 +1277,7 @@ fun ConnectingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .testTag(UiTestTags.CONNECTING_SCP_PANEL)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -1326,7 +1334,9 @@ fun ConnectingScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
                 )
 
                 Surface(
@@ -1427,7 +1437,9 @@ fun ConnectingScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_REMOTE_INPUT)
                 )
                 OutlinedTextField(
                     value = downloadLocalPath,
@@ -1445,7 +1457,9 @@ fun ConnectingScreen(
                             Icon(Icons.Default.Folder, contentDescription = "Browse")
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_LOCAL_INPUT)
                 )
                 Button(
                     onClick = {
@@ -1457,7 +1471,9 @@ fun ConnectingScreen(
                         onScpDownload(remote, downloadLocalPath.trim().ifBlank { null })
                         appendScpActivity("Downloading $remote...", clearFirst = true)
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
                 ) {
                     Text("Download")
                 }
@@ -1478,7 +1494,9 @@ fun ConnectingScreen(
                             Icon(Icons.Default.Folder, contentDescription = "Browse")
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_LOCAL_INPUT)
                 )
                 OutlinedTextField(
                     value = uploadRemotePath,
@@ -1514,7 +1532,9 @@ fun ConnectingScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_REMOTE_INPUT)
                 )
                 Button(
                     onClick = {
@@ -1529,7 +1549,9 @@ fun ConnectingScreen(
                         onScpUpload(local, remote)
                         appendScpActivity("Uploading $local -> $remote...", clearFirst = true)
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
                 ) {
                     Text("Upload")
                 }
@@ -1544,6 +1566,7 @@ fun ConnectingScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
+                            .testTag(UiTestTags.CONNECTING_SCP_ACTIVITY_LOG)
                             .padding(12.dp)
                     ) {
                         val activityLog = if (scpActivityLines.isEmpty()) {
@@ -1779,6 +1802,7 @@ fun ConnectingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .testTag(UiTestTags.CONNECTING_SFTP_PANEL)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -1800,7 +1824,8 @@ fun ConnectingScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .testTag(UiTestTags.CONNECTING_SFTP_CONSOLE),
                     color = Color(0xFF0F0F0F)
                 ) {
                     Column(
@@ -1841,7 +1866,9 @@ fun ConnectingScreen(
                             runSftpCommand(cmd)
                         }
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1860,19 +1887,25 @@ fun ConnectingScreen(
                             runSftpCommand(cmd)
                         },
                         enabled = !sftpCommandRunning || sftpShowCancel,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON)
                     ) {
                         Text(if (sftpCommandRunning && sftpShowCancel) "Cancel" else "Run")
                     }
                     Button(
                         onClick = { runSftpCommand("help") },
                         enabled = !sftpCommandRunning,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.CONNECTING_SFTP_HELP_BUTTON)
                     ) { Text("Help") }
                     Button(
                         onClick = { runSftpCommand("refresh") },
                         enabled = !sftpCommandRunning,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.CONNECTING_SFTP_REFRESH_BUTTON)
                     ) { Text("Refresh") }
                 }
             }
@@ -1960,6 +1993,7 @@ fun ConnectingScreen(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .testTag(UiTestTags.CONNECTING_SNIPPET_PICKER)
                                 .height(320.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -2019,6 +2053,7 @@ fun ConnectingScreen(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
+                    .testTag(UiTestTags.CONNECTING_RETRY_BUTTON)
             ) {
                 Text(
                     text = "Retry",
@@ -2045,8 +2080,9 @@ private fun CompactKeyRow(
     ) {
         keys
             .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+            .withIndex()
             .take(KeyboardLayoutDefaults.SLOT_ROWS)
-            .forEach { row ->
+            .forEach { (rowIndex, row) ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -2065,11 +2101,18 @@ private fun CompactKeyRow(
                             key.action.modifier != null &&
                             activeModifiers.contains(key.action.modifier)
                         val aliasActive = key.action.iconId in activeAliasIcons
+                        val flatIndex = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + index
+                        val testTag = if (key.action.iconId == "keyboard") {
+                            UiTestTags.CONNECTING_KEYBOARD_TOGGLE
+                        } else {
+                            UiTestTags.connectingCompactKey(flatIndex)
+                        }
                         CompactKeyButton(
                             key = key,
                             keyShape = keyShape,
                             modifierActive = modifierActive,
                             aliasActive = aliasActive,
+                            testTag = testTag,
                             onSendKey = onSendKey
                         )
                     }
@@ -2085,6 +2128,7 @@ private fun RowScope.CompactKeyButton(
     keyShape: RoundedCornerShape,
     modifierActive: Boolean,
     aliasActive: Boolean,
+    testTag: String,
     onSendKey: (CompactTerminalKey) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -2100,6 +2144,7 @@ private fun RowScope.CompactKeyButton(
         modifier = Modifier
             .weight(1f)
             .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+            .testTag(testTag)
             .clip(keyShape)
             .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
             .background(
@@ -2166,7 +2211,7 @@ private fun ConnectionLogsPane(
     modifier: Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.testTag(UiTestTags.CONNECTING_LOG_PANEL),
         color = Color(0xFF080808)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

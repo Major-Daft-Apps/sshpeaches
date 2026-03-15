@@ -15,7 +15,7 @@ Project Context – SSHPeaches Android App:
 - Repo root: /home/zenulabidin/Documents/sshpeaches
 - Build tooling: Gradle wrapper 8.13 (local.properties -> /home/zenulabidin/Android/Sdk). Kotlin Compose app targeting Android 8.0+.
 - Major dependencies: Compose BOM 2024.02.01, Material3, Navigation Compose, Lifecycle Compose, Room 2.6.1, SSHJ 0.37.0, ZXing, Coil (compose & svg), kotlinx-coroutines-android, SLF4J API.
-- Documentation: docs/blueprint.md (product spec), docs/design.md (UI layouts). Refer to those for feature expectations (Hosts, Identities, Port Forwards, Snippets, QR flows, Keyboard Editor, Quick Connect, Settings, branding).
+- Documentation: docs/user-wiki/developer/Product-Blueprint.md (product spec), docs/user-wiki/developer/UI-Design-Notes.md (UI layouts). Refer to those for feature expectations (Hosts, Identities, Port Forwards, Snippets, QR flows, Keyboard Editor, Quick Connect, Settings, branding).
 
 Implemented Features (commit 1b1f865 + latest work):
 - **Repositories/ViewModel**: AppRepository + InMemoryAppRepository support hosts/identities/port forwards + snippets (demo). AppViewModel provides add/update/delete for hosts, identities, port forwards; settings toggles handled via MutableStateFlows.

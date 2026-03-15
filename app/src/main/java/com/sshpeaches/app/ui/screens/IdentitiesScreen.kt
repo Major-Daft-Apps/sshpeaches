@@ -69,6 +69,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrPayload
@@ -125,7 +126,7 @@ fun IdentitiesScreen(
     onImportFromQr: () -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
-    val search = remember { mutableStateOf("") }
+    val search = rememberSaveable { mutableStateOf("") }
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
@@ -339,7 +340,9 @@ fun IdentitiesScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TextField(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.IDENTITY_SEARCH_INPUT),
                 value = search.value,
                 onValueChange = { search.value = it },
                 placeholder = { Text("Search identities") },
@@ -354,7 +357,12 @@ fun IdentitiesScreen(
         ) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = { openDialog(null) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.IDENTITY_ADD_BUTTON)
+                    ) {
                         Text("Add identity")
                     }
                     Button(
@@ -368,7 +376,9 @@ fun IdentitiesScreen(
                             }
                             scanLauncher.launch(options)
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.IDENTITY_IMPORT_BUTTON)
                     ) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                         Text("Import QR")
@@ -400,6 +410,7 @@ fun IdentitiesScreen(
                                     tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                     modifier = Modifier
                                         .size(20.dp)
+                                        .testTag(UiTestTags.identityFavorite(identity.id))
                                         .clickable { onToggleFavorite(identity.id) }
                                 )
                                 if (identity.hasPrivateKey) {
@@ -415,6 +426,7 @@ fun IdentitiesScreen(
                                     contentDescription = "Share identity",
                                     modifier = Modifier
                                         .size(20.dp)
+                                        .testTag(UiTestTags.identityShare(identity.id))
                                         .clickable {
                                             if (identity.hasPrivateKey) {
                                                 sharePassphrasePrompt.value = identity
@@ -456,8 +468,14 @@ fun IdentitiesScreen(
                                 .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            TextButton(onClick = { openDialog(identity) }) { Text("Edit") }
-                            TextButton(onClick = { onDelete(identity.id) }) { Text("Delete") }
+                            TextButton(
+                                onClick = { openDialog(identity) },
+                                modifier = Modifier.testTag(UiTestTags.IDENTITY_CARD_EDIT_BUTTON)
+                            ) { Text("Edit") }
+                            TextButton(
+                                onClick = { onDelete(identity.id) },
+                                modifier = Modifier.testTag(UiTestTags.IDENTITY_CARD_DELETE_BUTTON)
+                            ) { Text("Delete") }
                             TextButton(onClick = { openCopyKeyDialog(identity) }) { Text("Install Key To Host") }
                         }
                     }
@@ -486,6 +504,7 @@ fun IdentitiesScreen(
                         onValueChange = { labelState.value = it },
                         label = { Text("Label") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
@@ -549,15 +568,18 @@ fun IdentitiesScreen(
                             keyboardType = KeyboardType.Password
                         )
                     )
-                    Button(onClick = {
-                        generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
-                        generationRsaBits.value = 4096
-                        generationCurve.value = IdentityEcdsaCurve.P256
-                        generationPassphrase.value = ""
-                        generationConfirmPassphrase.value = ""
-                        generationError.value = null
-                        showGenerateDialog.value = true
-                    }) {
+                    Button(
+                        onClick = {
+                            generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
+                            generationRsaBits.value = 4096
+                            generationCurve.value = IdentityEcdsaCurve.P256
+                            generationPassphrase.value = ""
+                            generationConfirmPassphrase.value = ""
+                            generationError.value = null
+                            showGenerateDialog.value = true
+                        },
+                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_GENERATE_BUTTON)
+                    ) {
                         Text("Generate keypair")
                     }
                     OutlinedTextField(
@@ -565,7 +587,8 @@ fun IdentitiesScreen(
                         onValueChange = {},
                         label = { Text("Fingerprint") },
                         singleLine = true,
-                        readOnly = true
+                        readOnly = true,
+                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_FINGERPRINT_INPUT)
                     )
                     dialogKeyStatus.value?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall)
@@ -797,8 +820,9 @@ fun IdentitiesScreen(
                 TextButton(onClick = {
                     val phrase = generationPassphrase.value.trim()
                     if (phrase.isNotBlank()) {
-                        if (phrase.length < 4) {
-                            generationError.value = "Passphrase must be at least 4 characters."
+                        if (phrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH) {
+                            generationError.value =
+                                "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                             return@TextButton
                         }
                         if (phrase != generationConfirmPassphrase.value) {
@@ -995,7 +1019,8 @@ fun IdentitiesScreen(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.Password
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.IDENTITY_SHARE_PASSPHRASE_INPUT)
                     )
                     OutlinedTextField(
                         value = shareConfirmPassphraseState.value,
@@ -1010,7 +1035,8 @@ fun IdentitiesScreen(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.Password
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.IDENTITY_SHARE_CONFIRM_PASSPHRASE_INPUT)
                     )
                     sharePassphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -1021,7 +1047,9 @@ fun IdentitiesScreen(
                 TextButton(onClick = {
                     val phrase = sharePassphraseState.value
                     when {
-                        phrase.length < 4 -> sharePassphraseError.value = "Passphrase must be at least 4 characters."
+                        phrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH ->
+                            sharePassphraseError.value =
+                                "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         phrase != shareConfirmPassphraseState.value -> sharePassphraseError.value = "Passphrases do not match."
                         else -> {
                             val bitmap = generateIdentityQr(identity, phrase)
@@ -1083,8 +1111,9 @@ fun IdentitiesScreen(
             confirmButton = {
                 TextButton(onClick = {
                     val phrase = importPassphraseState.value
-                    if (phrase.length < 4) {
-                        importPassphraseError.value = "Passphrase required."
+                    if (phrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH) {
+                        importPassphraseError.value =
+                            "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         return@TextButton
                     }
                     val success = onImportIdentityKey(identityId, payload, phrase)

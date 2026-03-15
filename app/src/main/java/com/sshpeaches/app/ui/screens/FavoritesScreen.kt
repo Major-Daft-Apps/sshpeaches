@@ -49,7 +49,8 @@ fun FavoritesScreen(
     val hasContent = openSessions.isNotEmpty() ||
         section.hostFavorites.isNotEmpty() ||
         section.identityFavorites.isNotEmpty() ||
-        section.portFavorites.isNotEmpty()
+        section.portFavorites.isNotEmpty() ||
+        section.snippetFavorites.isNotEmpty()
     LaunchedEffect(hasContent) {
         onEmptyStateVisibleChanged(!hasContent)
     }
@@ -93,10 +94,20 @@ fun FavoritesScreen(
                                 )
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                TextButton(onClick = { onOpenSession(session.hostId) }) {
+                                TextButton(
+                                    onClick = { onOpenSession(session.hostId) },
+                                    modifier = Modifier.testTag(
+                                        UiTestTags.openSessionAction(session.hostId, "open")
+                                    )
+                                ) {
                                     Text("Open")
                                 }
-                                TextButton(onClick = { onDisconnectSession(session.hostId) }) {
+                                TextButton(
+                                    onClick = { onDisconnectSession(session.hostId) },
+                                    modifier = Modifier.testTag(
+                                        UiTestTags.openSessionAction(session.hostId, "disconnect")
+                                    )
+                                ) {
                                     Text("Disconnect")
                                 }
                             }
@@ -166,6 +177,36 @@ fun FavoritesScreen(
                             )
                         }
                         IconButton(onClick = { onToggleFavorite(forward.id) }) {
+                            Icon(Icons.Default.Star, contentDescription = "Unfavorite")
+                        }
+                    }
+                }
+            }
+        }
+        if (section.snippetFavorites.isNotEmpty()) {
+            item { SectionHeader("Snippets") }
+            items(section.snippetFavorites, key = { it.id }) { snippet ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(snippet.title, style = MaterialTheme.typography.titleMedium)
+                            if (snippet.description.isNotBlank()) {
+                                Text(snippet.description, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Text(snippet.command, style = MaterialTheme.typography.bodySmall)
+                        }
+                        IconButton(onClick = { onToggleFavorite(snippet.id) }) {
                             Icon(Icons.Default.Star, contentDescription = "Unfavorite")
                         }
                     }

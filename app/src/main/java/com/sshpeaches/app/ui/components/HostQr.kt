@@ -6,8 +6,7 @@ import java.util.Base64
 
 fun encodeHostPayload(
     host: HostConnection,
-    encryptedPasswordPayload: String?,
-    legacyPassword: String? = null
+    encryptedPasswordPayload: String?
 ): String {
     val json = JSONObject().apply {
         put("id", host.id)
@@ -27,9 +26,6 @@ fun encodeHostPayload(
         put("backgroundBehavior", host.backgroundBehavior.name)
         put("terminalProfileId", host.terminalProfileId ?: "")
         encryptedPasswordPayload?.let { put("pwdPayload", it) }
-        legacyPassword?.let {
-            put("pwd", Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8)))
-        }
     }
     return Base64.getEncoder().encodeToString(json.toString().toByteArray(Charsets.UTF_8))
 }

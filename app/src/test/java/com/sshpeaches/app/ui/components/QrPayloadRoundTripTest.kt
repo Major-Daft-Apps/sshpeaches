@@ -20,8 +20,7 @@ class QrPayloadRoundTripTest {
         val host = sampleHost(id = "h1")
         val payload = encodeHostPayload(
             host = host,
-            encryptedPasswordPayload = "enc-pwd-blob",
-            legacyPassword = null
+            encryptedPasswordPayload = "enc-pwd-blob"
         )
 
         val decoded = decodeHostFromQr(payload)
@@ -43,23 +42,6 @@ class QrPayloadRoundTripTest {
         assertEquals(host.backgroundBehavior, decoded.host.backgroundBehavior)
         assertEquals(host.terminalProfileId, decoded.host.terminalProfileId)
         assertEquals("enc-pwd-blob", decoded.encryptedPasswordPayload)
-        assertNull(decoded.legacyPassword)
-    }
-
-    @Test
-    fun host_roundTrip_withLegacyPassword() {
-        val host = sampleHost(id = "legacy-host")
-        val payload = encodeHostPayload(
-            host = host,
-            encryptedPasswordPayload = null,
-            legacyPassword = "SuperSecret!"
-        )
-
-        val decoded = decodeHostFromQr(payload)
-
-        assertNotNull(decoded)
-        assertEquals("SuperSecret!", decoded!!.legacyPassword)
-        assertNull(decoded.encryptedPasswordPayload)
     }
 
     @Test

@@ -46,6 +46,7 @@ fun AppDrawer(
         modifier = Modifier
             .fillMaxHeight()
             .verticalScroll(drawerScroll)
+            .testTag(UiTestTags.DRAWER_SCROLL_CONTAINER)
             .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)

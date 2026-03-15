@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
+import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -54,10 +55,6 @@ class SettingsSmokeTest {
         composeRule.onNodeWithText("Dark").performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
 
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD).performClick()
-        composeRule.onNodeWithText("vt100").performClick()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD).assertTextContains("vt100")
-
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
@@ -70,18 +67,22 @@ class SettingsSmokeTest {
             }.getOrDefault(false)
         }
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+    }
 
+    @Test
+    fun exportQrDialogShowsPassphraseFieldsWhenSecretsEnabled() {
+        AppStateSeeder.configureSettings(includeSecretsInQr = true)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.navigateDrawer(Routes.SETTINGS)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
+
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
         composeRule.onNodeWithText("Export via QR").performClick()
 
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_IDENTITIES_SWITCH)
-            .assertIsOn()
-            .performClick()
-            .assertIsOff()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SETTINGS_SWITCH)
-            .assertIsOn()
-            .performClick()
-            .assertIsOff()
-
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH).assertIsOn()
+        composeRule.onNodeWithText("Export passphrase").assertIsDisplayed()
+        composeRule.onNodeWithText("Confirm passphrase").assertIsDisplayed()
         composeRule.onNodeWithText("Cancel").performClick()
     }
 }

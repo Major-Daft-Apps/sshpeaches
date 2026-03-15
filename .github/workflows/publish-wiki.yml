@@ -1,0 +1,59 @@
+name: Publish Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/user-wiki/**"
+      - ".github/workflows/publish-wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      WIKI_TOKEN: ${{ secrets.WIKI_TOKEN != '' && secrets.WIKI_TOKEN || github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone wiki repository
+        run: |
+          git clone "https://x-access-token:${WIKI_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+
+      - name: Sync wiki content
+        run: |
+          rsync -av --delete \
+            --exclude ".git" \
+            "docs/user-wiki/" "wiki/"
+
+      - name: Commit and push wiki changes
+        working-directory: wiki
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No wiki changes to publish."
+            exit 0
+          fi
+
+          git add --all
+
+          if git diff --cached --quiet; then
+            echo "No staged wiki changes to publish."
+            exit 0
+          fi
+
+          git commit -m "Sync wiki from ${GITHUB_SHA}"
+          git push origin HEAD

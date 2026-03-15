@@ -10,8 +10,7 @@ import java.util.UUID
 data class HostQrImportData(
     val host: HostConnection,
     val targetId: String,
-    val encryptedPasswordPayload: String?,
-    val legacyPassword: String?
+    val encryptedPasswordPayload: String?
 )
 
 sealed interface HostQrImportResult {
@@ -37,8 +36,7 @@ fun processHostQrImport(
         HostQrImportData(
             host = imported,
             targetId = targetId,
-            encryptedPasswordPayload = payload.encryptedPasswordPayload,
-            legacyPassword = payload.legacyPassword
+            encryptedPasswordPayload = payload.encryptedPasswordPayload
         )
     )
 }

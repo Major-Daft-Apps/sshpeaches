@@ -7,13 +7,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.majordaftapps.sshpeaches.app.MainActivity
-import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
@@ -156,7 +156,8 @@ class SessionService : Service() {
         availableForwards: List<PortForward> = emptyList(),
         availableSnippets: List<Snippet> = emptyList(),
         autoStartForwards: Boolean = true,
-        autoTrustUnknownHostKey: Boolean = true,
+        autoTrustUnknownHostKey: Boolean = false,
+        hostKeyPromptEnabled: Boolean = true,
         allowPasswordSave: Boolean = false,
         terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM
     ) {
@@ -199,8 +200,12 @@ class SessionService : Service() {
                     sessionHost,
                     SessionLoggerFactory(sessionId),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
-                    onHostKeyPrompt = { prompt ->
-                        awaitHostKeyDecision(sessionId, prompt, attemptDeadlineMillis)
+                    onHostKeyPrompt = if (hostKeyPromptEnabled) {
+                        { prompt ->
+                            awaitHostKeyDecision(sessionId, prompt, attemptDeadlineMillis)
+                        }
+                    } else {
+                        null
                     }
                 )
                 throwIfAttemptTimedOut(attemptDeadlineMillis)
@@ -2018,18 +2023,19 @@ class SessionService : Service() {
             stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val notificationIcon = resolveNotificationIcon()
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}")
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_notification_logo)
+            .setSmallIcon(notificationIcon)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setSubText(if (totalSessions == 1) "1 active session" else "$totalSessions active sessions")
             .setContentIntent(pendingOpen)
-            .addAction(R.drawable.ic_notification_logo, "Open", pendingOpen)
-            .addAction(R.drawable.ic_notification_logo, "Disconnect", pendingStop)
+            .addAction(notificationIcon, "Open", pendingOpen)
+            .addAction(notificationIcon, "Disconnect", pendingStop)
         return builder.build()
     }
 
@@ -2049,6 +2055,16 @@ class SessionService : Service() {
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         }
         nm.createNotificationChannel(channel)
+    }
+
+    private fun resolveNotificationIcon(): Int {
+        val appIcon = applicationInfo.icon
+        if (appIcon != 0) return appIcon
+        return runCatching {
+            packageManager.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0)).icon
+        }.getOrDefault(android.R.drawable.stat_notify_more)
+            .takeIf { it != 0 }
+            ?: android.R.drawable.stat_notify_more
     }
 
     private fun resolveStartupCommand(startupScript: String, snippets: List<Snippet>): String {

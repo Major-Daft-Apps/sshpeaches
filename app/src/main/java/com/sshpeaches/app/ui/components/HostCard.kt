@@ -13,12 +13,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DesktopWindows
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,9 +49,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import android.content.Intent
@@ -68,6 +71,7 @@ import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
@@ -169,7 +173,10 @@ fun HostCard(
                     Text("${host.username}@${host.host}:${host.port}", style = MaterialTheme.typography.bodyMedium)
                     host.group?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                 }
-                TextButton(onClick = { onToggleFavorite(host.id) }) {
+                TextButton(
+                    onClick = { onToggleFavorite(host.id) },
+                    modifier = Modifier.testTag(UiTestTags.hostFavorite(host.id))
+                ) {
                     Icon(
                         imageVector = if (host.favorite) Icons.Default.Star else Icons.Outlined.StarBorder,
                         contentDescription = if (host.favorite) "Unfavorite" else "Favorite"
@@ -187,18 +194,24 @@ fun HostCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     HostActionButton(
-                        label = "SSH",
+                        icon = Icons.Default.Terminal,
+                        contentDescription = "SSH terminal",
                         selected = true,
+                        modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "ssh")),
                         onClick = { onAction(host, ConnectionMode.SSH) }
                     )
                     HostActionButton(
-                        label = "SFTP",
+                        icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                        contentDescription = "SFTP file transfer",
                         selected = false,
+                        modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "sftp")),
                         onClick = { onAction(host, ConnectionMode.SFTP) }
                     )
                     HostActionButton(
-                        label = "SCP",
+                        icon = Icons.Default.Save,
+                        contentDescription = "SCP file copy",
                         selected = false,
+                        modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "scp")),
                         onClick = { onAction(host, ConnectionMode.SCP) }
                     )
                 }
@@ -206,7 +219,10 @@ fun HostCard(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { showInfo.value = true }) {
+                    IconButton(
+                        onClick = { showInfo.value = true },
+                        modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "info"))
+                    ) {
                         Icon(
                             Icons.Default.Info,
                             contentDescription = "Info"
@@ -224,7 +240,8 @@ fun HostCard(
                                     Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                        }
+                        },
+                        modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "qr"))
                     ) {
                         Icon(
                             Icons.Default.QrCode,
@@ -382,6 +399,7 @@ fun HostCard(
     if (showQr.value) {
         AlertDialog(
             onDismissRequest = { showQr.value = false },
+            modifier = Modifier.testTag(UiTestTags.HOST_QR_DIALOG),
             confirmButton = { TextButton(onClick = { showQr.value = false }) { Text("Close") } },
             title = { Text("Share ${host.name}") },
             text = {
@@ -414,6 +432,7 @@ fun HostCard(
                 confirmPassphraseState.value = ""
                 passphraseError.value = null
             },
+            modifier = Modifier.testTag(UiTestTags.HOST_EXPORT_PASSWORD_DIALOG),
             title = { Text("Protect exported password") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -431,7 +450,8 @@ fun HostCard(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.Password
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.HOST_EXPORT_PASSWORD_INPUT)
                     )
                     OutlinedTextField(
                         value = confirmPassphraseState.value,
@@ -446,7 +466,8 @@ fun HostCard(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.Password
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.HOST_EXPORT_PASSWORD_CONFIRM_INPUT)
                     )
                     passphraseError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -454,11 +475,14 @@ fun HostCard(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    modifier = Modifier.testTag(UiTestTags.HOST_EXPORT_PASSWORD_CONFIRM_BUTTON),
+                    onClick = {
                     val passphrase = passphraseState.value
                     when {
-                        passphrase.length < 4 -> {
-                            passphraseError.value = "Passphrase must be at least 4 characters."
+                        passphrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH -> {
+                            passphraseError.value =
+                                "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         }
                         passphrase != confirmPassphraseState.value -> {
                             passphraseError.value = "Passphrases do not match."
@@ -512,10 +536,26 @@ private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
 }
 
 @Composable
-private fun HostActionButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-        Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+private fun HostActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     }
 }
 

@@ -73,6 +73,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.text.KeyboardActions
@@ -119,10 +121,17 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.local.Converters
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
@@ -144,9 +153,11 @@ import com.majordaftapps.sshpeaches.app.ui.screens.SnippetEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
@@ -162,6 +173,7 @@ import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.majordaftapps.sshpeaches.app.util.snippetReference
 import java.util.UUID
 import org.json.JSONArray
@@ -185,8 +197,7 @@ fun SSHPeachesRoot(
     onCrashReportsToggle: (Boolean) -> Unit,
     onAnalyticsToggle: (Boolean) -> Unit,
     onDiagnosticsToggle: (Boolean) -> Unit,
-    onIncludeIdentitiesToggle: (Boolean) -> Unit,
-    onIncludeSettingsToggle: (Boolean) -> Unit,
+    onIncludeSecretsInQrToggle: (Boolean) -> Unit,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     onHostKeyPromptToggle: (Boolean) -> Unit,
     onAutoTrustHostKeyToggle: (Boolean) -> Unit,
@@ -203,24 +214,34 @@ fun SSHPeachesRoot(
     onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
     onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     onHostDelete: (String) -> Unit,
+    onImportHost: (HostConnection) -> Unit,
+    onHostOsMetadataImported: (String, OsMetadata) -> Unit,
     onHostInfoCommandsChange: (String, List<String>) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    onImportPortForward: (PortForward) -> Unit,
     onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
     onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
     onStopSession: (String) -> Unit,
     onIdentityAdd: (String, String, String?, String?) -> Unit,
+    onImportIdentity: (Identity) -> Unit,
     onIdentityUpdate: (String, String, String, String?) -> Unit,
     onIdentityDelete: (String) -> Unit,
+    onImportHostPasswordPayload: (String, String, String) -> Boolean,
     onImportIdentityKey: (String, String, String) -> Boolean,
     onImportIdentityKeyPlain: (String, String) -> Boolean,
     onStoreIdentityPublicKey: (String, String) -> Boolean,
+    onImportIdentityPublicKey: (String, String) -> Boolean,
     onStoreIdentityKeyPassphrase: (String, String?) -> Unit,
+    onImportIdentityKeyPassphrasePayload: (String, String, String) -> Boolean,
     onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
     onRemoveIdentityKey: (String) -> Unit,
     onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
+    onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
     onKeyboardReset: () -> Unit,
+    onImportTerminalProfiles: (List<TerminalProfile>, String?) -> Unit,
     onSnippetAdd: (String, String, String) -> Unit,
+    onImportSnippet: (Snippet) -> Unit,
     onSnippetUpdate: (String, String, String, String) -> Unit,
     onSnippetDelete: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
@@ -245,7 +266,9 @@ fun SSHPeachesRoot(
     onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
     corePermissions: List<CorePermissionStatus>,
     onRequestCorePermissions: () -> Unit,
-    onOpenAppPermissionSettings: () -> Unit
+    onOpenAppPermissionSettings: () -> Unit,
+    requestedStartupRoute: String? = null,
+    onStartupRouteHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -276,7 +299,8 @@ fun SSHPeachesRoot(
     }
     val favoritesEmpty = uiState.favorites.hostFavorites.isEmpty() &&
         uiState.favorites.identityFavorites.isEmpty() &&
-        uiState.favorites.portFavorites.isEmpty()
+        uiState.favorites.portFavorites.isEmpty() &&
+        uiState.favorites.snippetFavorites.isEmpty()
     val routeEmptyStateVisible = when (currentRoute) {
         Routes.FAVORITES -> emptyStateByRoute[Routes.FAVORITES] ?: favoritesEmpty
         Routes.HOSTS -> uiState.hosts.isEmpty()
@@ -375,7 +399,7 @@ fun SSHPeachesRoot(
         Routes.FORWARDS -> "Port Forwards"
         Routes.SNIPPETS -> "Snippets"
         Routes.SNIPPET_EDITOR_ROUTE -> "Snippet Editor"
-        Routes.KEYBOARD -> "Keyboard"
+        Routes.KEYBOARD -> "Keyboard Editor"
         Routes.THEME_EDITOR -> "Theme Editor"
         Routes.THEME_EDITOR_EDIT_ROUTE -> "Edit Terminal Theme"
         Routes.SETTINGS -> "Settings"
@@ -413,6 +437,17 @@ fun SSHPeachesRoot(
             }
         }
         onOpenSessionRequestHandled()
+    }
+
+    LaunchedEffect(requestedStartupRoute, currentRoute) {
+        val startupRoute = requestedStartupRoute ?: return@LaunchedEffect
+        if (startupRoute != currentRoute && startupRoute != Routes.CONNECTING) {
+            navController.navigate(startupRoute) {
+                popUpTo(Routes.FAVORITES)
+                launchSingleTop = true
+            }
+        }
+        onStartupRouteHandled()
     }
 
     LaunchedEffect(quickConnectRequest.value?.sessionId) {
@@ -502,22 +537,170 @@ fun SSHPeachesRoot(
         sessionLogs.removeAll { it.hostId == sessionId }
     }
 
-    fun importTransferPayloadFromQr(encodedPayload: String): String {
-        val payload = runCatching {
-            String(Base64.decode(encodedPayload.trim(), Base64.DEFAULT), Charsets.UTF_8)
-        }.getOrNull() ?: return "Invalid export QR payload."
-        val root = runCatching { JSONObject(payload) }.getOrNull() ?: return "Invalid export QR payload."
+    fun importTransferPayloadFromQr(encodedPayload: String, passphrase: String?): String {
+        val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export QR payload."
 
         var importedHosts = 0
         var importedIdentities = 0
         var importedForwards = 0
-        var privateKeysMissing = 0
+        var importedSnippets = 0
+        var importedTerminalProfiles = 0
+        var importedPasswords = 0
+        var importedPrivateKeys = 0
+        var importedKeyPassphrases = 0
+        var protectedImportFailures = 0
+        var metadataImportFailures = 0
         var settingsApplied = false
+        var keyboardLayoutApplied = false
 
-        val existingIdentityFingerprints = uiState.identities.map { it.fingerprint.trim() }.toMutableSet()
-        val existingForwardKeys = uiState.portForwards.map {
-            "${it.label}|${it.sourceHost}|${it.sourcePort}|${it.destinationHost}|${it.destinationPort}"
-        }.toMutableSet()
+        val existingIdentityByFingerprint = uiState.identities
+            .associateBy { it.fingerprint.trim() }
+            .toMutableMap()
+        val existingForwardByKey = uiState.portForwards
+            .associateBy {
+                forwardTransferKey(
+                    label = it.label,
+                    sourceHost = it.sourceHost,
+                    sourcePort = it.sourcePort,
+                    destinationHost = it.destinationHost,
+                    destinationPort = it.destinationPort
+                )
+            }
+            .toMutableMap()
+        val existingSnippetByKey = uiState.snippets
+            .associateBy { snippetTransferKey(it.title, it.command) }
+            .toMutableMap()
+        val identityIdMap = mutableMapOf<String, String>()
+        val forwardIdMap = mutableMapOf<String, String>()
+        val snippetIdMap = mutableMapOf<String, String>()
+        val pendingHostPasswordImports = mutableListOf<Pair<String, String>>()
+        val pendingIdentityPublicKeyImports = mutableListOf<Pair<String, String>>()
+        val pendingIdentityKeyImports = mutableListOf<Pair<String, String>>()
+        val pendingIdentityKeyPassphraseImports = mutableListOf<Pair<String, String>>()
+
+        root.optJSONArray("identities")?.let { identities ->
+            for (index in 0 until identities.length()) {
+                val item = identities.optJSONObject(index) ?: continue
+                val fingerprint = item.optString("fingerprint").trim()
+                if (fingerprint.isBlank()) continue
+
+                val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
+                val existing = existingIdentityByFingerprint[fingerprint]
+                val targetId = existing?.id ?: exportedId
+                identityIdMap[exportedId] = targetId
+
+                if (existing == null) {
+                    val importedIdentity = Identity(
+                        id = targetId,
+                        label = item.optString("label").ifBlank { "Identity" },
+                        fingerprint = fingerprint,
+                        username = item.optString("username").trim().ifBlank { null },
+                        createdEpochMillis = optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
+                        favorite = item.optBoolean("favorite", false),
+                        tags = jsonStringList(item.optJSONArray("tags")),
+                        notes = item.optString("notes"),
+                        hasPrivateKey = false,
+                        keyImportEpochMillis = null
+                    )
+                    onImportIdentity(importedIdentity)
+                    existingIdentityByFingerprint[fingerprint] = importedIdentity
+                    importedIdentities += 1
+                } else if (item.optBoolean("favorite", false) && !existing.favorite) {
+                    onToggleFavorite(existing.id)
+                }
+
+                item.optString("publicKey").trim().ifBlank { null }?.let {
+                    pendingIdentityPublicKeyImports += targetId to it
+                }
+                item.optString("keyPayload").trim().ifBlank { null }?.let {
+                    pendingIdentityKeyImports += targetId to it
+                }
+                item.optString("keyPassphrasePayload").trim().ifBlank { null }?.let {
+                    pendingIdentityKeyPassphraseImports += targetId to it
+                }
+            }
+        }
+
+        root.optJSONArray("snippets")?.let { snippets ->
+            for (index in 0 until snippets.length()) {
+                val item = snippets.optJSONObject(index) ?: continue
+                val title = item.optString("title").trim().ifBlank { "Imported Snippet" }
+                val command = item.optString("command").trim()
+                if (command.isBlank()) continue
+
+                val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
+                val key = snippetTransferKey(title, command)
+                val existing = existingSnippetByKey[key]
+                val targetId = existing?.id ?: exportedId
+                snippetIdMap[exportedId] = targetId
+
+                if (existing == null) {
+                    val importedSnippet = Snippet(
+                        id = targetId,
+                        title = title,
+                        description = item.optString("description"),
+                        command = command,
+                        tags = jsonStringList(item.optJSONArray("tags")),
+                        autoRunHostIds = jsonStringList(item.optJSONArray("autoRunHostIds")),
+                        requireConfirmation = item.optBoolean("requireConfirmation", true),
+                        favorite = item.optBoolean("favorite", false)
+                    )
+                    onImportSnippet(importedSnippet)
+                    existingSnippetByKey[key] = importedSnippet
+                    importedSnippets += 1
+                } else if (item.optBoolean("favorite", false) && !existing.favorite) {
+                    onToggleFavorite(existing.id)
+                }
+            }
+        }
+
+        root.optJSONArray("portForwards")?.let { forwards ->
+            for (index in 0 until forwards.length()) {
+                val item = forwards.optJSONObject(index) ?: continue
+                val label = item.optString("label").trim().ifBlank { "Imported Forward" }
+                val sourceHost = item.optString("sourceHost").trim().ifBlank { "127.0.0.1" }
+                val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
+                val destinationHost = item.optString("destinationHost").trim()
+                val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
+                if (destinationHost.isBlank()) continue
+
+                val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
+                val key = forwardTransferKey(
+                    label = label,
+                    sourceHost = sourceHost,
+                    sourcePort = sourcePort,
+                    destinationHost = destinationHost,
+                    destinationPort = destinationPort
+                )
+                val existing = existingForwardByKey[key]
+                val targetId = existing?.id ?: exportedId
+                forwardIdMap[exportedId] = targetId
+
+                if (existing == null) {
+                    val importedForward = PortForward(
+                        id = targetId,
+                        label = label,
+                        type = runCatching {
+                            PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
+                        }.getOrDefault(PortForwardType.LOCAL),
+                        sourceHost = sourceHost,
+                        sourcePort = sourcePort,
+                        destinationHost = destinationHost,
+                        destinationPort = destinationPort,
+                        associatedHosts = jsonStringList(item.optJSONArray("associatedHosts")),
+                        favorite = item.optBoolean("favorite", false),
+                        enabled = item.optBoolean("enabled", true)
+                    )
+                    onImportPortForward(importedForward)
+                    existingForwardByKey[key] = importedForward
+                    importedForwards += 1
+                } else if (item.optBoolean("favorite", false) && !existing.favorite) {
+                    onToggleFavorite(existing.id)
+                }
+            }
+        }
 
         root.optJSONArray("hosts")?.let { hosts ->
             for (index in 0 until hosts.length()) {
@@ -533,46 +716,50 @@ fun SSHPeachesRoot(
                 val defaultMode = runCatching {
                     ConnectionMode.valueOf(item.optString("defaultMode", ConnectionMode.SSH.name))
                 }.getOrDefault(ConnectionMode.SSH)
-                val terminalProfileId = item.optString("terminalProfileId").trim().ifBlank { null }
-                val suppliedId = item.optString("id").trim().ifBlank { null }
-                onHostAdd(
-                    name,
-                    host,
-                    port,
-                    username,
-                    auth,
-                    item.optString("group").trim().ifBlank { null },
-                    item.optString("notes"),
-                    defaultMode,
-                    false,
-                    null,
-                    null,
-                    "",
-                    BackgroundBehavior.INHERIT,
-                    terminalProfileId,
-                    null,
-                    suppliedId
+                val targetId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
+                val encryptedPasswordPayload = item.optString("pwdPayload").trim().ifBlank { null }
+                val startupScript = item.optString("startupScript")
+                val remappedStartupScript = parseSnippetReference(startupScript)
+                    ?.let { snippetId -> snippetIdMap[snippetId]?.let(::snippetReference) ?: startupScript }
+                    ?: startupScript
+                onImportHost(
+                    HostConnection(
+                        id = targetId,
+                        name = name,
+                        host = host,
+                        port = port,
+                        username = username,
+                        preferredAuth = auth,
+                        group = item.optString("group").trim().ifBlank { null },
+                        lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
+                        favorite = item.optBoolean("favorite", false),
+                        osMetadata = Converters.toOsMetadata(
+                            item.optString("osMetadata", Converters.fromOsMetadata(OsMetadata.Undetected))
+                        ),
+                        notes = item.optString("notes"),
+                        defaultMode = defaultMode,
+                        attachedForwards = jsonStringList(item.optJSONArray("attachedForwards"))
+                            .map { forwardIdMap[it] ?: it },
+                        snippets = jsonStringList(item.optJSONArray("snippets"))
+                            .map { snippetIdMap[it] ?: it },
+                        hasPassword = false,
+                        useMosh = item.optBoolean("useMosh", false),
+                        preferredIdentityId = item.optString("preferredIdentityId").trim().ifBlank { null }
+                            ?.let { identityIdMap[it] ?: it },
+                        preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
+                            ?.let { forwardIdMap[it] ?: it },
+                        startupScript = remappedStartupScript,
+                        backgroundBehavior = runCatching {
+                            BackgroundBehavior.valueOf(
+                                item.optString("backgroundBehavior", BackgroundBehavior.INHERIT.name)
+                            )
+                        }.getOrDefault(BackgroundBehavior.INHERIT),
+                        terminalProfileId = item.optString("terminalProfileId").trim().ifBlank { null },
+                        infoCommands = jsonStringList(item.optJSONArray("infoCommands"))
+                    )
                 )
+                encryptedPasswordPayload?.let { pendingHostPasswordImports += targetId to it }
                 importedHosts += 1
-            }
-        }
-
-        root.optJSONArray("identities")?.let { identities ->
-            for (index in 0 until identities.length()) {
-                val item = identities.optJSONObject(index) ?: continue
-                val fingerprint = item.optString("fingerprint").trim()
-                if (fingerprint.isBlank() || existingIdentityFingerprints.contains(fingerprint)) continue
-                onIdentityAdd(
-                    item.optString("label").ifBlank { "Identity" },
-                    fingerprint,
-                    item.optString("username").trim().ifBlank { null },
-                    item.optString("id").trim().ifBlank { null }
-                )
-                existingIdentityFingerprints += fingerprint
-                importedIdentities += 1
-                if (item.optBoolean("hasPrivateKey", false)) {
-                    privateKeysMissing += 1
-                }
             }
         }
 
@@ -594,57 +781,100 @@ fun SSHPeachesRoot(
             onCustomLockTimeoutMinutesChange(
                 settings.optInt("customLockTimeoutMinutes", uiState.customLockTimeoutMinutes).coerceIn(1, 180)
             )
+            runCatching {
+                com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation.valueOf(
+                    settings.optString("terminalEmulation", uiState.terminalEmulation.name)
+                )
+            }.getOrNull()?.let(onTerminalEmulationChange)
+            runCatching {
+                TerminalSelectionMode.valueOf(
+                    settings.optString("terminalSelectionMode", uiState.terminalSelectionMode.name)
+                )
+            }.getOrNull()?.let(onTerminalSelectionModeChange)
+            onCrashReportsToggle(settings.optBoolean("crashReportsEnabled", uiState.crashReportsEnabled))
+            onAnalyticsToggle(settings.optBoolean("analyticsEnabled", uiState.analyticsEnabled))
+            onDiagnosticsToggle(
+                settings.optBoolean("diagnosticsLoggingEnabled", uiState.diagnosticsLoggingEnabled)
+            )
             onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
             onHostKeyPromptToggle(settings.optBoolean("hostKeyPromptEnabled", uiState.hostKeyPromptEnabled))
             onAutoTrustHostKeyToggle(settings.optBoolean("autoTrustHostKey", uiState.autoTrustHostKey))
+            onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
+            onSnippetRunTimeoutSecondsChange(
+                settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
+            )
+
+            val importedProfiles = terminalProfilesFromJson(settings.optJSONArray("terminalProfiles"))
+            val importedDefaultProfileId = settings.optString("defaultTerminalProfileId").trim().ifBlank { null }
+            if (importedProfiles.isNotEmpty() || importedDefaultProfileId != null) {
+                importedTerminalProfiles = importedProfiles.count {
+                    it.id !in TerminalProfileDefaults.builtInProfiles.map { profile -> profile.id }.toSet()
+                }
+                onImportTerminalProfiles(importedProfiles, importedDefaultProfileId)
+            }
+
+            settings.optJSONArray("keyboardLayout")?.let { layout ->
+                onImportKeyboardLayout(keyboardLayoutFromJson(layout))
+                keyboardLayoutApplied = true
+            }
         }
 
-        root.optJSONArray("portForwards")?.let { forwards ->
-            for (index in 0 until forwards.length()) {
-                val item = forwards.optJSONObject(index) ?: continue
-                val label = item.optString("label").trim().ifBlank { "Imported Forward" }
-                val sourceHost = item.optString("sourceHost").trim().ifBlank { "127.0.0.1" }
-                val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
-                val destinationHost = item.optString("destinationHost").trim()
-                val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
-                if (destinationHost.isBlank()) continue
-                val forwardKey = "$label|$sourceHost|$sourcePort|$destinationHost|$destinationPort"
-                if (existingForwardKeys.contains(forwardKey)) continue
-                val type = runCatching {
-                    PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
-                }.getOrDefault(PortForwardType.LOCAL)
-                val associatedHosts = item.optJSONArray("associatedHosts")?.let { associated ->
-                    buildList {
-                        for (i in 0 until associated.length()) {
-                            associated.optString(i).trim().ifBlank { null }?.let { add(it) }
-                        }
-                    }
-                }.orEmpty()
-                onPortForwardAdd(
-                    label,
-                    type,
-                    sourceHost,
-                    sourcePort,
-                    destinationHost,
-                    destinationPort,
-                    item.optBoolean("enabled", true),
-                    associatedHosts
-                )
-                existingForwardKeys += forwardKey
-                importedForwards += 1
+        pendingIdentityPublicKeyImports.forEach { (identityId, publicKey) ->
+            if (!onImportIdentityPublicKey(identityId, publicKey)) {
+                metadataImportFailures += 1
             }
+        }
+
+        if (!passphrase.isNullOrBlank()) {
+            pendingHostPasswordImports.forEach { (hostId, payload) ->
+                if (onImportHostPasswordPayload(hostId, payload, passphrase)) {
+                    importedPasswords += 1
+                } else {
+                    protectedImportFailures += 1
+                }
+            }
+            pendingIdentityKeyImports.forEach { (identityId, payload) ->
+                if (onImportIdentityKey(identityId, payload, passphrase)) {
+                    importedPrivateKeys += 1
+                } else {
+                    protectedImportFailures += 1
+                }
+            }
+            pendingIdentityKeyPassphraseImports.forEach { (identityId, payload) ->
+                if (onImportIdentityKeyPassphrasePayload(identityId, payload, passphrase)) {
+                    importedKeyPassphrases += 1
+                } else {
+                    protectedImportFailures += 1
+                }
+            }
+        } else {
+            protectedImportFailures += pendingHostPasswordImports.size +
+                pendingIdentityKeyImports.size +
+                pendingIdentityKeyPassphraseImports.size
         }
 
         val parts = mutableListOf<String>()
         parts += "$importedHosts hosts"
         parts += "$importedIdentities identities"
         parts += "$importedForwards forwards"
+        parts += "$importedSnippets snippets"
+        if (importedTerminalProfiles > 0) parts += "$importedTerminalProfiles terminal profiles"
+        if (keyboardLayoutApplied) parts += "keyboard layout applied"
+        if (importedPasswords > 0) parts += "$importedPasswords passwords"
+        if (importedPrivateKeys > 0) parts += "$importedPrivateKeys private keys"
+        if (importedKeyPassphrases > 0) parts += "$importedKeyPassphrases key passphrases"
         if (settingsApplied) parts += "settings applied"
         val summary = "Import complete: ${parts.joinToString(", ")}."
-        return if (privateKeysMissing > 0) {
-            "$summary $privateKeysMissing identity entries referenced private keys, but key material is not included in transfer QR."
-        } else {
-            summary
+        return buildString {
+            append(summary)
+            if (protectedImportFailures > 0) {
+                append(' ')
+                append("$protectedImportFailures protected items could not be imported. Check the export passphrase and unlock state.")
+            }
+            if (metadataImportFailures > 0) {
+                append(' ')
+                append("$metadataImportFailures identity metadata items could not be imported.")
+            }
         }
     }
 
@@ -747,7 +977,8 @@ fun SSHPeachesRoot(
                                             IconButton(
                                                 onClick = {
                                                     connectingFindRequestToken.intValue += 1
-                                                }
+                                                },
+                                                modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_BUTTON)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Search,
@@ -755,7 +986,10 @@ fun SSHPeachesRoot(
                                                 )
                                             }
                                         }
-                                        IconButton(onClick = { closeCurrentConnectingSession() }) {
+                                        IconButton(
+                                            onClick = { closeCurrentConnectingSession() },
+                                            modifier = Modifier.testTag(UiTestTags.CONNECTING_CLOSE_BUTTON)
+                                        ) {
                                             Icon(
                                                 imageVector = Icons.Default.Close,
                                                 contentDescription = "Close session"
@@ -1012,6 +1246,7 @@ fun SSHPeachesRoot(
                             onImportFromQr = { showMessage("Host imported from QR") },
                             onToggleFavorite = onToggleFavorite,
                             onAdd = onHostAdd,
+                            onImportPasswordPayload = onImportHostPasswordPayload,
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
                             onStartSession = { host, mode, password ->
@@ -1267,10 +1502,8 @@ fun SSHPeachesRoot(
                                 onAnalyticsToggle = onAnalyticsToggle,
                                 diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
                                 onDiagnosticsToggle = onDiagnosticsToggle,
-                                includeIdentities = uiState.includeIdentitiesInQr,
-                                onIncludeIdentitiesToggle = onIncludeIdentitiesToggle,
-                                includeSettings = uiState.includeSettingsInQr,
-                                onIncludeSettingsToggle = onIncludeSettingsToggle,
+                                includeSecretsInQr = uiState.includeSecretsInQr,
+                                onIncludeSecretsInQrToggle = onIncludeSecretsInQrToggle,
                                 autoStartForwards = uiState.autoStartForwards,
                                 onAutoStartForwardsToggle = onAutoStartForwardsToggle,
                                 hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
@@ -1285,7 +1518,8 @@ fun SSHPeachesRoot(
                                 biometricAvailable = biometricAvailable,
                                 onSetPin = onSetPin,
                                 onClearPin = onClearPin,
-                                onGenerateExportPayload = { buildExportPayload(uiState) },
+                                onGenerateExportPayload = { passphrase -> buildExportPayload(uiState, passphrase) },
+                                onTransferPayloadRequiresPassphrase = ::transferPayloadRequiresPassphrase,
                                 onImportFromQrPayload = ::importTransferPayloadFromQr,
                                 onShowMessage = showMessage,
                                 corePermissions = corePermissions,
@@ -1311,29 +1545,10 @@ fun SSHPeachesRoot(
     }
 
     if (missingCorePermissions.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Permissions Required") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "SSHPeaches needs these permissions to work properly, including background SSH sessions and session notifications."
-                    )
-                    missingCorePermissions.forEach { permission ->
-                        Text("- ${permission.title}")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onOpenAppPermissionSettings) {
-                    Text("Manage permissions")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onRequestCorePermissions) {
-                    Text("Request now")
-                }
-            }
+        PermissionRequiredDialog(
+            missingCorePermissions = missingCorePermissions,
+            onManagePermissions = onOpenAppPermissionSettings,
+            onRequestNow = onRequestCorePermissions
         )
     }
 
@@ -1441,6 +1656,7 @@ fun SSHPeachesRoot(
     hostKeyPrompt?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
+            modifier = Modifier.testTag(UiTestTags.HOST_KEY_PROMPT_DIALOG),
             title = {
                 Text(if (prompt.keyChanged) "Host Key Changed" else "Trust Host Key?")
             },
@@ -1458,7 +1674,10 @@ fun SSHPeachesRoot(
                 }
             },
             confirmButton = {
-                Button(onClick = { onRespondToHostKeyPrompt(prompt.id, true) }) {
+                Button(
+                    onClick = { onRespondToHostKeyPrompt(prompt.id, true) },
+                    modifier = Modifier.testTag(UiTestTags.HOST_KEY_PROMPT_ACCEPT)
+                ) {
                     Text("Yes")
                 }
             },
@@ -1469,12 +1688,16 @@ fun SSHPeachesRoot(
                             onClick = {
                                 onAutoTrustHostKeyToggle(true)
                                 onRespondToHostKeyPrompt(prompt.id, true)
-                            }
+                            },
+                            modifier = Modifier.testTag(UiTestTags.HOST_KEY_PROMPT_ACCEPT_ALWAYS)
                         ) {
                             Text("Yes (Don't Ask Again)")
                         }
                     }
-                    TextButton(onClick = { onRespondToHostKeyPrompt(prompt.id, false) }) {
+                    TextButton(
+                        onClick = { onRespondToHostKeyPrompt(prompt.id, false) },
+                        modifier = Modifier.testTag(UiTestTags.HOST_KEY_PROMPT_REJECT)
+                    ) {
                         Text("No")
                     }
                 }
@@ -1489,13 +1712,15 @@ fun SSHPeachesRoot(
     AutoHidePasswordReveal(promptPasswordRevealIndex)
     LaunchedEffect(passwordPrompt?.id) {
         if (passwordPrompt != null) {
-            passwordFocusRequester.requestFocus()
+            withFrameNanos { }
+            runCatching { passwordFocusRequester.requestFocus() }
             keyboardController?.show()
         }
     }
     passwordPrompt?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
+            modifier = Modifier.testTag(UiTestTags.PASSWORD_PROMPT_DIALOG),
             title = { Text("Password Required") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1524,6 +1749,7 @@ fun SSHPeachesRoot(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .testTag(UiTestTags.PASSWORD_PROMPT_INPUT)
                             .focusRequester(passwordFocusRequester)
                     )
                     if (prompt.allowSave) {
@@ -1543,6 +1769,7 @@ fun SSHPeachesRoot(
             confirmButton = {
                 Button(
                     enabled = promptPassword.value.isNotBlank(),
+                    modifier = Modifier.testTag(UiTestTags.PASSWORD_PROMPT_CONFIRM),
                     onClick = {
                         onRespondToPasswordPrompt(
                             prompt.id,
@@ -1555,7 +1782,10 @@ fun SSHPeachesRoot(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { onRespondToPasswordPrompt(prompt.id, null, false) }) {
+                TextButton(
+                    onClick = { onRespondToPasswordPrompt(prompt.id, null, false) },
+                    modifier = Modifier.testTag(UiTestTags.PASSWORD_PROMPT_CANCEL)
+                ) {
                     Text("Cancel")
                 }
             }
@@ -1743,14 +1973,79 @@ fun SSHPeachesRoot(
     }
 
     if (showAbout.value && !uiState.isLocked) {
+        val website = context.getString(R.string.project_website)
+        val supportUrl = context.getString(R.string.support_url)
+        val privacy = context.getString(R.string.privacy_policy_url)
         AboutDialog(
             onDismiss = { showAbout.value = false },
+            onOpenWebsite = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(website)))
+            },
+            onOpenSupport = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(supportUrl)))
+            },
+            onOpenPrivacy = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacy)))
+            },
             onOpenSourceLicenses = {
                 showAbout.value = false
                 navController.navigate(Routes.OPEN_SOURCE_LICENSES)
             }
         )
     }
+}
+
+@Composable
+internal fun PermissionRequiredDialog(
+    missingCorePermissions: List<CorePermissionStatus>,
+    onManagePermissions: () -> Unit,
+    onRequestNow: () -> Unit
+) {
+    val canRequestAny = missingCorePermissions.any { it.remediation == CorePermissionRemediation.REQUEST }
+    AlertDialog(
+        modifier = Modifier.testTag(UiTestTags.PERMISSION_REQUIRED_DIALOG),
+        onDismissRequest = {},
+        title = { Text("Permissions Required") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (canRequestAny) {
+                        "SSHPeaches needs these permissions to work properly, including background SSH sessions and session notifications."
+                    } else {
+                        "SSHPeaches needs permissions that must be enabled from system settings before background SSH sessions and notifications can work properly."
+                    }
+                )
+                missingCorePermissions.forEach { permission ->
+                    val suffix = if (permission.remediation == CorePermissionRemediation.SETTINGS) {
+                        " (enable in Settings)"
+                    } else {
+                        ""
+                    }
+                    Text("- ${permission.title}$suffix")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onManagePermissions,
+                modifier = Modifier.testTag(UiTestTags.PERMISSION_REQUIRED_MANAGE_BUTTON)
+            ) {
+                Text("Manage permissions")
+            }
+        },
+        dismissButton = if (canRequestAny) {
+            {
+                TextButton(
+                    onClick = onRequestNow,
+                    modifier = Modifier.testTag(UiTestTags.PERMISSION_REQUIRED_REQUEST_BUTTON)
+                ) {
+                    Text("Request now")
+                }
+            }
+        } else {
+            null
+        }
+    )
 }
 
 private fun sessionIdFor(hostId: String, mode: ConnectionMode): String =
@@ -1815,7 +2110,7 @@ private fun sanitizeSnippetOutput(value: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun QuickConnectSheet(
+internal fun QuickConnectSheet(
     onDismiss: () -> Unit,
     portForwards: List<PortForward>,
     identities: List<Identity>,
@@ -1830,24 +2125,24 @@ private fun QuickConnectSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState
     ) {
-        val host = remember { mutableStateOf("") }
-        val port = remember { mutableStateOf("22") }
-        val username = remember { mutableStateOf("") }
-        val password = remember { mutableStateOf("") }
+        val host = rememberSaveable { mutableStateOf("") }
+        val port = rememberSaveable { mutableStateOf("22") }
+        val username = rememberSaveable { mutableStateOf("") }
+        val password = rememberSaveable { mutableStateOf("") }
         val revealPasswordIndex = remember { mutableIntStateOf(-1) }
-        val auth = remember { mutableStateOf(AuthMethod.PASSWORD) }
-        val saveToHosts = remember { mutableStateOf(false) }
-        val useMosh = remember { mutableStateOf(false) }
-        val selectedIdentityId = remember { mutableStateOf<String?>(null) }
+        val auth = rememberSaveable { mutableStateOf(AuthMethod.PASSWORD) }
+        val saveToHosts = rememberSaveable { mutableStateOf(false) }
+        val useMosh = rememberSaveable { mutableStateOf(false) }
+        val selectedIdentityId = rememberSaveable { mutableStateOf<String?>(null) }
         val identityExpanded = remember { mutableStateOf(false) }
-        val selectedForwardId = remember { mutableStateOf<String?>(null) }
-        val selectedStartupSnippetId = remember { mutableStateOf<String?>(null) }
+        val selectedForwardId = rememberSaveable { mutableStateOf<String?>(null) }
+        val selectedStartupSnippetId = rememberSaveable { mutableStateOf<String?>(null) }
         val startupSnippetExpanded = remember { mutableStateOf(false) }
-        val selectedTerminalProfileId = remember { mutableStateOf<String?>(null) }
+        val selectedTerminalProfileId = rememberSaveable { mutableStateOf<String?>(null) }
         val terminalProfileExpanded = remember { mutableStateOf(false) }
         val hostHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
         val userHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
-        val status = remember { mutableStateOf<String?>(null) }
+        val status = rememberSaveable { mutableStateOf<String?>(null) }
 
         AutoHidePasswordReveal(revealPasswordIndex)
 
@@ -1872,7 +2167,9 @@ private fun QuickConnectSheet(
                     imeAction = ImeAction.Next,
                     autoCorrect = false
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.QUICK_CONNECT_HOST_INPUT)
             )
             OutlinedTextField(
                 value = port.value,
@@ -1885,7 +2182,9 @@ private fun QuickConnectSheet(
                     imeAction = ImeAction.Next,
                     autoCorrect = false
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.QUICK_CONNECT_PORT_INPUT)
             )
             OutlinedTextField(
                 value = username.value,
@@ -1898,7 +2197,9 @@ private fun QuickConnectSheet(
                     imeAction = ImeAction.Next,
                     autoCorrect = false
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.QUICK_CONNECT_USERNAME_INPUT)
             )
             OutlinedTextField(
                 value = password.value,
@@ -1912,7 +2213,9 @@ private fun QuickConnectSheet(
                     imeAction = ImeAction.Done,
                     autoCorrect = false
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.QUICK_CONNECT_PASSWORD_INPUT)
             )
             if (hostHistory.value.isNotEmpty()) {
                 Text("Last used hosts", style = MaterialTheme.typography.labelMedium)
@@ -2131,7 +2434,13 @@ private fun QuickConnectSheet(
                     onCheckedChange = { saveToHosts.value = it }
                 )
             }
-            status.value?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            status.value?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.testTag(UiTestTags.QUICK_CONNECT_STATUS_TEXT)
+                )
+            }
             Button(
                 onClick = {
                     val hostValue = host.value.trim()
@@ -2166,7 +2475,9 @@ private fun QuickConnectSheet(
                         selectedTerminalProfileId.value
                     )
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.QUICK_CONNECT_CONNECT_BUTTON),
                 enabled = true
             ) {
                 Text("Connect")
@@ -2176,8 +2487,11 @@ private fun QuickConnectSheet(
 }
 
 @Composable
-private fun AboutDialog(
+internal fun AboutDialog(
     onDismiss: () -> Unit,
+    onOpenWebsite: () -> Unit,
+    onOpenSupport: () -> Unit,
+    onOpenPrivacy: () -> Unit,
     onOpenSourceLicenses: () -> Unit
 ) {
     val makerLogo = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
@@ -2186,6 +2500,7 @@ private fun AboutDialog(
         R.drawable.major_daft_apps_black
     }
     AlertDialog(
+        modifier = Modifier.testTag(UiTestTags.ABOUT_DIALOG),
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
@@ -2220,25 +2535,23 @@ private fun AboutDialog(
                     style = MaterialTheme.typography.titleMedium
                 )
                 val website = stringResource(id = R.string.project_website)
-                val supportUrl = stringResource(id = R.string.support_url)
-                val privacy = stringResource(id = R.string.privacy_policy_url)
-                val context = LocalContext.current
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Website:")
                     Text(
                         website,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(website))
-                            context.startActivity(intent)
-                        }
+                        modifier = Modifier
+                            .testTag(UiTestTags.ABOUT_WEBSITE_LINK)
+                            .clickable(onClick = onOpenWebsite)
                     )
                 }
                 Text("License: GPL-3.0")
                 Text(
                     "Open Source License Notices",
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onOpenSourceLicenses() }
+                    modifier = Modifier
+                        .testTag(UiTestTags.ABOUT_LICENSES_LINK)
+                        .clickable { onOpenSourceLicenses() }
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2247,19 +2560,17 @@ private fun AboutDialog(
                     Text(
                         "Support",
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(supportUrl))
-                            context.startActivity(intent)
-                        }
+                        modifier = Modifier
+                            .testTag(UiTestTags.ABOUT_SUPPORT_LINK)
+                            .clickable(onClick = onOpenSupport)
                     )
                     Text("  |  ")
                     Text(
                         "Privacy Policy",
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(privacy))
-                            context.startActivity(intent)
-                        }
+                        modifier = Modifier
+                            .testTag(UiTestTags.ABOUT_PRIVACY_LINK)
+                            .clickable(onClick = onOpenPrivacy)
                     )
                 }
                 Column(
@@ -2279,12 +2590,154 @@ private fun AboutDialog(
     )
 }
 
-private fun buildExportPayload(state: AppUiState): String {
+private fun decodeTransferPayload(encodedPayload: String): JSONObject? {
+    val payload = runCatching {
+        String(Base64.decode(encodedPayload.trim(), Base64.DEFAULT), Charsets.UTF_8)
+    }.getOrNull() ?: return null
+    return runCatching { JSONObject(payload) }.getOrNull()
+}
+
+private fun transferPayloadRequiresPassphrase(encodedPayload: String): Boolean {
+    val root = decodeTransferPayload(encodedPayload) ?: return false
+    val hostsRequirePassphrase = root.optJSONArray("hosts")?.let { hosts ->
+        (0 until hosts.length()).any { index ->
+            hosts.optJSONObject(index)?.optString("pwdPayload").orEmpty().isNotBlank()
+        }
+    } ?: false
+    val identitiesRequirePassphrase = root.optJSONArray("identities")?.let { identities ->
+        (0 until identities.length()).any { index ->
+            val item = identities.optJSONObject(index)
+            item?.optString("keyPayload").orEmpty().isNotBlank() ||
+                item?.optString("keyPassphrasePayload").orEmpty().isNotBlank()
+        }
+    } ?: false
+    return hostsRequirePassphrase || identitiesRequirePassphrase
+}
+
+private fun optNullableLong(item: JSONObject, key: String): Long? =
+    if (item.has(key) && !item.isNull(key)) item.optLong(key) else null
+
+private fun jsonStringList(array: JSONArray?): List<String> = buildList {
+    if (array == null) return@buildList
+    for (index in 0 until array.length()) {
+        array.optString(index).trim().ifBlank { null }?.let(::add)
+    }
+}
+
+private fun forwardTransferKey(
+    label: String,
+    sourceHost: String,
+    sourcePort: Int,
+    destinationHost: String,
+    destinationPort: Int
+): String = listOf(
+    label.trim(),
+    sourceHost.trim(),
+    sourcePort.toString(),
+    destinationHost.trim(),
+    destinationPort.toString()
+).joinToString("|")
+
+private fun snippetTransferKey(title: String, command: String): String =
+    listOf(title.trim(), command.trim()).joinToString("|")
+
+private fun keyboardSlotToJson(slot: KeyboardSlotAction): JSONObject = JSONObject().apply {
+    put("type", slot.type.name)
+    put("label", slot.label)
+    put("text", slot.text)
+    put("keyCode", slot.keyCode ?: JSONObject.NULL)
+    put("modifier", slot.modifier?.name ?: JSONObject.NULL)
+    put("sequence", slot.sequence)
+    put("ctrl", slot.ctrl)
+    put("alt", slot.alt)
+    put("shift", slot.shift)
+    put("repeatable", slot.repeatable)
+    put("iconId", slot.iconId)
+}
+
+private fun keyboardLayoutToJson(slots: List<KeyboardSlotAction>): JSONArray = JSONArray().apply {
+    KeyboardLayoutDefaults.normalizeSlots(slots).forEach { put(keyboardSlotToJson(it)) }
+}
+
+private fun keyboardLayoutFromJson(array: JSONArray?): List<KeyboardSlotAction> {
+    if (array == null) return KeyboardLayoutDefaults.DEFAULT_SLOTS
+    val parsed = List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+        val item = array.optJSONObject(index)
+        KeyboardSlotAction(
+            type = runCatching {
+                KeyboardActionType.valueOf(
+                    item?.optString("type", KeyboardActionType.TEXT.name) ?: KeyboardActionType.TEXT.name
+                )
+            }.getOrDefault(KeyboardActionType.TEXT),
+            label = item?.optString("label").orEmpty(),
+            text = item?.optString("text").orEmpty(),
+            keyCode = item?.takeIf { it.has("keyCode") && !it.isNull("keyCode") }?.optInt("keyCode"),
+            modifier = item?.takeIf { it.has("modifier") && !it.isNull("modifier") }?.optString("modifier")
+                ?.let { value -> runCatching { KeyboardModifier.valueOf(value) }.getOrNull() },
+            sequence = item?.optString("sequence").orEmpty(),
+            ctrl = item?.optBoolean("ctrl", false) ?: false,
+            alt = item?.optBoolean("alt", false) ?: false,
+            shift = item?.optBoolean("shift", false) ?: false,
+            repeatable = item?.optBoolean("repeatable", false) ?: false,
+            iconId = item?.optString("iconId").orEmpty()
+        )
+    }
+    return KeyboardLayoutDefaults.normalizeSlots(parsed)
+}
+
+private fun terminalProfileToJson(profile: TerminalProfile): JSONObject = JSONObject().apply {
+    put("id", profile.id)
+    put("name", profile.name)
+    put("fontSizeSp", profile.fontSizeSp)
+    put("foregroundHex", profile.foregroundHex)
+    put("backgroundHex", profile.backgroundHex)
+    put("cursorHex", profile.cursorHex)
+    put("cursorStyle", profile.cursorStyle.name)
+    put("cursorBlink", profile.cursorBlink)
+}
+
+private fun terminalProfilesToJson(profiles: List<TerminalProfile>): JSONArray = JSONArray().apply {
+    profiles.forEach { put(terminalProfileToJson(it)) }
+}
+
+private fun terminalProfilesFromJson(array: JSONArray?): List<TerminalProfile> {
+    if (array == null) return emptyList()
+    val out = mutableListOf<TerminalProfile>()
+    for (index in 0 until array.length()) {
+        val item = array.optJSONObject(index) ?: continue
+        val id = item.optString("id").trim()
+        if (id.isBlank()) continue
+        out += TerminalProfile(
+            id = id,
+            name = item.optString("name", "Profile").trim().ifBlank { "Profile" },
+            fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(6, 28),
+            foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
+            backgroundHex = item.optString("backgroundHex", "#101010"),
+            cursorHex = item.optString("cursorHex", "#FFB74D"),
+            cursorStyle = runCatching {
+                TerminalCursorStyle.valueOf(
+                    item.optString("cursorStyle", TerminalCursorStyle.BLOCK.name)
+                )
+            }.getOrDefault(TerminalCursorStyle.BLOCK),
+            cursorBlink = item.optBoolean("cursorBlink", true)
+        )
+    }
+    return out
+}
+
+private fun buildExportPayload(state: AppUiState, passphrase: String?): String? {
+    val includeSecrets = state.includeSecretsInQr
+    val secretsPassphrase = if (includeSecrets) passphrase?.takeIf { it.isNotBlank() } ?: return null else null
     val payload = JSONObject().apply {
-        put("v", 1)
+        put("v", 2)
         put("exportedAt", System.currentTimeMillis())
         put("hosts", JSONArray().apply {
             state.hosts.forEach { host ->
+                val encryptedPasswordPayload = if (includeSecrets && host.hasPassword) {
+                    SecurityManager.exportHostPasswordPayload(host.id, secretsPassphrase!!) ?: return null
+                } else {
+                    null
+                }
                 put(JSONObject().apply {
                     put("id", host.id)
                     put("name", host.name)
@@ -2293,39 +2746,76 @@ private fun buildExportPayload(state: AppUiState): String {
                     put("username", host.username)
                     put("auth", host.preferredAuth.name)
                     put("group", host.group)
+                    put("lastUsedEpochMillis", host.lastUsedEpochMillis ?: JSONObject.NULL)
+                    put("favorite", host.favorite)
                     put("notes", host.notes)
                     put("defaultMode", host.defaultMode.name)
+                    put("attachedForwards", JSONArray(host.attachedForwards))
+                    put("snippets", JSONArray(host.snippets))
+                    put("osMetadata", Converters.fromOsMetadata(host.osMetadata))
                     put("hasPassword", host.hasPassword)
+                    put("useMosh", host.useMosh)
+                    put("preferredIdentityId", host.preferredIdentityId)
+                    put("preferredForwardId", host.preferredForwardId)
+                    put("startupScript", host.startupScript)
+                    put("backgroundBehavior", host.backgroundBehavior.name)
                     put("terminalProfileId", host.terminalProfileId ?: "")
+                    put("infoCommands", JSONArray(host.infoCommands))
+                    encryptedPasswordPayload?.let { put("pwdPayload", it) }
                 })
             }
         })
-        if (state.includeIdentitiesInQr) {
-            put("identities", JSONArray().apply {
-                state.identities.forEach { identity ->
-                    put(JSONObject().apply {
-                        put("id", identity.id)
-                        put("label", identity.label)
-                        put("fingerprint", identity.fingerprint)
-                        put("username", identity.username)
-                        put("hasPrivateKey", identity.hasPrivateKey)
-                    })
+        put("identities", JSONArray().apply {
+            state.identities.forEach { identity ->
+                val encryptedKeyPayload = if (includeSecrets && identity.hasPrivateKey) {
+                    SecurityManager.exportIdentityKeyPayload(identity.id, secretsPassphrase!!) ?: return null
+                } else {
+                    null
                 }
-            })
-        }
-        if (state.includeSettingsInQr) {
-            put("settings", JSONObject().apply {
-                put("themeMode", state.themeMode.name)
-                put("allowBackgroundSessions", state.allowBackgroundSessions)
-                put("backgroundSessionTimeout", state.backgroundSessionTimeout.name)
-                put("biometricLockEnabled", state.biometricLockEnabled)
-                put("lockTimeout", state.lockTimeout.name)
-                put("customLockTimeoutMinutes", state.customLockTimeoutMinutes)
-                put("autoStartForwards", state.autoStartForwards)
-                put("hostKeyPromptEnabled", state.hostKeyPromptEnabled)
-                put("autoTrustHostKey", state.autoTrustHostKey)
-            })
-        }
+                val encryptedKeyPassphrasePayload = if (includeSecrets) {
+                    SecurityManager.exportIdentityKeyPassphrasePayload(identity.id, secretsPassphrase!!)
+                } else {
+                    null
+                }
+                put(JSONObject().apply {
+                    put("id", identity.id)
+                    put("label", identity.label)
+                    put("fingerprint", identity.fingerprint)
+                    put("username", identity.username)
+                    put("createdEpochMillis", identity.createdEpochMillis)
+                    put("lastUsedEpochMillis", identity.lastUsedEpochMillis ?: JSONObject.NULL)
+                    put("favorite", identity.favorite)
+                    put("tags", JSONArray(identity.tags))
+                    put("notes", identity.notes)
+                    put("hasPrivateKey", identity.hasPrivateKey)
+                    put("keyImportEpochMillis", identity.keyImportEpochMillis ?: JSONObject.NULL)
+                    SecurityManager.exportIdentityPublicKey(identity.id)?.let { put("publicKey", it) }
+                    encryptedKeyPayload?.let { put("keyPayload", it) }
+                    encryptedKeyPassphrasePayload?.let { put("keyPassphrasePayload", it) }
+                })
+            }
+        })
+        put("settings", JSONObject().apply {
+            put("themeMode", state.themeMode.name)
+            put("allowBackgroundSessions", state.allowBackgroundSessions)
+            put("backgroundSessionTimeout", state.backgroundSessionTimeout.name)
+            put("biometricLockEnabled", state.biometricLockEnabled)
+            put("lockTimeout", state.lockTimeout.name)
+            put("customLockTimeoutMinutes", state.customLockTimeoutMinutes)
+            put("terminalEmulation", state.terminalEmulation.name)
+            put("terminalSelectionMode", state.terminalSelectionMode.name)
+            put("terminalProfiles", terminalProfilesToJson(state.terminalProfiles))
+            put("defaultTerminalProfileId", state.defaultTerminalProfileId)
+            put("crashReportsEnabled", state.crashReportsEnabled)
+            put("analyticsEnabled", state.analyticsEnabled)
+            put("diagnosticsLoggingEnabled", state.diagnosticsLoggingEnabled)
+            put("autoStartForwards", state.autoStartForwards)
+            put("hostKeyPromptEnabled", state.hostKeyPromptEnabled)
+            put("autoTrustHostKey", state.autoTrustHostKey)
+            put("usageReportsEnabled", state.usageReportsEnabled)
+            put("snippetRunTimeoutSeconds", state.snippetRunTimeoutSeconds)
+            put("keyboardLayout", keyboardLayoutToJson(state.keyboardSlots))
+        })
         put("portForwards", JSONArray().apply {
             state.portForwards.forEach { forward ->
                 put(JSONObject().apply {
@@ -2337,7 +2827,22 @@ private fun buildExportPayload(state: AppUiState): String {
                     put("destinationHost", forward.destinationHost)
                     put("destinationPort", forward.destinationPort)
                     put("associatedHosts", JSONArray(forward.associatedHosts))
+                    put("favorite", forward.favorite)
                     put("enabled", forward.enabled)
+                })
+            }
+        })
+        put("snippets", JSONArray().apply {
+            state.snippets.forEach { snippet ->
+                put(JSONObject().apply {
+                    put("id", snippet.id)
+                    put("title", snippet.title)
+                    put("description", snippet.description)
+                    put("command", snippet.command)
+                    put("tags", JSONArray(snippet.tags))
+                    put("autoRunHostIds", JSONArray(snippet.autoRunHostIds))
+                    put("requireConfirmation", snippet.requireConfirmation)
+                    put("favorite", snippet.favorite)
                 })
             }
         })

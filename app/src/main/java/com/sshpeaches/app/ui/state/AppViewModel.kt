@@ -59,11 +59,10 @@ class AppViewModel(
     private val crashReportsFlow = MutableStateFlow(false)
     private val analyticsFlow = MutableStateFlow(false)
     private val diagnosticsLoggingFlow = MutableStateFlow(false)
-    private val includeIdentitiesFlow = MutableStateFlow(true)
-    private val includeSettingsFlow = MutableStateFlow(true)
+    private val includeSecretsInQrFlow = MutableStateFlow(false)
     private val autoStartForwardsFlow = MutableStateFlow(true)
     private val hostKeyPromptFlow = MutableStateFlow(true)
-    private val autoTrustHostKeyFlow = MutableStateFlow(true)
+    private val autoTrustHostKeyFlow = MutableStateFlow(false)
     private val usageReportsFlow = MutableStateFlow(false)
     private val snippetRunTimeoutSecondsFlow = MutableStateFlow(10)
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
@@ -158,13 +157,8 @@ class AppViewModel(
             }
         }
         viewModelScope.launch {
-            SettingsStore.includeIdentities.collect { enabled ->
-                includeIdentitiesFlow.value = enabled
-            }
-        }
-        viewModelScope.launch {
-            SettingsStore.includeSettings.collect { enabled ->
-                includeSettingsFlow.value = enabled
+            SettingsStore.includeSecretsInQr.collect { enabled ->
+                includeSecretsInQrFlow.value = enabled
             }
         }
         viewModelScope.launch {
@@ -210,8 +204,9 @@ class AppViewModel(
         val favoriteHosts = hostList.filter { it.favorite }
         val favoriteIdentities = identities.filter { it.favorite }
         val favoritePorts = forwards.filter { it.favorite }
+        val favoriteSnippets = snippets.filter { it.favorite }
         AppUiState(
-            favorites = FavoritesSection(favoriteHosts, favoriteIdentities, favoritePorts),
+            favorites = FavoritesSection(favoriteHosts, favoriteIdentities, favoritePorts, favoriteSnippets),
             hosts = hostList,
             identities = identities,
             portForwards = forwards,
@@ -250,8 +245,7 @@ class AppViewModel(
     )
 
     private data class SharePrefs(
-        val includeIds: Boolean,
-        val includeSettings: Boolean,
+        val includeSecrets: Boolean,
         val autoStart: Boolean,
         val hostKeyPrompt: Boolean,
         val autoTrustHostKey: Boolean,
@@ -321,13 +315,12 @@ class AppViewModel(
     }
 
     private val shareBasePrefsFlow = combine(
-        includeIdentitiesFlow,
-        includeSettingsFlow,
+        includeSecretsInQrFlow,
         autoStartForwardsFlow,
         hostKeyPromptFlow,
         autoTrustHostKeyFlow
-    ) { includeIds, includeSettings, autoStart, hostKeyPrompt, autoTrustHostKey ->
-        SharePrefs(includeIds, includeSettings, autoStart, hostKeyPrompt, autoTrustHostKey, false)
+    ) { includeSecrets, autoStart, hostKeyPrompt, autoTrustHostKey ->
+        SharePrefs(includeSecrets, autoStart, hostKeyPrompt, autoTrustHostKey, false)
     }
 
     private val sharePrefsFlow = combine(
@@ -358,8 +351,7 @@ class AppViewModel(
             crashReportsEnabled = privacy.crash,
             analyticsEnabled = privacy.analytics,
             diagnosticsLoggingEnabled = privacy.diagnostics,
-            includeIdentitiesInQr = share.includeIds,
-            includeSettingsInQr = share.includeSettings,
+            includeSecretsInQr = share.includeSecrets,
             autoStartForwards = share.autoStart,
             hostKeyPromptEnabled = share.hostKeyPrompt,
             autoTrustHostKey = share.autoTrustHostKey,
@@ -443,8 +435,7 @@ class AppViewModel(
         append(state.crashReportsEnabled).append('|')
         append(state.analyticsEnabled).append('|')
         append(state.diagnosticsLoggingEnabled).append('|')
-        append(state.includeIdentitiesInQr).append('|')
-        append(state.includeSettingsInQr).append('|')
+        append(state.includeSecretsInQr).append('|')
         append(state.autoStartForwards).append('|')
         append(state.hostKeyPromptEnabled).append('|')
         append(state.autoTrustHostKey).append('|')
@@ -595,15 +586,9 @@ class AppViewModel(
         }
     }
 
-    fun setIncludeIdentities(enabled: Boolean) {
-        launchLogged("setIncludeIdentities", "enabled=$enabled") {
-            SettingsStore.setIncludeIdentities(enabled)
-        }
-    }
-
-    fun setIncludeSettings(enabled: Boolean) {
-        launchLogged("setIncludeSettings", "enabled=$enabled") {
-            SettingsStore.setIncludeSettings(enabled)
+    fun setIncludeSecretsInQr(enabled: Boolean) {
+        launchLogged("setIncludeSecretsInQr", "enabled=$enabled") {
+            SettingsStore.setIncludeSecretsInQr(enabled)
         }
     }
 
@@ -779,6 +764,43 @@ class AppViewModel(
         }
     }
 
+    fun importHostPasswordPayload(id: String, payload: String, passphrase: String): Boolean {
+        logAction(
+            "importHostPasswordPayload",
+            "hostId=$id, payloadLength=${payload.length}, passphraseLength=${passphrase.length}"
+        )
+        val ok = runCatching {
+            SecurityManager.importHostPasswordPayload(id, payload, passphrase)
+            markHostHasPasswordWithRetry(id, true)
+        }.onFailure { t ->
+            UiDebugLog.error("importHostPasswordPayload", t, "hostId=$id")
+        }.isSuccess
+        logResult("importHostPasswordPayload", ok, "hostId=$id")
+        return ok
+    }
+
+    fun importHost(host: HostConnection) {
+        logAction("importHost", "hostId=${host.id}, favorite=${host.favorite}, hasPassword=${host.hasPassword}")
+        if (host.name.isBlank() || host.host.isBlank() || host.username.isBlank()) {
+            logResult("importHost", false, "validation-failed")
+            return
+        }
+        val normalized = host.copy(
+            name = host.name.trim(),
+            host = host.host.trim(),
+            port = host.port.coerceIn(1, 65_535),
+            username = host.username.trim(),
+            group = host.group?.takeIf { it.isNotBlank() },
+            preferredIdentityId = host.preferredIdentityId?.takeIf { it.isNotBlank() },
+            preferredForwardId = host.preferredForwardId?.takeIf { it.isNotBlank() },
+            terminalProfileId = host.terminalProfileId?.takeIf { it.isNotBlank() },
+            infoCommands = host.infoCommands.map { it.trim() }.filter { it.isNotBlank() }
+        )
+        launchLogged("importHost", "hostId=${normalized.id}") {
+            repository.addHost(normalized)
+        }
+    }
+
     fun updateHostOsMetadata(id: String, osMetadata: OsMetadata) {
         val existing = uiState.value.hosts.find { it.id == id } ?: return
         if (existing.osMetadata == osMetadata) return
@@ -793,6 +815,39 @@ class AppViewModel(
         if (existing.infoCommands == normalized) return
         launchLogged("updateHostInfoCommands", "hostId=$id, count=${normalized.size}") {
             repository.updateHost(existing.copy(infoCommands = normalized))
+        }
+    }
+
+    private fun markHostHasPasswordWithRetry(id: String, hasPassword: Boolean) {
+        val current = uiState.value.hosts.find { it.id == id }
+        if (current != null) {
+            if (current.hasPassword == hasPassword) {
+                logResult("markHostHasPasswordWithRetry", true, "hostId=$id, no-change")
+                return
+            }
+            launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
+                repository.updateHost(current.copy(hasPassword = hasPassword))
+            }
+            return
+        }
+        viewModelScope.launch {
+            repeat(12) {
+                delay(75)
+                val host = uiState.value.hosts.find { it.id == id }
+                if (host != null) {
+                    if (host.hasPassword != hasPassword) {
+                        launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
+                            repository.updateHost(host.copy(hasPassword = hasPassword))
+                        }
+                    }
+                    return@launch
+                }
+            }
+            logResult(
+                "markHostHasPasswordWithRetry",
+                false,
+                "hostId=$id, hasPassword=$hasPassword, not-found-after-retry"
+            )
         }
     }
 
@@ -829,6 +884,25 @@ class AppViewModel(
         )
         launchLogged("addPortForward", "forwardId=${forward.id}, type=$normalizedType") {
             repository.addPortForward(forward)
+        }
+    }
+
+    fun importPortForward(forward: PortForward) {
+        logAction("importPortForward", "forwardId=${forward.id}, favorite=${forward.favorite}, enabled=${forward.enabled}")
+        if (forward.label.isBlank() || forward.destinationHost.isBlank()) {
+            logResult("importPortForward", false, "validation-failed")
+            return
+        }
+        val normalized = forward.copy(
+            label = forward.label.trim(),
+            type = PortForwardType.LOCAL,
+            sourceHost = forward.sourceHost.ifBlank { "127.0.0.1" },
+            sourcePort = forward.sourcePort.coerceIn(1, 65_535),
+            destinationHost = forward.destinationHost.trim(),
+            destinationPort = forward.destinationPort.coerceIn(1, 65_535)
+        )
+        launchLogged("importPortForward", "forwardId=${normalized.id}") {
+            repository.addPortForward(normalized)
         }
     }
 
@@ -897,6 +971,22 @@ class AppViewModel(
         )
         launchLogged("addSnippet", "snippetId=${snippet.id}") {
             repository.addSnippet(snippet)
+        }
+    }
+
+    fun importSnippet(snippet: Snippet) {
+        logAction("importSnippet", "snippetId=${snippet.id}, favorite=${snippet.favorite}")
+        if (snippet.command.isBlank()) {
+            logResult("importSnippet", false, "validation-failed")
+            return
+        }
+        val normalized = snippet.copy(
+            title = snippet.title.ifBlank { "Snippet" },
+            command = snippet.command.trim(),
+            tags = snippet.tags.map { it.trim() }.filter { it.isNotBlank() }
+        )
+        launchLogged("importSnippet", "snippetId=${normalized.id}") {
+            repository.addSnippet(normalized)
         }
     }
 
@@ -1137,6 +1227,17 @@ class AppViewModel(
         return ok
     }
 
+    fun importIdentityPublicKey(id: String, publicKey: String): Boolean {
+        logAction("importIdentityPublicKey", "identityId=$id, keyLength=${publicKey.length}")
+        val ok = runCatching {
+            SecurityManager.importIdentityPublicKey(id, publicKey.trim())
+        }.onFailure { t ->
+            UiDebugLog.error("importIdentityPublicKey", t, "identityId=$id")
+        }.isSuccess
+        logResult("importIdentityPublicKey", ok, "identityId=$id")
+        return ok
+    }
+
     fun storeIdentityKeyPassphrase(id: String, passphrase: String?) {
         logAction("storeIdentityKeyPassphrase", "identityId=$id, passphraseLength=${passphrase?.length ?: 0}")
         runCatching {
@@ -1145,6 +1246,37 @@ class AppViewModel(
             UiDebugLog.error("storeIdentityKeyPassphrase", t, "identityId=$id")
         }
         logResult("storeIdentityKeyPassphrase", true, "identityId=$id")
+    }
+
+    fun importIdentityKeyPassphrasePayload(id: String, payload: String, passphrase: String): Boolean {
+        logAction(
+            "importIdentityKeyPassphrasePayload",
+            "identityId=$id, payloadLength=${payload.length}, passphraseLength=${passphrase.length}"
+        )
+        val ok = runCatching {
+            SecurityManager.importIdentityKeyPassphrasePayload(id, payload, passphrase)
+        }.onFailure { t ->
+            UiDebugLog.error("importIdentityKeyPassphrasePayload", t, "identityId=$id")
+        }.isSuccess
+        logResult("importIdentityKeyPassphrasePayload", ok, "identityId=$id")
+        return ok
+    }
+
+    fun importIdentity(identity: Identity) {
+        logAction("importIdentity", "identityId=${identity.id}, favorite=${identity.favorite}, hasPrivateKey=${identity.hasPrivateKey}")
+        if (identity.fingerprint.isBlank()) {
+            logResult("importIdentity", false, "validation-failed")
+            return
+        }
+        val normalized = identity.copy(
+            label = identity.label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
+            fingerprint = identity.fingerprint.trim(),
+            username = identity.username?.takeIf { it.isNotBlank() },
+            tags = identity.tags.map { it.trim() }.filter { it.isNotBlank() }
+        )
+        launchLogged("importIdentity", "identityId=${normalized.id}") {
+            repository.addIdentity(normalized)
+        }
     }
 
     private fun markIdentityHasKeyWithRetry(id: String, hasKey: Boolean) {
@@ -1179,6 +1311,15 @@ class AppViewModel(
         }
     }
 
+    fun importKeyboardLayout(slots: List<KeyboardSlotAction>) {
+        logAction("importKeyboardLayout", "slotCount=${slots.size}")
+        val normalized = KeyboardLayoutDefaults.normalizeSlots(slots)
+        keyboardSlotsFlow.value = normalized
+        launchLogged("importKeyboardLayout", "slotCount=${normalized.size}") {
+            SettingsStore.setKeyboardLayout(normalized)
+        }
+    }
+
     fun resetKeyboardLayout() {
         logAction("resetKeyboardLayout")
         keyboardSlotsFlow.value = KeyboardLayoutDefaults.DEFAULT_SLOTS
@@ -1187,11 +1328,36 @@ class AppViewModel(
         }
     }
 
+    fun importTerminalProfiles(profiles: List<TerminalProfile>, defaultProfileId: String?) {
+        logAction(
+            "importTerminalProfiles",
+            "profileCount=${profiles.size}, defaultProfileId=${defaultProfileId.orEmpty()}"
+        )
+        launchLogged("importTerminalProfiles", "profileCount=${profiles.size}") {
+            val builtInIds = TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet()
+            val mergedCustom = terminalProfilesFlow.value
+                .filterNot { builtInIds.contains(it.id) }
+                .associateByTo(linkedMapOf()) { it.id }
+
+            profiles
+                .map(::normalizeProfile)
+                .filterNot { builtInIds.contains(it.id) }
+                .forEach { mergedCustom[it.id] = it }
+
+            SettingsStore.setTerminalProfiles(mergedCustom.values.sortedBy { it.name.lowercase() })
+
+            val availableIds = builtInIds + mergedCustom.keys
+            defaultProfileId
+                ?.takeIf { availableIds.contains(it) }
+                ?.let { SettingsStore.setDefaultTerminalProfileId(it) }
+        }
+    }
+
     private fun normalizeProfile(profile: TerminalProfile): TerminalProfile {
         val normalizedName = profile.name.trim().ifBlank { "Custom Profile" }.take(48)
         return profile.copy(
             name = normalizedName,
-            fontSizeSp = profile.fontSizeSp.coerceIn(8, 28)
+            fontSizeSp = profile.fontSizeSp.coerceIn(6, 28)
         )
     }
 

@@ -27,6 +27,8 @@ object SecurityManager {
     private const val KEY_IDENTITY_PUBLIC_PREFIX = "ident_pub_"
     private const val KEY_IDENTITY_PASSPHRASE_PREFIX = "ident_pass_"
     private const val INIT_AWAIT_TIMEOUT_SECONDS = 20L
+    private const val CURRENT_EXPORT_KDF_ITERATIONS = 210_000
+    const val MIN_SECRET_PASSPHRASE_LENGTH = 12
 
     @Volatile
     private var appContext: Context? = null
@@ -182,77 +184,66 @@ object SecurityManager {
         awaitPrefs().edit().remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId).apply()
     }
 
-    fun exportHostPasswordPayload(hostId: String, passphrase: String): String? {
+    fun exportIdentityPublicKey(identityId: String): String? {
         val securePrefs = awaitPrefs()
-        if (passphrase.isBlank()) return null
+        return securePrefs.getString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, null)
+    }
+
+    fun importIdentityPublicKey(identityId: String, publicKey: String) {
+        val securePrefs = awaitPrefs()
+        securePrefs.edit()
+            .putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
+            .apply()
+    }
+
+    fun exportHostPasswordPayload(hostId: String, passphrase: String): String? {
+        if (lockState.value) return null
+        val securePrefs = awaitPrefs()
+        requireValidSecretPassphrase(passphrase)
         val password = securePrefs.getString(KEY_PASSWORD_PREFIX + hostId, null) ?: return null
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val key = deriveKey(passphrase, salt)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val secretKey = SecretKeySpec(key, "AES")
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(password.toByteArray(Charsets.UTF_8))
-        val payload = JSONObject().apply {
-            put("v", 1)
-            put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
-            put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
-            put("cipher", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-        }.toString()
-        return Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        return encryptTransferPayload(password, passphrase)
     }
 
     fun importHostPasswordPayload(hostId: String, payload: String, passphrase: String) {
         val securePrefs = awaitPrefs()
-        if (passphrase.isBlank()) return
-        val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
-        val json = JSONObject(decoded)
-        val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
-        val salt = Base64.decode(json.getString("salt"), Base64.NO_WRAP)
-        val cipherBytes = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val secretKey = SecretKeySpec(deriveKey(passphrase, salt), "AES")
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
-        val plaintext = cipher.doFinal(cipherBytes).toString(Charsets.UTF_8)
+        requireValidSecretPassphrase(passphrase)
+        val plaintext = decryptTransferPayload(payload, passphrase)
         securePrefs.edit()
             .putString(KEY_PASSWORD_PREFIX + hostId, plaintext)
             .apply()
     }
 
     fun exportIdentityKeyPayload(identityId: String, passphrase: String): String? {
+        if (lockState.value) return null
         val securePrefs = awaitPrefs()
-        if (passphrase.isBlank()) return null
+        requireValidSecretPassphrase(passphrase)
         val keyValue = securePrefs.getString(KEY_IDENTITY_PREFIX + identityId, null) ?: return null
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val key = deriveKey(passphrase, salt)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val secretKey = SecretKeySpec(key, "AES")
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(keyValue.toByteArray(Charsets.UTF_8))
-        val payload = JSONObject().apply {
-            put("v", 1)
-            put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
-            put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
-            put("cipher", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-        }.toString()
-        return Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        return encryptTransferPayload(keyValue, passphrase)
     }
 
     fun importIdentityKeyPayload(identityId: String, payload: String, passphrase: String) {
         val securePrefs = awaitPrefs()
-        if (passphrase.isBlank()) return
-        val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
-        val json = JSONObject(decoded)
-        val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
-        val salt = Base64.decode(json.getString("salt"), Base64.NO_WRAP)
-        val cipherBytes = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val secretKey = SecretKeySpec(deriveKey(passphrase, salt), "AES")
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
-        val plaintext = cipher.doFinal(cipherBytes).toString(Charsets.UTF_8)
+        requireValidSecretPassphrase(passphrase)
+        val plaintext = decryptTransferPayload(payload, passphrase)
         securePrefs.edit()
             .putString(KEY_IDENTITY_PREFIX + identityId, plaintext)
+            .apply()
+    }
+
+    fun exportIdentityKeyPassphrasePayload(identityId: String, passphrase: String): String? {
+        if (lockState.value) return null
+        val securePrefs = awaitPrefs()
+        requireValidSecretPassphrase(passphrase)
+        val keyPassphrase = securePrefs.getString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, null) ?: return null
+        return encryptTransferPayload(keyPassphrase, passphrase)
+    }
+
+    fun importIdentityKeyPassphrasePayload(identityId: String, payload: String, passphrase: String) {
+        val securePrefs = awaitPrefs()
+        requireValidSecretPassphrase(passphrase)
+        val plaintext = decryptTransferPayload(payload, passphrase)
+        securePrefs.edit()
+            .putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, plaintext)
             .apply()
     }
 
@@ -267,10 +258,50 @@ object SecurityManager {
         check(!lockState.value) { "Cannot $action while locked" }
     }
 
-    private fun deriveKey(passphrase: String, salt: ByteArray): ByteArray {
+    private fun requireValidSecretPassphrase(passphrase: String) {
+        require(passphrase.length >= MIN_SECRET_PASSPHRASE_LENGTH) {
+            "Passphrase must be at least $MIN_SECRET_PASSPHRASE_LENGTH characters."
+        }
+    }
+
+    private fun deriveKey(passphrase: String, salt: ByteArray, iterations: Int): ByteArray {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val spec = javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, 12000, 256)
+        val spec = javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, iterations, 256)
         return factory.generateSecret(spec).encoded
+    }
+
+    private fun encryptTransferPayload(value: String, passphrase: String): String {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val key = deriveKey(passphrase, salt, CURRENT_EXPORT_KDF_ITERATIONS)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
+        val secretKey = SecretKeySpec(key, "AES")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        val payload = JSONObject().apply {
+            put("v", 1)
+            put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
+            put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
+            put("iter", CURRENT_EXPORT_KDF_ITERATIONS)
+            put("cipher", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+        }.toString()
+        return Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    }
+
+    private fun decryptTransferPayload(payload: String, passphrase: String): String {
+        val decoded = String(Base64.decode(payload, Base64.NO_WRAP))
+        val json = JSONObject(decoded)
+        val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
+        val salt = Base64.decode(json.getString("salt"), Base64.NO_WRAP)
+        val iterations = json.optInt("iter", 0)
+        require(iterations == CURRENT_EXPORT_KDF_ITERATIONS) {
+            "Unsupported secret export format."
+        }
+        val cipherBytes = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val secretKey = SecretKeySpec(deriveKey(passphrase, salt, iterations), "AES")
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        return cipher.doFinal(cipherBytes).toString(Charsets.UTF_8)
     }
 
     private fun startInitializationIfNeeded(async: Boolean) {

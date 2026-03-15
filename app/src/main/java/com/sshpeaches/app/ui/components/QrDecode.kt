@@ -13,8 +13,7 @@ import java.util.Base64
 
 data class HostQrPayload(
     val host: HostConnection,
-    val encryptedPasswordPayload: String?,
-    val legacyPassword: String?
+    val encryptedPasswordPayload: String?
 )
 
 data class IdentityQrPayload(
@@ -48,10 +47,7 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         terminalProfileId = json.optString("terminalProfileId").takeIf { it.isNotBlank() }
     )
     val encrypted = json.optString("pwdPayload").takeIf { it.isNotBlank() }
-    val legacy = json.optString("pwd").takeIf { it.isNotBlank() }?.let { encoded ->
-        String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
-    }
-    HostQrPayload(host, encrypted, legacy)
+    HostQrPayload(host, encrypted)
 }.getOrNull()
 
 fun decodeIdentityFromQr(contents: String): IdentityQrPayload? = runCatching {

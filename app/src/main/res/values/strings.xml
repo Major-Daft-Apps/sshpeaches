@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">SSHPeaches</string>
-    <string name="app_version">0.9.4 (beta)</string>
+    <string name="app_version">0.9.5 (beta)</string>
     <string name="about_version">Version %1$s</string>
     <string name="project_website">https://majordaftapps.com</string>
     <string name="support_url">https://majordaftapps.com/sshpeaches-support</string>
@@ -12,6 +12,9 @@
     <string name="widget_no_hosts">No hosts saved.</string>
     <string name="widget_no_open_sessions">No open sessions.</string>
     <string name="widget_more_hosts">+%1$d more hosts</string>
+    <string name="widget_action_ssh">SSH terminal</string>
+    <string name="widget_action_sftp">SFTP file transfer</string>
+    <string name="widget_action_scp">SCP file copy</string>
     <string name="widget_open">Open</string>
     <string name="widget_disconnect">Disconnect</string>
 </resources>

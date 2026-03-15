@@ -1,16 +1,21 @@
-# SSHPeaches Documentation
+# SSHPeaches Wiki Sources
 
-This folder contains both end-user guides and product/design references.
+This folder now uses a single wiki root with a nested developer section.
 
-## If you installed from F-Droid or Google Play
+## User Wiki
 
-Start here:
+For people using SSHPeaches on Android:
 
-- [Getting Started](getting-started.md) - first launch, first connection, and security setup.
-- [User Guide](user-guide.md) - what each screen does and how to use it.
-- [Troubleshooting](troubleshooting.md) - common issues and fixes.
+- [Home](user-wiki/Home.md)
+- [Getting Started](user-wiki/Getting-Started.md)
+- [User Guide](user-wiki/User-Guide.md)
+- [Troubleshooting](user-wiki/Troubleshooting.md)
 
-## For contributors
+## Developer Section
 
-- [Product Blueprint](blueprint.md) - roadmap and product scope.
-- [UI Design Notes](design.md) - UI behavior and layout notes.
+For contributors, maintainers, and release work:
+
+- [Developer Home](user-wiki/developer/Home.md)
+- [Product Blueprint](user-wiki/developer/Product-Blueprint.md)
+- [UI Design Notes](user-wiki/developer/UI-Design-Notes.md)
+- [Google Play Publish Checklist](user-wiki/developer/Google-Play-Publish-Checklist.md)

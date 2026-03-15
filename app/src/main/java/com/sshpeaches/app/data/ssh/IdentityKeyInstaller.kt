@@ -25,14 +25,14 @@ object IdentityKeyInstaller {
         hostPasswordOverride: String?,
         identityPassphraseOverride: String?
     ): Result = withContext(Dispatchers.IO) {
-        val publicKey = resolvePublicKey(identityId)
+        val publicKey = resolvePublicKey(identityId, identityPassphraseOverride)
             ?: return@withContext Result(false, "Public key is missing for this identity.")
 
         val client = runCatching {
             SshClientProvider.createClient(
                 context = context,
                 host = host,
-                autoTrustUnknownHostKey = true,
+                autoTrustUnknownHostKey = false,
                 onHostKeyPrompt = null
             )
         }.getOrElse { error ->
@@ -66,7 +66,19 @@ object IdentityKeyInstaller {
         }.getOrElse { error ->
             val message = when (error) {
                 is UserAuthException -> "Authentication failed for ${host.username}@${host.host}."
-                else -> error.message ?: "Failed to copy key to host."
+                else -> (
+                    error.message
+                        ?.takeIf {
+                        it.contains("verification", ignoreCase = true) ||
+                            it.contains("known host", ignoreCase = true) ||
+                            it.contains("host key", ignoreCase = true)
+                        }
+                        ?.let {
+                            "Host key is not trusted for ${host.username}@${host.host}. Verify the server key in a normal session first, then retry."
+                        }
+                        ?: error.message
+                        ?: "Failed to copy key to host."
+                    )
             }
             Result(false, message)
         }.also {
@@ -74,7 +86,7 @@ object IdentityKeyInstaller {
         }
     }
 
-    private fun resolvePublicKey(identityId: String): String? {
+    private fun resolvePublicKey(identityId: String, identityPassphraseOverride: String?): String? {
         val storedPublic = runCatching { SecurityManager.getIdentityPublicKey(identityId) }.getOrNull()
             ?.lineSequence()
             ?.firstOrNull { it.trim().isNotBlank() }
@@ -84,7 +96,12 @@ object IdentityKeyInstaller {
         val privateKey = runCatching { SecurityManager.getIdentityKey(identityId) }.getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?: return null
-        val derived = SshKeyGenerator.derivePublicKeyFromPrivate(privateKey)?.trim()
+        val passphrase = identityPassphraseOverride?.takeIf { it.isNotBlank() }
+            ?: runCatching { SecurityManager.getIdentityKeyPassphrase(identityId) }.getOrNull()
+        val derived = SshKeyGenerator.derivePublicKeyFromPrivate(
+            privateKeyMaterial = privateKey,
+            passphrase = passphrase
+        )?.trim()
         if (!derived.isNullOrBlank()) {
             runCatching { SecurityManager.storeIdentityPublicKey(identityId, derived) }
             return derived

@@ -25,9 +25,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,11 +50,11 @@ fun ThemeEditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_THEME_EDITOR)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Theme Editor", style = MaterialTheme.typography.headlineSmall)
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Terminal Themes", style = MaterialTheme.typography.titleMedium)
@@ -74,6 +76,7 @@ fun ThemeEditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor()
+                            .testTag(UiTestTags.THEME_DEFAULT_FIELD)
                     )
                     ExposedDropdownMenu(
                         expanded = defaultTerminalProfileExpanded.value,
@@ -85,7 +88,8 @@ fun ThemeEditorScreen(
                                 onClick = {
                                     defaultTerminalProfileExpanded.value = false
                                     onDefaultTerminalProfileChange(profile.id)
-                                }
+                                },
+                                modifier = Modifier.testTag(UiTestTags.themeDefaultOption(profile.name))
                             )
                         }
                     }
@@ -108,15 +112,24 @@ fun ThemeEditorScreen(
                             )
                         }
                         if (builtInProfileIds.contains(profile.id)) {
-                            TextButton(onClick = { onDuplicateTheme(profile.id) }) {
+                            TextButton(
+                                onClick = { onDuplicateTheme(profile.id) },
+                                modifier = Modifier.testTag(UiTestTags.themeDuplicate(profile.id))
+                            ) {
                                 Text("Duplicate")
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(onClick = { onEditTheme(profile.id) }) {
+                                TextButton(
+                                    onClick = { onEditTheme(profile.id) },
+                                    modifier = Modifier.testTag(UiTestTags.themeEdit(profile.id))
+                                ) {
                                     Text("Edit")
                                 }
-                                TextButton(onClick = { showDeleteProfileDialog.value = profile.id }) {
+                                TextButton(
+                                    onClick = { showDeleteProfileDialog.value = profile.id },
+                                    modifier = Modifier.testTag(UiTestTags.themeDelete(profile.id))
+                                ) {
                                     Text("Delete")
                                 }
                             }
@@ -125,7 +138,9 @@ fun ThemeEditorScreen(
                 }
                 Button(
                     onClick = onCreateTheme,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.THEME_CREATE_BUTTON)
                 ) {
                     Text("New Terminal Theme")
                 }
@@ -144,14 +159,20 @@ fun ThemeEditorScreen(
             title = { Text("Delete terminal theme?") },
             text = { Text("Delete $profileName? Hosts using it will fall back to app default.") },
             confirmButton = {
-                TextButton(onClick = {
-                    onDeleteTerminalProfile(profileId)
-                    showDeleteProfileDialog.value = null
-                    onShowMessage("Terminal theme deleted.")
-                }) { Text("Delete") }
+                TextButton(
+                    onClick = {
+                        onDeleteTerminalProfile(profileId)
+                        showDeleteProfileDialog.value = null
+                        onShowMessage("Terminal theme deleted.")
+                    },
+                    modifier = Modifier.testTag(UiTestTags.THEME_DELETE_CONFIRM)
+                ) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteProfileDialog.value = null }) { Text("Cancel") }
+                TextButton(
+                    onClick = { showDeleteProfileDialog.value = null },
+                    modifier = Modifier.testTag(UiTestTags.THEME_DELETE_CANCEL)
+                ) { Text("Cancel") }
             }
         )
     }

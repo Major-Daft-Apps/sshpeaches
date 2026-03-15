@@ -26,8 +26,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.calculatePasswordRevealIndex
@@ -45,7 +47,9 @@ fun LockScreenOverlay(
     val errorState = remember { mutableStateOf<String?>(null) }
     AutoHidePasswordReveal(pinRevealIndex)
     Surface(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.LOCK_SCREEN_OVERLAY),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
@@ -93,6 +97,7 @@ fun LockScreenOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp)
+                    .testTag(UiTestTags.LOCK_SCREEN_PIN_INPUT)
             )
             errorState.value?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
@@ -109,7 +114,8 @@ fun LockScreenOverlay(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(top = 16.dp)
+                    .testTag(UiTestTags.LOCK_SCREEN_UNLOCK_BUTTON),
                 enabled = pinState.value.length >= 4
             ) {
                 Text("Unlock with PIN")
@@ -117,7 +123,9 @@ fun LockScreenOverlay(
             if (biometricEnabled && biometricAvailable) {
                 TextButton(
                     onClick = onBiometricUnlock,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .testTag(UiTestTags.LOCK_SCREEN_BIOMETRIC_BUTTON)
                 ) {
                     Text("Unlock with biometric")
                 }

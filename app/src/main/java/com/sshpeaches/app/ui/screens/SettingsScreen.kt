@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
@@ -52,8 +53,10 @@ import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.calculatePasswordRevealIndex
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -84,10 +87,8 @@ fun SettingsScreen(
     onAnalyticsToggle: (Boolean) -> Unit,
     diagnosticsLoggingEnabled: Boolean,
     onDiagnosticsToggle: (Boolean) -> Unit,
-    includeIdentities: Boolean,
-    onIncludeIdentitiesToggle: (Boolean) -> Unit,
-    includeSettings: Boolean,
-    onIncludeSettingsToggle: (Boolean) -> Unit,
+    includeSecretsInQr: Boolean,
+    onIncludeSecretsInQrToggle: (Boolean) -> Unit,
     autoStartForwards: Boolean,
     onAutoStartForwardsToggle: (Boolean) -> Unit,
     hostKeyPromptEnabled: Boolean,
@@ -102,8 +103,9 @@ fun SettingsScreen(
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
     onClearPin: () -> Unit,
-    onGenerateExportPayload: () -> String,
-    onImportFromQrPayload: (String) -> String = { "Invalid export QR." },
+    onGenerateExportPayload: (String?) -> String?,
+    onTransferPayloadRequiresPassphrase: (String) -> Boolean = { false },
+    onImportFromQrPayload: (String, String?) -> String = { _, _ -> "Invalid export QR." },
     onShowMessage: (String) -> Unit = {},
     corePermissions: List<CorePermissionStatus> = emptyList(),
     onManagePermissions: () -> Unit = {}
@@ -112,7 +114,7 @@ fun SettingsScreen(
     val lockExpanded = remember { mutableStateOf(false) }
     val backgroundTimeoutExpanded = remember { mutableStateOf(false) }
     val terminalExpanded = remember { mutableStateOf(false) }
-    val showTransferDialog = remember { mutableStateOf(false) }
+    val showTransferDialog = rememberSaveable { mutableStateOf(false) }
     val themeOptions = listOf(
         ThemeMode.SYSTEM to "Automatic",
         ThemeMode.LIGHT to "Light",
@@ -145,16 +147,34 @@ fun SettingsScreen(
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
     val snippetTimeoutState = remember(snippetRunTimeoutSeconds) { mutableStateOf(snippetRunTimeoutSeconds.toString()) }
     val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val exportPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+    val exportPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+    val exportConfirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+    val exportConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+    val exportPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingImportPayload = remember { mutableStateOf<String?>(null) }
+    val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+    val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+    val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
     val scanLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
         val contents = result.contents.orEmpty()
         if (contents.isBlank()) {
             onShowMessage("QR scan cancelled.")
         } else {
-            onShowMessage(onImportFromQrPayload(contents))
+            if (onTransferPayloadRequiresPassphrase(contents)) {
+                pendingImportPayload.value = contents
+                importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                importPassphraseError.value = null
+            } else {
+                onShowMessage(onImportFromQrPayload(contents, null))
+            }
         }
     }
     AutoHidePasswordReveal(pinRevealIndex)
     AutoHidePasswordReveal(confirmPinRevealIndex)
+    AutoHidePasswordReveal(exportPassphraseRevealIndex)
+    AutoHidePasswordReveal(exportConfirmPassphraseRevealIndex)
+    AutoHidePasswordReveal(importPassphraseRevealIndex)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -166,10 +186,10 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
                 .verticalScroll(rememberScrollState())
+                .testTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Settings", style = MaterialTheme.typography.headlineSmall)
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Permissions", style = MaterialTheme.typography.titleMedium)
@@ -231,7 +251,8 @@ fun SettingsScreen(
                                 onClick = {
                                     expanded.value = false
                                     onThemeChange(mode)
-                                }
+                                },
+                                modifier = Modifier.testTag(UiTestTags.settingsThemeOption(label))
                             )
                         }
                     }
@@ -330,6 +351,9 @@ fun SettingsScreen(
                     ) {
                         terminalOptions.forEach { option ->
                             DropdownMenuItem(
+                                modifier = Modifier.testTag(
+                                    UiTestTags.settingsTerminalOption(option.label)
+                                ),
                                 text = { Text(option.label) },
                                 onClick = {
                                     terminalExpanded.value = false
@@ -385,7 +409,8 @@ fun SettingsScreen(
                     Switch(
                         checked = biometricEnabled,
                         onCheckedChange = onBiometricToggle,
-                        enabled = biometricAvailable && pinConfigured
+                        enabled = biometricAvailable && pinConfigured,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BIOMETRIC_SWITCH)
                     )
                 }
                 if (!biometricAvailable) {
@@ -454,7 +479,11 @@ fun SettingsScreen(
                         Text("Host key prompts")
                         Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
                     }
-                    Switch(checked = hostKeyPromptEnabled, onCheckedChange = onHostKeyPromptToggle)
+                    Switch(
+                        checked = hostKeyPromptEnabled,
+                        onCheckedChange = onHostKeyPromptToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
+                    )
                 }
                 Row(
                     modifier = Modifier
@@ -473,21 +502,30 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    Switch(checked = autoTrustHostKey, onCheckedChange = onAutoTrustHostKeyToggle)
+                    Switch(
+                        checked = autoTrustHostKey,
+                        onCheckedChange = onAutoTrustHostKeyToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH)
+                    )
                 }
                 Text(
                     if (pinConfigured) "PIN lock configured."
                     else "PIN lock not configured.",
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_STATUS_TEXT)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { showPinDialog.value = true }) {
+                    Button(
+                        onClick = { showPinDialog.value = true },
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_SET_PIN_BUTTON)
+                    ) {
                         Text(if (pinConfigured) "Change PIN" else "Set PIN")
                     }
                     if (pinConfigured) {
                         Button(
                             onClick = { showDisablePinDialog.value = true },
-                            enabled = !isLocked
+                            enabled = !isLocked,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON)
                         ) { Text("Disable PIN") }
                     }
                 }
@@ -597,7 +635,9 @@ fun SettingsScreen(
                 )
                 Button(
                     onClick = { showRestoreDefaultsDialog.value = true },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON)
                 ) {
                     Text("Restore Default Settings")
                 }
@@ -610,12 +650,14 @@ fun SettingsScreen(
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Export hosts, identities, and settings via QR code.",
+                    "Export hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings via QR code.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Button(
                     onClick = { showTransferDialog.value = true },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
                 ) {
                     Text("Export via QR")
                 }
@@ -642,66 +684,141 @@ fun SettingsScreen(
     if (showTransferDialog.value) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTransferDialog.value = false },
+            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_DIALOG),
             title = { Text("Export data") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings are always included in transfer exports.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Include identities")
-                            Text("Attach keys when sharing/exporting", style = MaterialTheme.typography.bodySmall)
+                            Text("Include passwords and private keys")
+                            Text(
+                                "Encrypt saved passwords and private key material with a passphrase.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                         Switch(
-                            checked = includeIdentities,
-                            onCheckedChange = onIncludeIdentitiesToggle,
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_IDENTITIES_SWITCH)
+                            checked = includeSecretsInQr,
+                            onCheckedChange = onIncludeSecretsInQrToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Include settings")
-                            Text("Share app preferences when exporting", style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(
-                            checked = includeSettings,
-                            onCheckedChange = onIncludeSettingsToggle,
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SETTINGS_SWITCH)
+                    if (includeSecretsInQr) {
+                        OutlinedTextField(
+                            value = exportPassphraseState.value,
+                            onValueChange = {
+                                updatePasswordStateWithReveal(
+                                    exportPassphraseState,
+                                    exportPassphraseRevealIndex,
+                                    it
+                                )
+                                exportPassphraseError.value = null
+                            },
+                            label = { Text("Export passphrase") },
+                            singleLine = true,
+                            visualTransformation = TailRevealPasswordVisualTransformation(
+                                exportPassphraseRevealIndex.intValue
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                autoCorrect = false,
+                                capitalization = KeyboardCapitalization.None,
+                                keyboardType = KeyboardType.Password
+                            ),
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT)
+                        )
+                        OutlinedTextField(
+                            value = exportConfirmPassphraseState.value,
+                            onValueChange = {
+                                updatePasswordStateWithReveal(
+                                    exportConfirmPassphraseState,
+                                    exportConfirmPassphraseRevealIndex,
+                                    it
+                                )
+                                exportPassphraseError.value = null
+                            },
+                            label = { Text("Confirm passphrase") },
+                            singleLine = true,
+                            visualTransformation = TailRevealPasswordVisualTransformation(
+                                exportConfirmPassphraseRevealIndex.intValue
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                autoCorrect = false,
+                                capitalization = KeyboardCapitalization.None,
+                                keyboardType = KeyboardType.Password
+                            ),
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+                        )
+                        Text(
+                            "Use this same passphrase when importing on another device.",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    Text("Next: generate a QR code that bundles your selections.")
+                    exportPassphraseError.value?.let {
+                        Text(
+                            it,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_ERROR)
+                        )
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val payload = onGenerateExportPayload()
-                    exportQrBitmap.value = runCatching {
-                        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
-                        val bmp = android.graphics.Bitmap.createBitmap(
-                            matrix.width,
-                            matrix.height,
-                            android.graphics.Bitmap.Config.ARGB_8888
-                        )
-                        for (x in 0 until matrix.width) {
-                            for (y in 0 until matrix.height) {
-                                bmp.setPixel(
-                                    x,
-                                    y,
-                                    if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-                                )
+                TextButton(
+                    onClick = {
+                        val passphrase = if (includeSecretsInQr) exportPassphraseState.value else null
+                        when {
+                            includeSecretsInQr && passphrase.orEmpty().length < 4 -> {
+                                exportPassphraseError.value = "Passphrase must be at least 4 characters."
+                                return@TextButton
+                            }
+                            includeSecretsInQr && passphrase != exportConfirmPassphraseState.value -> {
+                                exportPassphraseError.value = "Passphrases do not match."
+                                return@TextButton
                             }
                         }
-                        bmp
-                    }.getOrNull()
-                    if (exportQrBitmap.value == null) {
-                        onShowMessage("Unable to generate export QR.")
-                    }
-                    showTransferDialog.value = false
-                }) { Text("Generate QR") }
+                        val payload = onGenerateExportPayload(passphrase)
+                        if (payload == null) {
+                            exportPassphraseError.value = if (includeSecretsInQr) {
+                                "Unable to export protected data. Unlock the app and try again."
+                            } else {
+                                "Unable to generate export QR."
+                            }
+                            return@TextButton
+                        }
+                        exportQrBitmap.value = runCatching {
+                            val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
+                            val bmp = android.graphics.Bitmap.createBitmap(
+                                matrix.width,
+                                matrix.height,
+                                android.graphics.Bitmap.Config.ARGB_8888
+                            )
+                            for (x in 0 until matrix.width) {
+                                for (y in 0 until matrix.height) {
+                                    bmp.setPixel(
+                                        x,
+                                        y,
+                                        if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                                    )
+                                }
+                            }
+                            bmp
+                        }.getOrNull()
+                        if (exportQrBitmap.value == null) {
+                            onShowMessage("Unable to generate export QR.")
+                        } else if (includeSecretsInQr) {
+                            ExportPassphraseCache.transfer = passphrase
+                            exportPassphraseError.value = null
+                        }
+                        showTransferDialog.value = false
+                    },
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON)
+                ) { Text("Generate QR") }
             },
             dismissButton = {
                 TextButton(onClick = { showTransferDialog.value = false }) { Text("Cancel") }
@@ -711,6 +828,7 @@ fun SettingsScreen(
     exportQrBitmap.value?.let { bitmap ->
         AlertDialog(
             onDismissRequest = { exportQrBitmap.value = null },
+            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_QR_DIALOG),
             title = { Text("Export QR") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -727,6 +845,65 @@ fun SettingsScreen(
             }
         )
     }
+    pendingImportPayload.value?.let { payload ->
+        AlertDialog(
+            onDismissRequest = {
+                pendingImportPayload.value = null
+                importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                importPassphraseError.value = null
+            },
+            title = { Text("Decrypt imported secrets") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("This export includes encrypted passwords or private keys.")
+                    OutlinedTextField(
+                        value = importPassphraseState.value,
+                        onValueChange = {
+                            updatePasswordStateWithReveal(
+                                importPassphraseState,
+                                importPassphraseRevealIndex,
+                                it
+                            )
+                            importPassphraseError.value = null
+                        },
+                        label = { Text("Import passphrase") },
+                        singleLine = true,
+                        visualTransformation = TailRevealPasswordVisualTransformation(
+                            importPassphraseRevealIndex.intValue
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Password
+                        )
+                    )
+                    importPassphraseError.value?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val passphrase = importPassphraseState.value
+                    if (passphrase.length < 4) {
+                        importPassphraseError.value = "Enter the export passphrase."
+                        return@TextButton
+                    }
+                    ExportPassphraseCache.transfer = passphrase
+                    onShowMessage(onImportFromQrPayload(payload, passphrase))
+                    pendingImportPayload.value = null
+                    importPassphraseError.value = null
+                }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingImportPayload.value = null
+                    importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                    importPassphraseError.value = null
+                }) { Text("Cancel") }
+            }
+        )
+    }
     if (showPinDialog.value) {
         AlertDialog(
             onDismissRequest = {
@@ -734,6 +911,7 @@ fun SettingsScreen(
                 pinEntry.value = ""
                 confirmPinEntry.value = ""
             },
+            modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_DIALOG),
             title = { Text(if (pinConfigured) "Change PIN" else "Set PIN") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -752,7 +930,8 @@ fun SettingsScreen(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.NumberPassword
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_INPUT)
                     )
                     OutlinedTextField(
                         value = confirmPinEntry.value,
@@ -769,18 +948,22 @@ fun SettingsScreen(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
                             keyboardType = KeyboardType.NumberPassword
-                        )
+                        ),
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_CONFIRM_INPUT)
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (pinEntry.value.length < 4 || pinEntry.value != confirmPinEntry.value) return@TextButton
-                    onSetPin(pinEntry.value)
-                    pinEntry.value = ""
-                    confirmPinEntry.value = ""
-                    showPinDialog.value = false
-                }) { Text("Save") }
+                TextButton(
+                    onClick = {
+                        if (pinEntry.value.length < 4 || pinEntry.value != confirmPinEntry.value) return@TextButton
+                        onSetPin(pinEntry.value)
+                        pinEntry.value = ""
+                        confirmPinEntry.value = ""
+                        showPinDialog.value = false
+                    },
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_SAVE_BUTTON)
+                ) { Text("Save") }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -800,10 +983,13 @@ fun SettingsScreen(
                 Text("This removes the PIN requirement. Biometric lock will also be disabled.")
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onClearPin()
-                    showDisablePinDialog.value = false
-                }) { Text("Disable") }
+                TextButton(
+                    onClick = {
+                        onClearPin()
+                        showDisablePinDialog.value = false
+                    },
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_DISABLE_PIN_CONFIRM)
+                ) { Text("Disable") }
             },
             dismissButton = {
                 TextButton(onClick = { showDisablePinDialog.value = false }) { Text("Cancel") }
@@ -821,11 +1007,14 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onRestoreDefaultSettings()
-                    showRestoreDefaultsDialog.value = false
-                    onShowMessage("Settings restored to defaults.")
-                }) { Text("Restore") }
+                TextButton(
+                    onClick = {
+                        onRestoreDefaultSettings()
+                        showRestoreDefaultsDialog.value = false
+                        onShowMessage("Settings restored to defaults.")
+                    },
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_CONFIRM)
+                ) { Text("Restore") }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreDefaultsDialog.value = false }) { Text("Cancel") }

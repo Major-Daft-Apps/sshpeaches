@@ -12,7 +12,8 @@ object AppStateResetter {
     private val securePrefsNames = listOf(
         "secure_store",
         "secure_store__androidx_security_crypto_encrypted_prefs_keyset__",
-        "secure_store__androidx_security_crypto_encrypted_prefs_value_keyset__"
+        "secure_store__androidx_security_crypto_encrypted_prefs_value_keyset__",
+        "sshpeaches_widget_state"
     )
 
     fun reset(context: Context) {
@@ -30,6 +31,7 @@ object AppStateResetter {
         securePrefsNames.forEach { name ->
             appContext.deleteSharedPreferences(name)
         }
+        appContext.deleteFile("known_hosts")
         appContext.stopService(Intent(appContext, SessionService::class.java))
     }
 }

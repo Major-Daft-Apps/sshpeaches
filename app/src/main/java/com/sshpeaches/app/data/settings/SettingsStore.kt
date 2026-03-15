@@ -51,8 +51,7 @@ object SettingsStore {
     private val crashReportsKey = booleanPreferencesKey("crash_reports")
     private val analyticsKey = booleanPreferencesKey("analytics")
     private val diagnosticsKey = booleanPreferencesKey("diagnostics")
-    private val includeIdentitiesKey = booleanPreferencesKey("include_identities")
-    private val includeSettingsKey = booleanPreferencesKey("include_settings")
+    private val includeSecretsInQrKey = booleanPreferencesKey("include_secrets_in_qr")
     private val autoStartForwardsKey = booleanPreferencesKey("auto_start_forwards")
     private val hostKeyPromptKey = booleanPreferencesKey("host_key_prompt")
     private val autoTrustHostKey = booleanPreferencesKey("auto_trust_host_key")
@@ -177,12 +176,8 @@ object SettingsStore {
         dataStore.data.map { prefs -> prefs[diagnosticsKey] ?: false }
     }
 
-    val includeIdentities: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[includeIdentitiesKey] ?: true }
-    }
-
-    val includeSettings: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[includeSettingsKey] ?: true }
+    val includeSecretsInQr: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[includeSecretsInQrKey] ?: false }
     }
 
     val autoStartForwards: Flow<Boolean> by lazy {
@@ -194,7 +189,7 @@ object SettingsStore {
     }
 
     val autoTrustHostKeyEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[autoTrustHostKey] ?: true }
+        dataStore.data.map { prefs -> prefs[autoTrustHostKey] ?: false }
     }
 
     val usageReportsEnabled: Flow<Boolean> by lazy {
@@ -310,15 +305,9 @@ object SettingsStore {
         }
     }
 
-    suspend fun setIncludeIdentities(enabled: Boolean) {
+    suspend fun setIncludeSecretsInQr(enabled: Boolean) {
         dataStore.edit { prefs ->
-            prefs[includeIdentitiesKey] = enabled
-        }
-    }
-
-    suspend fun setIncludeSettings(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[includeSettingsKey] = enabled
+            prefs[includeSecretsInQrKey] = enabled
         }
     }
 
@@ -474,7 +463,7 @@ object SettingsStore {
                 out += TerminalProfile(
                     id = id,
                     name = name,
-                    fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(8, 28),
+                    fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(6, 28),
                     foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
                     backgroundHex = item.optString("backgroundHex", "#101010"),
                     cursorHex = item.optString("cursorHex", "#FFB74D"),

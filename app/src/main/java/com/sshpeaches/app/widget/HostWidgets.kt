@@ -15,6 +15,7 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import java.util.UUID
 
 internal object HostWidgets {
     const val ACTION_WIDGET_CONNECT = "com.majordaftapps.sshpeaches.app.widget.ACTION_CONNECT"
@@ -23,6 +24,9 @@ internal object HostWidgets {
     const val EXTRA_HOST_ID = "extra_widget_host_id"
     const val EXTRA_MODE = "extra_widget_mode"
     const val EXTRA_SESSION_ID = "extra_widget_session_id"
+    private const val EXTRA_ACTION_TOKEN = "extra_widget_action_token"
+    private const val PREFS_NAME = "sshpeaches_widget_security"
+    private const val KEY_ACTION_TOKEN = "widget_action_token"
 
     fun updateAll(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
@@ -195,6 +199,7 @@ internal object HostWidgets {
             action = ACTION_WIDGET_CONNECT
             putExtra(EXTRA_HOST_ID, hostId)
             putExtra(EXTRA_MODE, mode.name)
+            putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
         }
         return PendingIntent.getBroadcast(
             context,
@@ -211,6 +216,7 @@ internal object HostWidgets {
         val intent = Intent(context, QuickConnectWidgetProvider::class.java).apply {
             action = ACTION_WIDGET_OPEN
             putExtra(EXTRA_SESSION_ID, sessionId)
+            putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
         }
         return PendingIntent.getBroadcast(
             context,
@@ -227,6 +233,7 @@ internal object HostWidgets {
         val intent = Intent(context, QuickConnectWidgetProvider::class.java).apply {
             action = ACTION_WIDGET_DISCONNECT
             putExtra(EXTRA_SESSION_ID, sessionId)
+            putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
         }
         return PendingIntent.getBroadcast(
             context,
@@ -234,6 +241,21 @@ internal object HostWidgets {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
+
+    fun isTrustedWidgetActionIntent(context: Context, intent: Intent): Boolean {
+        val expected = actionToken(context)
+        val actual = intent.getStringExtra(EXTRA_ACTION_TOKEN)
+        return !actual.isNullOrBlank() && actual == expected
+    }
+
+    private fun actionToken(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val existing = prefs.getString(KEY_ACTION_TOKEN, null)
+        if (!existing.isNullOrBlank()) return existing
+        val generated = UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_ACTION_TOKEN, generated).apply()
+        return generated
     }
 
     private const val MAX_HOST_ROWS_COMPACT = 4
@@ -258,6 +280,15 @@ abstract class BaseHostWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (
+            intent.action == HostWidgets.ACTION_WIDGET_CONNECT ||
+            intent.action == HostWidgets.ACTION_WIDGET_OPEN ||
+            intent.action == HostWidgets.ACTION_WIDGET_DISCONNECT
+        ) {
+            if (!HostWidgets.isTrustedWidgetActionIntent(context, intent)) {
+                return
+            }
+        }
         when (intent.action) {
             HostWidgets.ACTION_WIDGET_CONNECT -> {
                 val hostId = intent.getStringExtra(HostWidgets.EXTRA_HOST_ID).orEmpty()

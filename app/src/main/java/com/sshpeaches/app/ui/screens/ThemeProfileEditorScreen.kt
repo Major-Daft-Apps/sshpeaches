@@ -38,12 +38,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import java.util.Locale
 import java.util.UUID
 
@@ -83,6 +85,7 @@ fun ThemeProfileEditorScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .testTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -140,7 +143,11 @@ fun ThemeProfileEditorScreen(
         }
 
         editorError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(UiTestTags.THEME_PROFILE_ERROR)
+            )
         }
 
         Row(
@@ -178,7 +185,7 @@ fun ThemeProfileEditorScreen(
                     val profile = TerminalProfile(
                         id = initialProfile.id.ifBlank { "custom-${UUID.randomUUID()}" },
                         name = normalizedName,
-                        fontSizeSp = fontSizePt.toInt().coerceIn(8, 28),
+                        fontSizeSp = fontSizePt.toInt().coerceIn(6, 28),
                         foregroundHex = foregroundHex.trim().uppercase(Locale.US),
                         backgroundHex = backgroundHex.trim().uppercase(Locale.US),
                         cursorHex = cursorHex.trim().uppercase(Locale.US),
@@ -189,13 +196,17 @@ fun ThemeProfileEditorScreen(
                     onShowMessage("Terminal theme saved.")
                     onNavigateBack()
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON)
             ) {
                 Text("Save")
             }
             Button(
                 onClick = onNavigateBack,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UiTestTags.THEME_PROFILE_CANCEL_BUTTON)
             ) {
                 Text("Cancel")
             }
@@ -212,7 +223,8 @@ fun ThemeProfileEditorScreen(
                     value = draftName,
                     onValueChange = { draftName = it.take(48) },
                     singleLine = true,
-                    label = { Text("Name") }
+                    label = { Text("Name") },
+                    modifier = Modifier.testTag(UiTestTags.THEME_PROFILE_NAME_INPUT)
                 )
             },
             confirmButton = {
@@ -239,7 +251,7 @@ fun ThemeProfileEditorScreen(
                     Slider(
                         value = draftSize,
                         onValueChange = { draftSize = it },
-                        valueRange = 8f..28f
+                        valueRange = 6f..28f
                     )
                     Text(
                         "Aa",

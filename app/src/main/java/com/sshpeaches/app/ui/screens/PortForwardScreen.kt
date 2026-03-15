@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -82,7 +83,7 @@ fun PortForwardScreen(
     onImportFromQr: () -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
-    val search = remember { mutableStateOf("") }
+    val search = rememberSaveable { mutableStateOf("") }
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
@@ -174,7 +175,9 @@ fun PortForwardScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TextField(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.FORWARD_SEARCH_INPUT),
                     value = search.value,
                     onValueChange = { search.value = it },
                     placeholder = { Text("Search port forwards") },
@@ -189,7 +192,12 @@ fun PortForwardScreen(
             ) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(onClick = { openDialog(null) }, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { openDialog(null) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.FORWARD_ADD_BUTTON)
+                        ) {
                             Text("Add port forward")
                         }
                         Button(
@@ -203,7 +211,9 @@ fun PortForwardScreen(
                                 }
                                 scanLauncher.launch(options)
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.FORWARD_IMPORT_BUTTON)
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                             Text("Import QR")
@@ -256,6 +266,7 @@ fun PortForwardScreen(
                                     contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
                                     tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                     modifier = Modifier
+                                        .testTag(UiTestTags.forwardFavorite(forward.id))
                                         .clickable { onToggleFavorite(forward.id) }
                                         .padding(4.dp)
                                 )
@@ -263,6 +274,7 @@ fun PortForwardScreen(
                                     imageVector = Icons.Default.QrCode,
                                     contentDescription = "Share",
                                     modifier = Modifier
+                                        .testTag(UiTestTags.forwardShare(forward.id))
                                         .clickable { shareForward.value = forward }
                                         .padding(4.dp)
                                 )
@@ -271,6 +283,7 @@ fun PortForwardScreen(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit",
                                         modifier = Modifier
+                                            .testTag(UiTestTags.FORWARD_CARD_EDIT_BUTTON)
                                             .clickable { openDialog(forward) }
                                             .padding(4.dp)
                                     )
@@ -278,6 +291,7 @@ fun PortForwardScreen(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete",
                                         modifier = Modifier
+                                            .testTag(UiTestTags.FORWARD_CARD_DELETE_BUTTON)
                                             .clickable { onDelete(forward.id) }
                                             .padding(4.dp)
                                     )
@@ -309,6 +323,7 @@ fun PortForwardScreen(
                         onValueChange = { labelState.value = it },
                         label = { Text("Label") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
@@ -321,6 +336,7 @@ fun PortForwardScreen(
                         onValueChange = { bindState.value = it },
                         label = { Text("Local bind address") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -332,6 +348,7 @@ fun PortForwardScreen(
                         onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Local port") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -343,6 +360,7 @@ fun PortForwardScreen(
                         onValueChange = { dstHostState.value = it },
                         label = { Text("Destination host") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -354,6 +372,7 @@ fun PortForwardScreen(
                         onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Destination port") },
                         singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,

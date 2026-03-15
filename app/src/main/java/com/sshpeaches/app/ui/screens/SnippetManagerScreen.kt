@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -54,7 +55,7 @@ fun SnippetManagerScreen(
     onImportFromQr: () -> Unit = {},
     onEmptyStateVisibleChanged: (Boolean) -> Unit = {}
 ) {
-    val search = remember { mutableStateOf("") }
+    val search = rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -96,7 +97,9 @@ fun SnippetManagerScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TextField(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.SNIPPET_SEARCH_INPUT),
                 value = search.value,
                 onValueChange = { search.value = it },
                 placeholder = { Text("Search snippets") },
@@ -111,7 +114,12 @@ fun SnippetManagerScreen(
         ) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onCreateSnippet, modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = onCreateSnippet,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.SNIPPET_ADD_BUTTON)
+                    ) {
                         Text("Add snippet")
                     }
                     Button(
@@ -125,7 +133,9 @@ fun SnippetManagerScreen(
                             }
                             scanLauncher.launch(options)
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(UiTestTags.SNIPPET_IMPORT_BUTTON)
                     ) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                         Text("Import QR")
@@ -149,6 +159,7 @@ fun SnippetManagerScreen(
                         }
                         Text(snippet.command, style = MaterialTheme.typography.bodySmall)
                         RowActions(
+                            snippetId = snippet.id,
                             onRun = { onRun(snippet) },
                             onEdit = { onEditSnippet(snippet.id) },
                             onDelete = { onDelete(snippet.id) }
@@ -162,16 +173,25 @@ fun SnippetManagerScreen(
 }
 
 @Composable
-private fun RowActions(onRun: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun RowActions(snippetId: String, onRun: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledTonalButton(onClick = onRun) {
+        FilledTonalButton(
+            onClick = onRun,
+            modifier = Modifier.testTag(UiTestTags.snippetRun(snippetId))
+        ) {
             Icon(Icons.Default.PlayArrow, contentDescription = null)
             Text("Run")
         }
-        IconButton(onClick = onEdit) {
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.testTag(UiTestTags.snippetEdit(snippetId))
+        ) {
             Icon(Icons.Default.Edit, contentDescription = "Edit")
         }
-        IconButton(onClick = onDelete) {
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.testTag(UiTestTags.snippetDelete(snippetId))
+        ) {
             Icon(Icons.Default.Delete, contentDescription = "Delete")
         }
     }

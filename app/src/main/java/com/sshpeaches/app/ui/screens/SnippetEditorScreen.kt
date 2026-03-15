@@ -34,9 +34,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun SnippetEditorScreen(
@@ -52,7 +54,11 @@ fun SnippetEditorScreen(
     var editorError by remember { mutableStateOf<String?>(null) }
     val isEditingExisting = initialSnippet != null
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_SNIPPET_EDITOR)
+    ) {
     Column(
         modifier = Modifier
             .widthIn(max = 980.dp)
@@ -77,13 +83,17 @@ fun SnippetEditorScreen(
                     onValueChange = { title = it },
                     label = { Text("Title") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SNIPPET_EDITOR_TITLE_INPUT)
                 )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SNIPPET_EDITOR_DESCRIPTION_INPUT)
                 )
                 Text("Command", style = MaterialTheme.typography.labelLarge)
                 ScriptEditorWithLineNumbers(
@@ -195,6 +205,7 @@ private fun ScriptEditorWithLineNumbers(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 200.dp)
+                        .testTag(UiTestTags.SNIPPET_EDITOR_COMMAND_INPUT)
                 )
             }
         }

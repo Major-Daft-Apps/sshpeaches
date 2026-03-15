@@ -1,0 +1,171 @@
+package com.majordaftapps.sshpeaches.app.settings
+
+import android.Manifest
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
+import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class SettingsPreferencesTest {
+
+    @get:Rule(order = 0)
+    val appStateResetRule = AppStateResetRule()
+
+    @get:Rule(order = 1)
+    val notificationPermissionRule: GrantPermissionRule =
+        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+
+    @get:Rule(order = 2)
+    val composeRule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun themeModeAndTogglesPersistAcrossRecreate() {
+        AppStateSeeder.configureSettings(themeMode = ThemeMode.DARK)
+        composeRule.activityRule.scenario.recreate()
+        openSettings()
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
+
+        scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+        openSettings()
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+        scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+    }
+
+    @Test
+    fun exportQrWithSecretsValidatesPassphraseBeforeGenerating() {
+        AppStateSeeder.configureSettings(includeSecretsInQr = true)
+        composeRule.activityRule.scenario.recreate()
+
+        openSettings()
+        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
+        waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH).assertIsOn()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextInput("abc")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextInput("abc")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_ERROR)
+            .assertTextContains("Passphrase must be at least 4 characters.")
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextClearance()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextClearance()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextInput("peaches-123")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+            .performTextInput("mismatch-123")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_ERROR)
+            .assertTextContains("Passphrases do not match.")
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextClearance()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+            .performTextInput("peaches-123")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
+
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON)
+                .fetchSemanticsNodes().isEmpty()
+        }
+        check(
+            composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON)
+                .fetchSemanticsNodes().isEmpty()
+        ) {
+            "Expected export dialog to close after a valid protected export."
+        }
+    }
+
+    @Test
+    fun exportQrDialog_preservesEntriesAcrossRecreate() {
+        AppStateSeeder.configureSettings(includeSecretsInQr = true)
+        composeRule.activityRule.scenario.recreate()
+
+        openSettings()
+        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
+        waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT)
+            .performTextInput("restore-pass")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+            .performTextInput("restore-pass")
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+        openSettings()
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
+                .fetchSemanticsNodes().isEmpty()
+        }
+        check(
+            composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
+                .fetchSemanticsNodes().isEmpty()
+        ) {
+            "Expected the recreated export dialog to retain valid passphrases and close after generate."
+        }
+    }
+
+    private fun openSettings() {
+        val alreadyVisible = runCatching {
+            composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
+            true
+        }.getOrDefault(false)
+        if (!alreadyVisible) {
+            composeRule.navigateDrawer(Routes.SETTINGS)
+        }
+    }
+
+    private fun scrollToTag(tag: String) {
+        repeat(10) {
+            val visible = runCatching {
+                composeRule.onNodeWithTag(tag).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+            if (visible) return
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
+                .performTouchInput { swipeUp() }
+        }
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+    }
+
+    private fun waitForTag(tag: String) {
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+}

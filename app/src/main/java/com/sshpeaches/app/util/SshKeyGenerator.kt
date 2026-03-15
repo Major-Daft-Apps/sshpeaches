@@ -4,6 +4,7 @@ import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.spec.ECGenParameterSpec
+import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.EncryptedPrivateKeyInfo
@@ -51,6 +52,8 @@ data class GeneratedIdentityKeyPair(
 )
 
 object SshKeyGenerator {
+    private const val PRIVATE_KEY_PBE_ITERATIONS = 210_000
+
     fun generate(spec: IdentityKeyGenerationSpec): GeneratedIdentityKeyPair {
         val keyPair = when (spec.algorithm) {
             IdentityKeyAlgorithm.ED25519 -> {
@@ -85,20 +88,44 @@ object SshKeyGenerator {
         )
     }
 
-    fun derivePublicKeyFromPrivate(privateKeyMaterial: String, comment: String = ""): String? {
+    fun derivePublicKeyFromPrivate(
+        privateKeyMaterial: String,
+        comment: String = "",
+        passphrase: String? = null
+    ): String? {
         val pem = parsePem(privateKeyMaterial) ?: return null
-        val privateParams = runCatching {
-            when (pem.type) {
-                "PRIVATE KEY" -> PrivateKeyFactory.createKey(pem.body)
-                "RSA PRIVATE KEY", "EC PRIVATE KEY", "DSA PRIVATE KEY", "OPENSSH PRIVATE KEY" ->
-                    OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(pem.body)
-                else -> null
-            }
-        }.getOrNull() ?: return null
+        val privateParams = loadPrivateKeyParameters(pem, passphrase) ?: return null
 
         val publicParams = derivePublicParameters(privateParams) ?: return null
         val publicBlob = runCatching { OpenSSHPublicKeyUtil.encodePublicKey(publicParams) }.getOrNull() ?: return null
         return toOpenSshPublicLine(publicBlob, comment)
+    }
+
+    private fun loadPrivateKeyParameters(pem: PemBlock, passphrase: String?): AsymmetricKeyParameter? {
+        return runCatching {
+            when (pem.type) {
+                "PRIVATE KEY" -> PrivateKeyFactory.createKey(pem.body)
+                "ENCRYPTED PRIVATE KEY" -> decryptPkcs8PrivateKey(pem.body, passphrase)?.let { keySpec ->
+                    PrivateKeyFactory.createKey(keySpec.encoded)
+                }
+                "RSA PRIVATE KEY", "EC PRIVATE KEY", "DSA PRIVATE KEY", "OPENSSH PRIVATE KEY" ->
+                    OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(pem.body)
+                else -> null
+            }
+        }.getOrNull()
+    }
+
+    private fun decryptPkcs8PrivateKey(body: ByteArray, passphrase: String?): PKCS8EncodedKeySpec? {
+        if (passphrase.isNullOrBlank()) return null
+        return runCatching {
+            val encryptedInfo = EncryptedPrivateKeyInfo(body)
+            val algorithm = encryptedInfo.algName
+            val secretKey = SecretKeyFactory.getInstance(algorithm)
+                .generateSecret(PBEKeySpec(passphrase.toCharArray()))
+            val cipher = Cipher.getInstance(algorithm)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, encryptedInfo.algParameters)
+            encryptedInfo.getKeySpec(cipher)
+        }.getOrNull()
     }
 
     private fun derivePublicParameters(privateParams: AsymmetricKeyParameter): AsymmetricKeyParameter? = when (privateParams) {
@@ -130,7 +157,7 @@ object SshKeyGenerator {
         candidateAlgorithms.forEach { algorithm ->
             runCatching {
                 val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-                val paramSpec = PBEParameterSpec(salt, 12_000)
+                val paramSpec = PBEParameterSpec(salt, PRIVATE_KEY_PBE_ITERATIONS)
                 val secretKey = SecretKeyFactory.getInstance(algorithm).generateSecret(PBEKeySpec(passphrase.toCharArray()))
                 val cipher = Cipher.getInstance(algorithm)
                 cipher.init(Cipher.ENCRYPT_MODE, secretKey, paramSpec)

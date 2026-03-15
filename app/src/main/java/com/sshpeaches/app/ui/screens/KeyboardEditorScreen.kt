@@ -45,7 +45,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.majordaftapps.sshpeaches.app.R
@@ -53,6 +56,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPack
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun KeyboardEditorScreen(
@@ -84,7 +88,9 @@ fun KeyboardEditorScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_KEYBOARD)
     ) {
         Column(
             modifier = Modifier
@@ -94,7 +100,6 @@ fun KeyboardEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Keyboard Editor", style = MaterialTheme.typography.headlineSmall)
             Text("Tap a slot to open the full key-action editor.")
 
             Column(
@@ -115,6 +120,7 @@ fun KeyboardEditorScreen(
                             row.forEachIndexed { columnIndex, action ->
                                 val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
                                 KeySlot(
+                                    index = index,
                                     action = action,
                                     active = !action.isEmpty(),
                                     onClick = { editorIndex.value = index }
@@ -162,7 +168,10 @@ fun KeyboardEditorScreen(
                 }
             }
 
-            TextButton(onClick = onReset) {
+            TextButton(
+                onClick = onReset,
+                modifier = Modifier.testTag(UiTestTags.KEYBOARD_RESET_BUTTON)
+            ) {
                 Text("Reset layout")
             }
         }
@@ -171,14 +180,20 @@ fun KeyboardEditorScreen(
 
 @Composable
 private fun RowScope.KeySlot(
+    index: Int,
     action: KeyboardSlotAction,
     active: Boolean,
     onClick: () -> Unit
 ) {
+    val slotLabel = KeyboardLayoutDefaults.compactLabel(action, fallback = "+")
     Box(
         modifier = Modifier
             .weight(1f)
             .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+            .testTag(UiTestTags.keyboardSlot(index))
+            .semantics(mergeDescendants = true) {
+                contentDescription = slotLabel
+            }
             .clip(RoundedCornerShape(5.dp))
             .border(1.dp, Color(0xFF474747), RoundedCornerShape(5.dp))
             .background(if (active) Color(0xFF121212) else Color(0xFF0A0A0A))
@@ -195,7 +210,7 @@ private fun RowScope.KeySlot(
             )
         } else {
             Text(
-                text = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
+                text = slotLabel,
                 color = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
                 fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
                 maxLines = 1
@@ -254,7 +269,10 @@ private fun KeyActionEditorVertical(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onCancel) {
+                IconButton(
+                    onClick = onCancel,
+                    modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_BACK_BUTTON)
+                ) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
                 Text("Edit Key Action", style = MaterialTheme.typography.headlineSmall)
@@ -332,13 +350,16 @@ private fun KeyActionEditorVertical(
             onValueChange = { textDraft.value = it },
             label = { Text("Text payload") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(UiTestTags.KEYBOARD_EDITOR_TEXT_INPUT)
         )
         TextButton(
             enabled = textDraft.value.isNotBlank(),
             onClick = {
                 onApply(KeyboardLayoutDefaults.textAction(textDraft.value))
-            }
+            },
+            modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_USE_TEXT_BUTTON)
         ) {
             Text("Use Text")
         }
@@ -359,7 +380,10 @@ private fun KeyActionEditorVertical(
             Text("Inject Password")
         }
 
-        TextButton(onClick = { advancedExpanded.value = !advancedExpanded.value }) {
+        TextButton(
+            onClick = { advancedExpanded.value = !advancedExpanded.value },
+            modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_ADVANCED_BUTTON)
+        ) {
             Icon(
                 imageVector = if (advancedExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = null
@@ -378,13 +402,16 @@ private fun KeyActionEditorVertical(
                 onValueChange = { sequenceDraft.value = it },
                 label = { Text("Custom sequence") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.KEYBOARD_EDITOR_SEQUENCE_INPUT)
             )
             TextButton(
                 enabled = sequenceDraft.value.isNotBlank(),
                 onClick = {
                     onApply(KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value))
-                }
+                },
+                modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_USE_SEQUENCE_BUTTON)
             ) {
                 Text("Use Custom Sequence")
             }

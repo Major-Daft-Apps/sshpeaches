@@ -30,11 +30,10 @@ data class AppUiState(
     val crashReportsEnabled: Boolean = false,
     val analyticsEnabled: Boolean = false,
     val diagnosticsLoggingEnabled: Boolean = false,
-    val includeIdentitiesInQr: Boolean = true,
-    val includeSettingsInQr: Boolean = true,
+    val includeSecretsInQr: Boolean = false,
     val autoStartForwards: Boolean = true,
     val hostKeyPromptEnabled: Boolean = true,
-    val autoTrustHostKey: Boolean = true,
+    val autoTrustHostKey: Boolean = false,
     val usageReportsEnabled: Boolean = false,
     val snippetRunTimeoutSeconds: Int = 10,
     val pinConfigured: Boolean = false,
@@ -45,7 +44,8 @@ data class AppUiState(
 data class FavoritesSection(
     val hostFavorites: List<HostConnection> = emptyList(),
     val identityFavorites: List<Identity> = emptyList(),
-    val portFavorites: List<PortForward> = emptyList()
+    val portFavorites: List<PortForward> = emptyList(),
+    val snippetFavorites: List<Snippet> = emptyList()
 )
 
 enum class SortMode { LAST_USED, ALPHABETICAL }
