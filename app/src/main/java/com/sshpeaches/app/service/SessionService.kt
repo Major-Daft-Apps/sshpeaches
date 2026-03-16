@@ -93,6 +93,7 @@ class SessionService : Service() {
     private val shellOutputPublishJobs = ConcurrentHashMap<String, Job>()
     private val moshTranscriptPublishJobs = ConcurrentHashMap<String, Job>()
     private val moshReconnectJobs = ConcurrentHashMap<String, Job>()
+    private val notificationStateLock = Any()
     private var foregroundNotificationId: Int? = null
     private val sessionNotificationIds = mutableSetOf<Int>()
     @Volatile
@@ -1959,38 +1960,42 @@ class SessionService : Service() {
     }
 
     private fun updateSessionNotifications() {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val activeHostIds = activeJobs.keys.toSet()
-        val snapshots = sessionSnapshots.value
-            .filter { activeHostIds.contains(it.hostId) }
-            .sortedBy { it.host.name.lowercase() }
+        synchronized(notificationStateLock) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val activeHostIds = activeJobs.keys.toSet()
+            val snapshots = sessionSnapshots.value
+                .filter { activeHostIds.contains(it.hostId) }
+                .sortedBy { it.host.name.lowercase() }
 
-        if (snapshots.isEmpty()) {
-            sessionNotificationIds.forEach { id -> nm.cancel(id) }
+            if (snapshots.isEmpty()) {
+                val existingNotificationIds = sessionNotificationIds.toSet()
+                existingNotificationIds.forEach { id -> nm.cancel(id) }
+                sessionNotificationIds.clear()
+                if (foregroundNotificationId != null) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    foregroundNotificationId = null
+                }
+                return
+            }
+
+            val existingNotificationIds = sessionNotificationIds.toSet()
+            val desiredIds = snapshots.map { notificationIdForHost(it.hostId) }.toSet()
+            val staleIds = existingNotificationIds - desiredIds
+            staleIds.forEach { id -> nm.cancel(id) }
+
+            snapshots.forEachIndexed { index, snapshot ->
+                val notificationId = notificationIdForHost(snapshot.hostId)
+                val notification = buildSessionNotification(snapshot, snapshots.size)
+                if (index == 0) {
+                    startForeground(notificationId, notification)
+                    foregroundNotificationId = notificationId
+                } else {
+                    nm.notify(notificationId, notification)
+                }
+            }
             sessionNotificationIds.clear()
-            if (foregroundNotificationId != null) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                foregroundNotificationId = null
-            }
-            return
+            sessionNotificationIds.addAll(desiredIds)
         }
-
-        val desiredIds = snapshots.map { notificationIdForHost(it.hostId) }.toSet()
-        val staleIds = sessionNotificationIds - desiredIds
-        staleIds.forEach { id -> nm.cancel(id) }
-
-        snapshots.forEachIndexed { index, snapshot ->
-            val notificationId = notificationIdForHost(snapshot.hostId)
-            val notification = buildSessionNotification(snapshot, snapshots.size)
-            if (index == 0) {
-                startForeground(notificationId, notification)
-                foregroundNotificationId = notificationId
-            } else {
-                nm.notify(notificationId, notification)
-            }
-        }
-        sessionNotificationIds.clear()
-        sessionNotificationIds.addAll(desiredIds)
     }
 
     private fun buildSessionNotification(
