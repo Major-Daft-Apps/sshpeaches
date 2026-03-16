@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
@@ -215,6 +215,7 @@ fun SSHPeachesRoot(
     onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     onHostDelete: (String) -> Unit,
     onImportHost: (HostConnection) -> Unit,
+    @Suppress("UNUSED_PARAMETER")
     onHostOsMetadataImported: (String, OsMetadata) -> Unit,
     onHostInfoCommandsChange: (String, List<String>) -> Unit,
     onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
@@ -963,7 +964,7 @@ fun SSHPeachesRoot(
                                 navigationIcon = {
                                     if (currentRoute == Routes.CONNECTING) {
                                         IconButton(onClick = { navigateBackFromConnecting() }) {
-                                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                         }
                                     } else {
                                         IconButton(onClick = { scope.launch { drawerState.open() } }) {

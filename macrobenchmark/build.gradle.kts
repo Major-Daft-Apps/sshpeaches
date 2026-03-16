@@ -41,6 +41,12 @@ dependencies {
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
+tasks.configureEach {
+    if (name == "connectedBenchmarkAndroidTest") {
+        dependsOn(":app:installBenchmark")
+    }
+}
+
 tasks.register("macrobenchmarkAndroidTest") {
     group = "verification"
     description = "Runs the macrobenchmark suite against the benchmark app build."
