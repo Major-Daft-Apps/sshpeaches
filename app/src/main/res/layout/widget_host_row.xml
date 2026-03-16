@@ -45,7 +45,7 @@
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/widget_action_scp"
         android:padding="6dp"
-        android:src="@drawable/ic_widget_save"
+        android:src="@drawable/ic_widget_cloud_download"
         android:tint="?android:attr/textColorPrimary" />
 
 </LinearLayout>

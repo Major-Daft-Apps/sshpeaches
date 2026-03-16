@@ -14,10 +14,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.StarBorder
@@ -208,7 +208,7 @@ fun HostCard(
                         onClick = { onAction(host, ConnectionMode.SFTP) }
                     )
                     HostActionButton(
-                        icon = Icons.Default.Save,
+                        icon = Icons.Default.CloudDownload,
                         contentDescription = "SCP file copy",
                         selected = false,
                         modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "scp")),
