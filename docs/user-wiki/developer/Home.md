@@ -4,9 +4,9 @@ This wiki is for contributors and maintainers working on the app, product direct
 
 ## Core Documents
 
-- [Product Blueprint](Product-Blueprint.md) - product scope, roadmap, and feature expectations
-- [UI Design Notes](UI-Design-Notes.md) - screen layouts, interaction notes, and visual direction
-- [Google Play Publish Checklist](Google-Play-Publish-Checklist.md) - release readiness, code-submission gate, and publish tasks
+- [Product Blueprint](Product-Blueprint) - product scope, roadmap, and feature expectations
+- [UI Design Notes](UI-Design-Notes) - screen layouts, interaction notes, and visual direction
+- [Google Play Publish Checklist](Google-Play-Publish-Checklist) - release readiness, code-submission gate, and publish tasks
 
 ## Intended Use
 
@@ -20,4 +20,4 @@ Before submitting changes for review, use the release checklist as the source of
 - `:app:liveAndroidTest`
 - release-lane and benchmark tasks when the change touches release-sensitive or performance-sensitive areas
 
-Before cutting a release candidate, run the full submission gate documented in [Google Play Publish Checklist](Google-Play-Publish-Checklist.md).
+Before cutting a release candidate, run the full submission gate documented in [Google Play Publish Checklist](Google-Play-Publish-Checklist).

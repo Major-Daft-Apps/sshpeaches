@@ -4,9 +4,9 @@ This wiki is for people using SSHPeaches on Android.
 
 ## Start Here
 
-- [Getting Started](Getting-Started.md) - first launch, first connection, and recommended security setup
-- [User Guide](User-Guide.md) - what each screen does and how to use it
-- [Troubleshooting](Troubleshooting.md) - common issues and fixes
+- [Getting Started](Getting-Started) - first launch, first connection, and recommended security setup
+- [User Guide](User-Guide) - what each screen does and how to use it
+- [Troubleshooting](Troubleshooting) - common issues and fixes
 
 ## What SSHPeaches Does
 
@@ -22,4 +22,4 @@ Minimum Android version: Android 8.0 (API 26).
 
 ## Developer Section
 
-Contributor and release documentation lives under [developer/](developer/Home.md).
+Contributor and release documentation lives under [developer/](developer/Home).
