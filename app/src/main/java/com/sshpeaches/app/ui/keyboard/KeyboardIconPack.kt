@@ -1,9 +1,9 @@
 package com.majordaftapps.sshpeaches.app.ui.keyboard
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CleaningServices
@@ -37,8 +37,8 @@ object KeyboardIconPack {
         KeyboardIconSpec("home", "Home", Icons.Default.Home),
         KeyboardIconSpec("up", "Up", Icons.Default.ArrowUpward),
         KeyboardIconSpec("down", "Down", Icons.Default.ArrowDownward),
-        KeyboardIconSpec("left", "Left", Icons.Default.ArrowBack),
-        KeyboardIconSpec("right", "Right", Icons.Default.ArrowForward)
+        KeyboardIconSpec("left", "Left", Icons.AutoMirrored.Filled.ArrowBack),
+        KeyboardIconSpec("right", "Right", Icons.AutoMirrored.Filled.ArrowForward)
     )
 
     fun byId(id: String?): KeyboardIconSpec? =

@@ -36,7 +36,7 @@ class DiagnosticsUploadWorker(
         val bundle = DiagnosticsBundle.basic(settings, counts)
         val appCheckToken = AppCheckTokenProvider.getToken()
         val uploader = DiagnosticsUploader(BuildConfig.DIAGNOSTICS_ENDPOINT)
-        return when (val result = uploader.upload(bundle, appCheckToken)) {
+        return when (uploader.upload(bundle, appCheckToken)) {
             is DiagnosticsUploader.UploadResult.Success -> Result.success()
             is DiagnosticsUploader.UploadResult.Skipped -> Result.success()
             is DiagnosticsUploader.UploadResult.Failed -> Result.failure()

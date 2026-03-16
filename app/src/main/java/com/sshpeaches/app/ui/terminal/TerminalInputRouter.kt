@@ -67,6 +67,7 @@ class TerminalInputRouter(
         return false
     }
 
+    @Suppress("DEPRECATION")
     fun onAndroidKeyDown(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_MULTIPLE && event.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
             val chars = event.characters ?: return true

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.majordaftapps.sshpeaches.app.service
 
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus.LogLevel
