@@ -22,4 +22,4 @@ Minimum Android version: Android 8.0 (API 26).
 
 ## Developer Section
 
-Contributor and release documentation lives under [developer/](developer/Home).
+Contributor and release documentation lives under [developer/](developer/Developer-Home).
