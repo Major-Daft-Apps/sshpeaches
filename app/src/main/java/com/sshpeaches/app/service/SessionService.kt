@@ -2063,13 +2063,7 @@ class SessionService : Service() {
     }
 
     private fun resolveNotificationIcon(): Int {
-        val appIcon = applicationInfo.icon
-        if (appIcon != 0) return appIcon
-        return runCatching {
-            packageManager.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0)).icon
-        }.getOrDefault(android.R.drawable.stat_notify_more)
-            .takeIf { it != 0 }
-            ?: android.R.drawable.stat_notify_more
+        return R.drawable.ic_notification_logo
     }
 
     private fun resolveStartupCommand(startupScript: String, snippets: List<Snippet>): String {
