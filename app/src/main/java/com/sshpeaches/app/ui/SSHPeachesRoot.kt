@@ -440,8 +440,9 @@ fun SSHPeachesRoot(
         onOpenSessionRequestHandled()
     }
 
-    LaunchedEffect(requestedStartupRoute, currentRoute) {
+    LaunchedEffect(requestedStartupRoute, backStackEntry?.destination?.route) {
         val startupRoute = requestedStartupRoute ?: return@LaunchedEffect
+        if (backStackEntry == null) return@LaunchedEffect
         if (startupRoute != currentRoute && startupRoute != Routes.CONNECTING) {
             navController.navigate(startupRoute) {
                 popUpTo(Routes.FAVORITES)
