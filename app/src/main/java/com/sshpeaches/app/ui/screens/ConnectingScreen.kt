@@ -200,7 +200,8 @@ fun ConnectingScreen(
     onRetry: () -> Unit,
     onToggleConnectedHostBar: () -> Unit,
     onOpenSettings: () -> Unit,
-    findRequestToken: Int
+    findRequestToken: Int,
+    onCloseConnection: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -1505,7 +1506,7 @@ fun ConnectingScreen(
                             Text("Download another")
                         }
                         TextButton(
-                            onClick = onClose,
+                            onClick = onCloseConnection,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Close connection")
