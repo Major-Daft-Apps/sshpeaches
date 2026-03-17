@@ -44,6 +44,15 @@ class StartupAndScrollBenchmark {
         ) {
             startActivityAndWait(launchIntent())
             device.waitForIdle()
+            // Force a visible redraw so FrameTimingMetric has renderthread slices to measure.
+            device.swipe(
+                device.displayWidth / 2,
+                (device.displayHeight * 0.75f).toInt(),
+                device.displayWidth / 2,
+                (device.displayHeight * 0.35f).toInt(),
+                20
+            )
+            device.waitForIdle()
         }
 
     private fun launchIntent(): Intent =
