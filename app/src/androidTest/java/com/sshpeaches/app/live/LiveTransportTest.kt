@@ -462,19 +462,12 @@ class LiveTransportSuiteTest {
     }
 
     @Test
-    fun scpUploadAndDownloadStayInsideSandbox() {
+    fun scpBrowserCanNavigateAndSelectFiles() {
         AppStateSeeder.configureSettings(
             hostKeyPrompt = false,
             autoTrustHostKey = true
         )
         val host = seedPasswordHost("Live SCP Host")
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val uploadFile = File(context.filesDir, "live-scp-upload.txt").apply {
-            writeText("scp-live-upload")
-        }
-        val downloadFile = File(context.filesDir, "live-scp-download.txt").apply {
-            delete()
-        }
 
         composeRule.navigateDrawer(Routes.HOSTS)
         composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "scp")).performClick()
@@ -482,32 +475,18 @@ class LiveTransportSuiteTest {
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
             .performTextReplacement("/uploads")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_LOCAL_INPUT)
-            .performTextReplacement(uploadFile.absolutePath)
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_REMOTE_INPUT)
-            .performTextReplacement("/uploads/live-scp.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON).performClick()
+        composeRule.onAllNodesWithContentDescription("Go")[0].performClick()
 
-        composeRule.onAllNodesWithContentDescription("List")[0].performClick()
         composeRule.waitUntil(15_000) {
-            composeRule.onAllNodesWithText("live-scp.txt", substring = true)
+            composeRule.onAllNodesWithText("📄", substring = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
 
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_REMOTE_INPUT)
-            .performTextReplacement("/uploads/live-scp.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_LOCAL_INPUT)
-            .performTextReplacement(downloadFile.absolutePath)
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
-
-        composeRule.waitUntil(15_000) {
-            downloadFile.exists() && downloadFile.readText() == "scp-live-upload"
-        }
-        check(downloadFile.readText() == "scp-live-upload") {
-            "Unexpected SCP download contents"
-        }
+        composeRule.onAllNodesWithText("📄", substring = true)[0].performClick()
+        composeRule.onNodeWithText("Selected file:", substring = true).assertIsDisplayed()
     }
+
 
     @Test
     fun identityAuthWithWrongUsernameShowsRetryState() {

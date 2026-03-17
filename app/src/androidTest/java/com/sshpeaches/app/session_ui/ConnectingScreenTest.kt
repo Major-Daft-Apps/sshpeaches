@@ -285,9 +285,9 @@ class ConnectingScreenTest {
     }
 
     @Test
-    fun scpPanel_validatesBlankDownloadAndInvokesTransfers() {
+    fun scpPanel_selectsRemoteFileAndValidatesDownloadAction() {
+        var listedPath: String? = null
         var downloadRequest: Pair<String, String?>? = null
-        var uploadRequest: Pair<String, String>? = null
 
         composeRule.setContent {
             MaterialTheme {
@@ -303,6 +303,11 @@ class ConnectingScreenTest {
                         path = "/uploads",
                         entries = listOf(
                             SessionService.RemoteDirectoryEntry(
+                                name = "subdir",
+                                isDirectory = true,
+                                sizeBytes = 0
+                            ),
+                            SessionService.RemoteDirectoryEntry(
                                 name = "existing.txt",
                                 isDirectory = false,
                                 sizeBytes = 24
@@ -315,11 +320,11 @@ class ConnectingScreenTest {
                     snippets = emptyList(),
                     onSendShellBytes = {},
                     onTerminalResize = { _, _ -> },
-                    onSftpListDirectory = {},
+                    onSftpListDirectory = { listedPath = it },
                     onSftpDownload = { _, _ -> },
                     onSftpUpload = { _, _ -> },
                     onScpDownload = { remote, local -> downloadRequest = remote to local },
-                    onScpUpload = { local, remote -> uploadRequest = local to remote },
+                    onScpUpload = { _, _ -> },
                     onManageRemotePath = { _, _, _ -> },
                     onRetry = {},
                     onToggleConnectedHostBar = {},
@@ -331,33 +336,25 @@ class ConnectingScreenTest {
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PANEL).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
-        composeRule.onNodeWithText(
-            "Select or enter a remote file path to download.",
-            substring = true
-        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Select a file first.", substring = true).assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_REMOTE_INPUT)
-            .performTextInput("/uploads/existing.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_LOCAL_INPUT)
-            .performTextInput("/data/local/tmp/existing.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
-
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_LOCAL_INPUT)
-            .performTextInput("/data/local/tmp/new.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_REMOTE_INPUT)
-            .performTextReplacement("/uploads/new.txt")
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON).performClick()
-
+        composeRule.onNodeWithText("📁 subdir", substring = true).performClick()
         composeRule.runOnIdle {
-            check(downloadRequest == ("/uploads/existing.txt" to "/data/local/tmp/existing.txt")) {
-                "SCP download callback did not receive the expected paths"
-            }
-            check(uploadRequest == ("/data/local/tmp/new.txt" to "/uploads/new.txt")) {
-                "SCP upload callback did not receive the expected paths"
+            check(listedPath == "/uploads/subdir") {
+                "SCP browser did not request directory listing for selected folder"
             }
         }
 
+        composeRule.onNodeWithText("📄 existing.txt", substring = true).performClick()
+        composeRule.onNodeWithText("Selected file: /uploads/existing.txt", substring = true).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            check(downloadRequest == null) {
+                "SCP download callback should not run before document picker returns"
+            }
+        }
     }
+
 
     private fun requestFor(mode: ConnectionMode) = QuickConnectRequest(
         sessionId = "session-${mode.name.lowercase()}",
