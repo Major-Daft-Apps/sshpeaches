@@ -539,6 +539,56 @@ fun SSHPeachesRoot(
         sessionLogs.removeAll { it.hostId == sessionId }
     }
 
+    fun openOrStartSavedHostSession(
+        host: HostConnection,
+        mode: ConnectionMode,
+        password: String?
+    ) {
+        val sessionId = sessionIdFor(host.id, mode)
+        val existingSnapshot = sessions.firstOrNull { it.hostId == sessionId }
+        if (
+            existingSnapshot?.status ==
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING ||
+            existingSnapshot?.status ==
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE
+        ) {
+            quickConnectRequest.value = quickRequestFromSnapshot(existingSnapshot)
+            quickConnectState.value = quickStateFromSnapshot(existingSnapshot, existingSnapshot.host)
+            pendingConnectingNavigation.value = false
+        } else {
+            if (existingSnapshot != null) {
+                onStopSession(sessionId)
+            }
+            resetSessionLogs(sessionId)
+            pendingConnectingNavigation.value = true
+            quickConnectRequest.value = QuickConnectRequest(
+                sessionId = sessionId,
+                name = host.name,
+                host = host.host,
+                port = host.port,
+                username = host.username,
+                auth = host.preferredAuth,
+                password = password ?: "",
+                mode = mode,
+                savedHostId = host.id,
+                useMosh = host.useMosh,
+                preferredIdentityId = host.preferredIdentityId,
+                forwardId = host.preferredForwardId,
+                script = host.startupScript,
+                terminalProfileId = host.terminalProfileId
+            )
+            quickConnectState.value = QuickConnectUiState(
+                phase = QuickConnectPhase.CONNECTING,
+                message = "Connecting to ${host.host}:${host.port}..."
+            )
+            onStartSession(sessionId, host, mode, password)
+        }
+        scope.launch {
+            drawerState.close()
+            navController.navigate(Routes.CONNECTING)
+        }
+    }
+
     fun importTransferPayloadFromQr(encodedPayload: String, passphrase: String?): String {
         val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export QR payload."
 
@@ -948,7 +998,11 @@ fun SSHPeachesRoot(
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        val showTopBar = currentRoute != Routes.CONNECTING || !connectedHostBarCollapsed.value
+                        val showConnectingTopBar =
+                            quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
+                                !connectedHostBarCollapsed.value
+                        val showTopBar =
+                            currentRoute != Routes.CONNECTING || showConnectingTopBar
                         AnimatedVisibility(
                             visible = showTopBar,
                             enter = fadeIn(animationSpec = tween(120)) + expandVertically(
@@ -1070,34 +1124,7 @@ fun SSHPeachesRoot(
                                 },
                                 activeSshSessionHostIds = activeSshSessionHostIds,
                                 onHostAction = { host, mode ->
-                                    val sessionId = sessionIdFor(host.id, mode)
-                                    resetSessionLogs(sessionId)
-                                    pendingConnectingNavigation.value = true
-                                    quickConnectRequest.value = QuickConnectRequest(
-                                        sessionId = sessionId,
-                                        name = host.name,
-                                        host = host.host,
-                                        port = host.port,
-                                        username = host.username,
-                                        auth = host.preferredAuth,
-                                        password = "",
-                                        mode = mode,
-                                        savedHostId = host.id,
-                                        useMosh = host.useMosh,
-                                        preferredIdentityId = host.preferredIdentityId,
-                                        forwardId = host.preferredForwardId,
-                                        script = host.startupScript,
-                                        terminalProfileId = host.terminalProfileId
-                                    )
-                                    quickConnectState.value = QuickConnectUiState(
-                                        phase = QuickConnectPhase.CONNECTING,
-                                        message = "Connecting to ${host.host}:${host.port}..."
-                                    )
-                                    onStartSession(sessionId, host, mode, null)
-                                    scope.launch {
-                                        drawerState.close()
-                                        navController.navigate(Routes.CONNECTING)
-                                    }
+                                    openOrStartSavedHostSession(host, mode, password = null)
                                 },
                                 onRunInfoCommand = { host, command ->
                                     val activeSshSession = sessions.firstOrNull {
@@ -1253,34 +1280,7 @@ fun SSHPeachesRoot(
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
                             onStartSession = { host, mode, password ->
-                                val sessionId = sessionIdFor(host.id, mode)
-                                resetSessionLogs(sessionId)
-                                pendingConnectingNavigation.value = true
-                                quickConnectRequest.value = QuickConnectRequest(
-                                    sessionId = sessionId,
-                                    name = host.name,
-                                    host = host.host,
-                                    port = host.port,
-                                    username = host.username,
-                                    auth = host.preferredAuth,
-                                    password = password ?: "",
-                                    mode = mode,
-                                    savedHostId = host.id,
-                                    useMosh = host.useMosh,
-                                    preferredIdentityId = host.preferredIdentityId,
-                                    forwardId = host.preferredForwardId,
-                                    script = host.startupScript,
-                                    terminalProfileId = host.terminalProfileId
-                                )
-                                quickConnectState.value = QuickConnectUiState(
-                                    phase = QuickConnectPhase.CONNECTING,
-                                    message = "Connecting to ${host.host}:${host.port}..."
-                                )
-                                onStartSession(sessionId, host, mode, password)
-                                scope.launch {
-                                    drawerState.close()
-                                    navController.navigate(Routes.CONNECTING)
-                                }
+                                openOrStartSavedHostSession(host, mode, password)
                             },
                             onStopSession = onStopSession,
                             activeSshSessionHostIds = activeSshSessionHostIds,

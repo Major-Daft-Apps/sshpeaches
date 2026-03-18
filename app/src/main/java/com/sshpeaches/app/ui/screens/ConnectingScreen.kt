@@ -1824,6 +1824,11 @@ fun ConnectingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.ime
+                            .exclude(WindowInsets.navigationBars)
+                            .only(WindowInsetsSides.Bottom)
+                    )
                     .testTag(UiTestTags.CONNECTING_SFTP_PANEL)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -2133,50 +2138,102 @@ private fun CompactKeyRow(
 ) {
     if (keys.isEmpty()) return
     val keyShape = RoundedCornerShape(5.dp)
+    val rows = remember(keys) {
+        keys
+            .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+            .take(KeyboardLayoutDefaults.SLOT_ROWS)
+    }
+    BoxWithConstraints(modifier = modifier) {
+        val useWideLayout = maxWidth >= COMPACT_KEY_WIDE_LAYOUT_MIN_WIDTH
+        if (useWideLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CompactKeyRows(
+                    rows = rows.take(2),
+                    rowOffset = 0,
+                    keyShape = keyShape,
+                    activeModifiers = activeModifiers,
+                    activeAliasIcons = activeAliasIcons,
+                    onSendKey = onSendKey,
+                    modifier = Modifier.weight(1f)
+                )
+                CompactKeyRows(
+                    rows = rows.drop(2),
+                    rowOffset = 2,
+                    keyShape = keyShape,
+                    activeModifiers = activeModifiers,
+                    activeAliasIcons = activeAliasIcons,
+                    onSendKey = onSendKey,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            CompactKeyRows(
+                rows = rows,
+                rowOffset = 0,
+                keyShape = keyShape,
+                activeModifiers = activeModifiers,
+                activeAliasIcons = activeAliasIcons,
+                onSendKey = onSendKey,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactKeyRows(
+    rows: List<List<CompactTerminalKey>>,
+    rowOffset: Int,
+    keyShape: RoundedCornerShape,
+    activeModifiers: Set<KeyboardModifier>,
+    activeAliasIcons: Set<String>,
+    onSendKey: (CompactTerminalKey) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        keys
-            .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
-            .withIndex()
-            .take(KeyboardLayoutDefaults.SLOT_ROWS)
-            .forEach { (rowIndex, row) ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    repeat(KeyboardLayoutDefaults.SLOT_COLUMNS) { index ->
-                        val key = row.getOrNull(index)
-                        if (key == null) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
-                            )
-                            return@repeat
-                        }
-                        val modifierActive = key.action.type == KeyboardActionType.MODIFIER &&
-                            key.action.modifier != null &&
-                            activeModifiers.contains(key.action.modifier)
-                        val aliasActive = key.action.iconId in activeAliasIcons
-                        val flatIndex = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + index
-                        val testTag = if (key.action.iconId == "keyboard") {
-                            UiTestTags.CONNECTING_KEYBOARD_TOGGLE
-                        } else {
-                            UiTestTags.connectingCompactKey(flatIndex)
-                        }
-                        CompactKeyButton(
-                            key = key,
-                            keyShape = keyShape,
-                            modifierActive = modifierActive,
-                            aliasActive = aliasActive,
-                            testTag = testTag,
-                            onSendKey = onSendKey
+        rows.forEachIndexed { rowIndex, row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(KeyboardLayoutDefaults.SLOT_COLUMNS) { index ->
+                    val key = row.getOrNull(index)
+                    if (key == null) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
                         )
+                        return@repeat
                     }
+                    val modifierActive = key.action.type == KeyboardActionType.MODIFIER &&
+                        key.action.modifier != null &&
+                        activeModifiers.contains(key.action.modifier)
+                    val aliasActive = key.action.iconId in activeAliasIcons
+                    val flatIndex = (rowOffset + rowIndex) * KeyboardLayoutDefaults.SLOT_COLUMNS + index
+                    val testTag = if (key.action.iconId == "keyboard") {
+                        UiTestTags.CONNECTING_KEYBOARD_TOGGLE
+                    } else {
+                        UiTestTags.connectingCompactKey(flatIndex)
+                    }
+                    CompactKeyButton(
+                        key = key,
+                        keyShape = keyShape,
+                        modifierActive = modifierActive,
+                        aliasActive = aliasActive,
+                        testTag = testTag,
+                        onSendKey = onSendKey
+                    )
                 }
             }
+        }
     }
 }
 
@@ -2579,6 +2636,7 @@ private const val IME_BUFFER_KEEP_TAIL_CHARS = 160
 private const val SFTP_CANCEL_BUTTON_DELAY_MS = 220L
 private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L
 private const val KEY_REPEAT_INTERVAL_MS = 65L
+private val COMPACT_KEY_WIDE_LAYOUT_MIN_WIDTH = 600.dp
 private const val SWIPE_NAV_REPEAT_INITIAL_DELAY_MS = 350L
 private const val SWIPE_NAV_REPEAT_INTERVAL_MS = 65L
 private const val SWIPE_NAV_MIN_DISTANCE_DP = 28

@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,13 +24,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -69,6 +68,10 @@ fun KeyboardEditorScreen(
     val keyBlockHeightPx = remember { mutableIntStateOf(0) }
     val activeEditorIndex = editorIndex.value
 
+    BackHandler(enabled = activeEditorIndex != null) {
+        editorIndex.value = null
+    }
+
     if (activeEditorIndex != null) {
         val current = normalizedSlots.getOrNull(activeEditorIndex) ?: KeyboardLayoutDefaults.emptyAction()
         KeyActionEditorVertical(
@@ -102,32 +105,43 @@ fun KeyboardEditorScreen(
         ) {
             Text("Tap a slot to open the full key-action editor.")
 
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
                     .onSizeChanged { keyBlockHeightPx.intValue = it.height }
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
             ) {
-                normalizedSlots
-                    .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
-                    .forEachIndexed { rowIndex, row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            row.forEachIndexed { columnIndex, action ->
-                                val index = rowIndex * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
-                                KeySlot(
-                                    index = index,
-                                    action = action,
-                                    active = !action.isEmpty(),
-                                    onClick = { editorIndex.value = index }
-                                )
-                            }
-                        }
+                val rows = remember(normalizedSlots) {
+                    normalizedSlots.chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+                }
+                val useWideLayout = maxWidth >= KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH
+                if (useWideLayout) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        KeyboardSlotRows(
+                            rows = rows.take(2),
+                            rowOffset = 0,
+                            onSlotClick = { editorIndex.value = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        KeyboardSlotRows(
+                            rows = rows.drop(2),
+                            rowOffset = 2,
+                            onSlotClick = { editorIndex.value = it },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
+                } else {
+                    KeyboardSlotRows(
+                        rows = rows,
+                        rowOffset = 0,
+                        onSlotClick = { editorIndex.value = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Card(
@@ -173,6 +187,46 @@ fun KeyboardEditorScreen(
                 modifier = Modifier.testTag(UiTestTags.KEYBOARD_RESET_BUTTON)
             ) {
                 Text("Reset layout")
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeyboardSlotRows(
+    rows: List<List<KeyboardSlotAction>>,
+    rowOffset: Int,
+    onSlotClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        rows.forEachIndexed { rowIndex, row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(KeyboardLayoutDefaults.SLOT_COLUMNS) { columnIndex ->
+                    val action = row.getOrNull(columnIndex)
+                    if (action == null) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
+                        )
+                        return@repeat
+                    }
+                    val index = (rowOffset + rowIndex) * KeyboardLayoutDefaults.SLOT_COLUMNS + columnIndex
+                    KeySlot(
+                        index = index,
+                        action = action,
+                        active = !action.isEmpty(),
+                        onClick = { onSlotClick(index) }
+                    )
+                }
             }
         }
     }
@@ -268,15 +322,7 @@ private fun KeyActionEditorVertical(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onCancel,
-                    modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_BACK_BUTTON)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text("Edit Key Action", style = MaterialTheme.typography.headlineSmall)
-            }
+            Text("Edit Key Action", style = MaterialTheme.typography.headlineSmall)
             Text("Slot ${slotIndex + 1}", style = MaterialTheme.typography.bodySmall)
         }
 
@@ -508,4 +554,5 @@ private fun PresetRow(
 private const val KEYBOARD_ILLUSTRATION_ASPECT_RATIO = 2160f / 1126f
 private val KEYBOARD_ILLUSTRATION_FALLBACK_HEIGHT = 180.dp
 private val KEYBOARD_ILLUSTRATION_MAX_WIDTH = 980.dp
+private val KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH = 600.dp
 private const val KEYBOARD_ILLUSTRATION_MAX_HEIGHT_MULTIPLIER = 2f

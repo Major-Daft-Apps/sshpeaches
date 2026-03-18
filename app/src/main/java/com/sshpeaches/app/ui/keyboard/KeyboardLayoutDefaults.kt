@@ -61,19 +61,19 @@ object KeyboardLayoutDefaults {
         snippetPickerAction(),
         passwordInjectAction(),
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
-        textAction("/", "/"),
-        textAction("-", "-"),
+        modifierAction(KeyboardModifier.ALT, "Alt"),
         keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
         keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
         keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
         keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
+        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
-        modifierAction(KeyboardModifier.ALT, "Alt"),
         keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
         keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
         keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
-        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
+        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true),
+        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
     )
 
     val modifierPresets: List<KeyboardSlotAction> = listOf(
