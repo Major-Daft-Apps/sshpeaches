@@ -254,7 +254,6 @@ fun SSHPeachesRoot(
     onSftpUploadFile: (String, String, String) -> Unit,
     onManageRemotePath: (String, String, String, String?) -> Unit,
     onScpDownloadFile: (String, String, String?) -> Unit,
-    onScpUploadFile: (String, String, String) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
@@ -1203,11 +1202,6 @@ fun SSHPeachesRoot(
                                 onScpDownload = { remotePath, localPath ->
                                     request?.let { current ->
                                         onScpDownloadFile(current.sessionId, remotePath, localPath)
-                                    }
-                                },
-                                onScpUpload = { localPath, remotePath ->
-                                    request?.let { current ->
-                                        onScpUploadFile(current.sessionId, localPath, remotePath)
                                     }
                                 },
                                 onManageRemotePath = { operation, sourcePath, destinationPath ->

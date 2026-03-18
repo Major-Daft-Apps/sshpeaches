@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -197,7 +198,6 @@ fun ConnectingScreen(
     onSftpDownload: (String, String?) -> Unit,
     onSftpUpload: (String, String) -> Unit,
     onScpDownload: (String, String?) -> Unit,
-    onScpUpload: (String, String) -> Unit,
     onManageRemotePath: (operation: String, sourcePath: String, destinationPath: String?) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
     onRetry: () -> Unit,

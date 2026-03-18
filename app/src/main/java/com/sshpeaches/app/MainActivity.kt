@@ -561,7 +561,6 @@ class MainActivity : FragmentActivity() {
                     onSftpUploadFile = sftpUploadFile,
                     onManageRemotePath = manageRemotePath,
                     onScpDownloadFile = scpDownloadFile,
-                    onScpUploadFile = scpUploadFile,
                     resolveTerminalEmulator = resolveTerminalEmulator,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
