@@ -248,6 +248,7 @@ fun ConnectingScreen(
     val scpActivityLines = remember(request?.sessionId) { mutableStateListOf<String>() }
     var scpRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     var scpPendingListPath by remember(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpPendingListBaselineToken by remember(request?.sessionId) { mutableStateOf<Long?>(null) }
     var scpLastListedPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     val scpPathHistory = remember(request?.sessionId) { mutableStateListOf(".") }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
@@ -444,6 +445,7 @@ fun ConnectingScreen(
         scpActivityLines.clear()
         scpRemotePath = "."
         scpPendingListPath = null
+        scpPendingListBaselineToken = null
         scpLastListedPath = "."
         scpPathHistory.clear()
         scpPathHistory += "."
@@ -457,6 +459,7 @@ fun ConnectingScreen(
         }
         if (request?.mode == ConnectionMode.SCP) {
             scpPendingListPath = scpRemotePath
+            scpPendingListBaselineToken = remoteDirectory?.refreshToken
             onSftpListDirectory(scpRemotePath)
         }
         pendingModifiers = emptySet()
@@ -614,11 +617,19 @@ fun ConnectingScreen(
             ConnectionMode.SSH, null -> Unit
         }
     }
-    LaunchedEffect(remoteDirectory?.path, remoteDirectory?.entries, request?.sessionId, request?.mode, scpPendingListPath) {
+    LaunchedEffect(
+        remoteDirectory?.path,
+        remoteDirectory?.refreshToken,
+        request?.sessionId,
+        request?.mode,
+        scpPendingListPath,
+        scpPendingListBaselineToken
+    ) {
         if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
         val pendingPath = scpPendingListPath ?: return@LaunchedEffect
         val snapshot = remoteDirectory ?: return@LaunchedEffect
         if (snapshot.path != pendingPath) return@LaunchedEffect
+        if (scpPendingListBaselineToken == snapshot.refreshToken) return@LaunchedEffect
         scpActivityLines.clear()
         scpActivityLines += "Listing ${snapshot.path}:"
         if (snapshot.entries.isEmpty()) {
@@ -630,6 +641,21 @@ fun ConnectingScreen(
             }
         }
         scpPendingListPath = null
+        scpPendingListBaselineToken = null
+    }
+    LaunchedEffect(logs.size, request?.mode, scpPendingListPath) {
+        if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
+        if (scpPendingListPath == null || logs.isEmpty()) return@LaunchedEffect
+        val latest = logs.last().message
+        if (
+            latest.startsWith("Directory listing failed for") ||
+            latest.startsWith("SFTP operation failed:")
+        ) {
+            scpPendingListPath = null
+            scpPendingListBaselineToken = null
+            scpActivityLines.clear()
+            scpActivityLines += latest
+        }
     }
 
     fun inferRemoteDestination(localPath: String, currentDir: String): String {
@@ -1305,10 +1331,12 @@ fun ConnectingScreen(
             }
 
             fun browseScpPath(target: String, recordHistory: Boolean = true) {
+                if (scpPendingListPath != null) return
                 val normalized = target.trim().ifBlank { "." }
                 scpRemotePath = normalized
                 scpLastListedPath = normalized
                 scpPendingListPath = normalized
+                scpPendingListBaselineToken = remoteDirectory?.refreshToken
                 onSftpListDirectory(normalized)
                 if (recordHistory) {
                     while (scpPathHistory.size - 1 > scpPathHistoryIndex) {
@@ -1908,7 +1936,7 @@ fun ConnectingScreen(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.weight(0.08f))
+                Spacer(modifier = Modifier.weight(0.02f))
 
                 Box(
                     modifier = Modifier.size(360.dp),
@@ -1954,7 +1982,7 @@ fun ConnectingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
                     text = statusText,
@@ -1964,7 +1992,7 @@ fun ConnectingScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -2001,14 +2029,14 @@ fun ConnectingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(0.12f))
+                Spacer(modifier = Modifier.weight(0.04f))
 
                 ConnectionLogsPane(
                     renderedLogs = renderedLogs,
                     listState = listState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.5f)
+                        .weight(0.58f)
                 )
             }
         }

@@ -291,13 +291,15 @@ class SessionService : Service() {
                         refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
                     }
                     ConnectionMode.SCP -> {
-                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP transfer channel...")
+                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP browser...")
+                        sftpBinding = SftpBinding(client!!.newSFTPClient())
                         scpBinding = ScpBinding(client!!.newSCPFileTransfer())
+                        refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
                                 hostId = sessionId,
                                 level = SessionLogBus.LogLevel.INFO,
-                                message = "SCP ready. Use quick transfer controls to upload/download files."
+                                message = "SCP ready. Browse remote files and download them."
                             )
                         )
                     }
@@ -629,6 +631,13 @@ class SessionService : Service() {
                 refreshSftpDirectoryListing(hostId, sftp, targetPath)
             }
             if (!listed) {
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "Directory listing failed for $targetPath"
+                    )
+                )
                 UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
             }
         }
@@ -842,7 +851,8 @@ class SessionService : Service() {
                 hostId,
                 RemoteDirectorySnapshot(
                     path = canonicalPath,
-                    entries = entries
+                    entries = entries,
+                    refreshToken = SystemClock.elapsedRealtimeNanos()
                 )
             )
             SessionLogBus.emit(
@@ -2164,7 +2174,8 @@ class SessionService : Service() {
 
     data class RemoteDirectorySnapshot(
         val path: String,
-        val entries: List<RemoteDirectoryEntry>
+        val entries: List<RemoteDirectoryEntry>,
+        val refreshToken: Long = 0L
     )
 
     data class RemoteDirectoryEntry(
