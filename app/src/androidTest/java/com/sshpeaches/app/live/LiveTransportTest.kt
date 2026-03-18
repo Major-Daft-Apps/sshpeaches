@@ -487,7 +487,6 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithText("Selected file:", substring = true).assertIsDisplayed()
     }
 
-
     @Test
     fun identityAuthWithWrongUsernameShowsRetryState() {
         AppStateSeeder.configureSettings(

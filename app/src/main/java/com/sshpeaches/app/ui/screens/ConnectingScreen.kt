@@ -43,7 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -56,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,6 +73,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
@@ -79,6 +81,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInteropFilter
@@ -453,6 +456,7 @@ fun ConnectingScreen(
             sftpConsoleLines += "Type 'help' for SFTP commands."
         }
         if (request?.mode == ConnectionMode.SCP) {
+            scpPendingListPath = scpRemotePath
             onSftpListDirectory(scpRemotePath)
         }
         pendingModifiers = emptySet()
@@ -491,7 +495,6 @@ fun ConnectingScreen(
             }
         }
     }
-
     LaunchedEffect(terminalProfile.id) {
         terminalEngine.applyProfile(terminalProfile)
         terminalViewRef?.setTextSize(with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) })
@@ -1280,8 +1283,9 @@ fun ConnectingScreen(
             val remoteItems = remoteDirectory?.entries.orEmpty()
             val effectiveRemotePath = remoteDirectory?.path ?: scpRemotePath
             val normalizedRemoteInput = scpRemotePath.trim().ifBlank { "." }
-            val canGoBack = scpPathHistoryIndex > 0
-            val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex
+            val scpListingInProgress = scpPendingListPath != null
+            val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
+            val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex && !scpListingInProgress
             val scpDownloadFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
                 val selectedRemote = scpSelectedFile ?: return@rememberLauncherForActivityResult
@@ -1316,7 +1320,6 @@ fun ConnectingScreen(
                     scpPathHistoryIndex = scpPathHistory.lastIndex
                 }
             }
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1341,7 +1344,11 @@ fun ConnectingScreen(
                             browseScpPath(scpPathHistory[scpPathHistoryIndex], recordHistory = false)
                         }
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = if (canGoBack) Color.White else Color(0xFF6E6E6E)
+                        )
                     }
                     IconButton(
                         enabled = canGoForward,
@@ -1351,27 +1358,60 @@ fun ConnectingScreen(
                             browseScpPath(scpPathHistory[scpPathHistoryIndex], recordHistory = false)
                         }
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Forward")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Forward",
+                            tint = if (canGoForward) Color.White else Color(0xFF6E6E6E)
+                        )
                     }
-                    IconButton(onClick = { browseScpPath(parentPath(effectiveRemotePath)) }) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = "Up")
+                    IconButton(
+                        enabled = !scpListingInProgress,
+                        onClick = { browseScpPath(parentPath(effectiveRemotePath)) }
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowUpward,
+                            contentDescription = "Up",
+                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
+                        )
                     }
-                    IconButton(onClick = { browseScpPath(".") }) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
+                    IconButton(
+                        enabled = !scpListingInProgress,
+                        onClick = { browseScpPath(".") }
+                    ) {
+                        Icon(
+                            Icons.Default.Home,
+                            contentDescription = "Home",
+                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
+                        )
                     }
-                    IconButton(onClick = { browseScpPath(effectiveRemotePath, recordHistory = false) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    IconButton(
+                        enabled = !scpListingInProgress,
+                        onClick = { browseScpPath(effectiveRemotePath, recordHistory = false) }
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
+                        )
                     }
                 }
-
                 OutlinedTextField(
                     value = scpRemotePath,
                     onValueChange = { scpRemotePath = it },
                     label = { Text("Remote path") },
                     singleLine = true,
+                    enabled = !scpListingInProgress,
                     trailingIcon = {
-                        IconButton(onClick = { browseScpPath(normalizedRemoteInput) }) {
-                            Icon(Icons.Default.Terminal, contentDescription = "Go")
+                        if (scpListingInProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color(0xFFE5E5E5),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            IconButton(onClick = { browseScpPath(normalizedRemoteInput) }) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = "Open folder", tint = Color.White)
+                            }
                         }
                     },
                     keyboardOptions = KeyboardOptions(
@@ -1380,10 +1420,32 @@ fun ConnectingScreen(
                         imeAction = ImeAction.None,
                         autoCorrect = false
                     ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        disabledTextColor = Color(0xFF8E8E8E),
+                        focusedLabelColor = Color(0xFFE5E5E5),
+                        unfocusedLabelColor = Color(0xFFBDBDBD),
+                        disabledLabelColor = Color(0xFF8E8E8E),
+                        cursorColor = Color.White,
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color(0xFF7A7A7A),
+                        disabledBorderColor = Color(0xFF555555),
+                        focusedTrailingIconColor = Color.White,
+                        unfocusedTrailingIconColor = Color(0xFFE5E5E5),
+                        disabledTrailingIconColor = Color(0xFF8E8E8E)
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
                 )
+                if (scpListingInProgress) {
+                    Text(
+                        text = "Loading directory listing...",
+                        color = Color(0xFF9E9E9E),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 Surface(
                     modifier = Modifier
@@ -1412,13 +1474,14 @@ fun ConnectingScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(6.dp))
+                                        .alpha(if (scpListingInProgress) 0.65f else 1f)
                                         .background(
                                             when {
                                                 !item.isDirectory && scpSelectedFile == absolute -> Color(0xFF23435E)
                                                 else -> Color.Transparent
                                             }
                                         )
-                                        .clickable {
+                                        .clickable(enabled = !scpListingInProgress) {
                                             if (item.isDirectory) {
                                                 browseScpPath(absolute)
                                                 scpSelectedFile = null
@@ -1453,7 +1516,6 @@ fun ConnectingScreen(
                     color = Color(0xFFE5E5E5),
                     style = MaterialTheme.typography.bodySmall
                 )
-
                 Button(
                     onClick = {
                         if (scpSelectedFile == null) {
@@ -1462,7 +1524,7 @@ fun ConnectingScreen(
                         }
                         scpDownloadFolderPicker.launch(null)
                     },
-                    enabled = !scpTransferInProgress,
+                    enabled = !scpTransferInProgress && !scpListingInProgress,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
@@ -1846,14 +1908,51 @@ fun ConnectingScreen(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.weight(0.2f))
+                Spacer(modifier = Modifier.weight(0.08f))
 
-                Image(
-                    painter = painterResource(id = R.drawable.sshpeaches),
-                    contentDescription = "SSHPeaches logo",
-                    modifier = Modifier.size(180.dp),
-                    contentScale = ContentScale.Fit
-                )
+                Box(
+                    modifier = Modifier.size(360.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(340.dp)
+                            .blur(72.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0x2EFFFFFF),
+                                        Color(0x14FFFFFF),
+                                        Color(0x08F7F4EF),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = RoundedCornerShape(999.dp)
+                            )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(250.dp)
+                            .blur(32.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0x18FFFFFF),
+                                        Color(0x0CFBF7F1),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = RoundedCornerShape(999.dp)
+                            )
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.sshpeaches_activitybar),
+                        contentDescription = "SSHPeaches logo",
+                        colorFilter = ColorFilter.tint(Color(0xFFFA992A)),
+                        modifier = Modifier.size(128.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -1902,7 +2001,7 @@ fun ConnectingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(0.3f))
+                Spacer(modifier = Modifier.weight(0.12f))
 
                 ConnectionLogsPane(
                     renderedLogs = renderedLogs,

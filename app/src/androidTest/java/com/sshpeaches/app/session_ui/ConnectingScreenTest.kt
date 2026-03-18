@@ -355,7 +355,6 @@ class ConnectingScreenTest {
         }
     }
 
-
     private fun requestFor(mode: ConnectionMode) = QuickConnectRequest(
         sessionId = "session-${mode.name.lowercase()}",
         name = "Sandbox ${mode.name}",
