@@ -1067,6 +1067,16 @@ fun SSHPeachesRoot(
     @Composable
     fun SessionVerticalContent() {
         val request = effectiveQuickConnectRequest
+        val screenState = when {
+            currentRoute == Routes.SESSION && request != null -> {
+                effectiveQuickConnectState.copy(
+                    phase = QuickConnectPhase.SUCCESS,
+                    message = effectiveQuickConnectState.message.ifBlank { "Connected successfully" }
+                )
+            }
+
+            else -> effectiveQuickConnectState
+        }
         val logs = request?.let { current ->
             sessionLogs.filter { it.hostId == current.sessionId }
         } ?: emptyList()
@@ -1084,7 +1094,7 @@ fun SSHPeachesRoot(
             ?: TerminalProfileDefaults.builtInProfiles.first()
         ConnectingScreen(
             request = request,
-            state = effectiveQuickConnectState,
+            state = screenState,
             logs = logs,
             shellOutput = shellOutput,
             remoteDirectory = remoteDirectory,
