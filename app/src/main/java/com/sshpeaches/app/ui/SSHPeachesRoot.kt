@@ -52,13 +52,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
@@ -408,7 +405,7 @@ fun SSHPeachesRoot(
         val popped = navController.popBackStack()
         if (!popped) {
             val destination = routeBeforeConnecting.value
-                .takeIf { it != Routes.CONNECTING }
+                .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
                 ?: Routes.FAVORITES
             navController.navigate(destination) {
                 popUpTo(Routes.FAVORITES)
@@ -429,17 +426,27 @@ fun SSHPeachesRoot(
     val effectiveQuickConnectState = currentQuickConnectSnapshot?.let { snapshot ->
         quickStateFromSnapshot(snapshot, snapshot.host)
     } ?: quickConnectState.value
+    val isSessionVerticalRoute =
+        currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+
+    fun routeForSnapshot(snapshot: SessionSnapshot): String =
+        if (snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE) {
+            Routes.SESSION
+        } else {
+            Routes.CONNECTING
+        }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
-    BackHandler(enabled = currentRoute == Routes.CONNECTING && !drawerState.isOpen) {
+    BackHandler(enabled = isSessionVerticalRoute && !drawerState.isOpen) {
         navigateBackFromConnecting()
     }
     val activeSessionRequest = effectiveQuickConnectRequest
     val currentTitle = when (currentRoute) {
         Routes.FAVORITES -> "Favorites"
-        Routes.CONNECTING -> activeSessionRequest?.name?.ifBlank {
+        Routes.CONNECTING,
+        Routes.SESSION -> activeSessionRequest?.name?.ifBlank {
             activeSessionRequest.host
         } ?: "Connecting"
         Routes.HOSTS -> "Hosts"
@@ -463,7 +470,7 @@ fun SSHPeachesRoot(
     }
 
     LaunchedEffect(currentRoute) {
-        if (currentRoute != Routes.CONNECTING) {
+        if (!isSessionVerticalRoute) {
             routeBeforeConnecting.value = currentRoute
         }
         if (!showEditAction && editMode.value) {
@@ -475,6 +482,7 @@ fun SSHPeachesRoot(
         val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == targetHostId } ?: return@LaunchedEffect
         val host = snapshot.host
+        val targetRoute = routeForSnapshot(snapshot)
         quickConnectRequest.value = quickRequestFromSnapshot(
             snapshot,
             requestedOpenSessionFileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
@@ -482,8 +490,8 @@ fun SSHPeachesRoot(
         quickConnectState.value = quickStateFromSnapshot(snapshot, host)
         pendingConnectingNavigation.value = false
         autoResumeHandled.value = true
-        if (currentRoute != Routes.CONNECTING) {
-            navController.navigate(Routes.CONNECTING) {
+        if (currentRoute != targetRoute) {
+            navController.navigate(targetRoute) {
                 popUpTo(Routes.FAVORITES)
             }
         }
@@ -520,6 +528,27 @@ fun SSHPeachesRoot(
         }
     }
 
+    LaunchedEffect(currentQuickConnectSnapshot?.status, currentRoute) {
+        val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        when {
+            snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                currentRoute == Routes.CONNECTING -> {
+                navController.navigate(Routes.SESSION) {
+                    popUpTo(Routes.CONNECTING) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+
+            snapshot.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                currentRoute == Routes.SESSION -> {
+                navController.navigate(Routes.CONNECTING) {
+                    popUpTo(Routes.SESSION) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
     LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute) {
         val request = quickConnectRequest.value ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == request.sessionId }
@@ -529,9 +558,9 @@ fun SSHPeachesRoot(
                     pendingConnectingNavigation.value = false
                     quickConnectRequest.value = null
                     quickConnectState.value = QuickConnectUiState()
-                    if (currentRoute == Routes.CONNECTING) {
+                    if (isSessionVerticalRoute) {
                         val destination = routeBeforeConnecting.value
-                            .takeIf { it != Routes.CONNECTING }
+                            .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
                             ?: Routes.FAVORITES
                         navController.navigate(destination) {
                             popUpTo(Routes.FAVORITES)
@@ -571,7 +600,7 @@ fun SSHPeachesRoot(
         }
     }
     LaunchedEffect(currentRoute, quickConnectRequest.value?.sessionId) {
-        if (currentRoute == Routes.CONNECTING || quickConnectRequest.value == null) {
+        if (isSessionVerticalRoute || quickConnectRequest.value == null) {
             pendingConnectingNavigation.value = false
         }
     }
@@ -653,7 +682,11 @@ fun SSHPeachesRoot(
         }
         scope.launch {
             drawerState.close()
-            navController.navigate(Routes.CONNECTING)
+            navController.navigate(
+                existingSnapshot?.let(::routeForSnapshot) ?: Routes.CONNECTING
+            ) {
+                launchSingleTop = true
+            }
         }
     }
 
@@ -1022,7 +1055,7 @@ fun SSHPeachesRoot(
         }
         pendingConnectingNavigation.value = false
         val destination = routeBeforeConnecting.value
-            .takeIf { it != Routes.CONNECTING }
+            .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
             ?: Routes.FAVORITES
         navController.navigate(destination) {
             popUpTo(Routes.FAVORITES)
@@ -1031,10 +1064,118 @@ fun SSHPeachesRoot(
         quickConnectState.value = QuickConnectUiState()
     }
 
+    @Composable
+    fun SessionVerticalContent() {
+        val request = effectiveQuickConnectRequest
+        val logs = request?.let { current ->
+            sessionLogs.filter { it.hostId == current.sessionId }
+        } ?: emptyList()
+        val shellOutput = request?.let { current ->
+            shellOutputs[current.sessionId].orEmpty()
+        }.orEmpty()
+        val remoteDirectory = request?.let { current ->
+            remoteDirectories[current.sessionId]
+        }
+        val activeTerminalProfile = uiState.terminalProfiles.firstOrNull {
+            it.id == request?.terminalProfileId
+        } ?: uiState.terminalProfiles.firstOrNull {
+            it.id == uiState.defaultTerminalProfileId
+        } ?: uiState.terminalProfiles.firstOrNull()
+            ?: TerminalProfileDefaults.builtInProfiles.first()
+        ConnectingScreen(
+            request = request,
+            state = effectiveQuickConnectState,
+            logs = logs,
+            shellOutput = shellOutput,
+            remoteDirectory = remoteDirectory,
+            terminalProfile = activeTerminalProfile,
+            terminalSelectionMode = uiState.terminalSelectionMode,
+            terminalBellMode = uiState.terminalBellMode,
+            useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
+            terminalMarginPx = uiState.terminalMarginPx,
+            keyboardSlots = uiState.keyboardSlots,
+            snippets = uiState.snippets,
+            onSendShellBytes = { payload ->
+                request?.let { current ->
+                    onSendShellBytes(current.sessionId, payload)
+                }
+            },
+            onTerminalResize = { cols, rows ->
+                request?.let { current ->
+                    onResizeShell(current.sessionId, cols, rows)
+                }
+            },
+            onSftpListDirectory = { path ->
+                request?.let { current ->
+                    onListSftpDirectory(current.sessionId, path)
+                }
+            },
+            onSftpDownload = { remotePath, localPath ->
+                request?.let { current ->
+                    onSftpDownloadFile(current.sessionId, remotePath, localPath)
+                }
+            },
+            onSftpUpload = { localPath, remotePath ->
+                request?.let { current ->
+                    onSftpUploadFile(current.sessionId, localPath, remotePath)
+                }
+            },
+            onScpDownload = { remotePath, localPath ->
+                request?.let { current ->
+                    onScpDownloadFile(current.sessionId, remotePath, localPath)
+                }
+            },
+            onScpUpload = { localPath, remotePath ->
+                request?.let { current ->
+                    onScpUploadFile(current.sessionId, localPath, remotePath)
+                }
+            },
+            onManageRemotePath = { operation, sourcePath, destinationPath ->
+                request?.let { current ->
+                    onManageRemotePath(current.sessionId, operation, sourcePath, destinationPath)
+                }
+            },
+            resolveTerminalEmulator = resolveTerminalEmulator,
+            onRetry = {
+                quickConnectRequest.value?.let { current ->
+                    onStopSession(current.sessionId)
+                    val next = if (current.savedHostId == null) {
+                        current.copy(
+                            sessionId = sessionIdFor("quick-${UUID.randomUUID()}", current.mode)
+                        )
+                    } else {
+                        current.copy(
+                            sessionId = sessionIdFor(current.savedHostId, current.mode)
+                        )
+                    }
+                    resetSessionLogs(next.sessionId)
+                    quickConnectRequest.value = next
+                    quickConnectState.value = QuickConnectUiState(
+                        phase = QuickConnectPhase.CONNECTING,
+                        message = "Connecting to ${next.host}:${next.port}..."
+                    )
+                    onStartSession(
+                        next.sessionId,
+                        quickConnectHost(next),
+                        next.mode,
+                        next.password
+                    )
+                }
+            },
+            onToggleConnectedHostBar = {
+                connectedHostBarCollapsed.value = !connectedHostBarCollapsed.value
+            },
+            onOpenSettings = {
+                navController.navigate(Routes.SETTINGS)
+            },
+            findRequestToken = connectingFindRequestToken.intValue
+        )
+    }
+
     Box {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            gesturesEnabled = currentRoute != Routes.CONNECTING,
+            gesturesEnabled = !isSessionVerticalRoute,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -1088,21 +1229,11 @@ fun SSHPeachesRoot(
                                 !connectedHostBarCollapsed.value
                         val showTopBar =
                             currentRoute != Routes.CONNECTING || showConnectingTopBar
-                        AnimatedVisibility(
-                            visible = showTopBar,
-                            enter = fadeIn(animationSpec = tween(120)) + expandVertically(
-                                animationSpec = tween(150),
-                                expandFrom = Alignment.Top
-                            ),
-                            exit = fadeOut(animationSpec = tween(90)) + shrinkVertically(
-                                animationSpec = tween(120),
-                                shrinkTowards = Alignment.Top
-                            )
-                        ) {
+                        if (showTopBar) {
                             TopAppBar(
                                 title = { Text(currentTitle) },
                                 navigationIcon = {
-                                    if (currentRoute == Routes.CONNECTING) {
+                                    if (isSessionVerticalRoute) {
                                         IconButton(onClick = { navigateBackFromConnecting() }) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                         }
@@ -1113,7 +1244,7 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 actions = {
-                                    if (currentRoute == Routes.CONNECTING) {
+                                    if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
                                             IconButton(
                                                 onClick = {
@@ -1196,7 +1327,9 @@ fun SSHPeachesRoot(
                                         pendingConnectingNavigation.value = false
                                         scope.launch {
                                             drawerState.close()
-                                            navController.navigate(Routes.CONNECTING)
+                                            navController.navigate(routeForSnapshot(snapshot)) {
+                                                launchSingleTop = true
+                                            }
                                         }
                                     }
                                 },
@@ -1239,112 +1372,10 @@ fun SSHPeachesRoot(
                             )
                         }
                         composable(Routes.CONNECTING) {
-                            val request = effectiveQuickConnectRequest
-                            val logs = request?.let { current ->
-                                sessionLogs.filter { it.hostId == current.sessionId }
-                            } ?: emptyList()
-                            val shellOutput = request?.let { current ->
-                                shellOutputs[current.sessionId].orEmpty()
-                            }.orEmpty()
-                            val remoteDirectory = request?.let { current ->
-                                remoteDirectories[current.sessionId]
-                            }
-                            val activeTerminalProfile = uiState.terminalProfiles.firstOrNull {
-                                it.id == request?.terminalProfileId
-                            } ?: uiState.terminalProfiles.firstOrNull {
-                                it.id == uiState.defaultTerminalProfileId
-                            } ?: uiState.terminalProfiles.firstOrNull()
-                                ?: TerminalProfileDefaults.builtInProfiles.first()
-                            ConnectingScreen(
-                                request = request,
-                                state = effectiveQuickConnectState,
-                                logs = logs,
-                                shellOutput = shellOutput,
-                                remoteDirectory = remoteDirectory,
-                                terminalProfile = activeTerminalProfile,
-                                terminalSelectionMode = uiState.terminalSelectionMode,
-                                terminalBellMode = uiState.terminalBellMode,
-                                useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
-                                terminalMarginPx = uiState.terminalMarginPx,
-                                keyboardSlots = uiState.keyboardSlots,
-                                snippets = uiState.snippets,
-                                onSendShellBytes = { payload ->
-                                    request?.let { current ->
-                                        onSendShellBytes(current.sessionId, payload)
-                                    }
-                                },
-                                onTerminalResize = { cols, rows ->
-                                    request?.let { current ->
-                                        onResizeShell(current.sessionId, cols, rows)
-                                    }
-                                },
-                                onSftpListDirectory = { path ->
-                                    request?.let { current ->
-                                        onListSftpDirectory(current.sessionId, path)
-                                    }
-                                },
-                                onSftpDownload = { remotePath, localPath ->
-                                    request?.let { current ->
-                                        onSftpDownloadFile(current.sessionId, remotePath, localPath)
-                                    }
-                                },
-                                onSftpUpload = { localPath, remotePath ->
-                                    request?.let { current ->
-                                        onSftpUploadFile(current.sessionId, localPath, remotePath)
-                                    }
-                                },
-                                onScpDownload = { remotePath, localPath ->
-                                    request?.let { current ->
-                                        onScpDownloadFile(current.sessionId, remotePath, localPath)
-                                    }
-                                },
-                                onScpUpload = { localPath, remotePath ->
-                                    request?.let { current ->
-                                        onScpUploadFile(current.sessionId, localPath, remotePath)
-                                    }
-                                },
-                                onManageRemotePath = { operation, sourcePath, destinationPath ->
-                                    request?.let { current ->
-                                        onManageRemotePath(current.sessionId, operation, sourcePath, destinationPath)
-                                    }
-                                },
-                                resolveTerminalEmulator = resolveTerminalEmulator,
-                                onRetry = {
-                                    quickConnectRequest.value?.let { current ->
-                                        onStopSession(current.sessionId)
-                                        val next = if (current.savedHostId == null) {
-                                            current.copy(
-                                                sessionId = sessionIdFor("quick-${UUID.randomUUID()}", current.mode)
-                                            )
-                                        } else {
-                                            current.copy(
-                                                sessionId = sessionIdFor(current.savedHostId, current.mode)
-                                            )
-                                        }
-                                        resetSessionLogs(next.sessionId)
-                                        quickConnectRequest.value = next
-                                        quickConnectState.value = QuickConnectUiState(
-                                            phase = QuickConnectPhase.CONNECTING,
-                                            message = "Connecting to ${next.host}:${next.port}..."
-                                        )
-                                        onStartSession(
-                                            next.sessionId,
-                                            quickConnectHost(next),
-                                            next.mode,
-                                            next.password
-                                        )
-                                    }
-                                },
-                                onToggleConnectedHostBar = {
-                                    connectedHostBarCollapsed.value = !connectedHostBarCollapsed.value
-                                },
-                                onOpenSettings = {
-                                    if (currentRoute != Routes.SETTINGS) {
-                                        navController.navigate(Routes.SETTINGS)
-                                    }
-                                },
-                                findRequestToken = connectingFindRequestToken.intValue
-                            )
+                            SessionVerticalContent()
+                        }
+                        composable(Routes.SESSION) {
+                            SessionVerticalContent()
                         }
                     composable(Routes.HOSTS) {
                         val activeSshSessionHostIds = sessions
@@ -1389,7 +1420,9 @@ fun SSHPeachesRoot(
                                     pendingConnectingNavigation.value = false
                                     scope.launch {
                                         drawerState.close()
-                                        navController.navigate(Routes.CONNECTING)
+                                        navController.navigate(routeForSnapshot(snapshot)) {
+                                            launchSingleTop = true
+                                        }
                                     }
                                 }
                             },
@@ -2622,6 +2655,10 @@ internal fun AboutDialog(
         },
         text = {
             Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {

@@ -3,6 +3,7 @@ package com.majordaftapps.sshpeaches.app.ui.navigation
 object Routes {
     const val FAVORITES = "favorites"
     const val CONNECTING = "connecting"
+    const val SESSION = "session"
     const val HOSTS = "hosts"
     const val IDENTITIES = "identities"
     const val FORWARDS = "forwards"

@@ -78,7 +78,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -281,6 +280,9 @@ fun ConnectingScreen(
     var scpPendingListBaselineToken by remember(request?.sessionId) { mutableStateOf<Long?>(null) }
     var scpLastListedPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     var scpHomePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpVisibleEntries by remember(request?.sessionId) {
+        mutableStateOf<List<com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry>>(emptyList())
+    }
     val scpPathHistory = remember(request?.sessionId) { mutableStateListOf(".") }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
     var scpSelectedFile by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
@@ -324,11 +326,6 @@ fun ConnectingScreen(
         if (swipeNavigationEnabled) setOf("swipe_nav") else emptySet()
     }
     val swipeNavMinDistancePx = with(density) { SWIPE_NAV_MIN_DISTANCE_DP.dp.toPx() }
-    val latestRequest by rememberUpdatedState(request)
-    val latestRemoteDirectory by rememberUpdatedState(remoteDirectory)
-    val latestScpPendingListPath by rememberUpdatedState(scpPendingListPath)
-    val latestScpRemotePath by rememberUpdatedState(scpRemotePath)
-    val latestOnSftpListDirectory by rememberUpdatedState(onSftpListDirectory)
 
     fun applyTerminalFontSizeDelta(deltaSp: Float): Boolean {
         val updated = (terminalFontSizeSp + deltaSp).coerceIn(6f, 28f)
@@ -550,6 +547,7 @@ fun ConnectingScreen(
         scpPendingListBaselineToken = null
         scpLastListedPath = "."
         scpHomePath = null
+        scpVisibleEntries = emptyList()
         scpPathHistory.clear()
         scpPathHistory += "."
         scpPathHistoryIndex = 0
@@ -645,22 +643,6 @@ fun ConnectingScreen(
     DisposableEffect(lifecycleOwner, request?.sessionId) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    if (latestRequest?.mode == ConnectionMode.SCP) {
-                        val targetPath = latestScpPendingListPath
-                            ?: latestRemoteDirectory?.path
-                            ?: latestScpRemotePath
-                        if (latestScpPendingListPath != null || latestRemoteDirectory == null) {
-                            scpRemotePath = targetPath
-                            scpLastListedPath = targetPath
-                            scpPendingListPath = targetPath
-                            scpPendingListBaselineToken =
-                                latestRemoteDirectory?.takeIf { it.path == targetPath }?.refreshToken
-                            latestOnSftpListDirectory(targetPath)
-                        }
-                    }
-                }
-
                 Lifecycle.Event.ON_PAUSE,
                 Lifecycle.Event.ON_STOP -> {
                     keyboardController?.hide()
@@ -757,8 +739,9 @@ fun ConnectingScreen(
         view.revealTranscriptRow(startRow)
         view.onScreenUpdated()
     }
-    LaunchedEffect(remoteDirectory?.path, request?.sessionId, request?.mode) {
-        val path = remoteDirectory?.path ?: return@LaunchedEffect
+    LaunchedEffect(remoteDirectory?.path, remoteDirectory?.entries, request?.sessionId, request?.mode) {
+        val snapshot = remoteDirectory ?: return@LaunchedEffect
+        val path = snapshot.path
         when (request?.mode) {
             ConnectionMode.SFTP -> sftpPath = path
             ConnectionMode.SCP -> {
@@ -767,6 +750,7 @@ fun ConnectingScreen(
                 }
                 scpRemotePath = path
                 scpLastListedPath = path
+                scpVisibleEntries = snapshot.entries
             }
             ConnectionMode.SSH, null -> Unit
         }
@@ -796,6 +780,7 @@ fun ConnectingScreen(
                 scpPathHistoryIndex = scpPathHistory.lastIndex
             }
         }
+        scpVisibleEntries = snapshot.entries
         scpActivityLines.clear()
         scpActivityLines += "Listing ${snapshot.path}:"
         if (snapshot.entries.isEmpty()) {
@@ -1479,8 +1464,8 @@ fun ConnectingScreen(
                 )
             }
         } else if (showScpTransferSession && request != null) {
-            val remoteItems = remoteDirectory?.entries.orEmpty()
-            val effectiveRemotePath = remoteDirectory?.path ?: scpRemotePath
+            val remoteItems = remoteDirectory?.entries ?: scpVisibleEntries
+            val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
             val normalizedRemoteInput = scpRemotePath.trim().ifBlank { "." }
             val scpListingInProgress = scpPendingListPath != null
             val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
