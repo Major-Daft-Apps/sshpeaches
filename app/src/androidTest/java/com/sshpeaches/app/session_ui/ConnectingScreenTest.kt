@@ -346,7 +346,7 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithText("📄 existing.txt", substring = true).performClick()
-        composeRule.onNodeWithText("Selected file: /uploads/existing.txt", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Selected remote file: /uploads/existing.txt", substring = true).assertIsDisplayed()
 
         composeRule.runOnIdle {
             check(downloadRequest == null) {

@@ -9,8 +9,12 @@ fun resolveTerminalTypeface(font: TerminalFont): Typeface {
     if (font == TerminalFont.SYSTEM_MONOSPACE) return Typeface.MONOSPACE
     return font.typefaceFamilies
         .asSequence()
-        .map { family -> Typeface.create(family, Typeface.NORMAL) }
-        .firstOrNull(::isMonospacedTypeface)
+        .mapNotNull { family ->
+            runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
+        }
+        .firstOrNull { typeface ->
+            runCatching { isMonospacedTypeface(typeface) }.getOrDefault(false)
+        }
         ?: Typeface.MONOSPACE
 }
 

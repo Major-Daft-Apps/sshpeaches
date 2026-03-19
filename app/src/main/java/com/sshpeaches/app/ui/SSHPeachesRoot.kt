@@ -1293,8 +1293,7 @@ fun SSHPeachesRoot(
                                         navController.navigate(Routes.SETTINGS)
                                     }
                                 },
-                                findRequestToken = connectingFindRequestToken.intValue,
-                                onCloseConnection = { closeCurrentConnectingSession() }
+                                findRequestToken = connectingFindRequestToken.intValue
                             )
                         }
                     composable(Routes.HOSTS) {
