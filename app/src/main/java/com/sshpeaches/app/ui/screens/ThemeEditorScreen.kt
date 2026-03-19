@@ -107,7 +107,7 @@ fun ThemeEditorScreen(
                         ) {
                             Text(profile.name)
                             Text(
-                                "Font ${profile.fontSizeSp} pt  ${profile.foregroundHex}/${profile.backgroundHex}",
+                                "${profile.font.label}  ${profile.fontSizeSp} pt  ${profile.foregroundHex}/${profile.backgroundHex}",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -145,7 +145,7 @@ fun ThemeEditorScreen(
                     Text("New Terminal Theme")
                 }
                 Text(
-                    "Open a theme to edit name, text size, and colors using dedicated picker modals.",
+                    "Open a theme to edit name, font, text size, and colors using dedicated picker modals.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

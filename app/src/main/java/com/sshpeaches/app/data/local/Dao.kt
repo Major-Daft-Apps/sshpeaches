@@ -17,13 +17,13 @@ interface HostDao {
     suspend fun getById(id: String): HostEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(host: HostEntity)
+    suspend fun upsert(host: HostEntity): Long
 
     @Delete
-    suspend fun delete(host: HostEntity)
+    suspend fun delete(host: HostEntity): Int
 
     @Query("UPDATE hosts SET favorite = :favorite WHERE id = :id")
-    suspend fun updateFavorite(id: String, favorite: Boolean)
+    suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
     @Query("SELECT COUNT(*) FROM hosts")
     suspend fun countAll(): Int
@@ -38,13 +38,13 @@ interface IdentityDao {
     suspend fun getById(id: String): IdentityEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(identity: IdentityEntity)
+    suspend fun upsert(identity: IdentityEntity): Long
 
     @Delete
-    suspend fun delete(identity: IdentityEntity)
+    suspend fun delete(identity: IdentityEntity): Int
 
     @Query("UPDATE identities SET favorite = :favorite WHERE id = :id")
-    suspend fun updateFavorite(id: String, favorite: Boolean)
+    suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
     @Query("SELECT COUNT(*) FROM identities")
     suspend fun countAll(): Int
@@ -59,13 +59,13 @@ interface PortForwardDao {
     suspend fun getById(id: String): PortForwardEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(forward: PortForwardEntity)
+    suspend fun upsert(forward: PortForwardEntity): Long
 
     @Delete
-    suspend fun delete(forward: PortForwardEntity)
+    suspend fun delete(forward: PortForwardEntity): Int
 
     @Query("UPDATE port_forwards SET favorite = :favorite WHERE id = :id")
-    suspend fun updateFavorite(id: String, favorite: Boolean)
+    suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
     @Query("SELECT COUNT(*) FROM port_forwards")
     suspend fun countAll(): Int
@@ -80,13 +80,13 @@ interface SnippetDao {
     suspend fun getById(id: String): SnippetEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(snippet: SnippetEntity)
+    suspend fun upsert(snippet: SnippetEntity): Long
 
     @Delete
-    suspend fun delete(snippet: SnippetEntity)
+    suspend fun delete(snippet: SnippetEntity): Int
 
     @Query("UPDATE snippets SET favorite = :favorite WHERE id = :id")
-    suspend fun updateFavorite(id: String, favorite: Boolean)
+    suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
     @Query("SELECT COUNT(*) FROM snippets")
     suspend fun countAll(): Int

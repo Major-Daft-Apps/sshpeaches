@@ -2,50 +2,94 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/widget_row_surface"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:padding="10dp">
 
-    <TextView
-        android:id="@+id/widget_host_title"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textSize="12sp" />
+        android:orientation="vertical">
 
-    <ImageButton
-        android:id="@+id/widget_btn_ssh"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginStart="4dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/widget_action_ssh"
-        android:padding="6dp"
-        android:src="@drawable/ic_widget_terminal"
-        android:tint="?android:attr/textColorPrimary" />
+        <TextView
+            android:id="@+id/widget_host_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-    <ImageButton
-        android:id="@+id/widget_btn_sftp"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginStart="4dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/widget_action_sftp"
-        android:padding="6dp"
-        android:src="@drawable/ic_widget_drive_file_move"
-        android:tint="?android:attr/textColorPrimary" />
+        <TextView
+            android:id="@+id/widget_host_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/color_widget_text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
 
-    <ImageButton
-        android:id="@+id/widget_btn_scp"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginStart="4dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/widget_action_scp"
-        android:padding="6dp"
-        android:src="@drawable/ic_widget_cloud_download"
-        android:tint="?android:attr/textColorPrimary" />
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/widget_btn_ssh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_action_primary_background"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingLeft="10dp"
+            android:paddingTop="8dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="8dp"
+            android:text="@string/widget_action_ssh_short"
+            android:textAllCaps="false"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="10sp" />
+
+        <Button
+            android:id="@+id/widget_btn_sftp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_action_secondary_background"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingLeft="8dp"
+            android:paddingTop="8dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/widget_action_sftp_short"
+            android:textAllCaps="false"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="10sp" />
+
+        <Button
+            android:id="@+id/widget_btn_scp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_action_secondary_background"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:paddingLeft="10dp"
+            android:paddingTop="8dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="8dp"
+            android:text="@string/widget_action_scp_short"
+            android:textAllCaps="false"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="10sp" />
+    </LinearLayout>
 
 </LinearLayout>

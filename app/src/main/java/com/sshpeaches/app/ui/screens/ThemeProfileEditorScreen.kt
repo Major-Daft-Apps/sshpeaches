@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,14 +39,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.terminal.resolveTerminalTypeface
 import java.util.Locale
 import java.util.UUID
 
@@ -66,6 +68,7 @@ fun ThemeProfileEditorScreen(
     onShowMessage: (String) -> Unit = {}
 ) {
     var name by remember(initialProfile.id) { mutableStateOf(initialProfile.name) }
+    var font by remember(initialProfile.id) { mutableStateOf(initialProfile.font) }
     var fontSizePt by remember(initialProfile.id) { mutableFloatStateOf(initialProfile.fontSizeSp.toFloat()) }
     var foregroundHex by remember(initialProfile.id) { mutableStateOf(initialProfile.foregroundHex) }
     var backgroundHex by remember(initialProfile.id) { mutableStateOf(initialProfile.backgroundHex) }
@@ -74,7 +77,8 @@ fun ThemeProfileEditorScreen(
     var cursorBlink by remember(initialProfile.id) { mutableStateOf(initialProfile.cursorBlink) }
 
     var showNameDialog by remember { mutableStateOf(false) }
-    var showFontDialog by remember { mutableStateOf(false) }
+    var showFontFamilyDialog by remember { mutableStateOf(false) }
+    var showFontSizeDialog by remember { mutableStateOf(false) }
     var showCursorStyleDialog by remember { mutableStateOf(false) }
     var colorFieldDialog by remember { mutableStateOf<ThemeColorField?>(null) }
     var editorError by remember { mutableStateOf<String?>(null) }
@@ -100,12 +104,20 @@ fun ThemeProfileEditorScreen(
                     onClick = { showNameDialog = true }
                 )
                 EditorRow(
+                    label = "Font",
+                    value = font.label,
+                    buttonText = "Select",
+                    onClick = { showFontFamilyDialog = true },
+                    buttonModifier = Modifier.testTag(UiTestTags.THEME_PROFILE_FONT_BUTTON)
+                )
+                EditorRow(
                     label = "Font Size",
                     value = "${fontSizePt.toInt()} pt",
                     buttonText = "Adjust",
-                    onClick = { showFontDialog = true }
+                    onClick = { showFontSizeDialog = true }
                 )
                 ThemePreviewSample(
+                    terminalFont = font,
                     fontSizePt = fontSizePt,
                     foregroundHex = foregroundHex,
                     backgroundHex = backgroundHex
@@ -185,6 +197,7 @@ fun ThemeProfileEditorScreen(
                     val profile = TerminalProfile(
                         id = initialProfile.id.ifBlank { "custom-${UUID.randomUUID()}" },
                         name = normalizedName,
+                        font = font,
                         fontSizeSp = fontSizePt.toInt().coerceIn(6, 28),
                         foregroundHex = foregroundHex.trim().uppercase(Locale.US),
                         backgroundHex = backgroundHex.trim().uppercase(Locale.US),
@@ -240,10 +253,71 @@ fun ThemeProfileEditorScreen(
         )
     }
 
-    if (showFontDialog) {
+    if (showFontFamilyDialog) {
+        var draftFont by remember(font) { mutableStateOf(font) }
+        var fontExpanded by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showFontFamilyDialog = false },
+            title = { Text("Font") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ExposedDropdownMenuBox(
+                        expanded = fontExpanded,
+                        onExpandedChange = { fontExpanded = !fontExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = draftFont.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Terminal font") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = fontExpanded)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .testTag(UiTestTags.THEME_PROFILE_FONT_FIELD)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = fontExpanded,
+                            onDismissRequest = { fontExpanded = false }
+                        ) {
+                            TerminalFont.values().forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        draftFont = option
+                                        fontExpanded = false
+                                    },
+                                    modifier = Modifier.testTag(UiTestTags.themeProfileFontOption(option.label))
+                                )
+                            }
+                        }
+                    }
+                    ThemePreviewSample(
+                        terminalFont = draftFont,
+                        fontSizePt = fontSizePt,
+                        foregroundHex = foregroundHex,
+                        backgroundHex = backgroundHex
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    font = draftFont
+                    showFontFamilyDialog = false
+                }) { Text("Apply") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFontFamilyDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showFontSizeDialog) {
         var draftSize by remember(fontSizePt) { mutableFloatStateOf(fontSizePt) }
         AlertDialog(
-            onDismissRequest = { showFontDialog = false },
+            onDismissRequest = { showFontSizeDialog = false },
             title = { Text("Font Size") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,22 +327,22 @@ fun ThemeProfileEditorScreen(
                         onValueChange = { draftSize = it },
                         valueRange = 6f..28f
                     )
-                    Text(
-                        "Aa",
-                        fontSize = draftSize.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Medium
+                    FontPreviewText(
+                        text = "AaBb 0Oo1Il",
+                        terminalFont = font,
+                        fontSizePt = draftSize,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     fontSizePt = draftSize
-                    showFontDialog = false
+                    showFontSizeDialog = false
                 }) { Text("Apply") }
             },
             dismissButton = {
-                TextButton(onClick = { showFontDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showFontSizeDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -353,7 +427,8 @@ private fun EditorRow(
     label: String,
     value: String,
     buttonText: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    buttonModifier: Modifier = Modifier
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -364,12 +439,13 @@ private fun EditorRow(
             Text(label)
             Text(value, style = MaterialTheme.typography.bodySmall)
         }
-        TextButton(onClick = onClick) { Text(buttonText) }
+        TextButton(onClick = onClick, modifier = buttonModifier) { Text(buttonText) }
     }
 }
 
 @Composable
 private fun ThemePreviewSample(
+    terminalFont: TerminalFont,
     fontSizePt: Float,
     foregroundHex: String,
     backgroundHex: String
@@ -384,14 +460,39 @@ private fun ThemePreviewSample(
             .padding(12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(
-            text = "Aa Preview",
+        FontPreviewText(
+            text = "AaBb 0Oo1Il Preview",
+            terminalFont = terminalFont,
+            fontSizePt = fontSizePt,
             color = fg,
-            fontSize = fontSizePt.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium
+            modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+@Composable
+private fun FontPreviewText(
+    text: String,
+    terminalFont: TerminalFont,
+    fontSizePt: Float,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val typeface = remember(terminalFont) { resolveTerminalTypeface(terminalFont) }
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            TextView(context).apply {
+                setTypeface(typeface)
+            }
+        },
+        update = { view ->
+            view.text = text
+            view.typeface = typeface
+            view.textSize = fontSizePt
+            view.setTextColor(color.toArgb())
+        }
+    )
 }
 
 @Composable

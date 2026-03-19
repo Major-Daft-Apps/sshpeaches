@@ -2,9 +2,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/widget_row_surface"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:padding="12dp">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -18,45 +20,53 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textSize="12sp" />
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_open_session_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textSize="10sp" />
+            android:textColor="@color/color_widget_text_secondary"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <Button
         android:id="@+id/widget_btn_open"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/widget_action_primary_background"
         android:minHeight="0dp"
         android:minWidth="0dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="2dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="2dp"
+        android:paddingLeft="10dp"
+        android:paddingTop="6dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="6dp"
         android:text="@string/widget_open"
         android:textAllCaps="false"
+        android:textColor="@color/color_widget_text_primary"
         android:textSize="11sp" />
 
     <Button
         android:id="@+id/widget_btn_disconnect"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/widget_action_danger_background"
         android:minHeight="0dp"
         android:minWidth="0dp"
-        android:paddingLeft="8dp"
-        android:paddingTop="2dp"
-        android:paddingRight="8dp"
-        android:paddingBottom="2dp"
+        android:paddingLeft="10dp"
+        android:paddingTop="6dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="6dp"
         android:text="@string/widget_disconnect"
         android:textAllCaps="false"
+        android:textColor="@color/color_widget_text_primary"
         android:textSize="11sp" />
 
 </LinearLayout>

@@ -1,7 +1,16 @@
 <resources>
     <color name="color_hard_black">#000000</color>
     <color name="color_carbon_black">#191919</color>
+    <color name="color_blazing_flame">#F15025</color>
     <color name="peachy_orange">#FA992A</color>
     <color name="color_vanilla">#F6F1EB</color>
+    <color name="color_widget_surface_elevated">#232323</color>
+    <color name="color_widget_surface_inner">#111111</color>
+    <color name="color_widget_outline">#40F15025</color>
+    <color name="color_widget_text_primary">#F6F1EB</color>
+    <color name="color_widget_text_secondary">#B3F6F1EB</color>
+    <color name="color_widget_action_secondary">#2B2B2B</color>
+    <color name="color_widget_divider">#26F6F1EB</color>
+    <color name="color_widget_disconnect">#A73D27</color>
     <color name="ic_launcher_background">#ffe9cc</color>
 </resources>

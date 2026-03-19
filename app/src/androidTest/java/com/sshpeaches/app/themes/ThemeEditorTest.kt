@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.themes
 
 import android.Manifest
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -108,6 +109,37 @@ class ThemeEditorTest {
         composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_ERROR)
             .assertTextContains("Theme name already exists.")
+    }
+
+    @Test
+    fun createThemeProfile_withCustomFontShowsFontInThemeList() {
+        val themeName = "JetBrains QA"
+
+        composeRule.navigateDrawer(Routes.THEME_EDITOR)
+        composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON).performClick()
+
+        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_FONT_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_FONT_FIELD).performClick()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeProfileFontOption("JetBrains Mono"),
+            useUnmergedTree = true
+        ).performClick()
+        composeRule.onNodeWithText("Apply").performClick()
+
+        composeRule.onNodeWithText("Rename").performClick()
+        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
+        composeRule.onNodeWithText("Apply").performClick()
+        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
+
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+
+        composeRule.onNodeWithText(themeName).assertIsDisplayed()
+        composeRule.onNodeWithText("JetBrains Mono", substring = true).assertExists()
     }
 
     private fun renameThemeAndSave(themeName: String) {
