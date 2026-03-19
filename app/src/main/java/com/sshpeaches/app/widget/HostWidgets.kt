@@ -13,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
@@ -23,6 +24,7 @@ internal object HostWidgets {
     const val ACTION_WIDGET_DISCONNECT = "com.majordaftapps.sshpeaches.app.widget.ACTION_DISCONNECT"
     const val EXTRA_HOST_ID = "extra_widget_host_id"
     const val EXTRA_MODE = "extra_widget_mode"
+    const val EXTRA_FILE_TRANSFER_ENTRY_MODE = "extra_widget_file_transfer_entry_mode"
     const val EXTRA_SESSION_ID = "extra_widget_session_id"
     private const val EXTRA_ACTION_TOKEN = "extra_widget_action_token"
     private const val PREFS_NAME = "sshpeaches_widget_security"
@@ -156,18 +158,43 @@ internal object HostWidgets {
     private fun buildHostRow(context: Context, host: HostConnection): RemoteViews {
         val row = RemoteViews(context.packageName, R.layout.widget_host_row)
         val title = host.name.ifBlank { "${host.username}@${host.host}:${host.port}" }
+        val subtitle = if (host.username.isBlank()) {
+            context.getString(
+                R.string.widget_host_subtitle_no_user_format,
+                host.host,
+                host.port
+            )
+        } else {
+            context.getString(
+                R.string.widget_host_subtitle_format,
+                host.username,
+                host.host,
+                host.port
+            )
+        }
         row.setTextViewText(R.id.widget_host_title, title)
+        row.setTextViewText(R.id.widget_host_subtitle, subtitle)
         row.setOnClickPendingIntent(
             R.id.widget_btn_ssh,
             createConnectPendingIntent(context, host.id, ConnectionMode.SSH)
         )
         row.setOnClickPendingIntent(
             R.id.widget_btn_sftp,
-            createConnectPendingIntent(context, host.id, ConnectionMode.SFTP)
+            createConnectPendingIntent(
+                context,
+                host.id,
+                ConnectionMode.SCP,
+                FileTransferEntryMode.UPLOAD
+            )
         )
         row.setOnClickPendingIntent(
             R.id.widget_btn_scp,
-            createConnectPendingIntent(context, host.id, ConnectionMode.SCP)
+            createConnectPendingIntent(
+                context,
+                host.id,
+                ConnectionMode.SCP,
+                FileTransferEntryMode.DOWNLOAD
+            )
         )
         return row
     }
@@ -193,17 +220,19 @@ internal object HostWidgets {
     private fun createConnectPendingIntent(
         context: Context,
         hostId: String,
-        mode: ConnectionMode
+        mode: ConnectionMode,
+        fileTransferEntryMode: FileTransferEntryMode? = null
     ): PendingIntent {
         val intent = Intent(context, QuickConnectWidgetProvider::class.java).apply {
             action = ACTION_WIDGET_CONNECT
             putExtra(EXTRA_HOST_ID, hostId)
             putExtra(EXTRA_MODE, mode.name)
+            putExtra(EXTRA_FILE_TRANSFER_ENTRY_MODE, fileTransferEntryMode?.name)
             putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
         }
         return PendingIntent.getBroadcast(
             context,
-            "connect:$hostId:${mode.name}".hashCode(),
+            "connect:$hostId:${mode.name}:${fileTransferEntryMode?.name.orEmpty()}".hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -258,9 +287,9 @@ internal object HostWidgets {
         return generated
     }
 
-    private const val MAX_HOST_ROWS_COMPACT = 4
-    private const val MAX_HOST_ROWS_EXPANDED = 6
-    private const val MAX_OPEN_SESSION_ROWS = 6
+    private const val MAX_HOST_ROWS_COMPACT = 2
+    private const val MAX_HOST_ROWS_EXPANDED = 3
+    private const val MAX_OPEN_SESSION_ROWS = 4
 }
 
 abstract class BaseHostWidgetProvider : AppWidgetProvider() {
@@ -301,6 +330,10 @@ abstract class BaseHostWidgetProvider : AppWidgetProvider() {
                             Intent.FLAG_ACTIVITY_CLEAR_TOP
                         putExtra(MainActivity.EXTRA_WIDGET_HOST_ID, hostId)
                         putExtra(MainActivity.EXTRA_WIDGET_MODE, mode)
+                        putExtra(
+                            MainActivity.EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE,
+                            intent.getStringExtra(HostWidgets.EXTRA_FILE_TRANSFER_ENTRY_MODE)
+                        )
                     }
                     context.startActivity(launchIntent)
                 }

@@ -106,6 +106,10 @@ object UiTestTags {
     const val THEME_DELETE_CONFIRM = "theme_delete_confirm"
     const val THEME_DELETE_CANCEL = "theme_delete_cancel"
     const val THEME_PROFILE_NAME_INPUT = "theme_profile_name_input"
+    const val THEME_PROFILE_FONT_BUTTON = "theme_profile_font_button"
+    const val THEME_PROFILE_FONT_FIELD = "theme_profile_font_field"
+    fun themeProfileFontOption(name: String): String =
+        "theme_profile_font_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val THEME_PROFILE_SAVE_BUTTON = "theme_profile_save_button"
     const val THEME_PROFILE_CANCEL_BUTTON = "theme_profile_cancel_button"
     const val THEME_PROFILE_ERROR = "theme_profile_error"
@@ -115,9 +119,15 @@ object UiTestTags {
         "settings_theme_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     fun settingsTerminalOption(name: String): String =
         "settings_terminal_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsTerminalBellOption(name: String): String =
+        "settings_terminal_bell_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"
     const val SETTINGS_BACKGROUND_SWITCH = "settings_background_switch"
     const val SETTINGS_TERMINAL_EMULATION_FIELD = "settings_terminal_emulation_field"
+    const val SETTINGS_TERMINAL_BELL_FIELD = "settings_terminal_bell_field"
+    const val SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH = "settings_terminal_volume_buttons_switch"
+    const val SETTINGS_TERMINAL_MARGIN_INPUT = "settings_terminal_margin_input"
+    const val SETTINGS_MOSH_SERVER_COMMAND_INPUT = "settings_mosh_server_command_input"
     const val SETTINGS_DIAGNOSTICS_SWITCH = "settings_diagnostics_switch"
     const val SETTINGS_INCLUDE_SECRETS_SWITCH = "settings_include_secrets_switch"
     const val SETTINGS_BIOMETRIC_SWITCH = "settings_biometric_switch"
@@ -164,9 +174,11 @@ object UiTestTags {
     const val CONNECTING_SCP_DOWNLOAD_REMOTE_INPUT = "connecting_scp_download_remote_input"
     const val CONNECTING_SCP_DOWNLOAD_LOCAL_INPUT = "connecting_scp_download_local_input"
     const val CONNECTING_SCP_DOWNLOAD_BUTTON = "connecting_scp_download_button"
+    const val CONNECTING_SCP_OPEN_UPLOAD_BUTTON = "connecting_scp_open_upload_button"
     const val CONNECTING_SCP_UPLOAD_LOCAL_INPUT = "connecting_scp_upload_local_input"
     const val CONNECTING_SCP_UPLOAD_REMOTE_INPUT = "connecting_scp_upload_remote_input"
     const val CONNECTING_SCP_UPLOAD_BUTTON = "connecting_scp_upload_button"
+    const val CONNECTING_SCP_BACK_TO_DOWNLOAD_BUTTON = "connecting_scp_back_to_download_button"
     const val CONNECTING_SCP_ACTIVITY_LOG = "connecting_scp_activity_log"
     fun connectingCompactKey(index: Int): String = "connecting_compact_key_$index"
 

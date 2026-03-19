@@ -125,6 +125,7 @@ import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.local.Converters
@@ -160,6 +161,8 @@ import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
@@ -194,6 +197,10 @@ fun SSHPeachesRoot(
     onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
     onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
     onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
+    onTerminalBellModeChange: (TerminalBellMode) -> Unit,
+    onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
+    onTerminalMarginPxChange: (Int) -> Unit,
+    onMoshServerCommandChange: (String) -> Unit,
     onCrashReportsToggle: (Boolean) -> Unit,
     onAnalyticsToggle: (Boolean) -> Unit,
     onDiagnosticsToggle: (Boolean) -> Unit,
@@ -254,6 +261,7 @@ fun SSHPeachesRoot(
     onSftpUploadFile: (String, String, String) -> Unit,
     onManageRemotePath: (String, String, String, String?) -> Unit,
     onScpDownloadFile: (String, String, String?) -> Unit,
+    onScpUploadFile: (String, String, String) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
@@ -261,6 +269,7 @@ fun SSHPeachesRoot(
     hostKeyPrompts: List<HostKeyPrompt>,
     passwordPrompts: List<PasswordPrompt>,
     requestedOpenSessionId: String?,
+    requestedOpenSessionFileTransferEntryMode: FileTransferEntryMode? = null,
     onOpenSessionRequestHandled: () -> Unit,
     onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
     onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
@@ -347,7 +356,8 @@ fun SSHPeachesRoot(
     }
 
     fun quickRequestFromSnapshot(
-        snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
+        snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
+        fileTransferEntryMode: FileTransferEntryMode = FileTransferEntryMode.DOWNLOAD
     ): QuickConnectRequest {
         val host = snapshot.host
         val savedHostId = uiState.hosts.firstOrNull { it.id == host.id }?.id
@@ -365,7 +375,8 @@ fun SSHPeachesRoot(
             preferredIdentityId = host.preferredIdentityId,
             forwardId = host.preferredForwardId,
             script = host.startupScript,
-            terminalProfileId = host.terminalProfileId
+            terminalProfileId = host.terminalProfileId,
+            initialFileTransferEntryMode = fileTransferEntryMode
         )
     }
 
@@ -423,11 +434,14 @@ fun SSHPeachesRoot(
         }
     }
 
-    LaunchedEffect(requestedOpenSessionId, sessions, currentRoute) {
+    LaunchedEffect(requestedOpenSessionId, requestedOpenSessionFileTransferEntryMode, sessions, currentRoute) {
         val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == targetHostId } ?: return@LaunchedEffect
         val host = snapshot.host
-        quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
+        quickConnectRequest.value = quickRequestFromSnapshot(
+            snapshot,
+            requestedOpenSessionFileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
+        )
         quickConnectState.value = quickStateFromSnapshot(snapshot, host)
         pendingConnectingNavigation.value = false
         autoResumeHandled.value = true
@@ -541,7 +555,8 @@ fun SSHPeachesRoot(
     fun openOrStartSavedHostSession(
         host: HostConnection,
         mode: ConnectionMode,
-        password: String?
+        password: String?,
+        fileTransferEntryMode: FileTransferEntryMode? = null
     ) {
         val sessionId = sessionIdFor(host.id, mode)
         val existingSnapshot = sessions.firstOrNull { it.hostId == sessionId }
@@ -551,7 +566,10 @@ fun SSHPeachesRoot(
             existingSnapshot?.status ==
             com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE
         ) {
-            quickConnectRequest.value = quickRequestFromSnapshot(existingSnapshot)
+            quickConnectRequest.value = quickRequestFromSnapshot(
+                existingSnapshot,
+                fileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
+            )
             quickConnectState.value = quickStateFromSnapshot(existingSnapshot, existingSnapshot.host)
             pendingConnectingNavigation.value = false
         } else {
@@ -574,7 +592,8 @@ fun SSHPeachesRoot(
                 preferredIdentityId = host.preferredIdentityId,
                 forwardId = host.preferredForwardId,
                 script = host.startupScript,
-                terminalProfileId = host.terminalProfileId
+                terminalProfileId = host.terminalProfileId,
+                initialFileTransferEntryMode = fileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
             )
             quickConnectState.value = QuickConnectUiState(
                 phase = QuickConnectPhase.CONNECTING,
@@ -842,6 +861,23 @@ fun SSHPeachesRoot(
                     settings.optString("terminalSelectionMode", uiState.terminalSelectionMode.name)
                 )
             }.getOrNull()?.let(onTerminalSelectionModeChange)
+            runCatching {
+                TerminalBellMode.valueOf(
+                    settings.optString("terminalBellMode", uiState.terminalBellMode.name)
+                )
+            }.getOrNull()?.let(onTerminalBellModeChange)
+            onTerminalVolumeButtonsAdjustFontSizeChange(
+                settings.optBoolean(
+                    "terminalVolumeButtonsAdjustFontSize",
+                    uiState.terminalVolumeButtonsAdjustFontSize
+                )
+            )
+            onTerminalMarginPxChange(
+                settings.optInt("terminalMarginPx", uiState.terminalMarginPx).coerceIn(0, 128)
+            )
+            onMoshServerCommandChange(
+                settings.optString("moshServerCommand", uiState.moshServerCommand)
+            )
             onCrashReportsToggle(settings.optBoolean("crashReportsEnabled", uiState.crashReportsEnabled))
             onAnalyticsToggle(settings.optBoolean("analyticsEnabled", uiState.analyticsEnabled))
             onDiagnosticsToggle(
@@ -1122,8 +1158,13 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 activeSshSessionHostIds = activeSshSessionHostIds,
-                                onHostAction = { host, mode ->
-                                    openOrStartSavedHostSession(host, mode, password = null)
+                                onHostAction = { host, mode, fileTransferEntryMode ->
+                                    openOrStartSavedHostSession(
+                                        host,
+                                        mode,
+                                        password = null,
+                                        fileTransferEntryMode = fileTransferEntryMode
+                                    )
                                 },
                                 onRunInfoCommand = { host, command ->
                                     val activeSshSession = sessions.firstOrNull {
@@ -1172,6 +1213,9 @@ fun SSHPeachesRoot(
                                 remoteDirectory = remoteDirectory,
                                 terminalProfile = activeTerminalProfile,
                                 terminalSelectionMode = uiState.terminalSelectionMode,
+                                terminalBellMode = uiState.terminalBellMode,
+                                useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
+                                terminalMarginPx = uiState.terminalMarginPx,
                                 keyboardSlots = uiState.keyboardSlots,
                                 snippets = uiState.snippets,
                                 onSendShellBytes = { payload ->
@@ -1202,6 +1246,11 @@ fun SSHPeachesRoot(
                                 onScpDownload = { remotePath, localPath ->
                                     request?.let { current ->
                                         onScpDownloadFile(current.sessionId, remotePath, localPath)
+                                    }
+                                },
+                                onScpUpload = { localPath, remotePath ->
+                                    request?.let { current ->
+                                        onScpUploadFile(current.sessionId, localPath, remotePath)
                                     }
                                 },
                                 onManageRemotePath = { operation, sourcePath, destinationPath ->
@@ -1273,8 +1322,13 @@ fun SSHPeachesRoot(
                             onImportPasswordPayload = onImportHostPasswordPayload,
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,
-                            onStartSession = { host, mode, password ->
-                                openOrStartSavedHostSession(host, mode, password)
+                            onStartSession = { host, mode, password, fileTransferEntryMode ->
+                                openOrStartSavedHostSession(
+                                    host,
+                                    mode,
+                                    password,
+                                    fileTransferEntryMode
+                                )
                             },
                             onStopSession = onStopSession,
                             activeSshSessionHostIds = activeSshSessionHostIds,
@@ -1493,6 +1547,14 @@ fun SSHPeachesRoot(
                                 onTerminalEmulationChange = onTerminalEmulationChange,
                                 terminalSelectionMode = uiState.terminalSelectionMode,
                                 onTerminalSelectionModeChange = onTerminalSelectionModeChange,
+                                terminalBellMode = uiState.terminalBellMode,
+                                onTerminalBellModeChange = onTerminalBellModeChange,
+                                useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
+                                onUseVolumeButtonsToAdjustFontSizeChange = onTerminalVolumeButtonsAdjustFontSizeChange,
+                                terminalMarginPx = uiState.terminalMarginPx,
+                                onTerminalMarginPxChange = onTerminalMarginPxChange,
+                                moshServerCommand = uiState.moshServerCommand,
+                                onMoshServerCommandChange = onMoshServerCommandChange,
                                 crashReportsEnabled = uiState.crashReportsEnabled,
                                 onCrashReportsToggle = onCrashReportsToggle,
                                 analyticsEnabled = uiState.analyticsEnabled,
@@ -2522,11 +2584,7 @@ internal fun AboutDialog(
                         .clip(RoundedCornerShape(16.dp)),
                     contentScale = ContentScale.Crop
                 )
-                val appVersion = if (BuildConfig.DEBUG) {
-                    "${BuildConfig.VERSION_NAME} (debug)"
-                } else {
-                    BuildConfig.VERSION_NAME
-                }
+                val appVersion = BuildConfig.VERSION_NAME
                 Text(
                     stringResource(id = R.string.about_version, appVersion),
                     style = MaterialTheme.typography.titleMedium
@@ -2685,6 +2743,7 @@ private fun keyboardLayoutFromJson(array: JSONArray?): List<KeyboardSlotAction> 
 private fun terminalProfileToJson(profile: TerminalProfile): JSONObject = JSONObject().apply {
     put("id", profile.id)
     put("name", profile.name)
+    put("font", profile.font.name)
     put("fontSizeSp", profile.fontSizeSp)
     put("foregroundHex", profile.foregroundHex)
     put("backgroundHex", profile.backgroundHex)
@@ -2707,6 +2766,7 @@ private fun terminalProfilesFromJson(array: JSONArray?): List<TerminalProfile> {
         out += TerminalProfile(
             id = id,
             name = item.optString("name", "Profile").trim().ifBlank { "Profile" },
+            font = TerminalFont.fromStorageValue(item.optString("font").takeIf { it.isNotBlank() }),
             fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(6, 28),
             foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
             backgroundHex = item.optString("backgroundHex", "#101010"),
@@ -2801,6 +2861,10 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             put("customLockTimeoutMinutes", state.customLockTimeoutMinutes)
             put("terminalEmulation", state.terminalEmulation.name)
             put("terminalSelectionMode", state.terminalSelectionMode.name)
+            put("terminalBellMode", state.terminalBellMode.name)
+            put("terminalVolumeButtonsAdjustFontSize", state.terminalVolumeButtonsAdjustFontSize)
+            put("terminalMarginPx", state.terminalMarginPx)
+            put("moshServerCommand", state.moshServerCommand)
             put("terminalProfiles", terminalProfilesToJson(state.terminalProfiles))
             put("defaultTerminalProfileId", state.defaultTerminalProfileId)
             put("crashReportsEnabled", state.crashReportsEnabled)

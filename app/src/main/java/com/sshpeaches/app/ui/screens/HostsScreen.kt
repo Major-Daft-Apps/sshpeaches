@@ -68,7 +68,9 @@ import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
 import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
@@ -103,7 +105,7 @@ fun HostsScreen(
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
     onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
-    onStartSession: (HostConnection, ConnectionMode, String?) -> Unit = { _, _, _ -> },
+    onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
     openSessions: List<SessionService.SessionSnapshot> = emptyList(),
@@ -374,7 +376,7 @@ fun HostsScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.name}",
+                                        text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.userFacingLabel()}",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Text(
@@ -448,8 +450,8 @@ fun HostsScreen(
                             canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
                             onRunInfoCommand = onRunInfoCommand,
                             onInfoCommandsChange = onInfoCommandsChange,
-                            onAction = { selected, mode ->
-                                onStartSession(selected, mode, null)
+                            onAction = { selected, mode, fileTransferEntryMode ->
+                                onStartSession(selected, mode, null, fileTransferEntryMode)
                             }
                         )
                         AnimatedVisibility(

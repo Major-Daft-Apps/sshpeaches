@@ -7,14 +7,23 @@
     <string name="privacy_policy_url">https://majordaftapps.com/privacy</string>
     <string name="widget_quick_connect_name">Hosts Quick Connect</string>
     <string name="widget_sessions_name">Hosts and Sessions</string>
+    <string name="widget_quick_connect_title">Quick Connect</string>
+    <string name="widget_quick_connect_subtitle">Launch straight into a terminal, file browser, upload, or download from your saved hosts.</string>
+    <string name="widget_sessions_title">Session Deck</string>
+    <string name="widget_sessions_subtitle">Pinned hosts up top, live sessions underneath.</string>
     <string name="widget_hosts_title">Hosts</string>
     <string name="widget_open_sessions_title">Open Sessions</string>
     <string name="widget_no_hosts">No hosts saved.</string>
     <string name="widget_no_open_sessions">No open sessions.</string>
     <string name="widget_more_hosts">+%1$d more hosts</string>
+    <string name="widget_host_subtitle_format">%1$s@%2$s:%3$d</string>
+    <string name="widget_host_subtitle_no_user_format">%1$s:%2$d</string>
     <string name="widget_action_ssh">SSH terminal</string>
-    <string name="widget_action_sftp">SFTP file transfer</string>
-    <string name="widget_action_scp">SCP file copy</string>
+    <string name="widget_action_sftp">Upload files</string>
+    <string name="widget_action_scp">Download files</string>
+    <string name="widget_action_ssh_short">SSH</string>
+    <string name="widget_action_sftp_short">Upload</string>
+    <string name="widget_action_scp_short">Download</string>
     <string name="widget_open">Open</string>
     <string name="widget_disconnect">Disconnect</string>
 </resources>

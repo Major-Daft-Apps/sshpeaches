@@ -38,6 +38,7 @@ import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import java.io.File
 import java.util.UUID
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -176,8 +177,8 @@ class LiveTransportSuiteTest {
 
         composeRule.navigateDrawer(Routes.HOSTS)
         composeRule.onNodeWithTag(UiTestTags.hostAction(passwordHost.id, "sftp")).performClick()
-        waitForTag(UiTestTags.CONNECTING_SFTP_PANEL)
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_PANEL).assertIsDisplayed()
+        waitForTag(UiTestTags.CONNECTING_SCP_PANEL)
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PANEL).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_CLOSE_BUTTON).performClick()
 
         composeRule.navigateDrawer(Routes.HOSTS)
@@ -364,6 +365,7 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
     }
 
+    @Ignore("SFTP host action was replaced by SCP upload/download.")
     @Test
     fun sftpUploadAndDownloadStayInsideSandbox() {
         AppStateSeeder.configureSettings(
@@ -402,6 +404,7 @@ class LiveTransportSuiteTest {
         }
     }
 
+    @Ignore("SFTP host action was replaced by SCP upload/download.")
     @Test
     fun sftpRenameAndDeleteStayInsideSandbox() {
         AppStateSeeder.configureSettings(

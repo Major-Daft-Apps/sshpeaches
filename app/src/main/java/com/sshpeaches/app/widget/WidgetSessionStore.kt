@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.widget
 
 import android.content.Context
 import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -18,7 +19,8 @@ object WidgetSessionStore {
             val title = snapshot.host.name.ifBlank {
                 "${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}"
             }
-            val subtitle = "${snapshot.mode.name} - ${snapshot.status.name.lowercase().replaceFirstChar { it.uppercase() }}"
+            val subtitle =
+                "${snapshot.mode.userFacingLabel()} - ${snapshot.status.name.lowercase().replaceFirstChar { it.uppercase() }}"
             payload.put(
                 JSONObject()
                     .put("sessionId", snapshot.hostId)

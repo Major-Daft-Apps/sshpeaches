@@ -46,10 +46,12 @@ import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
@@ -81,6 +83,14 @@ fun SettingsScreen(
     onTerminalEmulationChange: (TerminalEmulation) -> Unit,
     terminalSelectionMode: TerminalSelectionMode,
     onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
+    terminalBellMode: TerminalBellMode,
+    onTerminalBellModeChange: (TerminalBellMode) -> Unit,
+    useVolumeButtonsToAdjustFontSize: Boolean,
+    onUseVolumeButtonsToAdjustFontSizeChange: (Boolean) -> Unit,
+    terminalMarginPx: Int,
+    onTerminalMarginPxChange: (Int) -> Unit,
+    moshServerCommand: String,
+    onMoshServerCommandChange: (String) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -114,6 +124,7 @@ fun SettingsScreen(
     val lockExpanded = remember { mutableStateOf(false) }
     val backgroundTimeoutExpanded = remember { mutableStateOf(false) }
     val terminalExpanded = remember { mutableStateOf(false) }
+    val bellExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = rememberSaveable { mutableStateOf(false) }
     val themeOptions = listOf(
         ThemeMode.SYSTEM to "Automatic",
@@ -136,6 +147,11 @@ fun SettingsScreen(
         BackgroundSessionTimeout.FOREVER
     )
     val terminalOptions = listOf(TerminalEmulation.XTERM, TerminalEmulation.VT100)
+    val bellOptions = listOf(
+        TerminalBellMode.DISABLED,
+        TerminalBellMode.VIBRATE_DEVICE,
+        TerminalBellMode.SHOW_NOTIFICATION
+    )
     val selectionOptions = listOf(TerminalSelectionMode.NATURAL, TerminalSelectionMode.BLOCK)
     val showPinDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
@@ -146,6 +162,8 @@ fun SettingsScreen(
     val showRestoreDefaultsDialog = remember { mutableStateOf(false) }
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
     val snippetTimeoutState = remember(snippetRunTimeoutSeconds) { mutableStateOf(snippetRunTimeoutSeconds.toString()) }
+    val terminalMarginState = remember(terminalMarginPx) { mutableStateOf(terminalMarginPx.toString()) }
+    val moshServerCommandState = remember(moshServerCommand) { mutableStateOf(moshServerCommand) }
     val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val exportPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
     val exportPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
@@ -366,6 +384,112 @@ fun SettingsScreen(
                 Text(
                     "xterm is the default and recommended mode.",
                     style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value = terminalMarginState.value,
+                    onValueChange = { next ->
+                        val digits = next.filter { it.isDigit() }.take(3)
+                        terminalMarginState.value = digits
+                        if (digits.isEmpty()) {
+                            onTerminalMarginPxChange(0)
+                        } else {
+                            val parsed = digits.toIntOrNull()
+                            if (parsed != null) {
+                                val clamped = parsed.coerceIn(0, 128)
+                                terminalMarginState.value = clamped.toString()
+                                onTerminalMarginPxChange(clamped)
+                            }
+                        }
+                    },
+                    label = { Text("Terminal margin (px)") },
+                    supportingText = {
+                        Text(
+                            "Adds space around the terminal content for screen protectors. Use 0 to disable. 8 or 16 is a good starting point."
+                        )
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
+                )
+                ExposedDropdownMenuBox(
+                    expanded = bellExpanded.value,
+                    onExpandedChange = { bellExpanded.value = !bellExpanded.value }
+                ) {
+                    TextField(
+                        value = terminalBellMode.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Bell") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = bellExpanded.value)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                            .testTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = bellExpanded.value,
+                        onDismissRequest = { bellExpanded.value = false }
+                    ) {
+                        bellOptions.forEach { option ->
+                            DropdownMenuItem(
+                                modifier = Modifier.testTag(
+                                    UiTestTags.settingsTerminalBellOption(option.label)
+                                ),
+                                text = { Text(option.label) },
+                                onClick = {
+                                    bellExpanded.value = false
+                                    onTerminalBellModeChange(option)
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    terminalBellMode.description,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Use volume buttons to adjust font size")
+                        Text(
+                            "When enabled, volume up/down changes terminal font size instead of device volume while a terminal session is focused.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = useVolumeButtonsToAdjustFontSize,
+                        onCheckedChange = onUseVolumeButtonsToAdjustFontSizeChange,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH)
+                    )
+                }
+                OutlinedTextField(
+                    value = moshServerCommandState.value,
+                    onValueChange = { next ->
+                        moshServerCommandState.value = next
+                        onMoshServerCommandChange(next)
+                    },
+                    label = { Text("Mosh server command") },
+                    supportingText = {
+                        Text(
+                            "Command executed on the remote host to start mosh-server. Leave blank to use the default: $DEFAULT_MOSH_SERVER_COMMAND"
+                        )
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = KeyboardType.Text
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
                 )
                 Text(
                     "Selection mode",

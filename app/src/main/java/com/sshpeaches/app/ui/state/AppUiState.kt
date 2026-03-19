@@ -7,6 +7,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
@@ -25,6 +26,10 @@ data class AppUiState(
     val customLockTimeoutMinutes: Int = 30,
     val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
     val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
+    val terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
+    val terminalVolumeButtonsAdjustFontSize: Boolean = false,
+    val terminalMarginPx: Int = 0,
+    val moshServerCommand: String = DEFAULT_MOSH_SERVER_COMMAND,
     val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
     val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
     val crashReportsEnabled: Boolean = false,

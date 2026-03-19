@@ -44,6 +44,7 @@ import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.termux.terminal.TerminalEmulator
@@ -67,9 +68,11 @@ class MainActivity : FragmentActivity() {
     private var biometricAvailable: Boolean = false
     private var appUiBootstrapped = false
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val requestedOpenSessionFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
     private val requestedStartupRoute = mutableStateOf<String?>(null)
     private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
     private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
+    private val pendingWidgetConnectFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
     private val corePermissionsRefreshTick = mutableStateOf(0)
     private var latestAllowBackgroundSessions: Boolean = true
     private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
@@ -316,6 +319,7 @@ class MainActivity : FragmentActivity() {
             LaunchedEffect(
                 pendingWidgetConnectHostId.value,
                 pendingWidgetConnectMode.value,
+                pendingWidgetConnectFileTransferEntryMode.value,
                 uiState.hosts,
                 sessionService
             ) {
@@ -330,13 +334,17 @@ class MainActivity : FragmentActivity() {
                     UiDebugLog.result("widgetStartSession", false, "host-not-found hostId=$hostId")
                     pendingWidgetConnectHostId.value = null
                     pendingWidgetConnectMode.value = null
+                    pendingWidgetConnectFileTransferEntryMode.value = null
                     return@LaunchedEffect
                 }
                 val sessionId = "$hostId|${mode.name}|${UUID.randomUUID()}"
                 startSession(sessionId, host, mode, null)
                 requestedOpenSessionHostId.value = sessionId
+                requestedOpenSessionFileTransferEntryMode.value =
+                    pendingWidgetConnectFileTransferEntryMode.value
                 pendingWidgetConnectHostId.value = null
                 pendingWidgetConnectMode.value = null
+                pendingWidgetConnectFileTransferEntryMode.value = null
                 UiDebugLog.result("widgetStartSession", true, "sessionId=$sessionId")
             }
             val stopSession: (String) -> Unit = remember(sessionService) {
@@ -441,6 +449,10 @@ class MainActivity : FragmentActivity() {
                     onSnippetRunTimeoutSecondsChange = viewModel::setSnippetRunTimeoutSeconds,
                     onTerminalEmulationChange = viewModel::setTerminalEmulation,
                     onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
+                    onTerminalBellModeChange = viewModel::setTerminalBellMode,
+                    onTerminalVolumeButtonsAdjustFontSizeChange = viewModel::setTerminalVolumeButtonsAdjustFontSize,
+                    onTerminalMarginPxChange = viewModel::setTerminalMarginPx,
+                    onMoshServerCommandChange = viewModel::setMoshServerCommand,
                     onCrashReportsToggle = viewModel::setCrashReports,
                     onAnalyticsToggle = viewModel::setAnalytics,
                     onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -561,6 +573,7 @@ class MainActivity : FragmentActivity() {
                     onSftpUploadFile = sftpUploadFile,
                     onManageRemotePath = manageRemotePath,
                     onScpDownloadFile = scpDownloadFile,
+                    onScpUploadFile = scpUploadFile,
                     resolveTerminalEmulator = resolveTerminalEmulator,
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
@@ -568,7 +581,11 @@ class MainActivity : FragmentActivity() {
                     hostKeyPrompts = hostKeyPrompts,
                     passwordPrompts = passwordPrompts,
                     requestedOpenSessionId = requestedOpenSessionHostId.value,
-                    onOpenSessionRequestHandled = { requestedOpenSessionHostId.value = null },
+                    requestedOpenSessionFileTransferEntryMode = requestedOpenSessionFileTransferEntryMode.value,
+                    onOpenSessionRequestHandled = {
+                        requestedOpenSessionHostId.value = null
+                        requestedOpenSessionFileTransferEntryMode.value = null
+                    },
                     onRespondToHostKeyPrompt = { promptId, trust ->
                         sessionService?.respondToHostKeyPrompt(promptId, trust)
                     },
@@ -598,6 +615,10 @@ class MainActivity : FragmentActivity() {
         outState.putString(STATE_REQUESTED_STARTUP_ROUTE, requestedStartupRoute.value)
         outState.putString(STATE_PENDING_WIDGET_HOST_ID, pendingWidgetConnectHostId.value)
         outState.putString(STATE_PENDING_WIDGET_MODE, pendingWidgetConnectMode.value?.name)
+        outState.putString(
+            STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE,
+            pendingWidgetConnectFileTransferEntryMode.value?.name
+        )
     }
 
     override fun onDestroy() {
@@ -690,6 +711,7 @@ class MainActivity : FragmentActivity() {
                     return
                 }
                 requestedOpenSessionHostId.value = hostId
+                requestedOpenSessionFileTransferEntryMode.value = null
                 UiDebugLog.result("handleSessionOpenIntent", true, "hostId=$hostId")
             }
 
@@ -698,12 +720,17 @@ class MainActivity : FragmentActivity() {
                 val mode = runCatching {
                     ConnectionMode.valueOf(intent.getStringExtra(EXTRA_WIDGET_MODE).orEmpty())
                 }.getOrDefault(ConnectionMode.SSH)
+                val fileTransferEntryMode = intent.getStringExtra(EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE)
+                    ?.let { value ->
+                        runCatching { FileTransferEntryMode.valueOf(value) }.getOrNull()
+                    }
                 if (hostId.isBlank()) {
                     UiDebugLog.result("handleWidgetConnectIntent", false, "missing-host-id")
                     return
                 }
                 pendingWidgetConnectHostId.value = hostId
                 pendingWidgetConnectMode.value = mode
+                pendingWidgetConnectFileTransferEntryMode.value = fileTransferEntryMode
                 UiDebugLog.result("handleWidgetConnectIntent", true, "hostId=$hostId, mode=$mode")
             }
         }
@@ -721,6 +748,9 @@ class MainActivity : FragmentActivity() {
         pendingWidgetConnectMode.value =
             savedInstanceState.getString(STATE_PENDING_WIDGET_MODE)
                 ?.let { value -> runCatching { ConnectionMode.valueOf(value) }.getOrNull() }
+        pendingWidgetConnectFileTransferEntryMode.value =
+            savedInstanceState.getString(STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE)
+                ?.let { value -> runCatching { FileTransferEntryMode.valueOf(value) }.getOrNull() }
     }
 
     private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
@@ -739,6 +769,7 @@ class MainActivity : FragmentActivity() {
         const val ACTION_WIDGET_CONNECT = "com.majordaftapps.sshpeaches.app.action.WIDGET_CONNECT"
         const val EXTRA_WIDGET_HOST_ID = "extra_widget_host_id"
         const val EXTRA_WIDGET_MODE = "extra_widget_mode"
+        const val EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE = "extra_widget_file_transfer_entry_mode"
         const val EXTRA_START_ROUTE = "extra_start_route"
         private const val CORE_PERMISSION_PREFS = "core_permission_state"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
@@ -746,5 +777,7 @@ class MainActivity : FragmentActivity() {
         private const val STATE_REQUESTED_STARTUP_ROUTE = "state_requested_startup_route"
         private const val STATE_PENDING_WIDGET_HOST_ID = "state_pending_widget_host_id"
         private const val STATE_PENDING_WIDGET_MODE = "state_pending_widget_mode"
+        private const val STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE =
+            "state_pending_widget_file_transfer_entry_mode"
     }
 }

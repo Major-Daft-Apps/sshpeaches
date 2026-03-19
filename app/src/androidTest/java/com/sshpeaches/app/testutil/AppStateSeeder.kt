@@ -12,6 +12,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
@@ -81,7 +82,10 @@ object AppStateSeeder {
         diagnostics: Boolean? = null,
         includeSecretsInQr: Boolean? = null,
         biometricLock: Boolean? = null,
-        terminalSelectionMode: TerminalSelectionMode? = null
+        terminalSelectionMode: TerminalSelectionMode? = null,
+        terminalBellMode: TerminalBellMode? = null,
+        terminalMarginPx: Int? = null,
+        moshServerCommand: String? = null
     ) {
         val appContext = context
         runBlocking {
@@ -93,6 +97,9 @@ object AppStateSeeder {
             includeSecretsInQr?.let { SettingsStore.setIncludeSecretsInQr(it) }
             biometricLock?.let { SettingsStore.setBiometricLockEnabled(it) }
             terminalSelectionMode?.let { SettingsStore.setTerminalSelectionMode(it) }
+            terminalBellMode?.let { SettingsStore.setTerminalBellMode(it) }
+            terminalMarginPx?.let { SettingsStore.setTerminalMarginPx(it) }
+            moshServerCommand?.let { SettingsStore.setMoshServerCommand(it) }
         }
     }
 

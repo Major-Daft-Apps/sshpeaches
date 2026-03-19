@@ -29,7 +29,9 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.FavoritesSection
+import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
@@ -40,7 +42,7 @@ fun FavoritesScreen(
     onOpenSession: (String) -> Unit = {},
     onDisconnectSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
-    onHostAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    onHostAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
     onToggleFavorite: (String) -> Unit = {},
@@ -85,7 +87,7 @@ fun FavoritesScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.name}",
+                                    text = "${session.host.name.ifBlank { session.host.host }} • ${session.mode.userFacingLabel()}",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(

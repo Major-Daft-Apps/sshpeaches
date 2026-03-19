@@ -12,7 +12,8 @@ import com.termux.terminal.TextStyle
 class TermuxTerminalEngine(
     private val onWriteToRemote: (ByteArray) -> Unit,
     private val onCopyToClipboard: (String) -> Unit = {},
-    private val onRequestPasteText: () -> String? = { null }
+    private val onRequestPasteText: () -> String? = { null },
+    private var onBellAction: () -> Unit = {}
 ) : TerminalOutput(), TerminalSessionClient {
 
     private val emulator = TerminalEmulator(
@@ -65,6 +66,10 @@ class TermuxTerminalEngine(
 
     fun emulator(): TerminalEmulator = emulator
 
+    fun setOnBellAction(handler: () -> Unit) {
+        onBellAction = handler
+    }
+
     fun renderText(): String {
         return emulator.screen.getTranscriptTextWithoutJoinedLines()
     }
@@ -88,7 +93,9 @@ class TermuxTerminalEngine(
         emulator.paste(text)
     }
 
-    override fun onBell() {}
+    override fun onBell() {
+        onBellAction()
+    }
 
     override fun onColorsChanged() {}
 
@@ -106,7 +113,9 @@ class TermuxTerminalEngine(
         onPasteTextFromClipboard()
     }
 
-    override fun onBell(session: TerminalSession) {}
+    override fun onBell(session: TerminalSession) {
+        onBellAction()
+    }
 
     override fun onColorsChanged(session: TerminalSession) {}
 

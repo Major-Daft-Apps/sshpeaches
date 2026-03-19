@@ -13,8 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.QrCode
@@ -72,6 +72,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
@@ -88,7 +89,7 @@ fun HostCard(
     snippets: List<Snippet> = emptyList(),
     modifier: Modifier = Modifier,
     onToggleFavorite: (String) -> Unit = {},
-    onAction: (HostConnection, ConnectionMode) -> Unit = { _, _ -> },
+    onAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
     canRunInfoCommands: Boolean = false,
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
@@ -198,21 +199,25 @@ fun HostCard(
                         contentDescription = "SSH terminal",
                         selected = true,
                         modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "ssh")),
-                        onClick = { onAction(host, ConnectionMode.SSH) }
+                        onClick = { onAction(host, ConnectionMode.SSH, null) }
                     )
                     HostActionButton(
-                        icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                        contentDescription = "SFTP file transfer",
+                        icon = Icons.Default.CloudUpload,
+                        contentDescription = "Upload files",
                         selected = false,
                         modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "sftp")),
-                        onClick = { onAction(host, ConnectionMode.SFTP) }
+                        onClick = {
+                            onAction(host, ConnectionMode.SCP, FileTransferEntryMode.UPLOAD)
+                        }
                     )
                     HostActionButton(
                         icon = Icons.Default.CloudDownload,
-                        contentDescription = "SCP file copy",
+                        contentDescription = "Download files",
                         selected = false,
                         modifier = Modifier.testTag(UiTestTags.hostAction(host.id, "scp")),
-                        onClick = { onAction(host, ConnectionMode.SCP) }
+                        onClick = {
+                            onAction(host, ConnectionMode.SCP, FileTransferEntryMode.DOWNLOAD)
+                        }
                     )
                 }
                 Row(

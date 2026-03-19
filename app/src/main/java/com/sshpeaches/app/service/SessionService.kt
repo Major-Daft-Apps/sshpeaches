@@ -7,10 +7,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.SystemClock
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -23,6 +25,7 @@ import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
@@ -34,8 +37,11 @@ import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
-import java.io.File
 import java.io.BufferedReader
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -50,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +72,9 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
+import net.schmizz.sshj.xfer.LocalDestFile
+import net.schmizz.sshj.xfer.LocalFileFilter
+import net.schmizz.sshj.xfer.LocalSourceFile
 import net.schmizz.sshj.xfer.scp.SCPFileTransfer
 import kotlin.math.absoluteValue
 import kotlin.math.min
@@ -291,7 +301,7 @@ class SessionService : Service() {
                         refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
                     }
                     ConnectionMode.SCP -> {
-                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing SCP browser...")
+                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing file browser...")
                         sftpBinding = SftpBinding(client!!.newSFTPClient())
                         scpBinding = ScpBinding(client!!.newSCPFileTransfer())
                         refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
@@ -299,7 +309,7 @@ class SessionService : Service() {
                             SessionLogBus.Entry(
                                 hostId = sessionId,
                                 level = SessionLogBus.LogLevel.INFO,
-                                message = "SCP ready. Browse remote files and download them."
+                                message = "File browser ready. Browse remote files and download them."
                             )
                         )
                     }
@@ -368,7 +378,7 @@ class SessionService : Service() {
                 val modeLabel = when (mode) {
                     ConnectionMode.SSH -> if (useMoshTransport) "Mosh session ready" else "Interactive shell session ready"
                     ConnectionMode.SFTP -> "SFTP browser ready"
-                    ConnectionMode.SCP -> "SCP transfer ready"
+                    ConnectionMode.SCP -> "File transfer ready"
                 }
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
                 UiDebugLog.result("startSession", true, "sessionId=$sessionId, mode=$mode")
@@ -658,14 +668,22 @@ class SessionService : Service() {
         serviceScope.launch {
             runCatching {
                 measureOperation("sftpDownloadFile", hostId) {
-                    val destination = resolveDestinationFile(hostId, source, localPath)
-                    destination.parentFile?.mkdirs()
-                    sftp.get(source, destination.absolutePath)
+                    val destinationUri = localPath.toContentUriOrNull()
+                    val destinationLabel = if (destinationUri != null) {
+                        val target = ContentUriDestFile(destinationUri)
+                        sftp.get(source, target)
+                        describeUri(destinationUri)
+                    } else {
+                        val destination = resolveDestinationFile(hostId, source, localPath)
+                        destination.parentFile?.mkdirs()
+                        sftp.get(source, destination.absolutePath)
+                        destination.absolutePath
+                    }
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
                             hostId = hostId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "SFTP download complete: $source -> ${destination.absolutePath}"
+                            message = "SFTP download complete: $source -> $destinationLabel"
                         )
                     )
                 }
@@ -697,15 +715,27 @@ class SessionService : Service() {
         serviceScope.launch {
             runCatching {
                 measureOperation("sftpUploadFile", hostId) {
-                    val sourceFile = File(source)
-                    require(sourceFile.exists()) { "Local file does not exist: $source" }
-                    require(sourceFile.isFile) { "Local path is not a file: $source" }
-                    sftp.put(sourceFile.absolutePath, destination)
+                    val sourceUri = source.toContentUriOrNull()
+                    val sourceLabel = if (sourceUri != null) {
+                        val sourceFile = ContentUriSourceFile(sourceUri)
+                        try {
+                            sftp.put(sourceFile, destination)
+                        } finally {
+                            sourceFile.cleanup()
+                        }
+                        describeUri(sourceUri)
+                    } else {
+                        val sourceFile = File(source)
+                        require(sourceFile.exists()) { "Local file does not exist: $source" }
+                        require(sourceFile.isFile) { "Local path is not a file: $source" }
+                        sftp.put(sourceFile.absolutePath, destination)
+                        sourceFile.absolutePath
+                    }
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
                             hostId = hostId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "SFTP upload complete: ${sourceFile.absolutePath} -> $destination"
+                            message = "SFTP upload complete: $sourceLabel -> $destination"
                         )
                     )
                 }
@@ -736,14 +766,22 @@ class SessionService : Service() {
         serviceScope.launch {
             runCatching {
                 measureOperation("scpDownloadFile", hostId) {
-                    val destination = resolveDestinationFile(hostId, source, localPath)
-                    destination.parentFile?.mkdirs()
-                    scp.download(source, destination.absolutePath)
+                    val destinationUri = localPath.toContentUriOrNull()
+                    val destinationLabel = if (destinationUri != null) {
+                        val target = ContentUriDestFile(destinationUri)
+                        scp.download(source, target)
+                        describeUri(destinationUri)
+                    } else {
+                        val destination = resolveDestinationFile(hostId, source, localPath)
+                        destination.parentFile?.mkdirs()
+                        scp.download(source, destination.absolutePath)
+                        destination.absolutePath
+                    }
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
                             hostId = hostId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "SCP download complete: $source -> ${destination.absolutePath}"
+                            message = "SCP download complete: $source -> $destinationLabel"
                         )
                     )
                 }
@@ -775,15 +813,27 @@ class SessionService : Service() {
         serviceScope.launch {
             runCatching {
                 measureOperation("scpUploadFile", hostId) {
-                    val sourceFile = File(source)
-                    require(sourceFile.exists()) { "Local file does not exist: $source" }
-                    require(sourceFile.isFile) { "Local path is not a file: $source" }
-                    scp.upload(sourceFile.absolutePath, destination)
+                    val sourceUri = source.toContentUriOrNull()
+                    val sourceLabel = if (sourceUri != null) {
+                        val sourceFile = ContentUriSourceFile(sourceUri)
+                        try {
+                            scp.upload(sourceFile, destination)
+                        } finally {
+                            sourceFile.cleanup()
+                        }
+                        describeUri(sourceUri)
+                    } else {
+                        val sourceFile = File(source)
+                        require(sourceFile.exists()) { "Local file does not exist: $source" }
+                        require(sourceFile.isFile) { "Local path is not a file: $source" }
+                        scp.upload(sourceFile.absolutePath, destination)
+                        sourceFile.absolutePath
+                    }
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
                             hostId = hostId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "SCP upload complete: ${sourceFile.absolutePath} -> $destination"
+                            message = "SCP upload complete: $sourceLabel -> $destination"
                         )
                     )
                 }
@@ -879,6 +929,113 @@ class SessionService : Service() {
         base.mkdirs()
         val filename = remotePath.substringAfterLast('/').ifBlank { "download.bin" }
         return File(base, filename)
+    }
+
+    private fun String?.toContentUriOrNull(): Uri? {
+        val raw = this?.trim().orEmpty()
+        return raw.takeIf { it.startsWith("content://") }?.let(Uri::parse)
+    }
+
+    private fun describeUri(uri: Uri): String = queryUriDisplayName(uri) ?: uri.toString()
+
+    private fun queryUriDisplayName(uri: Uri): String? = runCatching {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun queryUriSize(uri: Uri): Long? = runCatching {
+        contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (idx >= 0 && cursor.moveToFirst() && !cursor.isNull(idx)) cursor.getLong(idx) else null
+        }
+    }.getOrNull()?.takeIf { it >= 0L }
+
+    private inner class ContentUriDestFile(
+        private val uri: Uri
+    ) : LocalDestFile {
+        override fun getLength(): Long = queryUriSize(uri) ?: 0L
+
+        override fun getOutputStream(): OutputStream = openOutputStream(append = false)
+
+        override fun getOutputStream(append: Boolean): OutputStream = openOutputStream(append)
+
+        override fun getChild(name: String): LocalDestFile {
+            throw IOException("Directory traversal is not supported for document destinations: $uri")
+        }
+
+        override fun getTargetFile(filename: String): LocalDestFile = this
+
+        override fun getTargetDirectory(dirname: String): LocalDestFile {
+            throw IOException("Directory destinations are not supported for document URIs: $uri")
+        }
+
+        override fun setPermissions(perms: Int) = Unit
+
+        override fun setLastAccessedTime(t: Long) = Unit
+
+        override fun setLastModifiedTime(t: Long) = Unit
+
+        private fun openOutputStream(append: Boolean): OutputStream {
+            val mode = if (append) "wa" else "w"
+            return contentResolver.openOutputStream(uri, mode)
+                ?: throw IOException("Unable to open destination stream for $uri")
+        }
+    }
+
+    private inner class ContentUriSourceFile(
+        private val uri: Uri
+    ) : LocalSourceFile {
+        private val displayName = queryUriDisplayName(uri) ?: "selected_file"
+        private var stagedFile: File? = null
+
+        override fun getName(): String = displayName
+
+        override fun getLength(): Long = queryUriSize(uri) ?: ensureStagedFile().length()
+
+        override fun getInputStream(): InputStream {
+            stagedFile?.let { return it.inputStream() }
+            return contentResolver.openInputStream(uri)
+                ?: throw IOException("Unable to open source stream for $uri")
+        }
+
+        override fun getPermissions(): Int = 420
+
+        override fun isFile(): Boolean = true
+
+        override fun isDirectory(): Boolean = false
+
+        override fun getChildren(filter: LocalFileFilter?): Iterable<LocalSourceFile> = emptyList()
+
+        override fun providesAtimeMtime(): Boolean = false
+
+        override fun getLastAccessTime(): Long = 0L
+
+        override fun getLastModifiedTime(): Long = 0L
+
+        fun cleanup() {
+            stagedFile?.delete()
+            stagedFile = null
+        }
+
+        private fun ensureStagedFile(): File {
+            stagedFile?.let { return it }
+            val safeName = displayName
+                .replace('/', '_')
+                .replace('\\', '_')
+                .ifBlank { "selected_file" }
+            val staged = File.createTempFile("uri_upload_", "_$safeName", cacheDir)
+            val input = contentResolver.openInputStream(uri)
+                ?: throw IOException("Unable to open source stream for $uri")
+            input.use { source ->
+                staged.outputStream().use { sink ->
+                    source.copyTo(sink)
+                }
+            }
+            stagedFile = staged
+            return staged
+        }
     }
 
     private fun runWithSftpClient(hostId: String, action: (SFTPClient) -> Unit): Boolean {
@@ -1287,7 +1444,10 @@ class SessionService : Service() {
 
     private suspend fun startMoshServer(hostId: String, client: SSHClient): MoshConnect {
         return client.startSession().use { session ->
-            val command = session.exec("LANG=en_US.UTF-8 mosh-server new -c 256")
+            val serverCommand = SettingsStore.moshServerCommand.first().ifBlank {
+                DEFAULT_MOSH_SERVER_COMMAND
+            }
+            val command = session.exec(serverCommand)
             val stdout = command.inputStream.bufferedReader(StandardCharsets.UTF_8)
             val stderr = command.errorStream.bufferedReader(StandardCharsets.UTF_8)
             val combined = StringBuilder()

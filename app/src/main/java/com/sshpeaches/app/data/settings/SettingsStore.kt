@@ -11,10 +11,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -45,6 +47,10 @@ object SettingsStore {
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
     private val terminalEmulationKey = stringPreferencesKey("terminal_emulation")
     private val terminalSelectionModeKey = stringPreferencesKey("terminal_selection_mode")
+    private val terminalBellModeKey = stringPreferencesKey("terminal_bell_mode")
+    private val terminalVolumeButtonsAdjustFontSizeKey = booleanPreferencesKey("terminal_volume_buttons_adjust_font_size")
+    private val terminalMarginPxKey = intPreferencesKey("terminal_margin_px")
+    private val moshServerCommandKey = stringPreferencesKey("mosh_server_command")
     private val terminalProfilesKey = stringPreferencesKey("terminal_profiles")
     private val defaultTerminalProfileIdKey = stringPreferencesKey("default_terminal_profile_id")
     private val customLockTimeoutMinutesKey = intPreferencesKey("custom_lock_timeout_minutes")
@@ -137,6 +143,34 @@ object SettingsStore {
                     prefs[terminalSelectionModeKey] ?: TerminalSelectionMode.NATURAL.name
                 )
             }.getOrDefault(TerminalSelectionMode.NATURAL)
+        }
+    }
+
+    val terminalBellMode: Flow<TerminalBellMode> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalBellMode.valueOf(
+                    prefs[terminalBellModeKey] ?: TerminalBellMode.DISABLED.name
+                )
+            }.getOrDefault(TerminalBellMode.DISABLED)
+        }
+    }
+
+    val terminalVolumeButtonsAdjustFontSize: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[terminalVolumeButtonsAdjustFontSizeKey] ?: false
+        }
+    }
+
+    val terminalMarginPx: Flow<Int> by lazy {
+        dataStore.data.map { prefs ->
+            (prefs[terminalMarginPxKey] ?: 0).coerceIn(0, 128)
+        }
+    }
+
+    val moshServerCommand: Flow<String> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[moshServerCommandKey] ?: DEFAULT_MOSH_SERVER_COMMAND
         }
     }
 
@@ -264,6 +298,30 @@ object SettingsStore {
     suspend fun setTerminalSelectionMode(value: TerminalSelectionMode) {
         dataStore.edit { prefs ->
             prefs[terminalSelectionModeKey] = value.name
+        }
+    }
+
+    suspend fun setTerminalBellMode(value: TerminalBellMode) {
+        dataStore.edit { prefs ->
+            prefs[terminalBellModeKey] = value.name
+        }
+    }
+
+    suspend fun setTerminalVolumeButtonsAdjustFontSize(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[terminalVolumeButtonsAdjustFontSizeKey] = enabled
+        }
+    }
+
+    suspend fun setTerminalMarginPx(pixels: Int) {
+        dataStore.edit { prefs ->
+            prefs[terminalMarginPxKey] = pixels.coerceIn(0, 128)
+        }
+    }
+
+    suspend fun setMoshServerCommand(command: String) {
+        dataStore.edit { prefs ->
+            prefs[moshServerCommandKey] = command
         }
     }
 
@@ -439,6 +497,7 @@ object SettingsStore {
                 JSONObject().apply {
                     put("id", profile.id)
                     put("name", profile.name)
+                    put("font", profile.font.name)
                     put("fontSizeSp", profile.fontSizeSp)
                     put("foregroundHex", profile.foregroundHex)
                     put("backgroundHex", profile.backgroundHex)
@@ -463,6 +522,7 @@ object SettingsStore {
                 out += TerminalProfile(
                     id = id,
                     name = name,
+                    font = TerminalFont.fromStorageValue(item.optString("font").takeIf { it.isNotBlank() }),
                     fontSizeSp = item.optInt("fontSizeSp", 10).coerceIn(6, 28),
                     foregroundHex = item.optString("foregroundHex", "#E6E6E6"),
                     backgroundHex = item.optString("backgroundHex", "#101010"),

@@ -21,6 +21,7 @@ import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import org.junit.Rule
@@ -49,6 +50,23 @@ class SettingsPreferencesTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
+        scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextClearance()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextInput("16")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).performClick()
+        composeRule.onNodeWithTag(
+            UiTestTags.settingsTerminalBellOption(TerminalBellMode.SHOW_NOTIFICATION.label)
+        ).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).assertTextContains("Show notification")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).assertIsOn()
+        scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT).performTextClearance()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+            .performTextInput("mosh-server new -s -l LANG=C.UTF-8")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+            .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
 
         scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
@@ -60,6 +78,13 @@ class SettingsPreferencesTest {
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+        scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).assertTextContains("Show notification")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).assertIsOn()
+        scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+            .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
         scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
     }

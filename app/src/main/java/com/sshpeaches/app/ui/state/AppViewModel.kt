@@ -21,6 +21,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
 import com.majordaftapps.sshpeaches.app.data.repository.InMemoryAppRepository
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -54,6 +55,10 @@ class AppViewModel(
     private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
     private val terminalEmulationFlow = MutableStateFlow(TerminalEmulation.XTERM)
     private val terminalSelectionModeFlow = MutableStateFlow(TerminalSelectionMode.NATURAL)
+    private val terminalBellModeFlow = MutableStateFlow(TerminalBellMode.DISABLED)
+    private val terminalVolumeButtonsAdjustFontSizeFlow = MutableStateFlow(false)
+    private val terminalMarginPxFlow = MutableStateFlow(0)
+    private val moshServerCommandFlow = MutableStateFlow(DEFAULT_MOSH_SERVER_COMMAND)
     private val terminalProfilesFlow = MutableStateFlow(TerminalProfileDefaults.builtInProfiles)
     private val defaultTerminalProfileIdFlow = MutableStateFlow(TerminalProfileDefaults.DEFAULT_PROFILE_ID)
     private val crashReportsFlow = MutableStateFlow(false)
@@ -124,6 +129,26 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.terminalSelectionMode.collect { value ->
                 terminalSelectionModeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalBellMode.collect { value ->
+                terminalBellModeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalVolumeButtonsAdjustFontSize.collect { value ->
+                terminalVolumeButtonsAdjustFontSizeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalMarginPx.collect { value ->
+                terminalMarginPxFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.moshServerCommand.collect { value ->
+                moshServerCommandFlow.value = value
             }
         }
         viewModelScope.launch {
@@ -224,6 +249,10 @@ class AppViewModel(
         val customTimeoutMinutes: Int,
         val terminalEmulation: TerminalEmulation,
         val terminalSelectionMode: TerminalSelectionMode,
+        val terminalBellMode: TerminalBellMode,
+        val terminalVolumeButtonsAdjustFontSize: Boolean,
+        val terminalMarginPx: Int,
+        val moshServerCommand: String,
         val terminalProfiles: List<TerminalProfile>,
         val defaultTerminalProfileId: String,
         val crash: Boolean,
@@ -240,6 +269,35 @@ class AppViewModel(
         val customTimeoutMinutes: Int,
         val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
         val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
+        val terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
+        val terminalVolumeButtonsAdjustFontSize: Boolean = false,
+        val terminalMarginPx: Int = 0,
+        val moshServerCommand: String = DEFAULT_MOSH_SERVER_COMMAND,
+        val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
+        val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID
+    )
+
+    private data class TerminalPrivacyPartial(
+        val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+        val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
+        val terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
+        val terminalVolumeButtonsAdjustFontSize: Boolean = false,
+        val terminalMarginPx: Int = 0,
+        val moshServerCommand: String = DEFAULT_MOSH_SERVER_COMMAND,
+        val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
+        val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID
+    )
+
+    private data class TerminalBehaviorPrefs(
+        val terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM,
+        val terminalSelectionMode: TerminalSelectionMode = TerminalSelectionMode.NATURAL,
+        val terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
+        val terminalVolumeButtonsAdjustFontSize: Boolean = false
+    )
+
+    private data class TerminalAppearancePrefs(
+        val terminalMarginPx: Int = 0,
+        val moshServerCommand: String = DEFAULT_MOSH_SERVER_COMMAND,
         val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
         val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID
     )
@@ -276,18 +334,48 @@ class AppViewModel(
         )
     }
 
-    private val privacyPartialFlow = combine(
-        privacyPartialBaseFlow,
+    private val terminalBehaviorPrefsFlow = combine(
         terminalEmulationFlow,
         terminalSelectionModeFlow,
-        terminalProfilesFlow,
-        defaultTerminalProfileIdFlow
-    ) { partial, terminalEmulation, selectionMode, profiles, defaultProfileId ->
-        partial.copy(
+        terminalBellModeFlow,
+        terminalVolumeButtonsAdjustFontSizeFlow
+    ) { terminalEmulation, selectionMode, terminalBellMode, terminalVolumeButtonsAdjustFontSize ->
+        TerminalBehaviorPrefs(
             terminalEmulation = terminalEmulation,
             terminalSelectionMode = selectionMode,
+            terminalBellMode = terminalBellMode,
+            terminalVolumeButtonsAdjustFontSize = terminalVolumeButtonsAdjustFontSize
+        )
+    }
+
+    private val terminalAppearancePrefsFlow = combine(
+        terminalMarginPxFlow,
+        moshServerCommandFlow,
+        terminalProfilesFlow,
+        defaultTerminalProfileIdFlow
+    ) { terminalMarginPx, moshServerCommand, profiles, defaultProfileId ->
+        TerminalAppearancePrefs(
+            terminalMarginPx = terminalMarginPx,
+            moshServerCommand = moshServerCommand,
             terminalProfiles = profiles,
             defaultTerminalProfileId = defaultProfileId
+        )
+    }
+
+    private val privacyPartialFlow = combine(
+        privacyPartialBaseFlow,
+        terminalBehaviorPrefsFlow,
+        terminalAppearancePrefsFlow
+    ) { partial, terminalBehavior, terminalAppearance ->
+        partial.copy(
+            terminalEmulation = terminalBehavior.terminalEmulation,
+            terminalSelectionMode = terminalBehavior.terminalSelectionMode,
+            terminalBellMode = terminalBehavior.terminalBellMode,
+            terminalVolumeButtonsAdjustFontSize = terminalBehavior.terminalVolumeButtonsAdjustFontSize,
+            terminalMarginPx = terminalAppearance.terminalMarginPx,
+            moshServerCommand = terminalAppearance.moshServerCommand,
+            terminalProfiles = terminalAppearance.terminalProfiles,
+            defaultTerminalProfileId = terminalAppearance.defaultTerminalProfileId
         )
     }
 
@@ -306,6 +394,10 @@ class AppViewModel(
             customTimeoutMinutes = partial.customTimeoutMinutes,
             terminalEmulation = partial.terminalEmulation,
             terminalSelectionMode = partial.terminalSelectionMode,
+            terminalBellMode = partial.terminalBellMode,
+            terminalVolumeButtonsAdjustFontSize = partial.terminalVolumeButtonsAdjustFontSize,
+            terminalMarginPx = partial.terminalMarginPx,
+            moshServerCommand = partial.moshServerCommand,
             terminalProfiles = partial.terminalProfiles,
             defaultTerminalProfileId = partial.defaultTerminalProfileId,
             crash = crash,
@@ -346,6 +438,10 @@ class AppViewModel(
             customLockTimeoutMinutes = privacy.customTimeoutMinutes,
             terminalEmulation = privacy.terminalEmulation,
             terminalSelectionMode = privacy.terminalSelectionMode,
+            terminalBellMode = privacy.terminalBellMode,
+            terminalVolumeButtonsAdjustFontSize = privacy.terminalVolumeButtonsAdjustFontSize,
+            terminalMarginPx = privacy.terminalMarginPx,
+            moshServerCommand = privacy.moshServerCommand,
             terminalProfiles = privacy.terminalProfiles,
             defaultTerminalProfileId = privacy.defaultTerminalProfileId,
             crashReportsEnabled = privacy.crash,
@@ -430,6 +526,10 @@ class AppViewModel(
         append(state.customLockTimeoutMinutes).append('|')
         append(state.terminalEmulation).append('|')
         append(state.terminalSelectionMode).append('|')
+        append(state.terminalBellMode).append('|')
+        append(state.terminalVolumeButtonsAdjustFontSize).append('|')
+        append(state.terminalMarginPx).append('|')
+        append(state.moshServerCommand).append('|')
         append(state.defaultTerminalProfileId).append('|')
         append(state.terminalProfiles.size).append('|')
         append(state.crashReportsEnabled).append('|')
@@ -508,6 +608,30 @@ class AppViewModel(
     fun setTerminalSelectionMode(value: TerminalSelectionMode) {
         launchLogged("setTerminalSelectionMode", "value=$value") {
             SettingsStore.setTerminalSelectionMode(value)
+        }
+    }
+
+    fun setTerminalBellMode(value: TerminalBellMode) {
+        launchLogged("setTerminalBellMode", "value=$value") {
+            SettingsStore.setTerminalBellMode(value)
+        }
+    }
+
+    fun setTerminalVolumeButtonsAdjustFontSize(enabled: Boolean) {
+        launchLogged("setTerminalVolumeButtonsAdjustFontSize", "enabled=$enabled") {
+            SettingsStore.setTerminalVolumeButtonsAdjustFontSize(enabled)
+        }
+    }
+
+    fun setTerminalMarginPx(pixels: Int) {
+        launchLogged("setTerminalMarginPx", "pixels=$pixels") {
+            SettingsStore.setTerminalMarginPx(pixels)
+        }
+    }
+
+    fun setMoshServerCommand(command: String) {
+        launchLogged("setMoshServerCommand", "command=${command.take(64)}") {
+            SettingsStore.setMoshServerCommand(command)
         }
     }
 
