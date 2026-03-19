@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -69,6 +70,7 @@ fun ThemeProfileEditorScreen(
     onNavigateBack: () -> Unit,
     onShowMessage: (String) -> Unit = {}
 ) {
+    val context = LocalContext.current
     var name by remember(initialProfile.id) { mutableStateOf(initialProfile.name) }
     var font by remember(initialProfile.id) { mutableStateOf(initialProfile.font) }
     var fontSizePt by remember(initialProfile.id) { mutableFloatStateOf(initialProfile.fontSizeSp.toFloat()) }
@@ -119,6 +121,7 @@ fun ThemeProfileEditorScreen(
                     onClick = { showFontSizeDialog = true }
                 )
                 ThemePreviewSample(
+                    context = context,
                     terminalFont = font,
                     fontSizePt = fontSizePt,
                     foregroundHex = foregroundHex,
@@ -284,7 +287,7 @@ fun ThemeProfileEditorScreen(
                             expanded = fontExpanded,
                             onDismissRequest = { fontExpanded = false }
                         ) {
-                            TerminalFont.values().forEach { option ->
+                            TerminalFont.selectableValues().forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text(option.label) },
                                     onClick = {
@@ -297,6 +300,7 @@ fun ThemeProfileEditorScreen(
                         }
                     }
                     ThemePreviewSample(
+                        context = context,
                         terminalFont = draftFont,
                         fontSizePt = fontSizePt,
                         foregroundHex = foregroundHex,
@@ -330,6 +334,7 @@ fun ThemeProfileEditorScreen(
                         valueRange = 6f..28f
                     )
                     FontPreviewText(
+                        context = context,
                         text = "AaBb 0Oo1Il",
                         terminalFont = font,
                         fontSizePt = draftSize,
@@ -447,6 +452,7 @@ private fun EditorRow(
 
 @Composable
 private fun ThemePreviewSample(
+    context: android.content.Context,
     terminalFont: TerminalFont,
     fontSizePt: Float,
     foregroundHex: String,
@@ -454,7 +460,7 @@ private fun ThemePreviewSample(
 ) {
     val fg = parseHexColorOrDefault(foregroundHex, Color(0xFFE6E6E6))
     val bg = parseHexColorOrDefault(backgroundHex, Color(0xFF101010))
-    val resolvedFont = remember(terminalFont) { resolveTerminalTypefaceResult(terminalFont) }
+    val resolvedFont = remember(context, terminalFont) { resolveTerminalTypefaceResult(context, terminalFont) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -467,6 +473,7 @@ private fun ThemePreviewSample(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             FontPreviewText(
+                context = context,
                 text = "AaBb 0Oo1Il [] {} () /\\\\",
                 terminalFont = terminalFont,
                 fontSizePt = fontSizePt,
@@ -489,13 +496,14 @@ private fun ThemePreviewSample(
 
 @Composable
 private fun FontPreviewText(
+    context: android.content.Context,
     text: String,
     terminalFont: TerminalFont,
     fontSizePt: Float,
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    val typeface = remember(terminalFont) { resolveTerminalTypeface(terminalFont) }
+    val typeface = remember(context, terminalFont) { resolveTerminalTypeface(context, terminalFont) }
     key(terminalFont) {
         AndroidView(
             modifier = modifier,

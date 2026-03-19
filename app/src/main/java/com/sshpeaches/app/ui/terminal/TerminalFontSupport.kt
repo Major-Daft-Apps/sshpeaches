@@ -1,9 +1,8 @@
 package com.majordaftapps.sshpeaches.app.ui.terminal
 
-import android.graphics.Paint
+import android.content.Context
 import android.graphics.Typeface
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
-import kotlin.math.abs
 
 data class ResolvedTerminalTypeface(
     val typeface: Typeface,
@@ -12,12 +11,15 @@ data class ResolvedTerminalTypeface(
     val fellBackToSystemMonospace: Boolean
 )
 
-fun resolveTerminalTypeface(font: TerminalFont): Typeface {
-    return resolveTerminalTypefaceResult(font).typeface
+private val typefaceCache = mutableMapOf<String, Typeface>()
+
+fun resolveTerminalTypeface(context: Context, font: TerminalFont): Typeface {
+    return resolveTerminalTypefaceResult(context, font).typeface
 }
 
-fun resolveTerminalTypefaceResult(font: TerminalFont): ResolvedTerminalTypeface {
-    if (font == TerminalFont.SYSTEM_MONOSPACE) {
+fun resolveTerminalTypefaceResult(context: Context, font: TerminalFont): ResolvedTerminalTypeface {
+    val assetPath = font.assetPath
+    if (assetPath == null) {
         return ResolvedTerminalTypeface(
             typeface = Typeface.MONOSPACE,
             requestedFont = font,
@@ -25,34 +27,15 @@ fun resolveTerminalTypefaceResult(font: TerminalFont): ResolvedTerminalTypeface 
             fellBackToSystemMonospace = false
         )
     }
-    val resolvedFamily = font.typefaceFamilies
-        .asSequence()
-        .mapNotNull { family ->
-            val typeface = runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
-            if (typeface != null && runCatching { isMonospacedTypeface(typeface) }.getOrDefault(false)) {
-                family
-            } else {
-                null
-            }
-        }
-        .firstOrNull()
-    val resolvedTypeface = resolvedFamily?.let { family ->
-        runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
-    } ?: Typeface.MONOSPACE
-    return ResolvedTerminalTypeface(
-        typeface = resolvedTypeface,
-        requestedFont = font,
-        resolvedFamily = resolvedFamily,
-        fellBackToSystemMonospace = resolvedFamily == null
-    )
-}
-
-private fun isMonospacedTypeface(typeface: Typeface): Boolean {
-    val paint = Paint().apply {
-        textSize = 32f
-        this.typeface = typeface
+    val resolvedTypeface = synchronized(typefaceCache) {
+        typefaceCache[assetPath] ?: runCatching {
+            Typeface.createFromAsset(context.assets, assetPath)
+        }.getOrNull()?.also { typefaceCache[assetPath] = it }
     }
-    val narrow = paint.measureText("iiii")
-    val wide = paint.measureText("WWWW")
-    return abs(narrow - wide) < 0.5f
+    return ResolvedTerminalTypeface(
+        typeface = resolvedTypeface ?: Typeface.MONOSPACE,
+        requestedFont = font,
+        resolvedFamily = assetPath.substringAfterLast('/'),
+        fellBackToSystemMonospace = resolvedTypeface == null
+    )
 }

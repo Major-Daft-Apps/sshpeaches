@@ -2852,7 +2852,7 @@ private fun applyTerminalTypeface(
     font: com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 ) {
     runCatching {
-        view.setTypeface(resolveTerminalTypeface(font))
+        view.setTypeface(resolveTerminalTypeface(view.context, font))
     }
 }
 

@@ -5,7 +5,7 @@ import java.util.UUID
 data class TerminalProfile(
     val id: String,
     val name: String,
-    val font: TerminalFont = TerminalFont.SYSTEM_MONOSPACE,
+    val font: TerminalFont = TerminalFont.DROID_SANS_MONO,
     val fontSizeSp: Int = 10,
     val foregroundHex: String = "#E6E6E6",
     val backgroundHex: String = "#101010",
@@ -27,7 +27,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = DEFAULT_PROFILE_ID,
             name = "Termux",
-            font = TerminalFont.SYSTEM_MONOSPACE,
+            font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#A9B7C6",
             backgroundHex = "#000000",
@@ -38,7 +38,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-gnome-light",
             name = "Linux Console",
-            font = TerminalFont.SYSTEM_MONOSPACE,
+            font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#00AA00",
             backgroundHex = "#000000",
@@ -49,7 +49,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-solarized-dark",
             name = "Solarized Dark",
-            font = TerminalFont.SYSTEM_MONOSPACE,
+            font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#839496",
             backgroundHex = "#002B36",
@@ -60,7 +60,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "builtin-green-screen",
             name = "Solarized Light",
-            font = TerminalFont.SYSTEM_MONOSPACE,
+            font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#657B83",
             backgroundHex = "#FDF6E3",
@@ -76,7 +76,7 @@ object TerminalProfileDefaults {
         TerminalProfile(
             id = "custom-${UUID.randomUUID()}",
             name = name,
-            font = TerminalFont.SYSTEM_MONOSPACE,
+            font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#E6E6E6",
             backgroundHex = "#101010",

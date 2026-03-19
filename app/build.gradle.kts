@@ -64,7 +64,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 5
-        versionName = "0.9.5 (beta)"
+        versionName = "0.9.7 (beta)"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")

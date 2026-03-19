@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -456,7 +457,7 @@ fun SSHPeachesRoot(
         Routes.SNIPPET_EDITOR_ROUTE -> "Snippet Editor"
         Routes.KEYBOARD -> "Keyboard Editor"
         Routes.THEME_EDITOR -> "Theme Editor"
-        Routes.THEME_EDITOR_EDIT_ROUTE -> "Edit Terminal Theme"
+        Routes.THEME_EDITOR_EDIT_ROUTE -> "Theme Editor"
         Routes.SETTINGS -> "Settings"
         Routes.OPEN_SOURCE_LICENSES -> "Open Source Licenses"
         else -> "SSHPeaches"
@@ -1237,8 +1238,11 @@ fun SSHPeachesRoot(
                         val showConnectingTopBar =
                             quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
                                 !connectedHostBarCollapsed.value
+                        val showSessionTopBar =
+                            currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
                         val showTopBar =
-                            currentRoute != Routes.CONNECTING || showConnectingTopBar
+                            showSessionTopBar &&
+                                (currentRoute != Routes.CONNECTING || showConnectingTopBar)
                         if (showTopBar) {
                             TopAppBar(
                                 title = { Text(currentTitle) },
@@ -1265,6 +1269,20 @@ fun SSHPeachesRoot(
                                                 Icon(
                                                     imageVector = Icons.Default.Search,
                                                     contentDescription = "Find"
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentRoute != Routes.SETTINGS) {
+                                                        navController.navigate(Routes.SETTINGS) {
+                                                            launchSingleTop = true
+                                                        }
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Build,
+                                                    contentDescription = "Settings"
                                                 )
                                             }
                                         }
