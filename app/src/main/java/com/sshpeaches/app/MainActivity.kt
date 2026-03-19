@@ -74,6 +74,7 @@ class MainActivity : FragmentActivity() {
     private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
     private val pendingWidgetConnectFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
     private val corePermissionsRefreshTick = mutableStateOf(0)
+    private val pendingSftpDirectoryRequests = LinkedHashMap<String, String>()
     private var latestAllowBackgroundSessions: Boolean = true
     private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
     private var backgroundSessionTimeoutJob: Job? = null
@@ -85,9 +86,16 @@ class MainActivity : FragmentActivity() {
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            sessionServiceState.value = (binder as? SessionService.SessionBinder)?.getService()
+            val service = (binder as? SessionService.SessionBinder)?.getService()
+            sessionServiceState.value = service
             serviceBound = true
             serviceConnectionRequested = true
+            if (service != null && pendingSftpDirectoryRequests.isNotEmpty()) {
+                pendingSftpDirectoryRequests.forEach { (hostId, path) ->
+                    service.listSftpDirectory(hostId, path)
+                }
+                pendingSftpDirectoryRequests.clear()
+            }
             UiDebugLog.result("SessionService.onServiceConnected", true, "bound=true")
         }
 
@@ -261,7 +269,12 @@ class MainActivity : FragmentActivity() {
                 latestBackgroundSessionTimeout = state.backgroundSessionTimeout
             }
         }
-        handleIncomingIntent(this.intent)
+        // Only consume the launch intent on a cold start. During recreation the pending
+        // request state is restored from the saved instance state, and replaying the raw
+        // intent can incorrectly reopen an SSH session or navigate back into CONNECTING.
+        if (savedInstanceState == null) {
+            handleIncomingIntent(this.intent)
+        }
         setContent {
             val viewModel = appViewModel
             appUiBootstrapped = true
@@ -390,7 +403,14 @@ class MainActivity : FragmentActivity() {
             }
             val listSftpDirectory: (String, String) -> Unit = remember(sessionService) {
                 { hostId: String, path: String ->
-                    sessionService?.listSftpDirectory(hostId, path)
+                    val service = sessionService
+                    if (service != null) {
+                        pendingSftpDirectoryRequests.remove(hostId)
+                        service.listSftpDirectory(hostId, path)
+                    } else {
+                        pendingSftpDirectoryRequests[hostId] = path
+                        ensureSessionServiceConnection()
+                    }
                 }
             }
             val sftpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {

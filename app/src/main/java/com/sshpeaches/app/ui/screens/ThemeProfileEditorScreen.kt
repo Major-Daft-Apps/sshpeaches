@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.terminal.resolveTerminalTypeface
+import com.majordaftapps.sshpeaches.app.ui.terminal.resolveTerminalTypefaceResult
 import java.util.Locale
 import java.util.UUID
 
@@ -452,21 +454,36 @@ private fun ThemePreviewSample(
 ) {
     val fg = parseHexColorOrDefault(foregroundHex, Color(0xFFE6E6E6))
     val bg = parseHexColorOrDefault(backgroundHex, Color(0xFF101010))
+    val resolvedFont = remember(terminalFont) { resolveTerminalTypefaceResult(terminalFont) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .height(96.dp)
             .background(bg, RoundedCornerShape(10.dp))
             .padding(12.dp),
-        contentAlignment = Alignment.CenterStart
     ) {
-        FontPreviewText(
-            text = "AaBb 0Oo1Il Preview",
-            terminalFont = terminalFont,
-            fontSizePt = fontSizePt,
-            color = fg,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FontPreviewText(
+                text = "AaBb 0Oo1Il [] {} () /\\\\",
+                terminalFont = terminalFont,
+                fontSizePt = fontSizePt,
+                color = fg,
+                modifier = Modifier.fillMaxWidth()
+            )
+            val previewStatus = if (resolvedFont.fellBackToSystemMonospace) {
+                "${terminalFont.label} is unavailable on this device. Previewing system monospace."
+            } else {
+                "Previewing ${resolvedFont.resolvedFamily ?: terminalFont.label}."
+            }
+            Text(
+                text = previewStatus,
+                color = fg.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
     }
 }
 
@@ -479,20 +496,22 @@ private fun FontPreviewText(
     modifier: Modifier = Modifier
 ) {
     val typeface = remember(terminalFont) { resolveTerminalTypeface(terminalFont) }
-    AndroidView(
-        modifier = modifier,
-        factory = { context ->
-            TextView(context).apply {
-                setTypeface(typeface)
+    key(terminalFont) {
+        AndroidView(
+            modifier = modifier,
+            factory = { context ->
+                TextView(context).apply {
+                    setTypeface(typeface)
+                }
+            },
+            update = { view ->
+                view.text = text
+                view.typeface = typeface
+                view.textSize = fontSizePt
+                view.setTextColor(color.toArgb())
             }
-        },
-        update = { view ->
-            view.text = text
-            view.typeface = typeface
-            view.textSize = fontSizePt
-            view.setTextColor(color.toArgb())
-        }
-    )
+        )
+    }
 }
 
 @Composable

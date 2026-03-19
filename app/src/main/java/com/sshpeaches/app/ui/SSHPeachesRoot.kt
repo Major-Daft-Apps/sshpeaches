@@ -324,6 +324,7 @@ fun SSHPeachesRoot(
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
             it.mode == ConnectionMode.SSH
     }
+    val rawQuickConnectRequest = quickConnectRequest.value
     val snippetRunSelection = remember { mutableStateOf<Snippet?>(null) }
     val snippetRunTargetHostId = remember { mutableStateOf<String?>(null) }
     val snippetRunInProgress = remember { mutableStateOf(false) }
@@ -380,6 +381,28 @@ fun SSHPeachesRoot(
         )
     }
 
+    fun reconcileQuickConnectRequest(
+        current: QuickConnectRequest,
+        snapshot: SessionSnapshot
+    ): QuickConnectRequest {
+        val host = snapshot.host
+        val savedHostId = uiState.hosts.firstOrNull { it.id == host.id }?.id ?: current.savedHostId
+        return current.copy(
+            name = host.name,
+            host = host.host,
+            port = host.port,
+            username = host.username,
+            auth = host.preferredAuth,
+            mode = snapshot.mode,
+            savedHostId = savedHostId,
+            useMosh = host.useMosh,
+            preferredIdentityId = host.preferredIdentityId,
+            forwardId = host.preferredForwardId,
+            script = host.startupScript,
+            terminalProfileId = host.terminalProfileId
+        )
+    }
+
     fun navigateBackFromConnecting() {
         pendingConnectingNavigation.value = false
         val popped = navController.popBackStack()
@@ -393,13 +416,27 @@ fun SSHPeachesRoot(
         }
     }
 
+    val currentQuickConnectSnapshot = rawQuickConnectRequest?.let { current ->
+        sessions.firstOrNull { it.hostId == current.sessionId }
+    }
+    val effectiveQuickConnectRequest = when {
+        rawQuickConnectRequest != null && currentQuickConnectSnapshot != null -> {
+            reconcileQuickConnectRequest(rawQuickConnectRequest, currentQuickConnectSnapshot)
+        }
+
+        else -> rawQuickConnectRequest
+    }
+    val effectiveQuickConnectState = currentQuickConnectSnapshot?.let { snapshot ->
+        quickStateFromSnapshot(snapshot, snapshot.host)
+    } ?: quickConnectState.value
+
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
     }
     BackHandler(enabled = currentRoute == Routes.CONNECTING && !drawerState.isOpen) {
         navigateBackFromConnecting()
     }
-    val activeSessionRequest = quickConnectRequest.value
+    val activeSessionRequest = effectiveQuickConnectRequest
     val currentTitle = when (currentRoute) {
         Routes.FAVORITES -> "Favorites"
         Routes.CONNECTING -> activeSessionRequest?.name?.ifBlank {
@@ -468,6 +505,19 @@ fun SSHPeachesRoot(
     LaunchedEffect(quickConnectRequest.value?.sessionId) {
         sawSnapshotForCurrentRequest.value = false
         connectedHostBarCollapsed.value = false
+    }
+
+    LaunchedEffect(rawQuickConnectRequest, currentQuickConnectSnapshot) {
+        val request = rawQuickConnectRequest ?: return@LaunchedEffect
+        val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        val reconciledRequest = reconcileQuickConnectRequest(request, snapshot)
+        if (quickConnectRequest.value != reconciledRequest) {
+            quickConnectRequest.value = reconciledRequest
+        }
+        val reconciledState = quickStateFromSnapshot(snapshot, snapshot.host)
+        if (quickConnectState.value != reconciledState) {
+            quickConnectState.value = reconciledState
+        }
     }
 
     LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute) {
@@ -1189,7 +1239,7 @@ fun SSHPeachesRoot(
                             )
                         }
                         composable(Routes.CONNECTING) {
-                            val request = quickConnectRequest.value
+                            val request = effectiveQuickConnectRequest
                             val logs = request?.let { current ->
                                 sessionLogs.filter { it.hostId == current.sessionId }
                             } ?: emptyList()
@@ -1207,7 +1257,7 @@ fun SSHPeachesRoot(
                                 ?: TerminalProfileDefaults.builtInProfiles.first()
                             ConnectingScreen(
                                 request = request,
-                                state = quickConnectState.value,
+                                state = effectiveQuickConnectState,
                                 logs = logs,
                                 shellOutput = shellOutput,
                                 remoteDirectory = remoteDirectory,

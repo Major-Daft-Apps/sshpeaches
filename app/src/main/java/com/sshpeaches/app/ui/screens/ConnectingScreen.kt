@@ -78,6 +78,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -279,6 +280,7 @@ fun ConnectingScreen(
     var scpPendingListPath by remember(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpPendingListBaselineToken by remember(request?.sessionId) { mutableStateOf<Long?>(null) }
     var scpLastListedPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
+    var scpHomePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     val scpPathHistory = remember(request?.sessionId) { mutableStateListOf(".") }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
     var scpSelectedFile by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
@@ -322,6 +324,11 @@ fun ConnectingScreen(
         if (swipeNavigationEnabled) setOf("swipe_nav") else emptySet()
     }
     val swipeNavMinDistancePx = with(density) { SWIPE_NAV_MIN_DISTANCE_DP.dp.toPx() }
+    val latestRequest by rememberUpdatedState(request)
+    val latestRemoteDirectory by rememberUpdatedState(remoteDirectory)
+    val latestScpPendingListPath by rememberUpdatedState(scpPendingListPath)
+    val latestScpRemotePath by rememberUpdatedState(scpRemotePath)
+    val latestOnSftpListDirectory by rememberUpdatedState(onSftpListDirectory)
 
     fun applyTerminalFontSizeDelta(deltaSp: Float): Boolean {
         val updated = (terminalFontSizeSp + deltaSp).coerceIn(6f, 28f)
@@ -542,6 +549,7 @@ fun ConnectingScreen(
         scpPendingListPath = null
         scpPendingListBaselineToken = null
         scpLastListedPath = "."
+        scpHomePath = null
         scpPathHistory.clear()
         scpPathHistory += "."
         scpPathHistoryIndex = 0
@@ -636,11 +644,32 @@ fun ConnectingScreen(
     }
     DisposableEffect(lifecycleOwner, request?.sessionId) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
-                keyboardController?.hide()
-                focusManager.clearFocus(force = true)
-                keyboardFocused = false
-                keyboardVisibleRequested = false
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    if (latestRequest?.mode == ConnectionMode.SCP) {
+                        val targetPath = latestScpPendingListPath
+                            ?: latestRemoteDirectory?.path
+                            ?: latestScpRemotePath
+                        if (latestScpPendingListPath != null || latestRemoteDirectory == null) {
+                            scpRemotePath = targetPath
+                            scpLastListedPath = targetPath
+                            scpPendingListPath = targetPath
+                            scpPendingListBaselineToken =
+                                latestRemoteDirectory?.takeIf { it.path == targetPath }?.refreshToken
+                            latestOnSftpListDirectory(targetPath)
+                        }
+                    }
+                }
+
+                Lifecycle.Event.ON_PAUSE,
+                Lifecycle.Event.ON_STOP -> {
+                    keyboardController?.hide()
+                    focusManager.clearFocus(force = true)
+                    keyboardFocused = false
+                    keyboardVisibleRequested = false
+                }
+
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -733,6 +762,9 @@ fun ConnectingScreen(
         when (request?.mode) {
             ConnectionMode.SFTP -> sftpPath = path
             ConnectionMode.SCP -> {
+                if (scpHomePath == null && (scpPendingListPath == "." || scpLastListedPath == ".")) {
+                    scpHomePath = path
+                }
                 scpRemotePath = path
                 scpLastListedPath = path
             }
@@ -750,8 +782,20 @@ fun ConnectingScreen(
         if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
         val pendingPath = scpPendingListPath ?: return@LaunchedEffect
         val snapshot = remoteDirectory ?: return@LaunchedEffect
-        if (snapshot.path != pendingPath) return@LaunchedEffect
         if (scpPendingListBaselineToken == snapshot.refreshToken) return@LaunchedEffect
+        if (pendingPath == ".") {
+            scpHomePath = snapshot.path
+        }
+        if (snapshot.path != pendingPath) {
+            scpRemotePath = snapshot.path
+            scpLastListedPath = snapshot.path
+            if (scpPathHistoryIndex in scpPathHistory.indices && scpPathHistory[scpPathHistoryIndex] == pendingPath) {
+                scpPathHistory[scpPathHistoryIndex] = snapshot.path
+            } else if (scpPathHistory.lastOrNull() == pendingPath) {
+                scpPathHistory[scpPathHistory.lastIndex] = snapshot.path
+                scpPathHistoryIndex = scpPathHistory.lastIndex
+            }
+        }
         scpActivityLines.clear()
         scpActivityLines += "Listing ${snapshot.path}:"
         if (snapshot.entries.isEmpty()) {
@@ -1527,7 +1571,7 @@ fun ConnectingScreen(
                             },
                             modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_BACK_TO_DOWNLOAD_BUTTON)
                         ) {
-                            Text("Back to downloads")
+                            Text("Download file")
                         }
                     } else {
                         TextButton(
@@ -1585,7 +1629,7 @@ fun ConnectingScreen(
                     }
                     IconButton(
                         enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(".") }
+                        onClick = { browseScpPath(scpHomePath ?: ".") }
                     ) {
                         Icon(
                             Icons.Default.Home,

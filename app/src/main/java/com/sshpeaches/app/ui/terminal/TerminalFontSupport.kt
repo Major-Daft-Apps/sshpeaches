@@ -5,17 +5,46 @@ import android.graphics.Typeface
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import kotlin.math.abs
 
+data class ResolvedTerminalTypeface(
+    val typeface: Typeface,
+    val requestedFont: TerminalFont,
+    val resolvedFamily: String?,
+    val fellBackToSystemMonospace: Boolean
+)
+
 fun resolveTerminalTypeface(font: TerminalFont): Typeface {
-    if (font == TerminalFont.SYSTEM_MONOSPACE) return Typeface.MONOSPACE
-    return font.typefaceFamilies
+    return resolveTerminalTypefaceResult(font).typeface
+}
+
+fun resolveTerminalTypefaceResult(font: TerminalFont): ResolvedTerminalTypeface {
+    if (font == TerminalFont.SYSTEM_MONOSPACE) {
+        return ResolvedTerminalTypeface(
+            typeface = Typeface.MONOSPACE,
+            requestedFont = font,
+            resolvedFamily = null,
+            fellBackToSystemMonospace = false
+        )
+    }
+    val resolvedFamily = font.typefaceFamilies
         .asSequence()
         .mapNotNull { family ->
-            runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
+            val typeface = runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
+            if (typeface != null && runCatching { isMonospacedTypeface(typeface) }.getOrDefault(false)) {
+                family
+            } else {
+                null
+            }
         }
-        .firstOrNull { typeface ->
-            runCatching { isMonospacedTypeface(typeface) }.getOrDefault(false)
-        }
-        ?: Typeface.MONOSPACE
+        .firstOrNull()
+    val resolvedTypeface = resolvedFamily?.let { family ->
+        runCatching { Typeface.create(family, Typeface.NORMAL) }.getOrNull()
+    } ?: Typeface.MONOSPACE
+    return ResolvedTerminalTypeface(
+        typeface = resolvedTypeface,
+        requestedFont = font,
+        resolvedFamily = resolvedFamily,
+        fellBackToSystemMonospace = resolvedFamily == null
+    )
 }
 
 private fun isMonospacedTypeface(typeface: Typeface): Boolean {

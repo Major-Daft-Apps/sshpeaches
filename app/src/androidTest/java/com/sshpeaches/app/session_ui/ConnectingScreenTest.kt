@@ -2,6 +2,9 @@ package com.majordaftapps.sshpeaches.app.session_ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -351,6 +354,79 @@ class ConnectingScreenTest {
         composeRule.runOnIdle {
             check(downloadRequest == null) {
                 "SCP download callback should not run before document picker returns"
+            }
+        }
+    }
+
+    @Test
+    fun scpPanel_homeButtonUsesCanonicalHomePath() {
+        val listedPaths = mutableListOf<String>()
+        var remoteDirectory by mutableStateOf<SessionService.RemoteDirectorySnapshot?>(null)
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SCP transfer ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = remoteDirectory,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = { listedPaths += it },
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            check(listedPaths.firstOrNull() == ".") {
+                "SCP screen did not request the initial home directory listing"
+            }
+            remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                path = "/home/tester",
+                entries = listOf(
+                    SessionService.RemoteDirectoryEntry(
+                        name = "docs",
+                        isDirectory = true,
+                        sizeBytes = 0
+                    )
+                ),
+                refreshToken = 1L
+            )
+        }
+
+        composeRule.onNodeWithText("📁 docs", substring = true).performClick()
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/home/tester/docs") {
+                "SCP browser did not navigate into the selected subdirectory"
+            }
+            remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                path = "/home/tester/docs",
+                entries = emptyList(),
+                refreshToken = 2L
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("Home").performClick()
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/home/tester") {
+                "SCP Home button should reuse the canonical home path instead of requesting '.'"
             }
         }
     }
