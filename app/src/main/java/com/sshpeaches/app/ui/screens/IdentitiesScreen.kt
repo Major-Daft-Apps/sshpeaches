@@ -702,6 +702,7 @@ fun IdentitiesScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Algorithm") },
+                            singleLine = true,
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = generationAlgorithmExpanded.value)
                             },
@@ -746,6 +747,7 @@ fun IdentitiesScreen(
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text("RSA bits") },
+                                singleLine = true,
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = generationRsaBitsExpanded.value)
                                 },

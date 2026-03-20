@@ -83,6 +83,11 @@ fun SnippetEditorScreen(
                     onValueChange = { title = it },
                     label = { Text("Title") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrect = false,
+                        capitalization = KeyboardCapitalization.Words,
+                        keyboardType = KeyboardType.Text
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(UiTestTags.SNIPPET_EDITOR_TITLE_INPUT)

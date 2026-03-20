@@ -43,6 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
@@ -242,6 +245,11 @@ fun ThemeProfileEditorScreen(
                     onValueChange = { draftName = it.take(48) },
                     singleLine = true,
                     label = { Text("Name") },
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrect = false,
+                        capitalization = KeyboardCapitalization.Words,
+                        keyboardType = KeyboardType.Text
+                    ),
                     modifier = Modifier.testTag(UiTestTags.THEME_PROFILE_NAME_INPUT)
                 )
             },

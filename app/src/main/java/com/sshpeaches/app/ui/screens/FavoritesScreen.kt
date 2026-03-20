@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
@@ -39,6 +40,7 @@ fun FavoritesScreen(
     section: FavoritesSection,
     snippets: List<Snippet> = emptyList(),
     openSessions: List<SessionService.SessionSnapshot> = emptyList(),
+    transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
     onOpenSession: (String) -> Unit = {},
     onDisconnectSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
@@ -91,7 +93,9 @@ fun FavoritesScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = session.statusMessage ?: session.status.name,
+                                    text = transferProgresses[session.hostId]?.statusMessage()
+                                        ?: session.statusMessage
+                                        ?: session.status.name,
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }

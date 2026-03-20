@@ -63,8 +63,8 @@ android {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.9.6 (beta)"
+        versionCode = 7
+        versionName = "0.9.7"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")

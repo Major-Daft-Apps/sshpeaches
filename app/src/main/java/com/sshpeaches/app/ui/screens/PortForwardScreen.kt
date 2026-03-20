@@ -394,6 +394,7 @@ fun PortForwardScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Filter hosts") },
+                            singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostFilterExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()

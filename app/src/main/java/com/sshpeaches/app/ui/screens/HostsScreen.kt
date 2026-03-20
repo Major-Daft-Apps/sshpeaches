@@ -67,6 +67,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
@@ -109,6 +110,7 @@ fun HostsScreen(
     @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
     openSessions: List<SessionService.SessionSnapshot> = emptyList(),
+    transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
     onOpenSession: (String) -> Unit = {},
     onDisconnectSession: (String) -> Unit = {},
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
@@ -380,7 +382,9 @@ fun HostsScreen(
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Text(
-                                        text = session.statusMessage ?: session.status.name,
+                                        text = transferProgresses[session.hostId]?.statusMessage()
+                                            ?: session.statusMessage
+                                            ?: session.status.name,
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
@@ -496,6 +500,7 @@ fun HostsScreen(
                         value = nameState.value,
                         onValueChange = { nameState.value = it },
                         label = { Text("Name") },
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
@@ -507,6 +512,7 @@ fun HostsScreen(
                         value = hostState.value,
                         onValueChange = { hostState.value = it },
                         label = { Text("Host / IP") },
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -518,6 +524,7 @@ fun HostsScreen(
                         value = portState.value,
                         onValueChange = { portState.value = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Port") },
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -529,6 +536,7 @@ fun HostsScreen(
                         value = userState.value,
                         onValueChange = { userState.value = it },
                         label = { Text("Username") },
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.None,
@@ -551,6 +559,7 @@ fun HostsScreen(
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text("Group (optional)") },
+                                singleLine = true,
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupExpanded.value) },
                                 modifier = Modifier
                                     .menuAnchor()
@@ -607,6 +616,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Authentication") },
+                            singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authMenuExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()
@@ -640,6 +650,7 @@ fun HostsScreen(
                                     "Password (optional)"
                             )
                         },
+                        singleLine = true,
                         visualTransformation = TailRevealPasswordVisualTransformation(passwordRevealIndex.intValue),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
@@ -694,6 +705,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Identity key") },
+                            singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = identityExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()
@@ -767,6 +779,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Terminal profile") },
+                            singleLine = true,
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalProfileExpanded.value)
                             },
@@ -808,6 +821,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Use local forwarded port") },
+                            singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = forwardExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()
@@ -856,6 +870,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Startup snippet") },
+                            singleLine = true,
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = startupSnippetExpanded.value)
                             },
@@ -928,6 +943,7 @@ fun HostsScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Background behavior") },
+                            singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundExpanded.value) },
                             modifier = Modifier
                                 .menuAnchor()

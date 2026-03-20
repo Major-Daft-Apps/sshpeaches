@@ -15,7 +15,9 @@ object WidgetSessionStore {
 
     fun write(context: Context, snapshots: List<SessionService.SessionSnapshot>) {
         val payload = JSONArray()
-        snapshots.forEach { snapshot ->
+        snapshots
+            .filter { it.status != SessionService.SessionStatus.ERROR }
+            .forEach { snapshot ->
             val title = snapshot.host.name.ifBlank {
                 "${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}"
             }

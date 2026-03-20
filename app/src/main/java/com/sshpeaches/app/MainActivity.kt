@@ -288,6 +288,7 @@ class MainActivity : FragmentActivity() {
             val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
             val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             val remoteDirectories by sessionService?.remoteDirectoryFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+            val fileTransferProgress by sessionService?.fileTransferProgressFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
             LaunchedEffect(uiState.hosts) {
                 HostWidgets.updateAll(this@MainActivity)
             }
@@ -598,6 +599,7 @@ class MainActivity : FragmentActivity() {
                     sessions = sessionSnapshots,
                     shellOutputs = shellOutputs,
                     remoteDirectories = remoteDirectories,
+                    fileTransferProgresses = fileTransferProgress,
                     hostKeyPrompts = hostKeyPrompts,
                     passwordPrompts = passwordPrompts,
                     requestedOpenSessionId = requestedOpenSessionHostId.value,

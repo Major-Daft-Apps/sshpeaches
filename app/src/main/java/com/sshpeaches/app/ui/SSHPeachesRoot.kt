@@ -169,6 +169,7 @@ import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.majordaftapps.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
 import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
@@ -264,6 +265,7 @@ fun SSHPeachesRoot(
     sessions: List<SessionSnapshot>,
     shellOutputs: Map<String, String>,
     remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
+    fileTransferProgresses: Map<String, FileTransferProgress>,
     hostKeyPrompts: List<HostKeyPrompt>,
     passwordPrompts: List<PasswordPrompt>,
     requestedOpenSessionId: String?,
@@ -321,6 +323,9 @@ fun SSHPeachesRoot(
     val activeSshSessions = sessions.filter {
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
             it.mode == ConnectionMode.SSH
+    }
+    val openSessionSnapshots = sessions.filter {
+        it.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR
     }
     val rawQuickConnectRequest = quickConnectRequest.value
     val snippetRunSelection = remember { mutableStateOf<Snippet?>(null) }
@@ -1087,6 +1092,9 @@ fun SSHPeachesRoot(
         val remoteDirectory = request?.let { current ->
             remoteDirectories[current.sessionId]
         }
+        val activeFileTransfer = request?.let { current ->
+            fileTransferProgresses[current.sessionId]
+        }
         val activeTerminalProfile = uiState.terminalProfiles.firstOrNull {
             it.id == request?.terminalProfileId
         } ?: uiState.terminalProfiles.firstOrNull {
@@ -1099,6 +1107,7 @@ fun SSHPeachesRoot(
             logs = logs,
             shellOutput = shellOutput,
             remoteDirectory = remoteDirectory,
+            activeFileTransfer = activeFileTransfer,
             terminalProfile = activeTerminalProfile,
             terminalSelectionMode = uiState.terminalSelectionMode,
             terminalBellMode = uiState.terminalBellMode,
@@ -1347,7 +1356,8 @@ fun SSHPeachesRoot(
                             FavoritesScreen(
                                 section = uiState.favorites,
                                 snippets = uiState.snippets,
-                                openSessions = sessions,
+                                openSessions = openSessionSnapshots,
+                                transferProgresses = fileTransferProgresses,
                                 onOpenSession = { sessionId ->
                                     sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
                                         quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
@@ -1440,7 +1450,8 @@ fun SSHPeachesRoot(
                             },
                             onStopSession = onStopSession,
                             activeSshSessionHostIds = activeSshSessionHostIds,
-                            openSessions = sessions,
+                            openSessions = openSessionSnapshots,
+                            transferProgresses = fileTransferProgresses,
                             onOpenSession = { sessionId ->
                                 sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
                                     quickConnectRequest.value = quickRequestFromSnapshot(snapshot)

@@ -124,6 +124,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -212,6 +213,7 @@ fun ConnectingScreen(
     logs: List<SessionLogBus.Entry>,
     shellOutput: String,
     remoteDirectory: com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot?,
+    activeFileTransfer: FileTransferProgress? = null,
     terminalProfile: TerminalProfile,
     terminalSelectionMode: TerminalSelectionMode,
     terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
@@ -289,7 +291,6 @@ fun ConnectingScreen(
     var scpSelectedFile by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var pendingScpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpUploadSourceUri by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
-    var scpTransferInProgress by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
     var scpTransferStatus by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var showScpUploadVertical by rememberSaveable(request?.sessionId) {
         mutableStateOf(request?.initialFileTransferEntryMode == FileTransferEntryMode.UPLOAD)
@@ -392,7 +393,13 @@ fun ConnectingScreen(
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SFTP
     val showScpTransferSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SCP
+    val scpTransferActive =
+        request?.mode == ConnectionMode.SCP && activeFileTransfer?.mode == ConnectionMode.SCP
+    val sftpTransferActive =
+        request?.mode == ConnectionMode.SFTP && activeFileTransfer?.mode == ConnectionMode.SFTP
+    val activeTransferMessage = activeFileTransfer?.statusMessage()
     val userFacingStateMessage = when {
+        !activeTransferMessage.isNullOrBlank() -> activeTransferMessage
         request?.mode == ConnectionMode.SCP && state.phase != QuickConnectPhase.ERROR -> {
             when (state.phase) {
                 QuickConnectPhase.SUCCESS -> {
@@ -555,7 +562,6 @@ fun ConnectingScreen(
         scpSelectedFile = null
         pendingScpDownloadRemotePath = null
         scpUploadSourceUri = null
-        scpTransferInProgress = false
         scpTransferStatus = null
         if (request?.mode == ConnectionMode.SFTP) {
             sftpConsoleLines += "Connected to ${request.host}:${request.port}"
@@ -604,19 +610,15 @@ fun ConnectingScreen(
         val latest = logs.last().message
         when {
             latest.startsWith("SCP download complete:") -> {
-                scpTransferInProgress = false
                 scpTransferStatus = "Download completed successfully."
             }
             latest.startsWith("SCP upload complete:") -> {
-                scpTransferInProgress = false
                 scpTransferStatus = "Upload completed successfully."
             }
             latest.startsWith("SCP download failed") -> {
-                scpTransferInProgress = false
                 scpTransferStatus = "Download failed. ${latest.substringAfter(':', "").trim()}"
             }
             latest.startsWith("SCP upload failed") -> {
-                scpTransferInProgress = false
                 scpTransferStatus = "Upload failed. ${latest.substringAfter(':', "").trim()}"
             }
         }
@@ -1496,12 +1498,10 @@ fun ConnectingScreen(
                 pendingScpDownloadRemotePath = null
                 if (selectedRemote.isNullOrBlank()) return@rememberLauncherForActivityResult
                 if (uri == null) {
-                    scpTransferInProgress = false
                     scpTransferStatus = "Download cancelled."
                     appendScpActivity("Save location selection cancelled.", clearFirst = true)
                     return@rememberLauncherForActivityResult
                 }
-                scpTransferInProgress = true
                 scpTransferStatus = null
                 onScpDownload(selectedRemote, uri.toString())
                 appendScpActivity("Downloading $selectedRemote -> $uri", clearFirst = true)
@@ -1760,10 +1760,10 @@ fun ConnectingScreen(
                         onValueChange = {},
                         label = { Text("Local file") },
                         readOnly = true,
-                        enabled = !scpTransferInProgress,
+                        enabled = !scpTransferActive,
                         trailingIcon = {
                             IconButton(
-                                enabled = !scpTransferInProgress,
+                                enabled = !scpTransferActive,
                                 onClick = { scpUploadDocumentPicker.launch(arrayOf("*/*")) }
                             ) {
                                 Icon(Icons.Default.FolderOpen, contentDescription = "Choose local file", tint = Color.White)
@@ -1789,7 +1789,6 @@ fun ConnectingScreen(
                                 uploadLocalPath.ifBlank { "upload.bin" },
                                 effectiveRemotePath
                             )
-                            scpTransferInProgress = true
                             scpTransferStatus = null
                             onScpUpload(scpUploadSourceUri!!, remoteTarget)
                             appendScpActivity(
@@ -1797,7 +1796,7 @@ fun ConnectingScreen(
                                 clearFirst = true
                             )
                         },
-                        enabled = !scpTransferInProgress && !scpListingInProgress,
+                        enabled = !scpTransferActive && !scpListingInProgress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
@@ -1823,22 +1822,13 @@ fun ConnectingScreen(
                                 selectedRemote.substringAfterLast('/').ifBlank { "download.bin" }
                             )
                         },
-                        enabled = !scpTransferInProgress && !scpListingInProgress,
+                        enabled = !scpTransferActive && !scpListingInProgress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
                     ) {
                         Text("Choose save location & Download")
                     }
-                }
-
-                if (scpTransferInProgress) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    Text(
-                        text = "Transfer in progress...",
-                        color = Color(0xFFBDBDBD),
-                        style = MaterialTheme.typography.bodySmall
-                    )
                 }
 
                 AnimatedVisibility(
@@ -1927,6 +1917,7 @@ fun ConnectingScreen(
                 appendSftpConsole("Uploading $localName -> $remote")
             }
             val consoleScrollState = rememberScrollState()
+            val sftpBusy = sftpCommandRunning || sftpTransferActive
 
             fun resolveLocalPath(raw: String): String {
                 val candidate = File(raw)
@@ -1950,6 +1941,10 @@ fun ConnectingScreen(
             fun runSftpCommand(input: String) {
                 val command = input.trim()
                 if (command.isEmpty()) return
+                if (sftpTransferActive) {
+                    appendSftpConsole("A file transfer is already running for this session.")
+                    return
+                }
                 if (sftpCommandRunning) {
                     appendSftpConsole("A command is already running. Tap Cancel to stop waiting.")
                     return
@@ -2173,7 +2168,7 @@ fun ConnectingScreen(
                     onValueChange = { sftpCommandInput = it },
                     label = { Text("Command (e.g. ls, cd /, get file.txt)") },
                     singleLine = true,
-                    enabled = !sftpCommandRunning,
+                    enabled = !sftpBusy,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
                         keyboardType = KeyboardType.Ascii,
@@ -2182,7 +2177,7 @@ fun ConnectingScreen(
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
-                            if (sftpCommandRunning) return@KeyboardActions
+                            if (sftpBusy) return@KeyboardActions
                             val cmd = sftpCommandInput
                             sftpCommandInput = ""
                             runSftpCommand(cmd)
@@ -2203,12 +2198,12 @@ fun ConnectingScreen(
                                 appendSftpConsole("Cancelled waiting for command completion.")
                                 return@Button
                             }
-                            if (sftpCommandRunning) return@Button
+                            if (sftpBusy) return@Button
                             val cmd = sftpCommandInput
                             sftpCommandInput = ""
                             runSftpCommand(cmd)
                         },
-                        enabled = !sftpCommandRunning || sftpShowCancel,
+                        enabled = (!sftpBusy) || (sftpCommandRunning && sftpShowCancel),
                         modifier = Modifier
                             .weight(1f)
                             .testTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON)
@@ -2217,14 +2212,14 @@ fun ConnectingScreen(
                     }
                     Button(
                         onClick = { runSftpCommand("help") },
-                        enabled = !sftpCommandRunning,
+                        enabled = !sftpBusy,
                         modifier = Modifier
                             .weight(1f)
                             .testTag(UiTestTags.CONNECTING_SFTP_HELP_BUTTON)
                     ) { Text("Help") }
                     Button(
                         onClick = { runSftpCommand("refresh") },
-                        enabled = !sftpCommandRunning,
+                        enabled = !sftpBusy,
                         modifier = Modifier
                             .weight(1f)
                             .testTag(UiTestTags.CONNECTING_SFTP_REFRESH_BUTTON)
@@ -2340,6 +2335,9 @@ fun ConnectingScreen(
                             text = message,
                             style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD))
                         )
+                    }
+                    activeFileTransfer?.let { transfer ->
+                        FileTransferProgressCard(transfer = transfer)
                     }
 
                     ConnectionLogsPane(
@@ -2622,6 +2620,40 @@ private fun RowScope.CompactKeyButton(
                 fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileTransferProgressCard(transfer: FileTransferProgress) {
+    val progressFraction = transfer.progressFraction
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF111111),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (progressFraction != null && transfer.hasStarted) {
+                LinearProgressIndicator(
+                    progress = progressFraction,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colorResource(id = R.color.peachy_orange),
+                    trackColor = Color(0xFF2C2C2C)
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colorResource(id = R.color.peachy_orange),
+                    trackColor = Color(0xFF2C2C2C)
+                )
+            }
+            Text(
+                text = transfer.progressSummary(),
+                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD))
             )
         }
     }
