@@ -104,6 +104,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -561,9 +562,14 @@ fun ConnectingScreen(
             sftpConsoleLines += "Type 'help' for SFTP commands."
         }
         if (request?.mode == ConnectionMode.SCP) {
-            scpPendingListPath = scpRemotePath
-            scpPendingListBaselineToken = remoteDirectory?.refreshToken
-            onSftpListDirectory(scpRemotePath)
+            if (remoteDirectory == null) {
+                scpPendingListPath = scpRemotePath
+                scpPendingListBaselineToken = null
+                onSftpListDirectory(scpRemotePath)
+            } else {
+                scpPendingListPath = null
+                scpPendingListBaselineToken = null
+            }
         }
         pendingModifiers = emptySet()
         showSnippetPicker = false
@@ -1694,6 +1700,18 @@ fun ConnectingScreen(
                         } else {
                             remoteItems.forEach { item ->
                                 val absolute = resolveChildPath(effectiveRemotePath, item.name)
+                                val onRemoteItemClick = {
+                                    if (item.isDirectory) {
+                                        browseScpPath(absolute)
+                                        if (!showScpUploadVertical) {
+                                            scpSelectedFile = null
+                                        }
+                                        scpTransferStatus = null
+                                    } else if (!showScpUploadVertical) {
+                                        scpSelectedFile = absolute
+                                        scpTransferStatus = null
+                                    }
+                                }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1707,18 +1725,8 @@ fun ConnectingScreen(
                                                 else -> Color.Transparent
                                             }
                                         )
-                                        .clickable(enabled = !scpListingInProgress) {
-                                            if (item.isDirectory) {
-                                                browseScpPath(absolute)
-                                                if (!showScpUploadVertical) {
-                                                    scpSelectedFile = null
-                                                }
-                                                scpTransferStatus = null
-                                            } else if (!showScpUploadVertical) {
-                                                scpSelectedFile = absolute
-                                                scpTransferStatus = null
-                                            }
-                                        }
+                                        .semantics(mergeDescendants = true) {}
+                                        .clickable(enabled = !scpListingInProgress, onClick = onRemoteItemClick)
                                         .padding(horizontal = 8.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -1726,7 +1734,9 @@ fun ConnectingScreen(
                                     Text(
                                         text = if (item.isDirectory) "📁 ${item.name}" else "📄 ${item.name}",
                                         color = if (item.isDirectory) Color(0xFFFFCC80) else Color(0xFFE5E5E5),
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable(enabled = !scpListingInProgress, onClick = onRemoteItemClick)
                                     )
                                     Text(
                                         text = if (item.isDirectory) "dir" else item.sizeBytes.toString(),
@@ -1804,7 +1814,7 @@ fun ConnectingScreen(
                     Button(
                         onClick = {
                             if (scpSelectedFile == null) {
-                                scpTransferStatus = "Select a remote file first."
+                                scpTransferStatus = "Select a file first."
                                 return@Button
                             }
                             val selectedRemote = scpSelectedFile ?: return@Button

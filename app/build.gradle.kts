@@ -63,8 +63,8 @@ android {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.9.7 (beta)"
+        versionCode = 6
+        versionName = "0.9.6 (beta)"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -175,7 +175,7 @@ android {
         managedDevices {
             localDevices {
                 create("pixel2Api34") {
-                    device = "Pixel 2"
+                    device = "Medium Phone"
                     apiLevel = 34
                     systemImageSource = "aosp-atd"
                 }

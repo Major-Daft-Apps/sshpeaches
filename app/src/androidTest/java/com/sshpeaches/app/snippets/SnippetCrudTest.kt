@@ -59,6 +59,9 @@ class SnippetCrudTest {
         composeRule.onNodeWithText("QA Snippet Updated").assertIsDisplayed()
 
         composeRule.onAllNodesWithContentDescription("Delete")[0].performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("QA Snippet Updated").fetchSemanticsNodes().isEmpty()
+        }
         composeRule.onAllNodesWithText("QA Snippet Updated").assertCountEquals(0)
     }
 }

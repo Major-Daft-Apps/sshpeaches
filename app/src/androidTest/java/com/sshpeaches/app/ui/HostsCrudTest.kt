@@ -82,10 +82,16 @@ class HostsCrudTest {
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.2.3")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON).performClick()
 
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("QA Host Updated").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("QA Host Updated").assertIsDisplayed()
         composeRule.onAllNodesWithText("QA Host").assertCountEquals(0)
 
         composeRule.onAllNodesWithText("Delete")[0].performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("QA Host Updated").fetchSemanticsNodes().isEmpty()
+        }
         composeRule.onAllNodesWithText("QA Host Updated").assertCountEquals(0)
     }
 

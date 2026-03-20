@@ -95,6 +95,9 @@ class IdentityCrudTest {
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_SEARCH_INPUT).performTextInput("Updated")
         composeRule.onNodeWithText("QA Identity Updated").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_CARD_DELETE_BUTTON).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("QA Identity Updated").fetchSemanticsNodes().isEmpty()
+        }
         composeRule.onAllNodesWithText("QA Identity Updated").assertCountEquals(0)
     }
 }

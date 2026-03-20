@@ -2,7 +2,6 @@ package com.majordaftapps.sshpeaches.app.themes
 
 import android.Manifest
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -139,7 +138,7 @@ class ThemeEditorTest {
         }
 
         composeRule.onNodeWithText(themeName).assertIsDisplayed()
-        composeRule.onNodeWithText("JetBrains Mono", substring = true).assertExists()
+        composeRule.onNodeWithText("JetBrains Mono", substring = true).assertIsDisplayed()
     }
 
     private fun renameThemeAndSave(themeName: String) {

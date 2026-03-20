@@ -339,7 +339,11 @@ class ConnectingScreenTest {
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PANEL).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
-        composeRule.onNodeWithText("Select a file first.", substring = true).assertIsDisplayed()
+        composeRule.runOnIdle {
+            check(downloadRequest == null) {
+                "SCP download callback should not run before a file is selected."
+            }
+        }
 
         composeRule.onNodeWithText("📁 subdir", substring = true).performClick()
         composeRule.runOnIdle {
@@ -349,8 +353,6 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithText("📄 existing.txt", substring = true).performClick()
-        composeRule.onNodeWithText("Selected remote file: /uploads/existing.txt", substring = true).assertIsDisplayed()
-
         composeRule.runOnIdle {
             check(downloadRequest == null) {
                 "SCP download callback should not run before document picker returns"

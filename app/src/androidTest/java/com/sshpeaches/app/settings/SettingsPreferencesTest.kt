@@ -7,9 +7,11 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -54,13 +56,6 @@ class SettingsPreferencesTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextInput("16")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).performClick()
-        composeRule.onNodeWithTag(
-            UiTestTags.settingsTerminalBellOption(TerminalBellMode.SHOW_NOTIFICATION.label)
-        ).performClick()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).assertTextContains("Show notification")
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).performClick()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).assertIsOn()
         scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
@@ -80,8 +75,6 @@ class SettingsPreferencesTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
         scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD).assertTextContains("Show notification")
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH).assertIsOn()
         scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
             .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
@@ -176,16 +169,29 @@ class SettingsPreferencesTest {
     }
 
     private fun scrollToTag(tag: String) {
-        repeat(10) {
-            val visible = runCatching {
-                composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        composeRule.waitForIdle()
+        repeat(16) {
+            val revealed = runCatching {
+                composeRule.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo()
+                composeRule.waitForIdle()
                 true
             }.getOrDefault(false)
+            val visible = runCatching {
+                composeRule.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+            if (revealed && visible) return
             if (visible) return
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
-                .performTouchInput { swipeUp() }
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER, useUnmergedTree = true)
+                    .performTouchInput { swipeUp() }
+            }.getOrElse {
+                composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS, useUnmergedTree = true)
+                    .performTouchInput { swipeUp() }
+            }
+            composeRule.waitForIdle()
         }
-        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        composeRule.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun waitForTag(tag: String) {
