@@ -150,7 +150,10 @@ fun UptimeScreen(
                     .testTag(UiTestTags.UPTIME_EMPTY_MONITORS),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No uptime monitors yet. Add a saved host to start tracking.")
+                Text(
+                    "No uptime monitors yet. Add a saved host to start tracking.",
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
             }
             return
         }
