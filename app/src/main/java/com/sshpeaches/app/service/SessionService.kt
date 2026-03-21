@@ -31,9 +31,11 @@ import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
+import com.majordaftapps.sshpeaches.app.util.selectedHostId
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -45,6 +47,9 @@ import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketException
+import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -64,8 +69,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.connection.channel.Channel
-import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
-import net.schmizz.sshj.connection.channel.direct.Parameters
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
@@ -360,7 +363,7 @@ class SessionService : Service() {
                     )
                 }
                 val configuredForwards = if (autoStartForwards) {
-                    availableForwards.filter { it.enabled && it.associatedHosts.contains(host.id) }
+                    availableForwards.filter { it.enabled && it.selectedHostId() == host.id }
                 } else {
                     emptyList()
                 }
@@ -369,6 +372,7 @@ class SessionService : Service() {
                     activeForwardBindings = activatePortForwards(
                         hostId = sessionId,
                         client = client!!,
+                        sessionHost = sessionHost,
                         forwards = configuredForwards
                     )
                 }
@@ -1252,6 +1256,7 @@ class SessionService : Service() {
     private fun activatePortForwards(
         hostId: String,
         client: SSHClient,
+        sessionHost: HostConnection,
         forwards: List<PortForward>
     ): List<PortForwardBinding> {
         val bindings = mutableListOf<PortForwardBinding>()
@@ -1267,7 +1272,7 @@ class SessionService : Service() {
                 return@forEach
             }
             runCatching {
-                val binding = startLocalPortForward(hostId, client, forward)
+                val binding = startLocalPortForward(hostId, client, sessionHost, forward)
                 bindings += binding
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -1289,42 +1294,146 @@ class SessionService : Service() {
         return bindings
     }
 
-    private fun startLocalPortForward(hostId: String, client: SSHClient, forward: PortForward): PortForwardBinding {
+    private fun startLocalPortForward(
+        hostId: String,
+        client: SSHClient,
+        sessionHost: HostConnection,
+        forward: PortForward
+    ): PortForwardBinding {
         val bindHost = normalizeBindHost(forward.sourceHost)
         val bindPort = requireValidPort(forward.sourcePort, "source")
-        val destinationHost = forward.destinationHost.ifBlank { "127.0.0.1" }
+        val destinationHost = forward.inferredDestinationHost(sessionHost)
         val destinationPort = requireValidPort(forward.destinationPort, "destination")
         val serverSocket = ServerSocket()
         serverSocket.reuseAddress = true
         serverSocket.bind(InetSocketAddress(bindHost, bindPort))
-        val localForwarder = client.newLocalPortForwarder(
-            Parameters(bindHost, bindPort, destinationHost, destinationPort),
-            serverSocket
-        )
-        val listenJob = serviceScope.launch(Dispatchers.IO) {
-            runCatching {
-                localForwarder.listen(Thread.currentThread())
-            }.onFailure { err ->
-                if (activeJobs.containsKey(hostId)) {
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = hostId,
-                            level = SessionLogBus.LogLevel.WARN,
-                            message = "Local forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
-                        )
+        val connectionJobs = Collections.synchronizedSet(mutableSetOf<Job>())
+        val acceptThread = Thread({
+            while (!serverSocket.isClosed && !Thread.currentThread().isInterrupted) {
+                val socket = try {
+                    serverSocket.accept()
+                } catch (err: IOException) {
+                    if (!isExpectedForwardCloseException(serverSocket, err)) {
+                        emitPortForwardWarning(hostId, forward, err)
+                    }
+                    break
+                }
+                socket.tcpNoDelay = true
+                val connectionJob = serviceScope.launch(Dispatchers.IO) {
+                    bridgeLocalPortForwardConnection(
+                        hostId = hostId,
+                        client = client,
+                        forward = forward,
+                        acceptedSocket = socket,
+                        destinationHost = destinationHost,
+                        destinationPort = destinationPort
                     )
                 }
+                connectionJobs += connectionJob
+                connectionJob.invokeOnCompletion {
+                    connectionJobs.remove(connectionJob)
+                    runCatching { socket.close() }
+                }
             }
+        }, "sshpeaches-port-forward-$bindPort").apply {
+            isDaemon = true
+            start()
         }
         return PortForwardBinding(
             forwardId = forward.id,
             summary = "Local forward active: $bindHost:$bindPort -> $destinationHost:$destinationPort",
             close = {
-                runCatching { localForwarder.close() }
-                listenJob.cancel()
+                runCatching { serverSocket.close() }
+                acceptThread.interrupt()
+                connectionJobs.toList().forEach { it.cancel() }
             }
         )
     }
+
+    private suspend fun bridgeLocalPortForwardConnection(
+        hostId: String,
+        client: SSHClient,
+        forward: PortForward,
+        acceptedSocket: Socket,
+        destinationHost: String,
+        destinationPort: Int
+    ) {
+        val directConnection = runCatching {
+            client.newDirectConnection(destinationHost, destinationPort)
+        }.getOrElse { err ->
+            runCatching { acceptedSocket.close() }
+            throw err
+        }
+        val upstreamJob = serviceScope.launch(Dispatchers.IO) {
+            runCatching {
+                copyPortForwardStream(
+                    input = acceptedSocket.getInputStream(),
+                    output = directConnection.outputStream
+                )
+            }.onFailure { err ->
+                if (!isExpectedForwardStreamException(err)) {
+                    emitPortForwardWarning(hostId, forward, err)
+                }
+            }
+        }
+        val downstreamJob = serviceScope.launch(Dispatchers.IO) {
+            runCatching {
+                copyPortForwardStream(
+                    input = directConnection.inputStream,
+                    output = acceptedSocket.getOutputStream()
+                )
+            }.onFailure { err ->
+                if (!isExpectedForwardStreamException(err)) {
+                    emitPortForwardWarning(hostId, forward, err)
+                }
+            }
+        }
+        try {
+            upstreamJob.join()
+            downstreamJob.join()
+        } catch (err: Exception) {
+            if (!isExpectedForwardStreamException(err)) {
+                emitPortForwardWarning(hostId, forward, err)
+            }
+        } finally {
+            upstreamJob.cancel()
+            downstreamJob.cancel()
+            runCatching { directConnection.close() }
+            runCatching { acceptedSocket.close() }
+        }
+    }
+
+    private fun copyPortForwardStream(
+        input: InputStream,
+        output: OutputStream
+    ) {
+        val buffer = ByteArray(DEFAULT_PORT_FORWARD_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) {
+                break
+            }
+            output.write(buffer, 0, read)
+            output.flush()
+        }
+    }
+
+    private fun emitPortForwardWarning(hostId: String, forward: PortForward, err: Throwable) {
+        if (!activeJobs.containsKey(hostId)) return
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.WARN,
+                message = "Local forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
+            )
+        )
+    }
+
+    private fun isExpectedForwardCloseException(serverSocket: ServerSocket, err: IOException): Boolean =
+        serverSocket.isClosed || err is SocketException
+
+    private fun isExpectedForwardStreamException(err: Throwable): Boolean =
+        err is CancellationException || err is SocketException || err is IOException
 
     private fun normalizeBindHost(value: String): String {
         val trimmed = value.trim()
@@ -2467,6 +2576,7 @@ class SessionService : Service() {
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
+        private const val DEFAULT_PORT_FORWARD_BUFFER_SIZE = 8 * 1024
         private const val SHELL_OUTPUT_PUBLISH_INTERVAL_MS = 40L
         private const val MOSH_SNAPSHOT_PUBLISH_INTERVAL_MS = 40L
         private const val TRANSFER_NOTIFICATION_UPDATE_INTERVAL_MS = 250L

@@ -13,6 +13,9 @@ interface HostDao {
     @Query("SELECT * FROM hosts")
     fun observeAll(): Flow<List<HostEntity>>
 
+    @Query("SELECT * FROM hosts")
+    suspend fun getAll(): List<HostEntity>
+
     @Query("SELECT * FROM hosts WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): HostEntity?
 

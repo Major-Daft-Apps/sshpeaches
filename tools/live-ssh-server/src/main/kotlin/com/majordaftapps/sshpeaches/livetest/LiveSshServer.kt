@@ -1,10 +1,12 @@
 package com.majordaftapps.sshpeaches.livetest
 
+import com.sun.net.httpserver.HttpServer
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.io.PrintWriter
+import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -35,6 +37,7 @@ import org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator
 import org.apache.sshd.server.channel.ChannelSession
 import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.command.CommandFactory
+import org.apache.sshd.server.forward.AcceptAllForwardingFilter
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.server.shell.ShellFactory
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
@@ -44,6 +47,7 @@ private const val PASSWORD_USERNAME = "tester"
 private const val PASSWORD_VALUE = "peaches-password"
 private const val PUBLIC_KEY_USERNAME = "tester-key"
 private const val READY_PREFIX = "LIVE_SSH_SERVER_READY"
+private const val FORWARD_HTTP_RESPONSE = "SSHPEACHES_FORWARD_OK"
 
 fun main(args: Array<String>) {
     val options = Options.parse(args)
@@ -52,6 +56,7 @@ fun main(args: Array<String>) {
     val sandboxParent = stateRoot.resolve("sandboxes").createDirectories()
     val sandboxRoot = Files.createTempDirectory(sandboxParent, "sandbox-").normalize()
     seedSandbox(sandboxRoot)
+    val forwardHttpServer = createForwardHttpServer(options.httpPort)
 
     val server = SshServer.setUpDefaultServer().apply {
         host = "127.0.0.1"
@@ -68,6 +73,7 @@ fun main(args: Array<String>) {
         publickeyAuthenticator = PublickeyAuthenticator { username: String, _: PublicKey, _: org.apache.sshd.server.session.ServerSession ->
             username == PUBLIC_KEY_USERNAME
         }
+        forwardingFilter = AcceptAllForwardingFilter.INSTANCE
         shellFactory = ShellFactory { _: ChannelSession ->
             FakeShellCommand(sandboxRoot)
         }
@@ -80,15 +86,30 @@ fun main(args: Array<String>) {
     }
 
     Runtime.getRuntime().addShutdownHook(Thread {
+        runCatching { forwardHttpServer.stop(0) }
         runCatching { server.stop(true) }
         runCatching { deleteRecursively(sandboxRoot, sandboxParent) }
     })
 
+    forwardHttpServer.start()
     server.start()
-    println("$READY_PREFIX port=${server.port} sandbox=${sandboxRoot.absolutePathString()} keyProfile=${options.keyProfile}")
+    println("$READY_PREFIX port=${server.port} httpPort=${options.httpPort} sandbox=${sandboxRoot.absolutePathString()} keyProfile=${options.keyProfile}")
     val latch = CountDownLatch(1)
     latch.await()
 }
+
+private fun createForwardHttpServer(port: Int): HttpServer =
+    HttpServer.create(InetSocketAddress("127.0.0.1", port), 0).apply {
+        createContext("/") { exchange ->
+            val body = "$FORWARD_HTTP_RESPONSE ${exchange.requestURI.path}".toByteArray(StandardCharsets.UTF_8)
+            exchange.responseHeaders.add("Content-Type", "text/plain; charset=utf-8")
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { stream ->
+                stream.write(body)
+            }
+        }
+        executor = null
+    }
 
 private fun seedSandbox(root: Path) {
     root.resolve("docs").createDirectories()
@@ -121,6 +142,7 @@ private fun deleteRecursively(path: Path, sandboxParent: Path) {
 
 private data class Options(
     val port: Int,
+    val httpPort: Int,
     val stateDir: Path,
     val keyProfile: String
 ) {
@@ -133,9 +155,10 @@ private data class Options(
                 }
                 .toMap()
             val port = parsed["port"]?.toIntOrNull() ?: 56321
+            val httpPort = parsed["httpPort"]?.toIntOrNull() ?: 56323
             val stateDir = Path.of(parsed["stateDir"] ?: Path.of("build", "live-ssh-server").toString())
             val keyProfile = parsed["keyProfile"]?.takeIf { it.isNotBlank() } ?: "primary"
-            return Options(port = port, stateDir = stateDir, keyProfile = keyProfile)
+            return Options(port = port, httpPort = httpPort, stateDir = stateDir, keyProfile = keyProfile)
         }
     }
 }

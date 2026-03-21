@@ -21,6 +21,8 @@ tasks.configureEach {
     }
 }
 
+val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
+
 android {
     namespace = "com.majordaftapps.sshpeaches.app"
     compileSdk = 36
@@ -80,6 +82,7 @@ android {
             testInstrumentationRunnerArguments["liveSshUsername"] = liveSshUsername
             testInstrumentationRunnerArguments["liveSshPassword"] = liveSshPassword
             testInstrumentationRunnerArguments["liveSshKeyUsername"] = "tester-key"
+            testInstrumentationRunnerArguments["liveForwardHttpPort"] = liveForwardHttpPort.toString()
         } else if (releaseLaneRequested) {
             testInstrumentationRunnerArguments["annotation"] = releaseLaneAnnotation
             testInstrumentationRunnerArguments["notAnnotation"] = liveSuiteAnnotation
@@ -308,6 +311,7 @@ tasks.register("startLiveSshServer") {
             helperRuntimeClasspath(),
             liveServerMainClass,
             "--port=$liveServerPort",
+            "--httpPort=$liveForwardHttpPort",
             "--stateDir=${liveServerStateDir.get().asFile.absolutePath}",
             "--keyProfile=primary"
         )

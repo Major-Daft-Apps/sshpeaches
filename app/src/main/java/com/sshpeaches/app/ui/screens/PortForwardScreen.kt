@@ -30,7 +30,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -66,8 +65,10 @@ import com.majordaftapps.sshpeaches.app.ui.components.PortForwardQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.processPortForwardQrImport
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
 import com.majordaftapps.sshpeaches.app.util.parsePort
+import com.majordaftapps.sshpeaches.app.util.selectedHostId
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,16 +90,27 @@ fun PortForwardScreen(
     val labelState = remember { mutableStateOf("") }
     val bindState = remember { mutableStateOf("127.0.0.1") }
     val srcPortState = remember { mutableStateOf("22") }
-    val dstHostState = remember { mutableStateOf("") }
     val dstPortState = remember { mutableStateOf("0") }
     val enabledState = remember { mutableStateOf(true) }
-    val selectedHostsState = remember { mutableStateOf<List<String>>(emptyList()) }
-    val selectedHostFilterId = remember { mutableStateOf<String?>(null) }
-    val hostFilterExpanded = remember { mutableStateOf(false) }
+    val selectedHostIdState = remember { mutableStateOf<String?>(null) }
+    val hostPickerExpanded = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val shareForward = remember { mutableStateOf<PortForward?>(null) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
+    fun openDialog(forward: PortForward?, asEdit: Boolean = forward != null) {
+        editingId.value = if (asEdit) forward?.id else null
+        labelState.value = forward?.label ?: ""
+        bindState.value = forward?.sourceHost ?: "127.0.0.1"
+        srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
+        dstPortState.value = forward?.destinationPort?.toString() ?: "0"
+        enabledState.value = forward?.enabled ?: true
+        selectedHostIdState.value = forward?.selectedHostId() ?: hosts.singleOrNull()?.id
+        hostPickerExpanded.value = false
+        dialogError.value = null
+        showDialog.value = true
+    }
+
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
         when (val processed = processPortForwardQrImport(contents)) {
@@ -111,46 +123,26 @@ fun PortForwardScreen(
                     Toast.makeText(context, "Only Local forwarding is supported.", Toast.LENGTH_SHORT).show()
                     return@rememberLauncherForActivityResult
                 }
-                onAdd(
-                    imported.label,
-                    PortForwardType.LOCAL,
-                    imported.sourceHost,
-                    imported.sourcePort,
-                    imported.destinationHost,
-                    imported.destinationPort,
-                    imported.enabled,
-                    imported.associatedHosts
-                )
+                openDialog(imported, asEdit = false)
                 onImportFromQr()
-                Toast.makeText(context, "Port forward imported", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Select a host to finish importing", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    fun openDialog(forward: PortForward?) {
-        editingId.value = forward?.id
-        labelState.value = forward?.label ?: ""
-        bindState.value = forward?.sourceHost ?: "127.0.0.1"
-        srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
-        dstHostState.value = forward?.destinationHost ?: ""
-        dstPortState.value = forward?.destinationPort?.toString() ?: "0"
-        enabledState.value = forward?.enabled ?: true
-        selectedHostsState.value = forward?.associatedHosts ?: emptyList()
-        selectedHostFilterId.value = null
-        hostFilterExpanded.value = false
-        dialogError.value = null
-        showDialog.value = true
     }
 
     fun closeDialog() {
         showDialog.value = false
     }
 
-    val filteredItems = items.filter {
-        it.label.contains(search.value, ignoreCase = true) ||
-            it.sourceHost.contains(search.value, ignoreCase = true) ||
-            it.destinationHost.contains(search.value, ignoreCase = true) ||
-            it.type.name.contains(search.value, ignoreCase = true)
+    val filteredItems = items.filter { forward ->
+        val selectedHost = hosts.firstOrNull { it.id == forward.selectedHostId() }
+        val resolvedDestinationHost = forward.inferredDestinationHost(selectedHost)
+        val selectedHostName = selectedHost?.name.orEmpty()
+        forward.label.contains(search.value, ignoreCase = true) ||
+            forward.sourceHost.contains(search.value, ignoreCase = true) ||
+            resolvedDestinationHost.contains(search.value, ignoreCase = true) ||
+            selectedHostName.contains(search.value, ignoreCase = true) ||
+            forward.type.name.contains(search.value, ignoreCase = true)
     }
     val showEmptyState = items.isEmpty() || filteredItems.isEmpty()
     LaunchedEffect(showEmptyState) {
@@ -226,6 +218,7 @@ fun PortForwardScreen(
                     item { EmptyState(itemLabel = "result") }
                 } else {
                     items(filteredItems, key = { it.id }) { forward ->
+                    val selectedHost = hosts.firstOrNull { it.id == forward.selectedHostId() }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -233,13 +226,12 @@ fun PortForwardScreen(
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(forward.label, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                text = localForwardSummary(forward),
+                                text = localForwardSummary(forward, selectedHost),
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            if (forward.associatedHosts.isNotEmpty()) {
-                                val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
+                            if (selectedHost != null) {
                                 Text(
-                                    text = "Hosts: ${names.joinToString()}",
+                                    text = "Host: ${selectedHost.name.ifBlank { selectedHost.host }}",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
@@ -355,17 +347,52 @@ fun PortForwardScreen(
                             keyboardType = KeyboardType.Number
                         )
                     )
-                    OutlinedTextField(
-                        value = dstHostState.value,
-                        onValueChange = { dstHostState.value = it },
-                        label = { Text("Destination host") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Ascii
+                    ExposedDropdownMenuBox(
+                        expanded = hostPickerExpanded.value,
+                        onExpandedChange = {
+                            if (hosts.isNotEmpty()) {
+                                hostPickerExpanded.value = !hostPickerExpanded.value
+                            }
+                        }
+                    ) {
+                        val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
+                        TextField(
+                            value = selectedHost?.name?.ifBlank { selectedHost.host } ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Host") },
+                            placeholder = { Text("Select host") },
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostPickerExpanded.value) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.FORWARD_DIALOG_HOST_FIELD)
                         )
+                        ExposedDropdownMenu(
+                            expanded = hostPickerExpanded.value,
+                            onDismissRequest = { hostPickerExpanded.value = false }
+                        ) {
+                            hosts.forEach { host ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(host.name.ifBlank { host.host }) },
+                                    modifier = Modifier.testTag(UiTestTags.forwardHostOption(host.id)),
+                                    onClick = {
+                                        selectedHostIdState.value = host.id
+                                        hostPickerExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
+                    Text(
+                        text = if (selectedHost == null) {
+                            "Destination host is inferred from the selected host."
+                        } else {
+                            "Destination host: ${selectedHost.host}"
+                        },
+                        style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(
                         value = dstPortState.value,
@@ -383,81 +410,8 @@ fun PortForwardScreen(
                         Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
                         Text("Enable now")
                     }
-                    ExposedDropdownMenuBox(
-                        expanded = hostFilterExpanded.value,
-                        onExpandedChange = { hostFilterExpanded.value = !hostFilterExpanded.value }
-                    ) {
-                        TextField(
-                            value = selectedHostFilterId.value?.let { selectedId ->
-                                hosts.firstOrNull { it.id == selectedId }?.name ?: "All hosts"
-                            } ?: "All hosts",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Filter hosts") },
-                            singleLine = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostFilterExpanded.value) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = hostFilterExpanded.value,
-                            onDismissRequest = { hostFilterExpanded.value = false }
-                        ) {
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("All hosts") },
-                                onClick = {
-                                    selectedHostFilterId.value = null
-                                    hostFilterExpanded.value = false
-                                }
-                            )
-                            hosts.forEach { host ->
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(host.name.ifBlank { host.host }) },
-                                    onClick = {
-                                        selectedHostFilterId.value = host.id
-                                        hostFilterExpanded.value = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val filtered = hosts.filter { host ->
-                            selectedHostFilterId.value == null || host.id == selectedHostFilterId.value
-                        }
-                        filtered.forEach { host ->
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val list = selectedHostsState.value.toMutableList()
-                                        if (list.contains(host.id)) list.remove(host.id) else list.add(host.id)
-                                        selectedHostsState.value = list
-                                    }
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Column {
-                                    Text(host.name, style = MaterialTheme.typography.bodyLarge)
-                                    Text("${host.host}:${host.port}", style = MaterialTheme.typography.bodySmall)
-                                }
-                                Checkbox(
-                                    checked = selectedHostsState.value.contains(host.id),
-                                    onCheckedChange = {
-                                        val list = selectedHostsState.value.toMutableList()
-                                        if (it == true && !list.contains(host.id)) list.add(host.id)
-                                        if (it == false && list.contains(host.id)) list.remove(host.id)
-                                        selectedHostsState.value = list
-                                    }
-                                )
-                            }
-                        }
-                        if (hosts.isEmpty()) {
-                            Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
-                        } else if (filtered.isEmpty()) {
-                            Text("No hosts match selected filter", style = MaterialTheme.typography.bodySmall)
-                        }
+                    if (hosts.isEmpty()) {
+                        Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
                     }
                     dialogError.value?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
@@ -474,15 +428,18 @@ fun PortForwardScreen(
                         dialogError.value = "Enter a valid destination port."
                         return@TextButton
                     }
-                    if (!isValidHostAddress(dstHostState.value)) {
-                        dialogError.value = "Enter a valid destination host."
+                    val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
+                        dialogError.value = "Select a host."
                         return@TextButton
                     }
-                    val dstHost = dstHostState.value.trim()
+                    if (!isValidHostAddress(selectedHost.host)) {
+                        dialogError.value = "Selected host has an invalid address."
+                        return@TextButton
+                    }
                     dialogError.value = null
                     val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
                     val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
-                    val associated = selectedHostsState.value
+                    val associated = listOf(selectedHost.id)
                     if (isEdit) {
                         onUpdate(
                             editingId.value!!,
@@ -490,7 +447,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            dstHost,
+                            selectedHost.host,
                             dstPort,
                             enabledState.value,
                             associated
@@ -501,7 +458,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            dstHost,
+                            selectedHost.host,
                             dstPort,
                             enabledState.value,
                             associated
@@ -543,7 +500,7 @@ fun PortForwardScreen(
                         )
                     } ?: Text("Unable to generate QR")
                     Text(
-                        localForwardSummary(forward),
+                        localForwardSummary(forward, hosts.firstOrNull { it.id == forward.selectedHostId() }),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -552,5 +509,5 @@ fun PortForwardScreen(
     }
 }
 
-private fun localForwardSummary(forward: PortForward): String =
-    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.destinationHost}:${forward.destinationPort}"
+private fun localForwardSummary(forward: PortForward, selectedHost: HostConnection? = null): String =
+    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.inferredDestinationHost(selectedHost)}:${forward.destinationPort}"

@@ -21,14 +21,20 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
 import com.majordaftapps.sshpeaches.app.data.repository.InMemoryAppRepository
+import com.majordaftapps.sshpeaches.app.data.repository.InMemoryUptimeRepository
+import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.util.normalizeAssociatedHostIds
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
+import com.majordaftapps.sshpeaches.app.uptime.NoOpUptimeMonitorRunner
+import com.majordaftapps.sshpeaches.app.uptime.UptimeMonitorRunnerDelegate
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -43,7 +49,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class AppViewModel(
-    private val repository: AppRepository = InMemoryAppRepository()
+    private val repository: AppRepository = InMemoryAppRepository(),
+    private val uptimeRepository: UptimeRepository = InMemoryUptimeRepository(),
+    private val uptimeMonitorRunner: UptimeMonitorRunnerDelegate = NoOpUptimeMonitorRunner()
 ) : ViewModel() {
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
@@ -73,6 +81,7 @@ class AppViewModel(
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+    private var uptimeTickerJob: Job? = null
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
 
@@ -464,8 +473,15 @@ class AppViewModel(
         state.copy(snippetRunTimeoutSeconds = snippetTimeout)
     }
 
-    val uiState: StateFlow<AppUiState> = combine(
+    private val uptimeUiState = combine(
         coreUiState,
+        uptimeRepository.summaries
+    ) { state, uptimeSummaries ->
+        state.copy(uptimeSummaries = uptimeSummaries)
+    }
+
+    val uiState: StateFlow<AppUiState> = combine(
+        uptimeUiState,
         keyboardSlotsFlow
     ) { state, slots ->
         state.copy(keyboardSlots = slots)
@@ -888,6 +904,51 @@ class AppViewModel(
         }
     }
 
+    fun addHostToUptime(hostId: String) {
+        launchLogged("addHostToUptime", "hostId=$hostId") {
+            uptimeRepository.addHost(hostId)
+        }
+    }
+
+    fun updateUptimeConfig(
+        hostId: String,
+        method: UptimeCheckMethod,
+        port: Int,
+        intervalMinutes: Int,
+        enabled: Boolean
+    ) {
+        launchLogged(
+            "updateUptimeConfig",
+            "hostId=$hostId, method=$method, port=$port, intervalMinutes=$intervalMinutes, enabled=$enabled"
+        ) {
+            uptimeRepository.updateConfig(
+                hostId = hostId,
+                method = method,
+                port = port.coerceIn(1, 65_535),
+                intervalMinutes = intervalMinutes.coerceIn(1, 60),
+                enabled = enabled
+            )
+        }
+    }
+
+    fun setUptimeEnabled(hostId: String, enabled: Boolean) {
+        launchLogged("setUptimeEnabled", "hostId=$hostId, enabled=$enabled") {
+            uptimeRepository.setEnabled(hostId, enabled)
+        }
+    }
+
+    fun removeHostFromUptime(hostId: String) {
+        launchLogged("removeHostFromUptime", "hostId=$hostId") {
+            uptimeRepository.removeHost(hostId)
+        }
+    }
+
+    fun refreshUptime(hostId: String? = null) {
+        launchLogged("refreshUptime", "hostId=${hostId.orEmpty()}") {
+            uptimeMonitorRunner.runDueChecks(hostId = hostId)
+        }
+    }
+
     fun importHostPasswordPayload(id: String, payload: String, passphrase: String): Boolean {
         logAction(
             "importHostPasswordPayload",
@@ -980,14 +1041,22 @@ class AppViewModel(
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
-        destHost: String,
+        ignoredDestHost: String,
         destPort: Int,
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        logAction("addPortForward", "labelBlank=${label.isBlank()}, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        logAction("addPortForward", "labelBlank=${label.isBlank()}, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${ignoredDestHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
         if (label.isBlank()) {
             logResult("addPortForward", false, "validation-failed")
+            return
+        }
+        val normalizedAssociatedHosts = normalizeAssociatedHostIds(associatedHosts)
+        val selectedHost = normalizedAssociatedHosts.firstOrNull()?.let { selectedId ->
+            uiState.value.hosts.find { it.id == selectedId }
+        }
+        if (selectedHost == null) {
+            logResult("addPortForward", false, "validation-failed-no-host")
             return
         }
         if (type != PortForwardType.LOCAL) {
@@ -1000,9 +1069,9 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = sourcePort,
-            destinationHost = destHost,
+            destinationHost = selectedHost.host,
             destinationPort = destPort,
-            associatedHosts = associatedHosts,
+            associatedHosts = normalizedAssociatedHosts,
             favorite = false,
             enabled = enabled
         )
@@ -1036,15 +1105,23 @@ class AppViewModel(
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
-        destHost: String,
+        ignoredDestHost: String,
         destPort: Int,
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        logAction("updatePortForward", "forwardId=$id, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        logAction("updatePortForward", "forwardId=$id, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${ignoredDestHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
         val existing = uiState.value.portForwards.find { it.id == id }
         if (existing == null) {
             logResult("updatePortForward", false, "not-found")
+            return
+        }
+        val normalizedAssociatedHosts = normalizeAssociatedHostIds(associatedHosts)
+        val selectedHost = normalizedAssociatedHosts.firstOrNull()?.let { selectedId ->
+            uiState.value.hosts.find { it.id == selectedId }
+        }
+        if (selectedHost == null) {
+            logResult("updatePortForward", false, "validation-failed-no-host")
             return
         }
         if (type != PortForwardType.LOCAL) {
@@ -1056,10 +1133,10 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { existing.sourceHost },
             sourcePort = sourcePort,
-            destinationHost = destHost,
+            destinationHost = selectedHost.host,
             destinationPort = destPort,
             enabled = enabled,
-            associatedHosts = associatedHosts
+            associatedHosts = normalizedAssociatedHosts
         )
         launchLogged("updatePortForward", "forwardId=$id") {
             repository.updatePortForward(updated)
@@ -1216,6 +1293,8 @@ class AppViewModel(
     fun onAppBackgrounded() {
         logAction("onAppBackgrounded", "locked=${lockedFlow.value}")
         appInBackground = true
+        uptimeTickerJob?.cancel()
+        uptimeTickerJob = null
         if (!lockedFlow.value) {
             scheduleLockTimer(lockTimeoutFlow.value)
         }
@@ -1227,6 +1306,7 @@ class AppViewModel(
         appInBackground = false
         lockTimerJob?.cancel()
         lockTimerJob = null
+        startUptimeTicker()
         logResult("onAppForegrounded", true)
     }
 
@@ -1498,6 +1578,17 @@ class AppViewModel(
         }
     }
 
+    private fun startUptimeTicker() {
+        uptimeTickerJob?.cancel()
+        uptimeTickerJob = viewModelScope.launch {
+            uptimeMonitorRunner.runDueChecks()
+            while (true) {
+                delay(60_000L)
+                uptimeMonitorRunner.runDueChecks()
+            }
+        }
+    }
+
     private fun lockTimeoutDuration(timeout: LockTimeout): Long? = when (timeout) {
         LockTimeout.IMMEDIATE -> 0L
         LockTimeout.ONE_MIN -> 60_000L
@@ -1510,10 +1601,14 @@ class AppViewModel(
         private val byLastUsed = compareByDescending<HostConnection> { it.lastUsedEpochMillis ?: 0L }
         private val byName = compareBy<HostConnection> { it.name.lowercase() }
 
-        fun provideFactory(repository: AppRepository): ViewModelProvider.Factory =
+        fun provideFactory(
+            repository: AppRepository,
+            uptimeRepository: UptimeRepository,
+            uptimeMonitorRunner: UptimeMonitorRunnerDelegate
+        ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
-                    AppViewModel(repository)
+                    AppViewModel(repository, uptimeRepository, uptimeMonitorRunner)
                 }
             }
     }

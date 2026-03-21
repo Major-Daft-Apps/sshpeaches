@@ -7,15 +7,15 @@ import org.junit.Test
 class KeyboardLayoutDefaultsTest {
 
     @Test
-    fun defaultLayout_matchesTermuxStyleRows() {
+    fun defaultLayout_matchesCurrentDefaultRows() {
         val labels = KeyboardLayoutDefaults.DEFAULT_SLOTS.map { it.label }
         assertEquals(28, labels.size)
 
         val expected = listOf(
             "F1", "F2", "F3", "F4", "F5", "F6", "F7",
             "F8", "F9", "F10", "F11", "F12", "Snippets", "Password",
-            "Esc", "/", "-", "Home", "Up", "End", "PgUp",
-            "Tab", "Ctrl", "Alt", "Left", "Down", "Right", "PgDn"
+            "Esc", "Alt", "Home", "Up", "End", "PgUp", "Swipe Nav",
+            "Tab", "Ctrl", "Left", "Down", "Right", "PgDn", "Keyboard"
         )
         assertEquals(expected, labels)
     }

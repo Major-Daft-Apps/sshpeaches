@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.testutil
 
 import android.content.Context
 import android.content.Intent
+import androidx.work.WorkManager
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
@@ -22,6 +23,7 @@ object AppStateResetter {
             SettingsStore.init(appContext)
             SettingsStore.resetToDefaults()
             SshPeachesDatabase.get(appContext).clearAllTables()
+            WorkManager.getInstance(appContext).cancelAllWork()
         }
 
         SecurityManager.init(appContext)

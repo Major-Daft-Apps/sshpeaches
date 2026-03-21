@@ -114,6 +114,21 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+for candidate in \
+    "${SSHPEACHES_GRADLE_JAVA_HOME:-}" \
+    "${STUDIO_JDK:-}" \
+    "${JDK21_HOME:-}" \
+    "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+    "/opt/android-studio/jbr" \
+    "$HOME/android-studio/jbr"
+do
+    if [ -n "$candidate" ] && [ -x "$candidate/bin/java" ] ; then
+        JAVA_HOME=$candidate
+        export JAVA_HOME
+        break
+    fi
+done
+
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then

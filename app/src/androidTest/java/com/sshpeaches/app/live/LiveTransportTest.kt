@@ -22,6 +22,8 @@ import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
@@ -37,10 +39,13 @@ import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.UUID
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -365,6 +370,52 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
     }
 
+    @Test
+    fun localPortForward_canFetchHttpResponse() {
+        assumeTrue(
+            "This live forward test requires localhost SSH routing via adb reverse.",
+            LiveBackendConfig.host == "127.0.0.1"
+        )
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            terminalSelectionMode = TerminalSelectionMode.NATURAL
+        )
+        val forwardedPort = 18080
+        val host = HostConnection(
+            id = "live-forward-${UUID.randomUUID()}",
+            name = "Live Forward Host",
+            host = "127.0.0.1",
+            port = LiveBackendConfig.port,
+            username = LiveBackendConfig.username,
+            preferredAuth = AuthMethod.PASSWORD,
+            hasPassword = true
+        )
+        AppStateSeeder.seedHost(host, LiveBackendConfig.password)
+        AppStateSeeder.seedPortForward(
+            PortForward(
+                id = "live-forward-config-${UUID.randomUUID()}",
+                label = "Live HTTP Forward",
+                type = PortForwardType.LOCAL,
+                sourceHost = "127.0.0.1",
+                sourcePort = forwardedPort,
+                destinationHost = host.host,
+                destinationPort = LiveBackendConfig.forwardHttpPort,
+                associatedHosts = listOf(host.id),
+                enabled = true
+            )
+        )
+
+        composeRule.navigateDrawer(Routes.HOSTS)
+        composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "ssh")).performClick()
+
+        waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+        val response = waitForForwardedHttpResponse(forwardedPort)
+        check(response.contains("SSHPEACHES_FORWARD_OK")) {
+            "Expected forwarded HTTP response but got: $response"
+        }
+    }
+
     @Ignore("SFTP host action was replaced by SCP upload/download.")
     @Test
     fun sftpUploadAndDownloadStayInsideSandbox() {
@@ -585,6 +636,43 @@ class LiveTransportSuiteTest {
         )
         AppStateSeeder.seedHost(host, LiveBackendConfig.password)
         return host
+    }
+
+    private fun waitForForwardedHttpResponse(forwardedPort: Int, timeoutMillis: Long = 20_000): String {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        var lastError: Throwable? = null
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress("127.0.0.1", forwardedPort), 2_000)
+                    socket.soTimeout = 2_000
+                    val writer = socket.getOutputStream().bufferedWriter()
+                    writer.apply {
+                        writer.write("GET /health HTTP/1.1\r\n")
+                        writer.write("Host: 127.0.0.1\r\n")
+                        writer.write("Connection: close\r\n")
+                        writer.write("\r\n")
+                        writer.flush()
+                    }
+                    val buffer = ByteArray(1_024)
+                    val response = StringBuilder()
+                    val input = socket.getInputStream()
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        response.append(String(buffer, 0, read))
+                        if (response.contains("SSHPEACHES_FORWARD_OK")) {
+                            return response.toString()
+                        }
+                    }
+                    return response.toString()
+                }
+            } catch (error: Throwable) {
+                lastError = error
+                Thread.sleep(500)
+            }
+        }
+        throw AssertionError("Timed out waiting for forwarded HTTP response", lastError)
     }
 
 }

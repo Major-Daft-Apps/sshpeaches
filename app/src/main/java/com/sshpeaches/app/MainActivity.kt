@@ -58,7 +58,11 @@ class MainActivity : FragmentActivity() {
 
     private val appViewModel: AppViewModel by viewModels {
         val app = application as SSHPeachesApplication
-        AppViewModel.provideFactory(app.container.repository)
+        AppViewModel.provideFactory(
+            repository = app.container.repository,
+            uptimeRepository = app.container.uptimeRepository,
+            uptimeMonitorRunner = app.container.uptimeMonitorRunner
+        )
     }
     private val sessionServiceState = mutableStateOf<SessionService?>(null)
     private var serviceBound = false
@@ -542,6 +546,11 @@ class MainActivity : FragmentActivity() {
                         )
                     },
                     onHostDelete = viewModel::deleteHost,
+                    onAddHostToUptime = viewModel::addHostToUptime,
+                    onUpdateUptimeConfig = viewModel::updateUptimeConfig,
+                    onSetUptimeEnabled = viewModel::setUptimeEnabled,
+                    onRemoveHostFromUptime = viewModel::removeHostFromUptime,
+                    onRefreshUptime = viewModel::refreshUptime,
                     onImportHost = viewModel::importHost,
                     onHostOsMetadataImported = viewModel::updateHostOsMetadata,
                     onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
@@ -778,6 +787,7 @@ class MainActivity : FragmentActivity() {
     private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
         Routes.FAVORITES,
         Routes.HOSTS,
+        Routes.UPTIME,
         Routes.IDENTITIES,
         Routes.FORWARDS,
         Routes.SNIPPETS,

@@ -36,6 +36,12 @@ for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 
+@rem Prefer a JDK that is known to work with Android Gradle test tasks.
+if defined SSHPEACHES_GRADLE_JAVA_HOME if exist "%SSHPEACHES_GRADLE_JAVA_HOME%\bin\java.exe" set "JAVA_HOME=%SSHPEACHES_GRADLE_JAVA_HOME%"
+if defined STUDIO_JDK if exist "%STUDIO_JDK%\bin\java.exe" set "JAVA_HOME=%STUDIO_JDK%"
+if defined JDK21_HOME if exist "%JDK21_HOME%\bin\java.exe" set "JAVA_HOME=%JDK21_HOME%"
+if exist "%ProgramFiles%\Android\Android Studio\jbr\bin\java.exe" set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
+
 @rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome
 

@@ -11,9 +11,11 @@ import androidx.room.TypeConverters
         HostEntity::class,
         IdentityEntity::class,
         PortForwardEntity::class,
-        SnippetEntity::class
+        SnippetEntity::class,
+        HostUptimeConfigEntity::class,
+        HostUptimeSampleEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -22,6 +24,8 @@ abstract class SshPeachesDatabase : RoomDatabase() {
     abstract fun identityDao(): IdentityDao
     abstract fun portForwardDao(): PortForwardDao
     abstract fun snippetDao(): SnippetDao
+    abstract fun hostUptimeConfigDao(): HostUptimeConfigDao
+    abstract fun hostUptimeSampleDao(): HostUptimeSampleDao
 
     companion object {
         @Volatile private var instance: SshPeachesDatabase? = null

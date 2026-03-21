@@ -126,6 +126,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.local.Converters
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -152,6 +153,7 @@ import com.majordaftapps.sshpeaches.app.ui.screens.SnippetEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.UptimeScreen
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -220,6 +222,11 @@ fun SSHPeachesRoot(
     onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
     onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     onHostDelete: (String) -> Unit,
+    onAddHostToUptime: (String) -> Unit,
+    onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
+    onSetUptimeEnabled: (String, Boolean) -> Unit,
+    onRemoveHostFromUptime: (String) -> Unit,
+    onRefreshUptime: (String?) -> Unit,
     onImportHost: (HostConnection) -> Unit,
     @Suppress("UNUSED_PARAMETER")
     onHostOsMetadataImported: (String, OsMetadata) -> Unit,
@@ -313,6 +320,7 @@ fun SSHPeachesRoot(
     val routeEmptyStateVisible = when (currentRoute) {
         Routes.FAVORITES -> emptyStateByRoute[Routes.FAVORITES] ?: favoritesEmpty
         Routes.HOSTS -> uiState.hosts.isEmpty()
+        Routes.UPTIME -> uiState.hosts.isEmpty() && uiState.uptimeSummaries.isEmpty()
         Routes.IDENTITIES -> emptyStateByRoute[Routes.IDENTITIES] ?: uiState.identities.isEmpty()
         Routes.FORWARDS -> emptyStateByRoute[Routes.FORWARDS] ?: uiState.portForwards.isEmpty()
         Routes.SNIPPETS -> emptyStateByRoute[Routes.SNIPPETS] ?: uiState.snippets.isEmpty()
@@ -456,6 +464,7 @@ fun SSHPeachesRoot(
             activeSessionRequest.host
         } ?: "Connecting"
         Routes.HOSTS -> "Hosts"
+        Routes.UPTIME -> "Uptime"
         Routes.IDENTITIES -> "Identities"
         Routes.FORWARDS -> "Port Forwards"
         Routes.SNIPPETS -> "Snippets"
@@ -1490,6 +1499,17 @@ fun SSHPeachesRoot(
                             onInfoCommandsChange = { host, commands ->
                                 onHostInfoCommandsChange(host.id, commands)
                             }
+                        )
+                    }
+                    composable(Routes.UPTIME) {
+                        UptimeScreen(
+                            hosts = uiState.hosts,
+                            summaries = uiState.uptimeSummaries,
+                            onAddHost = onAddHostToUptime,
+                            onUpdateConfig = onUpdateUptimeConfig,
+                            onSetEnabled = onSetUptimeEnabled,
+                            onRemoveHost = onRemoveHostFromUptime,
+                            onRefreshHost = onRefreshUptime
                         )
                     }
                     composable(Routes.IDENTITIES) {

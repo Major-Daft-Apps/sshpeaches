@@ -7,6 +7,9 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.UnverifiedReason
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import com.majordaftapps.sshpeaches.app.data.model.UptimeStatus
 
 /**
  * Centralized Room converters for enums and small aggregates.
@@ -59,6 +62,35 @@ object Converters {
     @JvmStatic
     fun toPortType(value: String?): PortForwardType =
         runCatching { PortForwardType.valueOf(value ?: PortForwardType.LOCAL.name) }.getOrDefault(PortForwardType.LOCAL)
+
+    @TypeConverter
+    @JvmStatic
+    fun fromUptimeCheckMethod(value: UptimeCheckMethod?): String =
+        value?.name ?: UptimeCheckMethod.TCP.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toUptimeCheckMethod(value: String?): UptimeCheckMethod =
+        runCatching { UptimeCheckMethod.valueOf(value ?: UptimeCheckMethod.TCP.name) }
+            .getOrDefault(UptimeCheckMethod.TCP)
+
+    @TypeConverter
+    @JvmStatic
+    fun fromUptimeStatus(value: UptimeStatus?): String? = value?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toUptimeStatus(value: String?): UptimeStatus? =
+        value?.let { runCatching { UptimeStatus.valueOf(it) }.getOrNull() }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromUnverifiedReason(value: UnverifiedReason?): String? = value?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toUnverifiedReason(value: String?): UnverifiedReason? =
+        value?.let { runCatching { UnverifiedReason.valueOf(it) }.getOrNull() }
 
     @TypeConverter
     @JvmStatic

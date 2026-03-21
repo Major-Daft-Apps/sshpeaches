@@ -19,4 +19,7 @@ object LiveBackendConfig {
 
     val keyUsername: String
         get() = arguments.getString("liveSshKeyUsername") ?: "tester-key"
+
+    val forwardHttpPort: Int
+        get() = arguments.getString("liveForwardHttpPort")?.toIntOrNull() ?: 56323
 }

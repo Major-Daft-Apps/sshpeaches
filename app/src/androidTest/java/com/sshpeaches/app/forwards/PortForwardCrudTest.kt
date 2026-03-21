@@ -15,6 +15,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
@@ -41,6 +43,10 @@ class PortForwardCrudTest {
 
     @Test
     fun addPortForward_showsInList() {
+        val host = sampleHost(id = "host-forward-add", name = "QA Host", address = "qa.internal")
+        AppStateSeeder.seedHost(host)
+        composeRule.activityRule.scenario.recreate()
+
         composeRule.navigateDrawer(Routes.FORWARDS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_FORWARDS).assertIsDisplayed()
 
@@ -50,7 +56,8 @@ class PortForwardCrudTest {
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT).performTextInput("127.0.0.1")
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT).performTextInput("8081")
-        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT).performTextInput("example.com")
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_HOST_FIELD).performClick()
+        composeRule.onNodeWithTag(UiTestTags.forwardHostOption(host.id)).performClick()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).performTextInput("443")
         composeRule.onNodeWithText("Add").performClick()
@@ -65,6 +72,8 @@ class PortForwardCrudTest {
 
     @Test
     fun editAndDeleteSeededPortForward() {
+        val host = sampleHost(id = "host-forward-edit", name = "Seed Host", address = "seed.internal")
+        AppStateSeeder.seedHost(host)
         AppStateSeeder.seedPortForward(
             PortForward(
                 id = "seed-forward",
@@ -72,8 +81,9 @@ class PortForwardCrudTest {
                 type = PortForwardType.LOCAL,
                 sourceHost = "127.0.0.1",
                 sourcePort = 8081,
-                destinationHost = "example.com",
-                destinationPort = 443
+                destinationHost = host.host,
+                destinationPort = 443,
+                associatedHosts = listOf(host.id)
             )
         )
         composeRule.activityRule.scenario.recreate()
@@ -99,4 +109,13 @@ class PortForwardCrudTest {
         composeRule.onNodeWithTag(UiTestTags.FORWARD_CARD_DELETE_BUTTON).performClick()
         composeRule.onAllNodesWithText("QA Tunnel Updated").assertCountEquals(0)
     }
+
+    private fun sampleHost(id: String, name: String, address: String): HostConnection =
+        HostConnection(
+            id = id,
+            name = name,
+            host = address,
+            username = "tester",
+            preferredAuth = AuthMethod.PASSWORD
+        )
 }

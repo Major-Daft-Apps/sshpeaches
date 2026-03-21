@@ -5,6 +5,7 @@ object Routes {
     const val CONNECTING = "connecting"
     const val SESSION = "session"
     const val HOSTS = "hosts"
+    const val UPTIME = "uptime"
     const val IDENTITIES = "identities"
     const val FORWARDS = "forwards"
     const val SNIPPETS = "snippets"

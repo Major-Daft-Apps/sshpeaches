@@ -8,11 +8,14 @@ import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.diagnostics.DiagnosticsScheduler
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
+import com.majordaftapps.sshpeaches.app.uptime.UptimeNotifications
+import com.majordaftapps.sshpeaches.app.uptime.UptimeScheduler
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -31,11 +34,20 @@ class SSHPeachesApplication : Application() {
         applyConfiguredNightMode()
         AppCheckInitializer.initialize(this)
         TelemetryInitializer.initialize(this)
+        UptimeNotifications.ensureChannel(this)
         appScope.launch {
             SettingsStore.usageReportsEnabled
                 .distinctUntilChanged()
                 .collect { enabled ->
                     DiagnosticsScheduler.update(this@SSHPeachesApplication, enabled)
+                }
+        }
+        appScope.launch {
+            container.uptimeRepository.configs
+                .map { configs -> configs.any { it.enabled } }
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    UptimeScheduler.update(this@SSHPeachesApplication, enabled)
                 }
         }
     }

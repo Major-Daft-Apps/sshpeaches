@@ -6,9 +6,11 @@ import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
 import com.majordaftapps.sshpeaches.app.data.local.asEntity
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.HostUptimeConfig
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -72,6 +74,26 @@ object AppStateSeeder {
     fun seedSnippet(snippet: Snippet) {
         runBlocking {
             SshPeachesDatabase.get(context).snippetDao().upsert(snippet.asEntity())
+        }
+    }
+
+    fun seedUptimeConfig(
+        hostId: String,
+        method: UptimeCheckMethod = UptimeCheckMethod.TCP,
+        port: Int = 22,
+        intervalMinutes: Int = 15,
+        enabled: Boolean = true
+    ) {
+        runBlocking {
+            SshPeachesDatabase.get(context).hostUptimeConfigDao().upsert(
+                HostUptimeConfig(
+                    hostId = hostId,
+                    method = method,
+                    port = port,
+                    intervalMinutes = intervalMinutes,
+                    enabled = enabled
+                ).asEntity()
+            )
         }
     }
 
