@@ -12,6 +12,10 @@ fun encodePortForwardPayload(forward: PortForward): String {
     val json = JSONObject().apply {
         put("id", forward.id)
         put("label", forward.label)
+        forward.group?.let { put("group", it) }
+        put("createdEpochMillis", forward.createdEpochMillis ?: JSONObject.NULL)
+        put("updatedEpochMillis", forward.updatedEpochMillis ?: JSONObject.NULL)
+        put("lastUsedEpochMillis", forward.lastUsedEpochMillis ?: JSONObject.NULL)
         put("type", forward.type.name)
         put("bind", forward.sourceHost)
         put("srcPort", forward.sourcePort)

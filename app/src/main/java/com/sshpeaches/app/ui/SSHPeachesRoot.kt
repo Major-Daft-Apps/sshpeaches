@@ -18,12 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -139,7 +139,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
-import com.majordaftapps.sshpeaches.app.ui.screens.FavoritesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.KeyboardEditorScreen
@@ -231,15 +231,15 @@ fun SSHPeachesRoot(
     @Suppress("UNUSED_PARAMETER")
     onHostOsMetadataImported: (String, OsMetadata) -> Unit,
     onHostInfoCommandsChange: (String, List<String>) -> Unit,
-    onPortForwardAdd: (String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    onPortForwardAdd: (String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onImportPortForward: (PortForward) -> Unit,
-    onPortForwardUpdate: (String, String, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    onPortForwardUpdate: (String, String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     onPortForwardDelete: (String) -> Unit,
     onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
     onStopSession: (String) -> Unit,
-    onIdentityAdd: (String, String, String?, String?) -> Unit,
+    onIdentityAdd: (String, String, String?, String?, String?) -> Unit,
     onImportIdentity: (Identity) -> Unit,
-    onIdentityUpdate: (String, String, String, String?) -> Unit,
+    onIdentityUpdate: (String, String, String, String?, String?) -> Unit,
     onIdentityDelete: (String) -> Unit,
     onImportHostPasswordPayload: (String, String, String) -> Boolean,
     onImportIdentityKey: (String, String, String) -> Boolean,
@@ -254,11 +254,15 @@ fun SSHPeachesRoot(
     onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
     onKeyboardReset: () -> Unit,
     onImportTerminalProfiles: (List<TerminalProfile>, String?) -> Unit,
-    onSnippetAdd: (String, String, String) -> Unit,
+    onSnippetAdd: (String, String?, String, String) -> Unit,
     onImportSnippet: (Snippet) -> Unit,
-    onSnippetUpdate: (String, String, String, String) -> Unit,
+    onSnippetUpdate: (String, String, String?, String, String) -> Unit,
     onSnippetDelete: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onMarkHostUsed: (String) -> Unit,
+    onMarkIdentityUsed: (String) -> Unit,
+    onMarkPortForwardUsed: (String) -> Unit,
+    onMarkSnippetUsed: (String) -> Unit,
     onSendSessionShortcut: (String, String) -> Unit,
     onSendShellBytes: (String, ByteArray) -> Unit,
     onResizeShell: (String, Int, Int) -> Unit,
@@ -287,6 +291,11 @@ fun SSHPeachesRoot(
     onStartupRouteHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val initialStartDestination = remember {
+        requestedStartupRoute
+            ?.takeUnless { it == Routes.CONNECTING }
+            ?: Routes.HOME
+    }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
@@ -294,31 +303,24 @@ fun SSHPeachesRoot(
     val quickConnectRequest = rememberSaveable { mutableStateOf<QuickConnectRequest?>(null) }
     val quickConnectState = rememberSaveable { mutableStateOf(QuickConnectUiState()) }
     val pendingConnectingNavigation = rememberSaveable { mutableStateOf(false) }
-    val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.FAVORITES) }
+    val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.HOME) }
     val sawSnapshotForCurrentRequest = rememberSaveable { mutableStateOf(false) }
-    val editMode = rememberSaveable { mutableStateOf(false) }
     val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
     val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
     val context = LocalContext.current
     val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
-    val currentRoute = backStackEntry?.destination?.route ?: Routes.FAVORITES
-    val editSupportedRoutes = remember {
-        setOf(
-            Routes.HOSTS,
-            Routes.IDENTITIES,
-            Routes.FORWARDS,
-            Routes.SNIPPETS
-        )
-    }
-    val favoritesEmpty = uiState.favorites.hostFavorites.isEmpty() &&
-        uiState.favorites.identityFavorites.isEmpty() &&
-        uiState.favorites.portFavorites.isEmpty() &&
-        uiState.favorites.snippetFavorites.isEmpty()
+    val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
     val routeEmptyStateVisible = when (currentRoute) {
-        Routes.FAVORITES -> emptyStateByRoute[Routes.FAVORITES] ?: favoritesEmpty
         Routes.HOSTS -> uiState.hosts.isEmpty()
         Routes.UPTIME -> uiState.hosts.isEmpty() && uiState.uptimeSummaries.isEmpty()
         Routes.IDENTITIES -> emptyStateByRoute[Routes.IDENTITIES] ?: uiState.identities.isEmpty()
@@ -326,7 +328,6 @@ fun SSHPeachesRoot(
         Routes.SNIPPETS -> emptyStateByRoute[Routes.SNIPPETS] ?: uiState.snippets.isEmpty()
         else -> false
     }
-    val showEditAction = currentRoute in editSupportedRoutes && !routeEmptyStateVisible
     val missingCorePermissions = corePermissions.filterNot { it.granted }
     val activeSshSessions = sessions.filter {
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
@@ -420,9 +421,9 @@ fun SSHPeachesRoot(
         if (!popped) {
             val destination = routeBeforeConnecting.value
                 .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-                ?: Routes.FAVORITES
+                ?: Routes.HOME
             navController.navigate(destination) {
-                popUpTo(Routes.FAVORITES)
+                popUpTo(Routes.HOME)
             }
         }
     }
@@ -458,7 +459,7 @@ fun SSHPeachesRoot(
     }
     val activeSessionRequest = effectiveQuickConnectRequest
     val currentTitle = when (currentRoute) {
-        Routes.FAVORITES -> "Favorites"
+        Routes.HOME -> "Home"
         Routes.CONNECTING,
         Routes.SESSION -> activeSessionRequest?.name?.ifBlank {
             activeSessionRequest.host
@@ -488,9 +489,6 @@ fun SSHPeachesRoot(
         if (!isSessionVerticalRoute) {
             routeBeforeConnecting.value = currentRoute
         }
-        if (!showEditAction && editMode.value) {
-            editMode.value = false
-        }
     }
 
     LaunchedEffect(requestedOpenSessionId, requestedOpenSessionFileTransferEntryMode, sessions, currentRoute) {
@@ -507,7 +505,7 @@ fun SSHPeachesRoot(
         autoResumeHandled.value = true
         if (currentRoute != targetRoute) {
             navController.navigate(targetRoute) {
-                popUpTo(Routes.FAVORITES)
+                popUpTo(Routes.HOME)
             }
         }
         onOpenSessionRequestHandled()
@@ -518,7 +516,7 @@ fun SSHPeachesRoot(
         if (backStackEntry == null) return@LaunchedEffect
         if (startupRoute != currentRoute && startupRoute != Routes.CONNECTING) {
             navController.navigate(startupRoute) {
-                popUpTo(Routes.FAVORITES)
+                popUpTo(Routes.HOME)
                 launchSingleTop = true
             }
         }
@@ -576,9 +574,9 @@ fun SSHPeachesRoot(
                     if (isSessionVerticalRoute) {
                         val destination = routeBeforeConnecting.value
                             .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-                            ?: Routes.FAVORITES
+                            ?: Routes.HOME
                         navController.navigate(destination) {
-                            popUpTo(Routes.FAVORITES)
+                            popUpTo(Routes.HOME)
                         }
                     }
                 } else {
@@ -646,12 +644,34 @@ fun SSHPeachesRoot(
         sessionLogs.removeAll { it.hostId == sessionId }
     }
 
+    fun markHostUsage(host: HostConnection) {
+        onMarkHostUsed(host.id)
+        host.preferredIdentityId?.let(onMarkIdentityUsed)
+        listOfNotNull(host.preferredForwardId)
+            .plus(host.attachedForwards)
+            .distinct()
+            .forEach(onMarkPortForwardUsed)
+    }
+
+    fun markRequestUsage(request: QuickConnectRequest) {
+        request.savedHostId?.let(onMarkHostUsed)
+        val savedHost = request.savedHostId?.let { hostId ->
+            uiState.hosts.firstOrNull { it.id == hostId }
+        }
+        savedHost?.preferredIdentityId?.let(onMarkIdentityUsed)
+        listOfNotNull(request.forwardId, savedHost?.preferredForwardId)
+            .plus(savedHost?.attachedForwards.orEmpty())
+            .distinct()
+            .forEach(onMarkPortForwardUsed)
+    }
+
     fun openOrStartSavedHostSession(
         host: HostConnection,
         mode: ConnectionMode,
         password: String?,
         fileTransferEntryMode: FileTransferEntryMode? = null
     ) {
+        markHostUsage(host)
         val sessionId = sessionIdFor(host.id, mode)
         val existingSnapshot = sessions.firstOrNull { it.hostId == sessionId }
         if (
@@ -763,7 +783,11 @@ fun SSHPeachesRoot(
                         label = item.optString("label").ifBlank { "Identity" },
                         fingerprint = fingerprint,
                         username = item.optString("username").trim().ifBlank { null },
+                        group = item.optString("group").trim().ifBlank { null },
                         createdEpochMillis = optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        updatedEpochMillis = optNullableLong(item, "updatedEpochMillis")
+                            ?: optNullableLong(item, "createdEpochMillis")
                             ?: System.currentTimeMillis(),
                         lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
                         favorite = item.optBoolean("favorite", false),
@@ -808,6 +832,13 @@ fun SSHPeachesRoot(
                     val importedSnippet = Snippet(
                         id = targetId,
                         title = title,
+                        group = item.optString("group").trim().ifBlank { null },
+                        createdEpochMillis = optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        updatedEpochMillis = optNullableLong(item, "updatedEpochMillis")
+                            ?: optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
                         description = item.optString("description"),
                         command = command,
                         tags = jsonStringList(item.optJSONArray("tags")),
@@ -850,6 +881,13 @@ fun SSHPeachesRoot(
                     val importedForward = PortForward(
                         id = targetId,
                         label = label,
+                        group = item.optString("group").trim().ifBlank { null },
+                        createdEpochMillis = optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        updatedEpochMillis = optNullableLong(item, "updatedEpochMillis")
+                            ?: optNullableLong(item, "createdEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
                         type = runCatching {
                             PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
                         }.getOrDefault(PortForwardType.LOCAL),
@@ -899,6 +937,13 @@ fun SSHPeachesRoot(
                         username = username,
                         preferredAuth = auth,
                         group = item.optString("group").trim().ifBlank { null },
+                        createdEpochMillis = optNullableLong(item, "createdEpochMillis")
+                            ?: optNullableLong(item, "lastUsedEpochMillis")
+                            ?: System.currentTimeMillis(),
+                        updatedEpochMillis = optNullableLong(item, "updatedEpochMillis")
+                            ?: optNullableLong(item, "createdEpochMillis")
+                            ?: optNullableLong(item, "lastUsedEpochMillis")
+                            ?: System.currentTimeMillis(),
                         lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
                         favorite = item.optBoolean("favorite", false),
                         osMetadata = Converters.toOsMetadata(
@@ -1071,9 +1116,9 @@ fun SSHPeachesRoot(
         pendingConnectingNavigation.value = false
         val destination = routeBeforeConnecting.value
             .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-            ?: Routes.FAVORITES
+            ?: Routes.HOME
         navController.navigate(destination) {
-            popUpTo(Routes.FAVORITES)
+            popUpTo(Routes.HOME)
         }
         quickConnectRequest.value = null
         quickConnectState.value = QuickConnectUiState()
@@ -1183,6 +1228,7 @@ fun SSHPeachesRoot(
                         phase = QuickConnectPhase.CONNECTING,
                         message = "Connecting to ${next.host}:${next.port}..."
                     )
+                    markRequestUsage(next)
                     onStartSession(
                         next.sessionId,
                         quickConnectHost(next),
@@ -1232,7 +1278,7 @@ fun SSHPeachesRoot(
                                 else -> {
                                     if (destination.route != currentRoute) {
                                         navController.navigate(destination.route) {
-                                            popUpTo(Routes.FAVORITES) { saveState = true }
+                                            popUpTo(Routes.HOME) { saveState = true }
                                             launchSingleTop = true
                                             restoreState = true
                                         }
@@ -1324,20 +1370,65 @@ fun SSHPeachesRoot(
                                             )
                                         }
                                     }
-                                    if (showEditAction) {
-                                        AnimatedContent(
-                                            targetState = editMode.value,
-                                            transitionSpec = {
-                                                (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.82f)) togetherWith
-                                                    (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 1.12f))
-                                            },
-                                            label = "editMode"
-                                        ) { editing ->
-                                            IconButton(onClick = { editMode.value = !editMode.value }) {
-                                                Icon(
-                                                    imageVector = if (editing) Icons.Default.Done else Icons.Default.Edit,
-                                                    contentDescription = if (editing) "Done editing" else "Edit"
-                                                )
+                                    when (currentRoute) {
+                                        Routes.HOSTS -> {
+                                            IconButton(
+                                                onClick = { hostImportRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarImport(Routes.HOSTS))
+                                            ) {
+                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import host QR")
+                                            }
+                                            IconButton(
+                                                onClick = { hostAddRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.HOSTS))
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add host")
+                                            }
+                                        }
+                                        Routes.IDENTITIES -> {
+                                            IconButton(
+                                                onClick = { identityImportRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarImport(Routes.IDENTITIES))
+                                            ) {
+                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import identity QR")
+                                            }
+                                            IconButton(
+                                                onClick = { identityAddRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.IDENTITIES))
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add identity")
+                                            }
+                                        }
+                                        Routes.FORWARDS -> {
+                                            IconButton(
+                                                onClick = { forwardImportRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarImport(Routes.FORWARDS))
+                                            ) {
+                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import port forward QR")
+                                            }
+                                            IconButton(
+                                                onClick = { forwardAddRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.FORWARDS))
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add port forward")
+                                            }
+                                        }
+                                        Routes.SNIPPETS -> {
+                                            IconButton(
+                                                onClick = { snippetImportRequestToken.intValue += 1 },
+                                                modifier = Modifier.testTag(UiTestTags.topBarImport(Routes.SNIPPETS))
+                                            ) {
+                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import snippet QR")
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    navController.navigate(Routes.snippetEditor()) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.SNIPPETS))
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add snippet")
                                             }
                                         }
                                     }
@@ -1348,13 +1439,13 @@ fun SSHPeachesRoot(
                 ) { padding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Routes.FAVORITES,
+                        startDestination = initialStartDestination,
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.background)
                             .padding(padding)
                     ) {
-                        composable(Routes.FAVORITES) {
+                        composable(Routes.HOME) {
                             val activeSshSessionHostIds = sessions
                                 .filter {
                                     it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
@@ -1362,13 +1453,19 @@ fun SSHPeachesRoot(
                                 }
                                 .map { it.host.id }
                                 .toSet()
-                            FavoritesScreen(
-                                section = uiState.favorites,
+                            HomeScreen(
+                                favorites = uiState.home.favorites,
+                                recents = uiState.home.recents,
                                 snippets = uiState.snippets,
                                 openSessions = openSessionSnapshots,
                                 transferProgresses = fileTransferProgresses,
+                                hasAnyResources = uiState.hosts.isNotEmpty() ||
+                                    uiState.identities.isNotEmpty() ||
+                                    uiState.portForwards.isNotEmpty() ||
+                                    uiState.snippets.isNotEmpty(),
                                 onOpenSession = { sessionId ->
                                     sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
+                                        markHostUsage(snapshot.host)
                                         quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
                                         quickConnectState.value = quickStateFromSnapshot(snapshot, snapshot.host)
                                         pendingConnectingNavigation.value = false
@@ -1415,7 +1512,33 @@ fun SSHPeachesRoot(
                                     onHostInfoCommandsChange(host.id, commands)
                                 },
                                 onToggleFavorite = onToggleFavorite,
-                                onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.FAVORITES] = it }
+                                onAddHost = {
+                                    hostAddRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.HOSTS) { launchSingleTop = true }
+                                    }
+                                },
+                                onAddIdentity = {
+                                    identityAddRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.IDENTITIES) { launchSingleTop = true }
+                                    }
+                                },
+                                onAddPortForward = {
+                                    forwardAddRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.FORWARDS) { launchSingleTop = true }
+                                    }
+                                },
+                                onAddSnippet = {
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.snippetEditor()) { launchSingleTop = true }
+                                    }
+                                }
                             )
                         }
                         composable(Routes.CONNECTING) {
@@ -1441,7 +1564,8 @@ fun SSHPeachesRoot(
                             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
-                            editMode = editMode.value,
+                            addRequestKey = hostAddRequestToken.intValue,
+                            importRequestKey = hostImportRequestToken.intValue,
                             canStoreCredentials = !uiState.isLocked,
                             onImportFromQr = { showMessage("Host imported from QR") },
                             onToggleFavorite = onToggleFavorite,
@@ -1457,30 +1581,7 @@ fun SSHPeachesRoot(
                                     fileTransferEntryMode
                                 )
                             },
-                            onStopSession = onStopSession,
                             activeSshSessionHostIds = activeSshSessionHostIds,
-                            openSessions = openSessionSnapshots,
-                            transferProgresses = fileTransferProgresses,
-                            onOpenSession = { sessionId ->
-                                sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
-                                    quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
-                                    quickConnectState.value = quickStateFromSnapshot(snapshot, snapshot.host)
-                                    pendingConnectingNavigation.value = false
-                                    scope.launch {
-                                        drawerState.close()
-                                        navController.navigate(routeForSnapshot(snapshot)) {
-                                            launchSingleTop = true
-                                        }
-                                    }
-                                }
-                            },
-                            onDisconnectSession = { sessionId ->
-                                onStopSession(sessionId)
-                                if (quickConnectRequest.value?.sessionId == sessionId) {
-                                    quickConnectRequest.value = null
-                                    quickConnectState.value = QuickConnectUiState()
-                                }
-                            },
                             onRunInfoCommand = { host, command ->
                                 val activeSshSession = sessions.firstOrNull {
                                     it.host.id == host.id &&
@@ -1517,6 +1618,8 @@ fun SSHPeachesRoot(
                             items = uiState.identities,
                             hosts = uiState.hosts,
                             isLocked = uiState.isLocked,
+                            addRequestKey = identityAddRequestToken.intValue,
+                            importRequestKey = identityImportRequestToken.intValue,
                             onAdd = onIdentityAdd,
                             onUpdate = onIdentityUpdate,
                             onDelete = onIdentityDelete,
@@ -1536,7 +1639,8 @@ fun SSHPeachesRoot(
                             PortForwardScreen(
                                 items = uiState.portForwards,
                                 hosts = uiState.hosts,
-                                editMode = editMode.value,
+                                addRequestKey = forwardAddRequestToken.intValue,
+                                importRequestKey = forwardImportRequestToken.intValue,
                                 onAdd = onPortForwardAdd,
                                 onUpdate = onPortForwardUpdate,
                                 onDelete = onPortForwardDelete,
@@ -1548,6 +1652,7 @@ fun SSHPeachesRoot(
                         composable(Routes.SNIPPETS) {
                             SnippetManagerScreen(
                                 snippets = uiState.snippets,
+                                importRequestKey = snippetImportRequestToken.intValue,
                                 onAdd = onSnippetAdd,
                                 onCreateSnippet = {
                                     navController.navigate(Routes.snippetEditor())
@@ -1585,11 +1690,11 @@ fun SSHPeachesRoot(
                             val initialSnippet = uiState.snippets.firstOrNull { it.id == snippetId }
                             SnippetEditorScreen(
                                 initialSnippet = initialSnippet,
-                                onSave = { title, description, command ->
+                                onSave = { title, group, description, command ->
                                     if (initialSnippet == null) {
-                                        onSnippetAdd(title, description, command)
+                                        onSnippetAdd(title, group, description, command)
                                     } else {
-                                        onSnippetUpdate(initialSnippet.id, title, description, command)
+                                        onSnippetUpdate(initialSnippet.id, title, group, description, command)
                                     }
                                 },
                                 onDelete = initialSnippet?.let {
@@ -1835,6 +1940,7 @@ fun SSHPeachesRoot(
                             )
                         )
                     }
+                    markRequestUsage(request)
                     onStartSession(
                         request.sessionId,
                         quickConnectHost(request),
@@ -2079,6 +2185,7 @@ fun SSHPeachesRoot(
                         scope.launch {
                             snippetRunInProgress.value = true
                             try {
+                                onMarkSnippetUsed(snippet.id)
                                 val timeoutSeconds = uiState.snippetRunTimeoutSeconds.coerceIn(1, 60)
                                 val baselineOutput = shellOutputs[target.hostId].orEmpty()
                                 var latestDelta = ""
@@ -2948,6 +3055,8 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                     put("username", host.username)
                     put("auth", host.preferredAuth.name)
                     put("group", host.group)
+                    put("createdEpochMillis", host.createdEpochMillis ?: JSONObject.NULL)
+                    put("updatedEpochMillis", host.updatedEpochMillis ?: JSONObject.NULL)
                     put("lastUsedEpochMillis", host.lastUsedEpochMillis ?: JSONObject.NULL)
                     put("favorite", host.favorite)
                     put("notes", host.notes)
@@ -2984,7 +3093,9 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                     put("label", identity.label)
                     put("fingerprint", identity.fingerprint)
                     put("username", identity.username)
+                    put("group", identity.group)
                     put("createdEpochMillis", identity.createdEpochMillis)
+                    put("updatedEpochMillis", identity.updatedEpochMillis ?: JSONObject.NULL)
                     put("lastUsedEpochMillis", identity.lastUsedEpochMillis ?: JSONObject.NULL)
                     put("favorite", identity.favorite)
                     put("tags", JSONArray(identity.tags))
@@ -3027,6 +3138,10 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                 put(JSONObject().apply {
                     put("id", forward.id)
                     put("label", forward.label)
+                    put("group", forward.group)
+                    put("createdEpochMillis", forward.createdEpochMillis ?: JSONObject.NULL)
+                    put("updatedEpochMillis", forward.updatedEpochMillis ?: JSONObject.NULL)
+                    put("lastUsedEpochMillis", forward.lastUsedEpochMillis ?: JSONObject.NULL)
                     put("type", forward.type.name)
                     put("sourceHost", forward.sourceHost)
                     put("sourcePort", forward.sourcePort)
@@ -3043,6 +3158,10 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                 put(JSONObject().apply {
                     put("id", snippet.id)
                     put("title", snippet.title)
+                    put("group", snippet.group)
+                    put("createdEpochMillis", snippet.createdEpochMillis ?: JSONObject.NULL)
+                    put("updatedEpochMillis", snippet.updatedEpochMillis ?: JSONObject.NULL)
+                    put("lastUsedEpochMillis", snippet.lastUsedEpochMillis ?: JSONObject.NULL)
                     put("description", snippet.description)
                     put("command", snippet.command)
                     put("tags", JSONArray(snippet.tags))

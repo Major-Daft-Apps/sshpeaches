@@ -87,7 +87,7 @@ class OpenSessionIntentLaunchTest {
     }
 
     @Test
-    fun launcherRelaunchShowsOpenSessionAndResumesItFromFavorites() {
+    fun launcherRelaunchShowsOpenSessionAndResumesItFromHome() {
         AppStateSeeder.configureSettings(
             hostKeyPrompt = false,
             autoTrustHostKey = true
@@ -99,7 +99,7 @@ class OpenSessionIntentLaunchTest {
         ).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val host = seedPasswordHost("Live Favorites Resume")
+        val host = seedPasswordHost("Live Home Resume")
 
         val sessionId = ActivityScenario.launch<MainActivity>(baseIntent).use {
             openDrawer()
@@ -112,7 +112,7 @@ class OpenSessionIntentLaunchTest {
         }
 
         ActivityScenario.launch<MainActivity>(baseIntent).use {
-            waitForTag(UiTestTags.SCREEN_FAVORITES)
+            waitForTag(UiTestTags.SCREEN_HOME)
             composeRule.onNodeWithTag(UiTestTags.openSessionAction(sessionId, "open"))
                 .assertIsDisplayed()
                 .performClick()

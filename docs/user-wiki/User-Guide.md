@@ -6,7 +6,7 @@ This document explains each major screen in SSHPeaches 0.1.x.
 
 Use the left drawer to access:
 
-- Favorites
+- Home
 - Hosts
 - Identities
 - Port Forwards
@@ -19,13 +19,15 @@ Use the left drawer to access:
 
 The drawer also includes a dedicated **Quick Connect** button for ad-hoc sessions.
 
-## Favorites
+## Home
 
-Favorites is the default landing screen.
+Home is the default landing screen.
 
-- Shows favorited hosts, identities, and forwards.
-- Use star actions in Hosts, Identities, and Port Forwards to add/remove favorites.
-- Host favorites keep the same action buttons as Hosts (`SSH`, `SFTP`, `SCP`, info, QR).
+- Shows open sessions when any are active.
+- Shows favorites grouped by type: hosts, identities, port forwards, and snippets.
+- Shows a single recents list across all four resource types.
+- If the app has no saved resources yet, Home shows a welcome screen with buttons to add your first host, identity, port forward, or snippet.
+- Open session rows use icons for reopen and disconnect actions.
 
 ## Hosts
 
@@ -35,9 +37,9 @@ Use this screen to manage saved servers.
 
 - Search hosts by name.
 - Sort menu: `Last Used` or `Alphabetical`.
-- Open sessions list appears at top with `Open` and `Disconnect`.
-- Add new host via **Add host**.
-- Import host via **Import QR**.
+- Hosts are organized into collapsible groups.
+- Use the top app bar icons to add a host or import one from QR.
+- Use the three-dot menu on a host card for `Edit` and `Delete`.
 
 ### Host card actions
 
@@ -53,6 +55,7 @@ If a host has a saved password, QR export prompts for a passphrase and encrypts 
 
 - Required: name, host/IP, port, username
 - Auth: password, identity, or both
+- In the add/edit form, the authentication block sits directly below `Username`
 - Optional: group, notes, transport (SSH/Mosh), terminal profile, preferred local forward, startup snippet, background behavior
 
 ## Connecting Screen
@@ -78,6 +81,8 @@ Use identities for SSH key authentication.
 - Generate/share identity QR
 - Import identity via QR
 - Mark favorites
+- Organize identities into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
 
 When exporting an identity with a private key, SSHPeaches requires an export passphrase and encrypts key data inside the QR payload.
 
@@ -90,6 +95,8 @@ SSHPeaches currently supports local forwards only (`-L`).
 - Associate forwards with hosts for auto-start
 - Share/import via QR
 - Mark favorites
+- Organize forwards into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
 
 Remote (`-R`) and dynamic (`-D`) forwarding are not in the current app scope.
 
@@ -101,6 +108,8 @@ Use snippets for reusable shell commands.
 - Edit/delete snippet
 - Import snippet via QR
 - Run snippet
+- Organize snippets into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
 
 Current run behavior: snippets run against the first active session. If no session is active, run is rejected.
 

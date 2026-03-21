@@ -239,8 +239,15 @@ class AppViewModel(
         val favoriteIdentities = identities.filter { it.favorite }
         val favoritePorts = forwards.filter { it.favorite }
         val favoriteSnippets = snippets.filter { it.favorite }
+        val favorites = FavoritesSection(
+            hostFavorites = favoriteHosts,
+            identityFavorites = favoriteIdentities,
+            portFavorites = favoritePorts,
+            snippetFavorites = favoriteSnippets
+        )
+        val recents = buildHomeRecents(hosts, identities, forwards, snippets)
         AppUiState(
-            favorites = FavoritesSection(favoriteHosts, favoriteIdentities, favoritePorts, favoriteSnippets),
+            home = HomeSection(favorites = favorites, recents = recents),
             hosts = hostList,
             identities = identities,
             portForwards = forwards,
@@ -800,6 +807,7 @@ class AppViewModel(
         val id = suppliedId ?: UUID.randomUUID().toString()
         val canStoreSecret = !SecurityManager.isLocked()
         val hasPassword = !password.isNullOrBlank() && canStoreSecret
+        val now = System.currentTimeMillis()
         if (hasPassword) {
             SecurityManager.storeHostPassword(id, password!!)
         } else if (password != null) {
@@ -813,6 +821,8 @@ class AppViewModel(
             username = username.trim(),
             preferredAuth = auth,
             group = group?.takeIf { it.isNotBlank() },
+            createdEpochMillis = now,
+            updatedEpochMillis = now,
             notes = notes,
             defaultMode = defaultMode,
             hasPassword = hasPassword,
@@ -856,6 +866,7 @@ class AppViewModel(
             return
         }
         val canStoreSecret = !SecurityManager.isLocked()
+        val now = System.currentTimeMillis()
         val hasPassword = when {
             !password.isNullOrBlank() && canStoreSecret -> {
                 SecurityManager.storeHostPassword(id, password)
@@ -874,6 +885,7 @@ class AppViewModel(
             username = username.ifBlank { existing.username },
             preferredAuth = auth,
             group = group?.takeIf { it.isNotBlank() },
+            updatedEpochMillis = now,
             notes = notes,
             defaultMode = defaultMode,
             hasPassword = hasPassword,
@@ -976,6 +988,9 @@ class AppViewModel(
             port = host.port.coerceIn(1, 65_535),
             username = host.username.trim(),
             group = host.group?.takeIf { it.isNotBlank() },
+            createdEpochMillis = host.createdEpochMillis ?: host.lastUsedEpochMillis ?: System.currentTimeMillis(),
+            updatedEpochMillis = host.updatedEpochMillis ?: host.createdEpochMillis ?: host.lastUsedEpochMillis
+                ?: System.currentTimeMillis(),
             preferredIdentityId = host.preferredIdentityId?.takeIf { it.isNotBlank() },
             preferredForwardId = host.preferredForwardId?.takeIf { it.isNotBlank() },
             terminalProfileId = host.terminalProfileId?.takeIf { it.isNotBlank() },
@@ -990,7 +1005,12 @@ class AppViewModel(
         val existing = uiState.value.hosts.find { it.id == id } ?: return
         if (existing.osMetadata == osMetadata) return
         launchLogged("updateHostOsMetadata", "hostId=$id, os=$osMetadata") {
-            repository.updateHost(existing.copy(osMetadata = osMetadata))
+            repository.updateHost(
+                existing.copy(
+                    osMetadata = osMetadata,
+                    updatedEpochMillis = System.currentTimeMillis()
+                )
+            )
         }
     }
 
@@ -999,7 +1019,12 @@ class AppViewModel(
         val normalized = commands.map { it.trim() }.filter { it.isNotBlank() }
         if (existing.infoCommands == normalized) return
         launchLogged("updateHostInfoCommands", "hostId=$id, count=${normalized.size}") {
-            repository.updateHost(existing.copy(infoCommands = normalized))
+            repository.updateHost(
+                existing.copy(
+                    infoCommands = normalized,
+                    updatedEpochMillis = System.currentTimeMillis()
+                )
+            )
         }
     }
 
@@ -1011,7 +1036,12 @@ class AppViewModel(
                 return
             }
             launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
-                repository.updateHost(current.copy(hasPassword = hasPassword))
+                repository.updateHost(
+                    current.copy(
+                        hasPassword = hasPassword,
+                        updatedEpochMillis = System.currentTimeMillis()
+                    )
+                )
             }
             return
         }
@@ -1022,7 +1052,12 @@ class AppViewModel(
                 if (host != null) {
                     if (host.hasPassword != hasPassword) {
                         launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
-                            repository.updateHost(host.copy(hasPassword = hasPassword))
+                            repository.updateHost(
+                                host.copy(
+                                    hasPassword = hasPassword,
+                                    updatedEpochMillis = System.currentTimeMillis()
+                                )
+                            )
                         }
                     }
                     return@launch
@@ -1038,6 +1073,7 @@ class AppViewModel(
 
     fun addPortForward(
         label: String,
+        group: String?,
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
@@ -1063,9 +1099,14 @@ class AppViewModel(
             logAction("addPortForward.localOnly", "requestedType=$type")
         }
         val normalizedType = PortForwardType.LOCAL
+        val now = System.currentTimeMillis()
         val forward = PortForward(
             id = UUID.randomUUID().toString(),
             label = label.trim(),
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
+            createdEpochMillis = now,
+            updatedEpochMillis = now,
+            lastUsedEpochMillis = if (enabled) now else null,
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = sourcePort,
@@ -1088,6 +1129,9 @@ class AppViewModel(
         }
         val normalized = forward.copy(
             label = forward.label.trim(),
+            group = forward.group?.trim()?.takeIf { it.isNotEmpty() },
+            createdEpochMillis = forward.createdEpochMillis ?: System.currentTimeMillis(),
+            updatedEpochMillis = forward.updatedEpochMillis ?: forward.createdEpochMillis ?: System.currentTimeMillis(),
             type = PortForwardType.LOCAL,
             sourceHost = forward.sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = forward.sourcePort.coerceIn(1, 65_535),
@@ -1102,6 +1146,7 @@ class AppViewModel(
     fun updatePortForward(
         id: String,
         label: String,
+        group: String?,
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
@@ -1128,8 +1173,12 @@ class AppViewModel(
             logAction("updatePortForward.localOnly", "requestedType=$type")
         }
         val normalizedType = PortForwardType.LOCAL
+        val now = System.currentTimeMillis()
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
+            updatedEpochMillis = now,
+            lastUsedEpochMillis = if (enabled) now else existing.lastUsedEpochMillis,
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { existing.sourceHost },
             sourcePort = sourcePort,
@@ -1155,7 +1204,7 @@ class AppViewModel(
         }
     }
 
-    fun addSnippet(title: String, description: String, command: String) {
+    fun addSnippet(title: String, group: String?, description: String, command: String) {
         logAction(
             "addSnippet",
             "titleBlank=${title.isBlank()}, commandBlank=${command.isBlank()}"
@@ -1164,9 +1213,13 @@ class AppViewModel(
             logResult("addSnippet", false, "validation-failed")
             return
         }
+        val now = System.currentTimeMillis()
         val snippet = Snippet(
             id = UUID.randomUUID().toString(),
             title = title.ifBlank { "Snippet" },
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
+            createdEpochMillis = now,
+            updatedEpochMillis = now,
             description = description,
             command = command
         )
@@ -1183,6 +1236,9 @@ class AppViewModel(
         }
         val normalized = snippet.copy(
             title = snippet.title.ifBlank { "Snippet" },
+            group = snippet.group?.trim()?.takeIf { it.isNotEmpty() },
+            createdEpochMillis = snippet.createdEpochMillis ?: System.currentTimeMillis(),
+            updatedEpochMillis = snippet.updatedEpochMillis ?: snippet.createdEpochMillis ?: System.currentTimeMillis(),
             command = snippet.command.trim(),
             tags = snippet.tags.map { it.trim() }.filter { it.isNotBlank() }
         )
@@ -1191,7 +1247,7 @@ class AppViewModel(
         }
     }
 
-    fun updateSnippet(id: String, title: String, description: String, command: String) {
+    fun updateSnippet(id: String, title: String, group: String?, description: String, command: String) {
         logAction("updateSnippet", "snippetId=$id, commandBlank=${command.isBlank()}")
         val existing = uiState.value.snippets.find { it.id == id }
         if (existing == null) {
@@ -1204,6 +1260,8 @@ class AppViewModel(
         }
         val updated = existing.copy(
             title = title.ifBlank { existing.title },
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
+            updatedEpochMillis = System.currentTimeMillis(),
             description = description,
             command = command
         )
@@ -1227,6 +1285,58 @@ class AppViewModel(
     fun toggleFavorite(id: String) {
         launchLogged("toggleFavorite", "id=$id") {
             repository.toggleFavorite(id)
+        }
+    }
+
+    fun markHostUsed(id: String) {
+        val existing = uiState.value.hosts.find { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        launchLogged("markHostUsed", "hostId=$id") {
+            repository.updateHost(
+                existing.copy(
+                    lastUsedEpochMillis = now,
+                    updatedEpochMillis = now
+                )
+            )
+        }
+    }
+
+    fun markIdentityUsed(id: String) {
+        val existing = uiState.value.identities.find { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        launchLogged("markIdentityUsed", "identityId=$id") {
+            repository.updateIdentity(
+                existing.copy(
+                    lastUsedEpochMillis = now,
+                    updatedEpochMillis = now
+                )
+            )
+        }
+    }
+
+    fun markPortForwardUsed(id: String) {
+        val existing = uiState.value.portForwards.find { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        launchLogged("markPortForwardUsed", "forwardId=$id") {
+            repository.updatePortForward(
+                existing.copy(
+                    lastUsedEpochMillis = now,
+                    updatedEpochMillis = now
+                )
+            )
+        }
+    }
+
+    fun markSnippetUsed(id: String) {
+        val existing = uiState.value.snippets.find { it.id == id } ?: return
+        val now = System.currentTimeMillis()
+        launchLogged("markSnippetUsed", "snippetId=$id") {
+            repository.updateSnippet(
+                existing.copy(
+                    lastUsedEpochMillis = now,
+                    updatedEpochMillis = now
+                )
+            )
         }
     }
 
@@ -1310,7 +1420,14 @@ class AppViewModel(
         logResult("onAppForegrounded", true)
     }
 
-    fun addIdentity(label: String, fingerprint: String, username: String?, suppliedId: String? = null, hasPrivateKey: Boolean = false) {
+    fun addIdentity(
+        label: String,
+        fingerprint: String,
+        username: String?,
+        group: String?,
+        suppliedId: String? = null,
+        hasPrivateKey: Boolean = false
+    ) {
         logAction("addIdentity", "labelBlank=${label.isBlank()}, fingerprintBlank=${fingerprint.isBlank()}, hasUsername=${!username.isNullOrBlank()}, hasPrivateKey=$hasPrivateKey")
         if (fingerprint.isBlank()) {
             logResult("addIdentity", false, "validation-failed")
@@ -1321,7 +1438,9 @@ class AppViewModel(
             label = label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
             fingerprint = fingerprint.trim(),
             username = username?.takeIf { it.isNotBlank() },
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
             createdEpochMillis = System.currentTimeMillis(),
+            updatedEpochMillis = System.currentTimeMillis(),
             lastUsedEpochMillis = null,
             favorite = false,
             hasPrivateKey = hasPrivateKey
@@ -1331,7 +1450,7 @@ class AppViewModel(
         }
     }
 
-    fun updateIdentity(id: String, label: String, fingerprint: String, username: String?) {
+    fun updateIdentity(id: String, label: String, fingerprint: String, username: String?, group: String?) {
         logAction("updateIdentity", "identityId=$id, labelBlank=${label.isBlank()}, fingerprintBlank=${fingerprint.isBlank()}, hasUsername=${!username.isNullOrBlank()}")
         val existing = uiState.value.identities.find { it.id == id }
         if (existing == null) {
@@ -1341,7 +1460,9 @@ class AppViewModel(
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
             fingerprint = fingerprint.trim().ifBlank { existing.fingerprint },
-            username = username?.takeIf { it.isNotBlank() }
+            username = username?.takeIf { it.isNotBlank() },
+            group = group?.trim()?.takeIf { it.isNotEmpty() },
+            updatedEpochMillis = System.currentTimeMillis()
         )
         launchLogged("updateIdentity", "identityId=$id") {
             repository.updateIdentity(updated)
@@ -1374,6 +1495,7 @@ class AppViewModel(
         }
         val updated = current.copy(
             hasPrivateKey = hasKey,
+            updatedEpochMillis = System.currentTimeMillis(),
             keyImportEpochMillis = if (hasKey) System.currentTimeMillis() else null
         )
         launchLogged("markIdentityHasKey", "identityId=$id, hasKey=$hasKey") {
@@ -1476,6 +1598,9 @@ class AppViewModel(
             label = identity.label.ifBlank { "Identity ${System.currentTimeMillis() / 1000}" },
             fingerprint = identity.fingerprint.trim(),
             username = identity.username?.takeIf { it.isNotBlank() },
+            group = identity.group?.trim()?.takeIf { it.isNotEmpty() },
+            createdEpochMillis = identity.createdEpochMillis,
+            updatedEpochMillis = identity.updatedEpochMillis ?: identity.createdEpochMillis,
             tags = identity.tags.map { it.trim() }.filter { it.isNotBlank() }
         )
         launchLogged("importIdentity", "identityId=${normalized.id}") {
@@ -1613,3 +1738,77 @@ class AppViewModel(
             }
     }
 }
+
+private fun buildHomeRecents(
+    hosts: List<HostConnection>,
+    identities: List<Identity>,
+    forwards: List<PortForward>,
+    snippets: List<Snippet>
+): List<HomeRecentItem> =
+    buildList {
+        hosts.forEach { host ->
+            mostRecentEpoch(host.lastUsedEpochMillis, host.updatedEpochMillis, host.createdEpochMillis)?.let { epoch ->
+                add(
+                    HomeRecentItem(
+                        key = "host_${host.id}",
+                        entityId = host.id,
+                        type = HomeRecentType.HOST,
+                        title = host.name,
+                        subtitle = "${host.username}@${host.host}:${host.port}",
+                        sortEpochMillis = epoch,
+                        favorite = host.favorite
+                    )
+                )
+            }
+        }
+        identities.forEach { identity ->
+            mostRecentEpoch(identity.lastUsedEpochMillis, identity.updatedEpochMillis, identity.createdEpochMillis)?.let { epoch ->
+                add(
+                    HomeRecentItem(
+                        key = "identity_${identity.id}",
+                        entityId = identity.id,
+                        type = HomeRecentType.IDENTITY,
+                        title = identity.label,
+                        subtitle = identity.username?.takeIf { it.isNotBlank() } ?: identity.fingerprint,
+                        sortEpochMillis = epoch,
+                        favorite = identity.favorite
+                    )
+                )
+            }
+        }
+        forwards.forEach { forward ->
+            mostRecentEpoch(forward.lastUsedEpochMillis, forward.updatedEpochMillis, forward.createdEpochMillis)?.let { epoch ->
+                add(
+                    HomeRecentItem(
+                        key = "forward_${forward.id}",
+                        entityId = forward.id,
+                        type = HomeRecentType.PORT_FORWARD,
+                        title = forward.label,
+                        subtitle = "${forward.sourceHost}:${forward.sourcePort} -> ${forward.destinationHost}:${forward.destinationPort}",
+                        sortEpochMillis = epoch,
+                        favorite = forward.favorite
+                    )
+                )
+            }
+        }
+        snippets.forEach { snippet ->
+            mostRecentEpoch(snippet.lastUsedEpochMillis, snippet.updatedEpochMillis, snippet.createdEpochMillis)?.let { epoch ->
+                add(
+                    HomeRecentItem(
+                        key = "snippet_${snippet.id}",
+                        entityId = snippet.id,
+                        type = HomeRecentType.SNIPPET,
+                        title = snippet.title,
+                        subtitle = snippet.command,
+                        sortEpochMillis = epoch,
+                        favorite = snippet.favorite
+                    )
+                )
+            }
+        }
+    }.sortedWith(
+        compareByDescending<HomeRecentItem> { it.sortEpochMillis }
+            .thenBy { it.title.lowercase() }
+    )
+
+private fun mostRecentEpoch(vararg values: Long?): Long? = values.filterNotNull().maxOrNull()

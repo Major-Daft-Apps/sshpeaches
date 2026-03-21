@@ -1,14 +1,14 @@
 package com.majordaftapps.sshpeaches.app.ui.components
 
-import org.json.JSONObject
-import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
-import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import org.json.JSONObject
 import java.util.Base64
 
 data class HostQrPayload(
@@ -35,6 +35,9 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         preferredAuth = runCatching { AuthMethod.valueOf(authName) }.getOrDefault(AuthMethod.PASSWORD),
         defaultMode = runCatching { ConnectionMode.valueOf(modeName) }.getOrDefault(ConnectionMode.SSH),
         group = json.optString("group").takeIf { it.isNotBlank() },
+        createdEpochMillis = json.optNullableLong("createdEpochMillis"),
+        updatedEpochMillis = json.optNullableLong("updatedEpochMillis"),
+        lastUsedEpochMillis = json.optNullableLong("lastUsedEpochMillis"),
         notes = json.optString("notes", ""),
         hasPassword = json.optBoolean("hasPassword", false),
         useMosh = json.optBoolean("useMosh", false),
@@ -57,8 +60,10 @@ fun decodeIdentityFromQr(contents: String): IdentityQrPayload? = runCatching {
         label = json.optString("label"),
         fingerprint = json.optString("fingerprint"),
         username = json.optString("user").takeIf { it.isNotBlank() },
-        createdEpochMillis = System.currentTimeMillis(),
-        lastUsedEpochMillis = null,
+        group = json.optString("group").takeIf { it.isNotBlank() },
+        createdEpochMillis = json.optNullableLong("createdEpochMillis") ?: System.currentTimeMillis(),
+        updatedEpochMillis = json.optNullableLong("updatedEpochMillis"),
+        lastUsedEpochMillis = json.optNullableLong("lastUsedEpochMillis"),
         hasPrivateKey = json.optBoolean("hasKey", false)
     )
     val keyPayload = json.optString("keyPayload").takeIf { it.isNotBlank() }
@@ -70,6 +75,10 @@ fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
     PortForward(
         id = json.optString("id"),
         label = json.optString("label", "QR Forward"),
+        group = json.optString("group").takeIf { it.isNotBlank() },
+        createdEpochMillis = json.optNullableLong("createdEpochMillis"),
+        updatedEpochMillis = json.optNullableLong("updatedEpochMillis"),
+        lastUsedEpochMillis = json.optNullableLong("lastUsedEpochMillis"),
         type = PortForwardType.LOCAL,
         sourceHost = json.optString("bind", "127.0.0.1"),
         sourcePort = json.optInt("srcPort", 0),
@@ -92,7 +101,18 @@ fun decodeSnippetFromQr(contents: String): Snippet? = runCatching {
     Snippet(
         id = json.optString("id"),
         title = json.optString("title", "Snippet"),
+        group = json.optString("group").takeIf { it.isNotBlank() },
+        createdEpochMillis = json.optNullableLong("createdEpochMillis"),
+        updatedEpochMillis = json.optNullableLong("updatedEpochMillis"),
+        lastUsedEpochMillis = json.optNullableLong("lastUsedEpochMillis"),
         description = json.optString("description", ""),
         command = json.optString("command", "")
     )
 }.getOrNull()
+
+private fun JSONObject.optNullableLong(key: String): Long? =
+    when {
+        isNull(key) -> null
+        !has(key) -> null
+        else -> optLong(key)
+    }

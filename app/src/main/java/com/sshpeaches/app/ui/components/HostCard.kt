@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Star
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -92,7 +94,9 @@ fun HostCard(
     onAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
     canRunInfoCommands: Boolean = false,
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
-    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
+    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
+    onEdit: ((HostConnection) -> Unit)? = null,
+    onDelete: ((HostConnection) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val showInfo = remember { mutableStateOf(false) }
@@ -107,6 +111,7 @@ fun HostCard(
     val infoCommandsState = rememberSaveable(host.id) {
         mutableStateOf(host.infoCommands)
     }
+    val showOverflow = rememberSaveable(host.id) { mutableStateOf(false) }
     val infoSnippetExpanded = rememberSaveable(host.id) { mutableStateOf(false) }
     val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
     AutoHidePasswordReveal(passphraseRevealIndex)
@@ -131,6 +136,7 @@ fun HostCard(
         infoCommandStatus.value = null
         infoSnippetExpanded.value = false
         infoCommandsState.value = host.infoCommands
+        showOverflow.value = false
     }
 
     Card(
@@ -174,14 +180,57 @@ fun HostCard(
                     Text("${host.username}@${host.host}:${host.port}", style = MaterialTheme.typography.bodyMedium)
                     host.group?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                 }
-                TextButton(
-                    onClick = { onToggleFavorite(host.id) },
-                    modifier = Modifier.testTag(UiTestTags.hostFavorite(host.id))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (host.favorite) Icons.Default.Star else Icons.Outlined.StarBorder,
-                        contentDescription = if (host.favorite) "Unfavorite" else "Favorite"
-                    )
+                    TextButton(
+                        onClick = { onToggleFavorite(host.id) },
+                        modifier = Modifier.testTag(UiTestTags.hostFavorite(host.id))
+                    ) {
+                        Icon(
+                            imageVector = if (host.favorite) Icons.Default.Star else Icons.Outlined.StarBorder,
+                            contentDescription = if (host.favorite) "Unfavorite" else "Favorite"
+                        )
+                    }
+                    if (onEdit != null || onDelete != null) {
+                        Box {
+                            IconButton(
+                                onClick = { showOverflow.value = true },
+                                modifier = Modifier.testTag(UiTestTags.hostOverflowButton(host.id))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More actions"
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showOverflow.value,
+                                onDismissRequest = { showOverflow.value = false }
+                            ) {
+                                onEdit?.let {
+                                    DropdownMenuItem(
+                                        text = { Text("Edit") },
+                                        onClick = {
+                                            showOverflow.value = false
+                                            it(host)
+                                        },
+                                        modifier = Modifier.testTag(UiTestTags.hostOverflowAction(host.id, "edit"))
+                                    )
+                                }
+                                onDelete?.let {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        onClick = {
+                                            showOverflow.value = false
+                                            it(host)
+                                        },
+                                        modifier = Modifier.testTag(UiTestTags.hostOverflowAction(host.id, "delete"))
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Row(

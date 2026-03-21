@@ -8,6 +8,8 @@ data class HostConnection(
     val username: String,
     val preferredAuth: AuthMethod,
     val group: String? = null,
+    val createdEpochMillis: Long? = null,
+    val updatedEpochMillis: Long? = null,
     val lastUsedEpochMillis: Long? = null,
     val favorite: Boolean = false,
     val osMetadata: OsMetadata = OsMetadata.Undetected,
@@ -30,7 +32,9 @@ data class Identity(
     val label: String,
     val fingerprint: String,
     val username: String? = null,
+    val group: String? = null,
     val createdEpochMillis: Long,
+    val updatedEpochMillis: Long? = null,
     val lastUsedEpochMillis: Long? = null,
     val favorite: Boolean = false,
     val tags: List<String> = emptyList(),
@@ -42,6 +46,7 @@ data class Identity(
 data class PortForward(
     val id: String,
     val label: String,
+    val group: String? = null,
     val type: PortForwardType,
     val sourceHost: String = "127.0.0.1",
     val sourcePort: Int,
@@ -49,18 +54,25 @@ data class PortForward(
     val destinationPort: Int = 0,
     val associatedHosts: List<String> = emptyList(),
     val favorite: Boolean = false,
-    val enabled: Boolean = false
+    val enabled: Boolean = false,
+    val createdEpochMillis: Long? = null,
+    val updatedEpochMillis: Long? = null,
+    val lastUsedEpochMillis: Long? = null
 )
 
 data class Snippet(
     val id: String,
     val title: String,
+    val group: String? = null,
     val description: String = "",
     val command: String,
     val tags: List<String> = emptyList(),
     val autoRunHostIds: List<String> = emptyList(),
     val requireConfirmation: Boolean = true,
-    val favorite: Boolean = false
+    val favorite: Boolean = false,
+    val createdEpochMillis: Long? = null,
+    val updatedEpochMillis: Long? = null,
+    val lastUsedEpochMillis: Long? = null
 )
 
 enum class AuthMethod { PASSWORD, IDENTITY, PASSWORD_AND_IDENTITY }

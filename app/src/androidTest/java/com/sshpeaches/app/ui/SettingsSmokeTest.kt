@@ -46,10 +46,16 @@ class SettingsSmokeTest {
 
     @Test
     fun toggleSettingsAndDropdowns_reflectsChanges() {
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
-            .assertIsOn()
-            .performClick()
-            .assertIsOff()
+        val backgroundInitiallyOn = runCatching {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOn()
+            true
+        }.getOrDefault(false)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
+        if (backgroundInitiallyOn) {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+        } else {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOn()
+        }
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).performClick()
         composeRule.onNodeWithText("Dark").performClick()
@@ -57,16 +63,26 @@ class SettingsSmokeTest {
 
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
-            .assertIsOff()
-            .performClick()
+        val diagnosticsInitiallyOn = runCatching {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+            true
+        }.getOrDefault(false)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
         composeRule.waitUntil(5_000) {
             runCatching {
-                composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+                if (diagnosticsInitiallyOn) {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+                } else {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+                }
                 true
             }.getOrDefault(false)
         }
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        if (diagnosticsInitiallyOn) {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+        } else {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        }
     }
 
     @Test

@@ -13,7 +13,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
 data class AppUiState(
-    val favorites: FavoritesSection = FavoritesSection(),
+    val home: HomeSection = HomeSection(),
     val hosts: List<HostConnection> = emptyList(),
     val uptimeSummaries: List<HostUptimeSummary> = emptyList(),
     val identities: List<Identity> = emptyList(),
@@ -48,12 +48,29 @@ data class AppUiState(
     val keyboardSlots: List<KeyboardSlotAction> = KeyboardLayoutDefaults.DEFAULT_SLOTS
 )
 
+data class HomeSection(
+    val favorites: FavoritesSection = FavoritesSection(),
+    val recents: List<HomeRecentItem> = emptyList()
+)
+
 data class FavoritesSection(
     val hostFavorites: List<HostConnection> = emptyList(),
     val identityFavorites: List<Identity> = emptyList(),
     val portFavorites: List<PortForward> = emptyList(),
     val snippetFavorites: List<Snippet> = emptyList()
 )
+
+data class HomeRecentItem(
+    val key: String,
+    val entityId: String,
+    val type: HomeRecentType,
+    val title: String,
+    val subtitle: String,
+    val sortEpochMillis: Long,
+    val favorite: Boolean
+)
+
+enum class HomeRecentType { HOST, IDENTITY, PORT_FORWARD, SNIPPET }
 
 enum class SortMode { LAST_USED, ALPHABETICAL }
 

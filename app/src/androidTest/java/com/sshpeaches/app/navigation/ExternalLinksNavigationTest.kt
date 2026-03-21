@@ -28,7 +28,7 @@ class ExternalLinksNavigationTest {
         composeRule.setContent {
             AppDrawer(
                 destinations = drawerDestinations,
-                currentRoute = Routes.FAVORITES,
+                currentRoute = Routes.HOME,
                 onDestinationSelected = { selectedRoute.set(it.route) },
                 onQuickConnect = {}
             )

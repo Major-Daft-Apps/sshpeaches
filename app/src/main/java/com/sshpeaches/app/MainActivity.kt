@@ -595,6 +595,10 @@ class MainActivity : FragmentActivity() {
                     onSnippetUpdate = viewModel::updateSnippet,
                     onSnippetDelete = viewModel::deleteSnippet,
                     onToggleFavorite = viewModel::toggleFavorite,
+                    onMarkHostUsed = viewModel::markHostUsed,
+                    onMarkIdentityUsed = viewModel::markIdentityUsed,
+                    onMarkPortForwardUsed = viewModel::markPortForwardUsed,
+                    onMarkSnippetUsed = viewModel::markSnippetUsed,
                     onSendSessionShortcut = sendSessionShortcut,
                     onSendShellBytes = sendShellBytes,
                     onResizeShell = resizeShell,
@@ -785,7 +789,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
-        Routes.FAVORITES,
+        Routes.HOME,
         Routes.HOSTS,
         Routes.UPTIME,
         Routes.IDENTITIES,

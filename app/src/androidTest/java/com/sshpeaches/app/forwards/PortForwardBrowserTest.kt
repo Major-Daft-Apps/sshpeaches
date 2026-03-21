@@ -82,8 +82,8 @@ class PortForwardBrowserTest {
         composeRule.onNodeWithText("Share Docs Tunnel").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 
-        composeRule.navigateDrawer(Routes.FAVORITES)
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_FAVORITES).assertIsDisplayed()
+        composeRule.navigateDrawer(Routes.HOME)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
         waitForForward("Docs Tunnel")
         composeRule.onNodeWithText("Docs Tunnel").assertIsDisplayed()
     }

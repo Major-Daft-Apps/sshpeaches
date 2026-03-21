@@ -121,8 +121,8 @@ class HostsBrowserTest {
 
         composeRule.onNodeWithTag(UiTestTags.hostFavorite(host.id)).performClick()
 
-        composeRule.navigateDrawer(Routes.FAVORITES)
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_FAVORITES).assertIsDisplayed()
+        composeRule.navigateDrawer(Routes.HOME)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
         composeRule.onNodeWithText(host.name).assertIsDisplayed()
     }
 
