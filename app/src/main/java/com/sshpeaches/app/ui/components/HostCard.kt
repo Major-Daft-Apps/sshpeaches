@@ -60,7 +60,6 @@ import android.content.Intent
 import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
 import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import android.widget.Toast
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
@@ -78,8 +77,6 @@ import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.majordaftapps.sshpeaches.app.util.snippetReference
@@ -287,7 +284,7 @@ fun HostCard(
                             if (host.hasPassword) {
                                 showPassphrasePrompt.value = true
                             } else {
-                                qrBitmap.value = generateQr(host, passphrase = null)
+                                qrBitmap.value = generateHostQr(host, passphrase = null)
                                 if (qrBitmap.value != null) {
                                     showQr.value = true
                                 } else {
@@ -542,7 +539,7 @@ fun HostCard(
                             passphraseError.value = "Passphrases do not match."
                         }
                         else -> {
-                            val bitmap = generateQr(host, passphrase)
+                            val bitmap = generateHostQr(host, passphrase)
                             if (bitmap != null) {
                                 qrBitmap.value = bitmap
                                 showPassphrasePrompt.value = false
@@ -568,25 +565,6 @@ fun HostCard(
             }
         )
     }
-}
-
-private fun generateQr(host: HostConnection, passphrase: String?): Bitmap? {
-    val encrypted = if (host.hasPassword && !passphrase.isNullOrBlank()) {
-        SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
-    } else {
-        null
-    }
-    val payload = encodeHostPayload(host = host, encryptedPasswordPayload = encrypted)
-    return runCatching {
-        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
-        val bmp = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
-        for (x in 0 until matrix.width) {
-            for (y in 0 until matrix.height) {
-                bmp.setPixel(x, y, if (matrix[x, y]) AndroidColor.BLACK else AndroidColor.WHITE)
-            }
-        }
-        bmp
-    }.getOrNull()
 }
 
 @Composable

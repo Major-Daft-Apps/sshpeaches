@@ -106,13 +106,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
 import android.net.Uri
-import android.util.Base64
 import androidx.browser.customtabs.CustomTabsIntent
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
@@ -309,10 +313,17 @@ fun SSHPeachesRoot(
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
     val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val uptimeAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val hostImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val identityAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val identityImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val forwardAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val forwardImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val snippetImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
@@ -1385,6 +1396,18 @@ fun SSHPeachesRoot(
                                                 Icon(Icons.Default.Add, contentDescription = "Add host")
                                             }
                                         }
+                                        Routes.UPTIME -> {
+                                            val hasAvailableUptimeHost = uiState.hosts.any { host ->
+                                                uiState.uptimeSummaries.none { summary -> summary.host.id == host.id }
+                                            }
+                                            IconButton(
+                                                onClick = { uptimeAddRequestToken.intValue += 1 },
+                                                enabled = hasAvailableUptimeHost,
+                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.UPTIME))
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add uptime host")
+                                            }
+                                        }
                                         Routes.IDENTITIES -> {
                                             IconButton(
                                                 onClick = { identityImportRequestToken.intValue += 1 },
@@ -1456,6 +1479,9 @@ fun SSHPeachesRoot(
                             HomeScreen(
                                 favorites = uiState.home.favorites,
                                 recents = uiState.home.recents,
+                                hosts = uiState.hosts,
+                                identities = uiState.identities,
+                                portForwards = uiState.portForwards,
                                 snippets = uiState.snippets,
                                 openSessions = openSessionSnapshots,
                                 transferProgresses = fileTransferProgresses,
@@ -1512,6 +1538,67 @@ fun SSHPeachesRoot(
                                     onHostInfoCommandsChange(host.id, commands)
                                 },
                                 onToggleFavorite = onToggleFavorite,
+                                onEditHost = { hostId ->
+                                    hostEditRequestId.value = hostId
+                                    hostEditRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.HOSTS) { launchSingleTop = true }
+                                    }
+                                },
+                                onDeleteHost = onHostDelete,
+                                onEditIdentity = { identityId ->
+                                    identityEditRequestId.value = identityId
+                                    identityEditRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.IDENTITIES) { launchSingleTop = true }
+                                    }
+                                },
+                                onDeleteIdentity = onIdentityDelete,
+                                onTogglePortForwardEnabled = { forward, enabled ->
+                                    onPortForwardUpdate(
+                                        forward.id,
+                                        forward.label,
+                                        forward.group,
+                                        forward.type,
+                                        forward.sourceHost,
+                                        forward.sourcePort,
+                                        forward.destinationHost,
+                                        forward.destinationPort,
+                                        enabled,
+                                        forward.associatedHosts
+                                    )
+                                },
+                                onEditPortForward = { forwardId ->
+                                    forwardEditRequestId.value = forwardId
+                                    forwardEditRequestToken.intValue += 1
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.FORWARDS) { launchSingleTop = true }
+                                    }
+                                },
+                                onDeletePortForward = onPortForwardDelete,
+                                onRunSnippet = { snippet ->
+                                    if (activeSshSessions.isEmpty()) {
+                                        showMessage("No active SSH session to run snippet.")
+                                    } else {
+                                        val preferredSessionId = quickConnectRequest.value?.sessionId
+                                        snippetRunTargetHostId.value = activeSshSessions
+                                            .firstOrNull { it.hostId == preferredSessionId }
+                                            ?.hostId
+                                            ?: activeSshSessions.first().hostId
+                                        snippetRunSelection.value = snippet
+                                    }
+                                },
+                                onEditSnippet = { snippetId ->
+                                    scope.launch {
+                                        drawerState.close()
+                                        navController.navigate(Routes.snippetEditor(snippetId)) { launchSingleTop = true }
+                                    }
+                                },
+                                onDeleteSnippet = onSnippetDelete,
+                                onShowMessage = showMessage,
                                 onAddHost = {
                                     hostAddRequestToken.intValue += 1
                                     scope.launch {
@@ -1565,6 +1652,8 @@ fun SSHPeachesRoot(
                             sortMode = uiState.sortMode,
                             onSortModeChange = onSortModeChange,
                             addRequestKey = hostAddRequestToken.intValue,
+                            editRequestKey = hostEditRequestToken.intValue,
+                            editRequestId = hostEditRequestId.value,
                             importRequestKey = hostImportRequestToken.intValue,
                             canStoreCredentials = !uiState.isLocked,
                             onImportFromQr = { showMessage("Host imported from QR") },
@@ -1606,6 +1695,7 @@ fun SSHPeachesRoot(
                         UptimeScreen(
                             hosts = uiState.hosts,
                             summaries = uiState.uptimeSummaries,
+                            addRequestKey = uptimeAddRequestToken.intValue,
                             onAddHost = onAddHostToUptime,
                             onUpdateConfig = onUpdateUptimeConfig,
                             onSetEnabled = onSetUptimeEnabled,
@@ -1619,6 +1709,8 @@ fun SSHPeachesRoot(
                             hosts = uiState.hosts,
                             isLocked = uiState.isLocked,
                             addRequestKey = identityAddRequestToken.intValue,
+                            editRequestKey = identityEditRequestToken.intValue,
+                            editRequestId = identityEditRequestId.value,
                             importRequestKey = identityImportRequestToken.intValue,
                             onAdd = onIdentityAdd,
                             onUpdate = onIdentityUpdate,
@@ -1639,7 +1731,10 @@ fun SSHPeachesRoot(
                             PortForwardScreen(
                                 items = uiState.portForwards,
                                 hosts = uiState.hosts,
+                                allowBackgroundSessions = uiState.allowBackgroundSessions,
                                 addRequestKey = forwardAddRequestToken.intValue,
+                                editRequestKey = forwardEditRequestToken.intValue,
+                                editRequestId = forwardEditRequestId.value,
                                 importRequestKey = forwardImportRequestToken.intValue,
                                 onAdd = onPortForwardAdd,
                                 onUpdate = onPortForwardUpdate,
@@ -2897,10 +2992,39 @@ internal fun AboutDialog(
     )
 }
 
-private fun decodeTransferPayload(encodedPayload: String): JSONObject? {
-    val payload = runCatching {
-        String(Base64.decode(encodedPayload.trim(), Base64.DEFAULT), Charsets.UTF_8)
+internal fun encodeTransferPayloadEnvelope(payload: String): String {
+    val rawBytes = payload.toByteArray(Charsets.UTF_8)
+    val compressedBytes = runCatching {
+        ByteArrayOutputStream().use { output ->
+            GZIPOutputStream(output).use { gzip ->
+                gzip.write(rawBytes)
+            }
+            output.toByteArray()
+        }
+    }.getOrNull()
+    val bytesToEncode = compressedBytes?.takeIf { it.size < rawBytes.size } ?: rawBytes
+    return Base64.getEncoder().encodeToString(bytesToEncode)
+}
+
+internal fun decodeTransferPayloadEnvelope(encodedPayload: String): String? {
+    val decodedBytes = runCatching {
+        Base64.getDecoder().decode(encodedPayload.trim())
     }.getOrNull() ?: return null
+    val payloadBytes = if (decodedBytes.isGzipPayload()) {
+        runCatching {
+            GZIPInputStream(ByteArrayInputStream(decodedBytes)).use { gzip -> gzip.readBytes() }
+        }.getOrNull() ?: return null
+    } else {
+        decodedBytes
+    }
+    return payloadBytes.toString(Charsets.UTF_8)
+}
+
+private fun ByteArray.isGzipPayload(): Boolean =
+    size >= 2 && this[0] == 0x1f.toByte() && this[1] == 0x8b.toByte()
+
+private fun decodeTransferPayload(encodedPayload: String): JSONObject? {
+    val payload = decodeTransferPayloadEnvelope(encodedPayload) ?: return null
     return runCatching { JSONObject(payload) }.getOrNull()
 }
 
@@ -3037,6 +3161,12 @@ private fun terminalProfilesFromJson(array: JSONArray?): List<TerminalProfile> {
 private fun buildExportPayload(state: AppUiState, passphrase: String?): String? {
     val includeSecrets = state.includeSecretsInQr
     val secretsPassphrase = if (includeSecrets) passphrase?.takeIf { it.isNotBlank() } ?: return null else null
+    if (
+        includeSecrets &&
+        secretsPassphrase!!.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH
+    ) {
+        return null
+    }
     val payload = JSONObject().apply {
         put("v", 2)
         put("exportedAt", System.currentTimeMillis())
@@ -3172,5 +3302,5 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             }
         })
     }.toString()
-    return Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    return encodeTransferPayloadEnvelope(payload)
 }

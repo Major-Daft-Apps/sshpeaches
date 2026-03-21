@@ -120,6 +120,8 @@ fun IdentitiesScreen(
     hosts: List<HostConnection>,
     isLocked: Boolean,
     addRequestKey: Int = 0,
+    editRequestKey: Int = 0,
+    editRequestId: String? = null,
     importRequestKey: Int = 0,
     onAdd: (label: String, fingerprint: String, username: String?, group: String?, suppliedId: String?) -> Unit = { _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, fingerprint: String, username: String?, group: String?) -> Unit = { _, _, _, _, _ -> },
@@ -187,6 +189,7 @@ fun IdentitiesScreen(
     val pendingDeleteIdentity = remember { mutableStateOf<Identity?>(null) }
     val overflowIdentityId = remember { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+    val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
     AutoHidePasswordReveal(sharePassphraseRevealIndex)
     AutoHidePasswordReveal(shareConfirmPassphraseRevealIndex)
     AutoHidePasswordReveal(importPassphraseRevealIndex)
@@ -331,6 +334,13 @@ fun IdentitiesScreen(
     LaunchedEffect(addRequestKey) {
         if (addRequestKey > 0) {
             openDialog(null)
+        }
+    }
+
+    LaunchedEffect(editRequestKey, editRequestId, items) {
+        if (editRequestKey > handledEditRequestKey.intValue) {
+            handledEditRequestKey.intValue = editRequestKey
+            items.firstOrNull { it.id == editRequestId }?.let(::openDialog)
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -110,6 +111,59 @@ class HomeScreenTest {
         composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_FORWARD).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_SNIPPET).assertIsDisplayed()
         composeRule.onAllNodesWithTag(UiTestTags.HOME_RECENTS_SECTION).assertCountEquals(0)
+    }
+
+    @Test
+    fun recentHostOverflowCanOpenEditDialog() {
+        AppStateSeeder.seedHost(
+            HostConnection(
+                id = "recent-host",
+                name = "Recent Host",
+                host = "10.0.0.5",
+                port = 22,
+                username = "tester",
+                preferredAuth = AuthMethod.PASSWORD,
+                createdEpochMillis = System.currentTimeMillis()
+            )
+        )
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+        assertHomeItemVisible("Recent Host")
+
+        val recentKey = "host_recent-host"
+        composeRule.onNodeWithTag(UiTestTags.homeRecentOverflowButton(recentKey)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.homeRecentOverflowAction(recentKey, "edit")).performClick()
+
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).assertTextContains("Recent Host")
+    }
+
+    @Test
+    fun favoriteIdentityOverflowCanOpenEditDialog() {
+        AppStateSeeder.seedIdentity(
+            identity = Identity(
+                id = "favorite-identity",
+                label = "Favorite Identity Overflow",
+                fingerprint = "SHA256:favoriteidentityoverflow",
+                username = "favuser",
+                createdEpochMillis = System.currentTimeMillis(),
+                favorite = true
+            ),
+            privateKey = FAVORITES_TEST_PRIVATE_KEY,
+            publicKey = FAVORITES_TEST_PUBLIC_KEY
+        )
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+        assertHomeItemVisible("Favorite Identity Overflow")
+
+        val favoriteKey = "identity_favorite-identity"
+        composeRule.onNodeWithTag(UiTestTags.homeFavoriteOverflowButton(favoriteKey)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.homeFavoriteOverflowAction(favoriteKey, "edit")).performClick()
+
+        composeRule.onNodeWithTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT).assertTextContains("Favorite Identity Overflow")
     }
 
     private fun assertHomeItemVisible(label: String) {

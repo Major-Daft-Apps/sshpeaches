@@ -103,6 +103,7 @@ object AppStateSeeder {
         autoTrustHostKey: Boolean? = null,
         diagnostics: Boolean? = null,
         includeSecretsInQr: Boolean? = null,
+        allowBackgroundSessions: Boolean? = null,
         biometricLock: Boolean? = null,
         terminalSelectionMode: TerminalSelectionMode? = null,
         terminalBellMode: TerminalBellMode? = null,
@@ -117,6 +118,7 @@ object AppStateSeeder {
             autoTrustHostKey?.let { SettingsStore.setAutoTrustHostKeyEnabled(it) }
             diagnostics?.let { SettingsStore.setDiagnosticsEnabled(it) }
             includeSecretsInQr?.let { SettingsStore.setIncludeSecretsInQr(it) }
+            allowBackgroundSessions?.let { SettingsStore.setAllowBackgroundSessions(it) }
             biometricLock?.let { SettingsStore.setBiometricLockEnabled(it) }
             terminalSelectionMode?.let { SettingsStore.setTerminalSelectionMode(it) }
             terminalBellMode?.let { SettingsStore.setTerminalBellMode(it) }

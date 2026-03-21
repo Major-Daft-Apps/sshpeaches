@@ -47,6 +47,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -730,7 +731,10 @@ fun SettingsScreen(
                 ) {
                     Column {
                         Text("Session diagnostics")
-                        Text("Capture anonymized session logs", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Capture local session logs for troubleshooting. Not uploaded.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                     Switch(
                         checked = diagnosticsLoggingEnabled,
@@ -743,8 +747,8 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Send usage reports (Advanced)")
-                        Text("Periodically send diagnostics bundle", style = MaterialTheme.typography.bodySmall)
+                        Text("Send usage reports")
+                        Text("Upload a usage report every 7 days", style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = usageReportsEnabled, onCheckedChange = onUsageReportsToggle)
                 }
@@ -897,8 +901,10 @@ fun SettingsScreen(
                     onClick = {
                         val passphrase = if (includeSecretsInQr) exportPassphraseState.value else null
                         when {
-                            includeSecretsInQr && passphrase.orEmpty().length < 4 -> {
-                                exportPassphraseError.value = "Passphrase must be at least 4 characters."
+                            includeSecretsInQr &&
+                                passphrase.orEmpty().length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH -> {
+                                exportPassphraseError.value =
+                                    "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                                 return@TextButton
                             }
                             includeSecretsInQr && passphrase != exportConfirmPassphraseState.value -> {
@@ -1009,8 +1015,13 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     val passphrase = importPassphraseState.value
-                    if (passphrase.length < 4) {
+                    if (passphrase.isBlank()) {
                         importPassphraseError.value = "Enter the export passphrase."
+                        return@TextButton
+                    }
+                    if (passphrase.length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH) {
+                        importPassphraseError.value =
+                            "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         return@TextButton
                     }
                     ExportPassphraseCache.transfer = passphrase

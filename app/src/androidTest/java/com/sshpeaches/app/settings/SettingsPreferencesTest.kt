@@ -19,6 +19,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
@@ -83,6 +84,22 @@ class SettingsPreferencesTest {
     }
 
     @Test
+    fun exportQrWithoutSecrets_generatesQrDialog() {
+        AppStateSeeder.configureSettings(includeSecretsInQr = false)
+        composeRule.activityRule.scenario.recreate()
+
+        openSettings()
+        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
+        waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
+
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH).assertIsOff()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
+        waitForTag(UiTestTags.SETTINGS_EXPORT_QR_DIALOG)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_DIALOG).assertIsDisplayed()
+    }
+
+    @Test
     fun exportQrWithSecretsValidatesPassphraseBeforeGenerating() {
         AppStateSeeder.configureSettings(includeSecretsInQr = true)
         composeRule.activityRule.scenario.recreate()
@@ -97,11 +114,13 @@ class SettingsPreferencesTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextInput("abc")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_ERROR)
-            .assertTextContains("Passphrase must be at least 4 characters.")
+            .assertTextContains(
+                "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
+            )
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextClearance()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextInput("peaches-123")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT).performTextInput("peaches-1234")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
             .performTextInput("mismatch-123")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
@@ -110,7 +129,7 @@ class SettingsPreferencesTest {
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
-            .performTextInput("peaches-123")
+            .performTextInput("peaches-1234")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON).performClick()
 
         composeRule.waitUntil(5_000) {

@@ -82,7 +82,7 @@ class UptimeScreenTest {
         composeRule.activityRule.scenario.recreate()
 
         openUptimeScreen()
-        composeRule.onNodeWithTag(UiTestTags.UPTIME_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.UPTIME)).performClick()
         composeRule.onNodeWithTag(UiTestTags.UPTIME_HOST_PICKER).performClick()
 
         composeRule.onNodeWithTag(UiTestTags.uptimeHostOption(available.id)).assertIsDisplayed()

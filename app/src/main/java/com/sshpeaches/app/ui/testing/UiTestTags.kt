@@ -29,6 +29,12 @@ object UiTestTags {
     const val HOME_WELCOME_ADD_SNIPPET = "home_welcome_add_snippet"
     const val HOME_RECENTS_SECTION = "home_recents_section"
     fun homeRecentItem(key: String): String = "home_recent_${sanitize(key)}"
+    fun homeRecentOverflowButton(key: String): String = "home_recent_${sanitize(key)}_overflow_button"
+    fun homeRecentOverflowAction(key: String, action: String): String =
+        "home_recent_${sanitize(key)}_overflow_${sanitize(action)}"
+    fun homeFavoriteOverflowButton(key: String): String = "home_favorite_${sanitize(key)}_overflow_button"
+    fun homeFavoriteOverflowAction(key: String, action: String): String =
+        "home_favorite_${sanitize(key)}_overflow_${sanitize(action)}"
 
     const val DRAWER_QUICK_CONNECT = "drawer_quick_connect"
     fun drawerItem(route: String): String = "drawer_item_$route"
@@ -104,6 +110,7 @@ object UiTestTags {
     const val FORWARD_DIALOG_BIND_INPUT = "forward_dialog_bind_input"
     const val FORWARD_DIALOG_SOURCE_PORT_INPUT = "forward_dialog_source_port_input"
     const val FORWARD_DIALOG_HOST_FIELD = "forward_dialog_host_field"
+    const val FORWARD_HOST_BACKGROUND_ERROR = "forward_host_background_error"
     fun forwardHostOption(hostId: String): String = "forward_host_option_$hostId"
     const val FORWARD_DIALOG_DEST_HOST_INPUT = "forward_dialog_dest_host_input"
     const val FORWARD_DIALOG_DEST_PORT_INPUT = "forward_dialog_dest_port_input"

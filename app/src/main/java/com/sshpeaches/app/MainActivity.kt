@@ -709,7 +709,15 @@ class MainActivity : FragmentActivity() {
             return
         }
         appViewModel.onAppBackgrounded()
+        val keepSessionsForActiveForwards = sessionServiceState.value?.hasActivePortForwards() == true
         when {
+            keepSessionsForActiveForwards -> {
+                UiDebugLog.result(
+                    "MainActivity.backgroundSessionTimeout",
+                    true,
+                    "stopNow=skip-active-port-forwards"
+                )
+            }
             !latestAllowBackgroundSessions -> {
                 sessionServiceState.value?.stopAllSessions()
                 UiDebugLog.result("MainActivity.backgroundSessionTimeout", true, "stopNow=background-disabled")

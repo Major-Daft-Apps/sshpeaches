@@ -93,6 +93,8 @@ fun HostsScreen(
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     addRequestKey: Int = 0,
+    editRequestKey: Int = 0,
+    editRequestId: String? = null,
     importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
     onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
@@ -144,6 +146,7 @@ fun HostsScreen(
     val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+    val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     AutoHidePasswordReveal(passwordRevealIndex)
@@ -298,6 +301,13 @@ fun HostsScreen(
     LaunchedEffect(addRequestKey) {
         if (addRequestKey > 0) {
             openDialog(null)
+        }
+    }
+
+    LaunchedEffect(editRequestKey, editRequestId, hosts) {
+        if (editRequestKey > handledEditRequestKey.intValue) {
+            handledEditRequestKey.intValue = editRequestKey
+            hosts.firstOrNull { it.id == editRequestId }?.let(::openDialog)
         }
     }
 

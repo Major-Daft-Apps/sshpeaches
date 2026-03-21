@@ -13,12 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -36,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -59,6 +58,7 @@ import java.util.Locale
 fun UptimeScreen(
     hosts: List<HostConnection>,
     summaries: List<HostUptimeSummary>,
+    addRequestKey: Int = 0,
     onAddHost: (String) -> Unit = {},
     onUpdateConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit = { _, _, _, _, _ -> },
     onSetEnabled: (String, Boolean) -> Unit = { _, _ -> },
@@ -78,6 +78,7 @@ fun UptimeScreen(
     val showDialog = remember { mutableStateOf(false) }
     val hostMenuExpanded = remember { mutableStateOf(false) }
     val methodMenuExpanded = remember { mutableStateOf(false) }
+    val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
 
     fun openAddDialog() {
         if (availableHosts.isEmpty()) return
@@ -105,6 +106,13 @@ fun UptimeScreen(
         showDialog.value = true
     }
 
+    LaunchedEffect(addRequestKey, availableHosts) {
+        if (addRequestKey > handledAddRequestKey.intValue) {
+            handledAddRequestKey.intValue = addRequestKey
+            openAddDialog()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -120,14 +128,6 @@ fun UptimeScreen(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Tracked hosts", style = MaterialTheme.typography.titleMedium)
                 Text("${summaries.size} monitored", style = MaterialTheme.typography.bodySmall)
-            }
-            Button(
-                onClick = { openAddDialog() },
-                enabled = availableHosts.isNotEmpty(),
-                modifier = Modifier.testTag(UiTestTags.UPTIME_ADD_BUTTON)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text("Add from Hosts", modifier = Modifier.padding(start = 8.dp))
             }
         }
 

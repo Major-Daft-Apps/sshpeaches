@@ -371,7 +371,7 @@ class LiveTransportSuiteTest {
     }
 
     @Test
-    fun localPortForward_canFetchHttpResponse() {
+    fun localPortForward_canFetchHttpResponseTwice() {
         assumeTrue(
             "This live forward test requires localhost SSH routing via adb reverse.",
             LiveBackendConfig.host == "127.0.0.1"
@@ -413,6 +413,10 @@ class LiveTransportSuiteTest {
         val response = waitForForwardedHttpResponse(forwardedPort)
         check(response.contains("SSHPEACHES_FORWARD_OK")) {
             "Expected forwarded HTTP response but got: $response"
+        }
+        val secondResponse = waitForForwardedHttpResponse(forwardedPort)
+        check(secondResponse.contains("SSHPEACHES_FORWARD_OK")) {
+            "Expected forwarded HTTP response on second request but got: $secondResponse"
         }
     }
 

@@ -38,6 +38,11 @@ object SettingsStore {
     private lateinit var appContext: Context
     private const val startupThemePrefsName = "startup_theme_mode"
     private const val startupThemeKey = "theme_mode"
+    private const val telemetryPrefsName = "telemetry_settings"
+    private const val startupCrashReportsKey = "crash_reports"
+    private const val startupAnalyticsKey = "analytics"
+    private const val startupDiagnosticsKey = "diagnostics"
+    private const val startupUsageReportsKey = "usage_reports"
 
     private val allowBackgroundSessionsKey = booleanPreferencesKey("allow_background_sessions")
     private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
@@ -81,6 +86,24 @@ object SettingsStore {
         startupThemePrefs().edit().putString(startupThemeKey, fromDataStore.name).apply()
         return fromDataStore
     }
+
+    fun getStartupCrashReportsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupCrashReportsKey,
+            runCatching { runBlocking { crashReportsEnabled.first() } }.getOrDefault(true)
+        )
+
+    fun getStartupAnalyticsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupAnalyticsKey,
+            runCatching { runBlocking { analyticsEnabled.first() } }.getOrDefault(true)
+        )
+
+    fun getStartupUsageReportsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupUsageReportsKey,
+            runCatching { runBlocking { usageReportsEnabled.first() } }.getOrDefault(false)
+        )
 
     val allowBackgroundSessions: Flow<Boolean> by lazy {
         dataStore.data.map { prefs ->
@@ -199,11 +222,11 @@ object SettingsStore {
     }
 
     val crashReportsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[crashReportsKey] ?: false }
+        dataStore.data.map { prefs -> prefs[crashReportsKey] ?: true }
     }
 
     val analyticsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[analyticsKey] ?: false }
+        dataStore.data.map { prefs -> prefs[analyticsKey] ?: true }
     }
 
     val diagnosticsEnabled: Flow<Boolean> by lazy {
@@ -349,18 +372,21 @@ object SettingsStore {
         dataStore.edit { prefs ->
             prefs[crashReportsKey] = enabled
         }
+        telemetryPrefs().edit().putBoolean(startupCrashReportsKey, enabled).apply()
     }
 
     suspend fun setAnalyticsEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[analyticsKey] = enabled
         }
+        telemetryPrefs().edit().putBoolean(startupAnalyticsKey, enabled).apply()
     }
 
     suspend fun setDiagnosticsEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[diagnosticsKey] = enabled
         }
+        telemetryPrefs().edit().putBoolean(startupDiagnosticsKey, enabled).apply()
     }
 
     suspend fun setIncludeSecretsInQr(enabled: Boolean) {
@@ -391,6 +417,7 @@ object SettingsStore {
         dataStore.edit { prefs ->
             prefs[usageReportsKey] = enabled
         }
+        telemetryPrefs().edit().putBoolean(startupUsageReportsKey, enabled).apply()
     }
 
     suspend fun setSnippetRunTimeoutSeconds(seconds: Int) {
@@ -406,6 +433,13 @@ object SettingsStore {
                 prefs.remove(key as Preferences.Key<Any>)
             }
         }
+        telemetryPrefs().edit().apply {
+            remove(startupCrashReportsKey)
+            remove(startupAnalyticsKey)
+            remove(startupDiagnosticsKey)
+            remove(startupUsageReportsKey)
+            apply()
+        }
     }
 
     private val dataStore: DataStore<Preferences>
@@ -417,6 +451,11 @@ object SettingsStore {
     private fun startupThemePrefs(): SharedPreferences {
         check(::appContext.isInitialized) { "SettingsStore not initialized" }
         return appContext.getSharedPreferences(startupThemePrefsName, Context.MODE_PRIVATE)
+    }
+
+    private fun telemetryPrefs(): SharedPreferences {
+        check(::appContext.isInitialized) { "SettingsStore not initialized" }
+        return appContext.getSharedPreferences(telemetryPrefsName, Context.MODE_PRIVATE)
     }
 
     private fun decodeKeyboardSlots(serialized: String): List<KeyboardSlotAction> =

@@ -3,7 +3,6 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
@@ -80,7 +81,10 @@ import java.util.UUID
 fun PortForwardScreen(
     items: List<PortForward>,
     hosts: List<HostConnection> = emptyList(),
+    allowBackgroundSessions: Boolean = true,
     addRequestKey: Int = 0,
+    editRequestKey: Int = 0,
+    editRequestId: String? = null,
     importRequestKey: Int = 0,
     onAdd: (label: String, group: String?, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     onUpdate: (id: String, label: String, group: String?, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
@@ -106,6 +110,9 @@ fun PortForwardScreen(
     val overflowForwardId = remember { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
+    val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
 
     fun openDialog(forward: PortForward?, asEdit: Boolean = forward != null) {
@@ -125,6 +132,9 @@ fun PortForwardScreen(
     fun closeDialog() {
         showDialog.value = false
     }
+
+    fun hostHasBackgroundSessionsDisabled(host: HostConnection): Boolean =
+        host.backgroundBehavior == BackgroundBehavior.ALWAYS_STOP
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -146,13 +156,24 @@ fun PortForwardScreen(
     }
 
     LaunchedEffect(addRequestKey) {
-        if (addRequestKey > 0) {
+        if (addRequestKey > handledAddRequestKey.intValue) {
+            handledAddRequestKey.intValue = addRequestKey
             openDialog(null)
         }
     }
 
+    LaunchedEffect(editRequestKey, editRequestId, items) {
+        if (editRequestKey > handledEditRequestKey.intValue) {
+            handledEditRequestKey.intValue = editRequestKey
+            items.firstOrNull { it.id == editRequestId }?.let { forward ->
+                openDialog(forward)
+            }
+        }
+    }
+
     LaunchedEffect(importRequestKey) {
-        if (importRequestKey > 0) {
+        if (importRequestKey > handledImportRequestKey.intValue) {
+            handledImportRequestKey.intValue = importRequestKey
             val options = ScanOptions().apply {
                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                 setPrompt("Scan port forward QR")
@@ -257,7 +278,10 @@ fun PortForwardScreen(
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Switch(
                                                 checked = forward.enabled,
                                                 onCheckedChange = {
@@ -275,23 +299,26 @@ fun PortForwardScreen(
                                                     )
                                                 }
                                             )
-                                            Icon(
-                                                imageVector = Icons.Default.Star,
-                                                contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
-                                                tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                            IconButton(
+                                                onClick = { onToggleFavorite(forward.id) },
                                                 modifier = Modifier
                                                     .testTag(UiTestTags.forwardFavorite(forward.id))
-                                                    .clickable { onToggleFavorite(forward.id) }
-                                                    .padding(4.dp)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.QrCode,
-                                                contentDescription = "Share",
-                                                modifier = Modifier
-                                                    .testTag(UiTestTags.forwardShare(forward.id))
-                                                    .clickable { shareForward.value = forward }
-                                                    .padding(4.dp)
-                                            )
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Star,
+                                                    contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
+                                                    tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { shareForward.value = forward },
+                                                modifier = Modifier.testTag(UiTestTags.forwardShare(forward.id))
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.QrCode,
+                                                    contentDescription = "Share"
+                                                )
+                                            }
                                             IconButton(
                                                 onClick = { overflowForwardId.value = forward.id },
                                                 modifier = Modifier.testTag(UiTestTags.forwardOverflowButton(forward.id))
@@ -344,6 +371,10 @@ fun PortForwardScreen(
 
     if (showDialog.value) {
         val isEdit = editingId.value != null
+        val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
+        val selectedHostBackgroundError = selectedHost
+            ?.takeIf(::hostHasBackgroundSessionsDisabled)
+            ?.let { "Selected host has background sessions disabled." }
         AlertDialog(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit port forward" else "Add port forward") },
@@ -412,7 +443,6 @@ fun PortForwardScreen(
                             }
                         }
                     ) {
-                        val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
                         TextField(
                             value = selectedHost?.name?.ifBlank { selectedHost.host } ?: "",
                             onValueChange = {},
@@ -442,7 +472,14 @@ fun PortForwardScreen(
                             }
                         }
                     }
-                    val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
+                    selectedHostBackgroundError?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.testTag(UiTestTags.FORWARD_HOST_BACKGROUND_ERROR)
+                        )
+                    }
                     Text(
                         text = if (selectedHost == null) {
                             "Destination host is inferred from the selected host."
@@ -485,18 +522,26 @@ fun PortForwardScreen(
                         dialogError.value = "Enter a valid destination port."
                         return@TextButton
                     }
-                    val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
+                    val chosenHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
                         dialogError.value = "Select a host."
                         return@TextButton
                     }
-                    if (!isValidHostAddress(selectedHost.host)) {
+                    if (!allowBackgroundSessions) {
+                        dialogError.value = "Enable background sessions in Settings before saving a port forward."
+                        return@TextButton
+                    }
+                    if (hostHasBackgroundSessionsDisabled(chosenHost)) {
+                        dialogError.value = "Selected host has background sessions disabled."
+                        return@TextButton
+                    }
+                    if (!isValidHostAddress(chosenHost.host)) {
                         dialogError.value = "Selected host has an invalid address."
                         return@TextButton
                     }
                     dialogError.value = null
                     val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
                     val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
-                    val associated = listOf(selectedHost.id)
+                    val associated = listOf(chosenHost.id)
                     if (isEdit) {
                         onUpdate(
                             editingId.value!!,
@@ -505,7 +550,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            selectedHost.host,
+                            chosenHost.host,
                             dstPort,
                             enabledState.value,
                             associated
@@ -517,7 +562,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            selectedHost.host,
+                            chosenHost.host,
                             dstPort,
                             enabledState.value,
                             associated

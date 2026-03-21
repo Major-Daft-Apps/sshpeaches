@@ -456,6 +456,9 @@ class SessionService : Service() {
         UiDebugLog.result("stopSession", true, "hostId=$hostId")
     }
 
+    fun hasActivePortForwards(): Boolean =
+        activeConnections.values.any { it.portForwardBindings.isNotEmpty() }
+
     fun stopAllSessions() {
         UiDebugLog.action("stopAllSessions", "count=${activeJobs.size}")
         val ids = activeJobs.keys.toList()
@@ -1364,27 +1367,39 @@ class SessionService : Service() {
             runCatching { acceptedSocket.close() }
             throw err
         }
+        val acceptedInput = acceptedSocket.getInputStream()
+        val acceptedOutput = acceptedSocket.getOutputStream()
+        val remoteInput = directConnection.inputStream
+        val remoteOutput = directConnection.outputStream
         val upstreamJob = serviceScope.launch(Dispatchers.IO) {
             runCatching {
                 copyPortForwardStream(
-                    input = acceptedSocket.getInputStream(),
-                    output = directConnection.outputStream
+                    input = acceptedInput,
+                    output = remoteOutput
                 )
             }.onFailure { err ->
                 if (!isExpectedForwardStreamException(err)) {
                     emitPortForwardWarning(hostId, forward, err)
                 }
+            }.also {
+                runCatching { remoteOutput.close() }
             }
         }
         val downstreamJob = serviceScope.launch(Dispatchers.IO) {
             runCatching {
                 copyPortForwardStream(
-                    input = directConnection.inputStream,
-                    output = acceptedSocket.getOutputStream()
+                    input = remoteInput,
+                    output = acceptedOutput
                 )
             }.onFailure { err ->
                 if (!isExpectedForwardStreamException(err)) {
                     emitPortForwardWarning(hostId, forward, err)
+                }
+            }.also {
+                runCatching {
+                    if (!acceptedSocket.isClosed && !acceptedSocket.isOutputShutdown) {
+                        acceptedSocket.shutdownOutput()
+                    }
                 }
             }
         }

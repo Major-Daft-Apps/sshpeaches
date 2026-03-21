@@ -20,8 +20,8 @@ object TelemetryInitializer {
     private const val TAG = "SSHPeachesTelemetry"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var initialized = false
-    @Volatile private var crashReportsEnabled = false
-    @Volatile private var analyticsEnabled = false
+    @Volatile private var crashReportsEnabled = true
+    @Volatile private var analyticsEnabled = true
     @Volatile private var usageReportsEnabled = false
     @Volatile private var crashlytics: FirebaseCrashlytics? = null
     @Volatile private var analytics: FirebaseAnalytics? = null
@@ -36,13 +36,16 @@ object TelemetryInitializer {
             return
         }
 
+        crashReportsEnabled = SettingsStore.getStartupCrashReportsEnabled()
+        analyticsEnabled = SettingsStore.getStartupAnalyticsEnabled()
+        usageReportsEnabled = SettingsStore.getStartupUsageReportsEnabled()
+
         crashlytics = FirebaseCrashlytics.getInstance().also {
-            // Explicit opt-in behavior; collection is enabled only by SettingsStore values.
-            it.setCrashlyticsCollectionEnabled(false)
+            it.setCrashlyticsCollectionEnabled(crashReportsEnabled)
         }
         analytics = FirebaseAnalytics.getInstance(application).also {
-            // Explicit opt-in behavior; collection is enabled only by SettingsStore values.
-            it.setAnalyticsCollectionEnabled(false)
+            it.setAnalyticsCollectionEnabled(analyticsEnabled || usageReportsEnabled)
+            it.setUserProperty("usage_reports_opt_in", usageReportsEnabled.toString())
         }
 
         scope.launch {
