@@ -25,11 +25,19 @@ class PortForwardsTest {
     }
 
     @Test
-    fun inferredDestinationHost_prefersSelectedHostAddress() {
+    fun inferredDestinationHost_prefersStoredAddressEvenWhenHostIsAssociated() {
         val host = sampleHost(id = "host-1", address = "prod.internal")
         val forward = sampleForward(destinationHost = "stale.internal", associatedHosts = listOf(host.id))
 
-        assertEquals("prod.internal", forward.inferredDestinationHost(host))
+        assertEquals("stale.internal", forward.inferredDestinationHost())
+    }
+
+    @Test
+    fun legacyLoopbackDestinationHost_returnsLoopbackWhenStoredHostMatchesAssociatedHost() {
+        val host = sampleHost(id = "host-1", address = "prod.internal")
+        val forward = sampleForward(destinationHost = "prod.internal", associatedHosts = listOf(host.id))
+
+        assertEquals("127.0.0.1", forward.legacyLoopbackDestinationHost(host))
     }
 
     @Test

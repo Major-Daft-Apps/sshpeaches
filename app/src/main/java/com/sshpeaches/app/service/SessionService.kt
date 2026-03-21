@@ -32,6 +32,7 @@ import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
+import com.majordaftapps.sshpeaches.app.util.legacyLoopbackDestinationHost
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
@@ -1305,8 +1306,9 @@ class SessionService : Service() {
     ): PortForwardBinding {
         val bindHost = normalizeBindHost(forward.sourceHost)
         val bindPort = requireValidPort(forward.sourcePort, "source")
-        val destinationHost = forward.inferredDestinationHost(sessionHost)
+        val destinationHost = forward.inferredDestinationHost()
         val destinationPort = requireValidPort(forward.destinationPort, "destination")
+        val legacyDestinationHost = forward.legacyLoopbackDestinationHost(sessionHost)
         val serverSocket = ServerSocket()
         serverSocket.reuseAddress = true
         serverSocket.bind(InetSocketAddress(bindHost, bindPort))
@@ -1323,14 +1325,21 @@ class SessionService : Service() {
                 }
                 socket.tcpNoDelay = true
                 val connectionJob = serviceScope.launch(Dispatchers.IO) {
-                    bridgeLocalPortForwardConnection(
-                        hostId = hostId,
-                        client = client,
-                        forward = forward,
-                        acceptedSocket = socket,
-                        destinationHost = destinationHost,
-                        destinationPort = destinationPort
-                    )
+                    runCatching {
+                        bridgeLocalPortForwardConnection(
+                            hostId = hostId,
+                            client = client,
+                            forward = forward,
+                            acceptedSocket = socket,
+                            destinationHost = destinationHost,
+                            destinationPort = destinationPort,
+                            legacyDestinationHost = legacyDestinationHost
+                        )
+                    }.onFailure { err ->
+                        if (!isExpectedForwardStreamException(err)) {
+                            emitPortForwardConnectionWarning(hostId, forward, err)
+                        }
+                    }
                 }
                 connectionJobs += connectionJob
                 connectionJob.invokeOnCompletion {
@@ -1359,10 +1368,21 @@ class SessionService : Service() {
         forward: PortForward,
         acceptedSocket: Socket,
         destinationHost: String,
-        destinationPort: Int
+        destinationPort: Int,
+        legacyDestinationHost: String?
     ) {
         val directConnection = runCatching {
             client.newDirectConnection(destinationHost, destinationPort)
+        }.recoverCatching { err ->
+            val fallbackHost = legacyDestinationHost ?: throw err
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Retrying local forward ${forward.label} against $fallbackHost because the saved destination matched the SSH host."
+                )
+            )
+            client.newDirectConnection(fallbackHost, destinationPort)
         }.getOrElse { err ->
             runCatching { acceptedSocket.close() }
             throw err
@@ -1440,6 +1460,17 @@ class SessionService : Service() {
                 hostId = hostId,
                 level = SessionLogBus.LogLevel.WARN,
                 message = "Local forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
+            )
+        )
+    }
+
+    private fun emitPortForwardConnectionWarning(hostId: String, forward: PortForward, err: Throwable) {
+        if (!activeJobs.containsKey(hostId)) return
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.WARN,
+                message = "Local forward ${forward.label} connection failed: ${err.message ?: "unknown error"}"
             )
         )
     }

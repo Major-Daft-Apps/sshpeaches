@@ -14,11 +14,18 @@ fun normalizeAssociatedHostIds(hostIds: List<String>): List<String> =
 
 fun PortForward.selectedHostId(): String? = normalizeAssociatedHostIds(associatedHosts).firstOrNull()
 
-fun PortForward.inferredDestinationHost(selectedHost: HostConnection? = null): String {
-    val inferredHost = selectedHost?.host?.trim().orEmpty()
-    if (inferredHost.isNotBlank()) {
-        return inferredHost
-    }
+fun PortForward.inferredDestinationHost(): String {
     val storedHost = destinationHost.trim()
     return if (storedHost.isNotBlank()) storedHost else DEFAULT_FORWARD_DESTINATION_HOST
+}
+
+fun PortForward.legacyLoopbackDestinationHost(selectedHost: HostConnection?): String? {
+    val storedHost = destinationHost.trim()
+    val associatedHost = selectedHost?.host?.trim().orEmpty()
+    if (storedHost.isBlank() || associatedHost.isBlank()) return null
+    return if (storedHost.equals(associatedHost, ignoreCase = true)) {
+        DEFAULT_FORWARD_DESTINATION_HOST
+    } else {
+        null
+    }
 }

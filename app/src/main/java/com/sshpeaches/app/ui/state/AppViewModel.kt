@@ -1077,12 +1077,12 @@ class AppViewModel(
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
-        ignoredDestHost: String,
+        destinationHost: String,
         destPort: Int,
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        logAction("addPortForward", "labelBlank=${label.isBlank()}, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${ignoredDestHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        logAction("addPortForward", "labelBlank=${label.isBlank()}, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${destinationHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
         if (label.isBlank()) {
             logResult("addPortForward", false, "validation-failed")
             return
@@ -1110,7 +1110,7 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = sourcePort,
-            destinationHost = selectedHost.host,
+            destinationHost = destinationHost.trim().ifBlank { "127.0.0.1" },
             destinationPort = destPort,
             associatedHosts = normalizedAssociatedHosts,
             favorite = false,
@@ -1150,12 +1150,12 @@ class AppViewModel(
         type: PortForwardType,
         sourceHost: String,
         sourcePort: Int,
-        ignoredDestHost: String,
+        destinationHost: String,
         destPort: Int,
         enabled: Boolean,
         associatedHosts: List<String>
     ) {
-        logAction("updatePortForward", "forwardId=$id, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${ignoredDestHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
+        logAction("updatePortForward", "forwardId=$id, type=$type, sourcePort=$sourcePort, destinationPort=$destPort, passedDestHost=${destinationHost.isNotBlank()}, enabled=$enabled, associatedHosts=${associatedHosts.size}")
         val existing = uiState.value.portForwards.find { it.id == id }
         if (existing == null) {
             logResult("updatePortForward", false, "not-found")
@@ -1182,7 +1182,7 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { existing.sourceHost },
             sourcePort = sourcePort,
-            destinationHost = selectedHost.host,
+            destinationHost = destinationHost.trim().ifBlank { "127.0.0.1" },
             destinationPort = destPort,
             enabled = enabled,
             associatedHosts = normalizedAssociatedHosts

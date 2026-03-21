@@ -100,6 +100,7 @@ fun PortForwardScreen(
     val groupState = remember { mutableStateOf("") }
     val bindState = remember { mutableStateOf("127.0.0.1") }
     val srcPortState = remember { mutableStateOf("22") }
+    val dstHostState = remember { mutableStateOf("127.0.0.1") }
     val dstPortState = remember { mutableStateOf("0") }
     val enabledState = remember { mutableStateOf(true) }
     val selectedHostIdState = remember { mutableStateOf<String?>(null) }
@@ -121,6 +122,7 @@ fun PortForwardScreen(
         groupState.value = forward?.group ?: ""
         bindState.value = forward?.sourceHost ?: "127.0.0.1"
         srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
+        dstHostState.value = forward?.inferredDestinationHost() ?: "127.0.0.1"
         dstPortState.value = forward?.destinationPort?.toString() ?: "0"
         enabledState.value = forward?.enabled ?: true
         selectedHostIdState.value = forward?.selectedHostId() ?: hosts.singleOrNull()?.id
@@ -188,7 +190,7 @@ fun PortForwardScreen(
     val filteredItems = items.filter { forward ->
         val query = search.value.trim()
         val selectedHost = hosts.firstOrNull { it.id == forward.selectedHostId() }
-        val resolvedDestinationHost = forward.inferredDestinationHost(selectedHost)
+        val resolvedDestinationHost = forward.inferredDestinationHost()
         val selectedHostName = selectedHost?.name.orEmpty()
         query.isBlank() ||
             forward.label.contains(query, ignoreCase = true) ||
@@ -269,7 +271,7 @@ fun PortForwardScreen(
                                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(forward.label, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            text = localForwardSummary(forward, selectedHost),
+                                            text = localForwardSummary(forward),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                         if (selectedHost != null) {
@@ -447,7 +449,7 @@ fun PortForwardScreen(
                             value = selectedHost?.name?.ifBlank { selectedHost.host } ?: "",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Host") },
+                            label = { Text("Associated host") },
                             placeholder = { Text("Select host") },
                             singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostPickerExpanded.value) },
@@ -482,11 +484,23 @@ fun PortForwardScreen(
                     }
                     Text(
                         text = if (selectedHost == null) {
-                            "Destination host is inferred from the selected host."
+                            "Destination traffic is opened through the selected SSH host."
                         } else {
-                            "Destination host: ${selectedHost.host}"
+                            "Use 127.0.0.1 to reach a service listening on the SSH host itself."
                         },
                         style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = dstHostState.value,
+                        onValueChange = { dstHostState.value = it },
+                        label = { Text("Destination host") },
+                        singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Ascii
+                        )
                     )
                     OutlinedTextField(
                         value = dstPortState.value,
@@ -538,6 +552,11 @@ fun PortForwardScreen(
                         dialogError.value = "Selected host has an invalid address."
                         return@TextButton
                     }
+                    val destinationHost = dstHostState.value.trim().ifBlank { "127.0.0.1" }
+                    if (!isValidHostAddress(destinationHost)) {
+                        dialogError.value = "Enter a valid destination host."
+                        return@TextButton
+                    }
                     dialogError.value = null
                     val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
                     val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
@@ -550,7 +569,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            chosenHost.host,
+                            destinationHost,
                             dstPort,
                             enabledState.value,
                             associated
@@ -562,7 +581,7 @@ fun PortForwardScreen(
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
-                            chosenHost.host,
+                            destinationHost,
                             dstPort,
                             enabledState.value,
                             associated
@@ -598,7 +617,7 @@ fun PortForwardScreen(
                         )
                     } ?: Text("Unable to generate QR")
                     Text(
-                        localForwardSummary(forward, hosts.firstOrNull { it.id == forward.selectedHostId() }),
+                        localForwardSummary(forward),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -607,5 +626,5 @@ fun PortForwardScreen(
     }
 }
 
-private fun localForwardSummary(forward: PortForward, selectedHost: HostConnection? = null): String =
-    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.inferredDestinationHost(selectedHost)}:${forward.destinationPort}"
+private fun localForwardSummary(forward: PortForward): String =
+    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.inferredDestinationHost()}:${forward.destinationPort}"
