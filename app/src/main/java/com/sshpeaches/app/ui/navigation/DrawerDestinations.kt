@@ -6,7 +6,7 @@ import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
@@ -19,7 +19,7 @@ data class DrawerDestination(
 )
 
 val drawerDestinations = listOf(
-    DrawerDestination(Routes.FAVORITES, "Favorites", Icons.Default.FavoriteBorder),
+    DrawerDestination(Routes.HOME, "Home", Icons.Default.Home),
     DrawerDestination(Routes.HOSTS, "Hosts", Icons.Default.Storage),
     DrawerDestination(Routes.IDENTITIES, "Identities", Icons.Default.Key),
     DrawerDestination(Routes.FORWARDS, "Port Forwards", Icons.Default.Bolt),

@@ -36,7 +36,7 @@ class SmokeNavigationTest {
 
     @Test
     fun drawerNavigation_showsAllCoreScreens() {
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_FAVORITES).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
 
         composeRule.navigateDrawer(Routes.HOSTS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_HOSTS).assertIsDisplayed()

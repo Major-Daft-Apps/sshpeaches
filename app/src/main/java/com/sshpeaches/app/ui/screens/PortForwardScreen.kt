@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -31,11 +32,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -44,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,9 +65,12 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
+import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
 import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.PortForwardQrImportResult
+import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.processPortForwardQrImport
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
@@ -75,9 +83,10 @@ import java.util.UUID
 fun PortForwardScreen(
     items: List<PortForward>,
     hosts: List<HostConnection> = emptyList(),
-    editMode: Boolean = false,
-    onAdd: (label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _ -> },
-    onUpdate: (id: String, label: String, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    addRequestKey: Int = 0,
+    importRequestKey: Int = 0,
+    onAdd: (label: String, group: String?, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (id: String, label: String, group: String?, type: PortForwardType, bind: String, srcPort: Int, dstHost: String, dstPort: Int, enabled: Boolean, associatedHosts: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onDelete: (id: String) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onImportFromQr: () -> Unit = {},
@@ -87,6 +96,7 @@ fun PortForwardScreen(
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
     val labelState = remember { mutableStateOf("") }
+    val groupState = remember { mutableStateOf("") }
     val bindState = remember { mutableStateOf("127.0.0.1") }
     val srcPortState = remember { mutableStateOf("22") }
     val dstHostState = remember { mutableStateOf("") }
@@ -97,6 +107,9 @@ fun PortForwardScreen(
     val hostFilterExpanded = remember { mutableStateOf(false) }
     val dialogError = remember { mutableStateOf<String?>(null) }
     val shareForward = remember { mutableStateOf<PortForward?>(null) }
+    val pendingDeleteForward = remember { mutableStateOf<PortForward?>(null) }
+    val overflowForwardId = remember { mutableStateOf<String?>(null) }
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -113,6 +126,7 @@ fun PortForwardScreen(
                 }
                 onAdd(
                     imported.label,
+                    imported.group,
                     PortForwardType.LOCAL,
                     imported.sourceHost,
                     imported.sourcePort,
@@ -130,6 +144,7 @@ fun PortForwardScreen(
     fun openDialog(forward: PortForward?) {
         editingId.value = forward?.id
         labelState.value = forward?.label ?: ""
+        groupState.value = forward?.group ?: ""
         bindState.value = forward?.sourceHost ?: "127.0.0.1"
         srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
         dstHostState.value = forward?.destinationHost ?: ""
@@ -146,12 +161,39 @@ fun PortForwardScreen(
         showDialog.value = false
     }
 
-    val filteredItems = items.filter {
-        it.label.contains(search.value, ignoreCase = true) ||
-            it.sourceHost.contains(search.value, ignoreCase = true) ||
-            it.destinationHost.contains(search.value, ignoreCase = true) ||
-            it.type.name.contains(search.value, ignoreCase = true)
+    LaunchedEffect(addRequestKey) {
+        if (addRequestKey > 0) {
+            openDialog(null)
+        }
     }
+
+    LaunchedEffect(importRequestKey) {
+        if (importRequestKey > 0) {
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Scan port forward QR")
+                setBeepEnabled(false)
+                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                setOrientationLocked(true)
+            }
+            scanLauncher.launch(options)
+        }
+    }
+
+    val filteredItems = items.filter {
+        val query = search.value.trim()
+        query.isBlank() ||
+            it.label.contains(query, ignoreCase = true) ||
+            (it.group?.contains(query, ignoreCase = true) == true) ||
+            it.sourceHost.contains(query, ignoreCase = true) ||
+            it.destinationHost.contains(query, ignoreCase = true) ||
+            it.type.name.contains(query, ignoreCase = true)
+    }
+    val groupedItems = buildGroupedSections(
+        items = filteredItems,
+        groupSelector = { it.group },
+        itemComparator = compareBy<PortForward> { it.label.lowercase() }
+    )
     val showEmptyState = items.isEmpty() || filteredItems.isEmpty()
     LaunchedEffect(showEmptyState) {
         onEmptyStateVisibleChanged(showEmptyState)
@@ -190,119 +232,126 @@ fun PortForwardScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(
-                            onClick = { openDialog(null) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(UiTestTags.FORWARD_ADD_BUTTON)
-                        ) {
-                            Text("Add port forward")
-                        }
-                        Button(
-                            onClick = {
-                                val options = ScanOptions().apply {
-                                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                    setPrompt("Scan port forward QR")
-                                    setBeepEnabled(false)
-                                    setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                                    setOrientationLocked(true)
-                                }
-                                scanLauncher.launch(options)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(UiTestTags.FORWARD_IMPORT_BUTTON)
-                        ) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                            Text("Import QR")
-                        }
-                    }
-                }
                 if (items.isEmpty()) {
                     item { EmptyState(itemLabel = "port forward") }
                 } else if (filteredItems.isEmpty()) {
                     item { EmptyState(itemLabel = "result") }
                 } else {
-                    items(filteredItems, key = { it.id }) { forward ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(forward.label, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = localForwardSummary(forward),
-                                style = MaterialTheme.typography.bodyMedium
+                    groupedItems.forEach { section ->
+                        item(key = "forward_header_${section.key}") {
+                            GroupSectionHeader(
+                                vertical = "forwards",
+                                label = section.label,
+                                count = section.items.size,
+                                expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
+                                onToggle = {
+                                    val current = expandedSections[section.key] ?: true
+                                    expandedSections[section.key] = !current
+                                }
                             )
-                            if (forward.associatedHosts.isNotEmpty()) {
-                                val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
-                                Text(
-                                    text = "Hosts: ${names.joinToString()}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Switch(
-                                    checked = forward.enabled,
-                                    onCheckedChange = {
-                                        onUpdate(
-                                            forward.id,
-                                            forward.label,
-                                            PortForwardType.LOCAL,
-                                            forward.sourceHost,
-                                            forward.sourcePort,
-                                            forward.destinationHost,
-                                            forward.destinationPort,
-                                            it,
-                                            forward.associatedHosts
+                        }
+                        if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
+                            items(section.items, key = { it.id }) { forward ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(forward.label, style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            text = localForwardSummary(forward),
+                                            style = MaterialTheme.typography.bodyMedium
                                         )
-                                    },
-                                    enabled = editMode
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
-                                    tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier
-                                        .testTag(UiTestTags.forwardFavorite(forward.id))
-                                        .clickable { onToggleFavorite(forward.id) }
-                                        .padding(4.dp)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.QrCode,
-                                    contentDescription = "Share",
-                                    modifier = Modifier
-                                        .testTag(UiTestTags.forwardShare(forward.id))
-                                        .clickable { shareForward.value = forward }
-                                        .padding(4.dp)
-                                )
-                                if (editMode) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        modifier = Modifier
-                                            .testTag(UiTestTags.FORWARD_CARD_EDIT_BUTTON)
-                                            .clickable { openDialog(forward) }
-                                            .padding(4.dp)
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        modifier = Modifier
-                                            .testTag(UiTestTags.FORWARD_CARD_DELETE_BUTTON)
-                                            .clickable { onDelete(forward.id) }
-                                            .padding(4.dp)
-                                    )
+                                        if (forward.associatedHosts.isNotEmpty()) {
+                                            val names = forward.associatedHosts.mapNotNull { id -> hosts.firstOrNull { it.id == id }?.name ?: id }
+                                            Text(
+                                                text = "Hosts: ${names.joinToString()}",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            Switch(
+                                                checked = forward.enabled,
+                                                onCheckedChange = {
+                                                    onUpdate(
+                                                        forward.id,
+                                                        forward.label,
+                                                        forward.group,
+                                                        PortForwardType.LOCAL,
+                                                        forward.sourceHost,
+                                                        forward.sourcePort,
+                                                        forward.destinationHost,
+                                                        forward.destinationPort,
+                                                        it,
+                                                        forward.associatedHosts
+                                                    )
+                                                }
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
+                                                tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                modifier = Modifier
+                                                    .testTag(UiTestTags.forwardFavorite(forward.id))
+                                                    .clickable { onToggleFavorite(forward.id) }
+                                                    .padding(4.dp)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.QrCode,
+                                                contentDescription = "Share",
+                                                modifier = Modifier
+                                                    .testTag(UiTestTags.forwardShare(forward.id))
+                                                    .clickable { shareForward.value = forward }
+                                                    .padding(4.dp)
+                                            )
+                                            IconButton(
+                                                onClick = { overflowForwardId.value = forward.id },
+                                                modifier = Modifier.testTag(UiTestTags.forwardOverflowButton(forward.id))
+                                            ) {
+                                                Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                                            }
+                                            DropdownMenu(
+                                                expanded = overflowForwardId.value == forward.id,
+                                                onDismissRequest = { overflowForwardId.value = null }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Edit") },
+                                                    onClick = {
+                                                        overflowForwardId.value = null
+                                                        openDialog(forward)
+                                                    },
+                                                    modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "edit"))
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Delete") },
+                                                    onClick = {
+                                                        overflowForwardId.value = null
+                                                        pendingDeleteForward.value = forward
+                                                    },
+                                                    modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "delete"))
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                }
             }
         }
+    }
+
+    pendingDeleteForward.value?.let { forward ->
+        DeleteConfirmationDialog(
+            title = "Delete port forward?",
+            message = "Delete ${forward.label}?",
+            onConfirm = {
+                onDelete(forward.id)
+                pendingDeleteForward.value = null
+            },
+            onDismiss = { pendingDeleteForward.value = null }
+        )
     }
 
     if (showDialog.value) {
@@ -324,6 +373,18 @@ fun PortForwardScreen(
                         label = { Text("Label") },
                         singleLine = true,
                         modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT),
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        )
+                    )
+                    OutlinedTextField(
+                        value = groupState.value,
+                        onValueChange = { groupState.value = it },
+                        label = { Text("Group") },
+                        singleLine = true,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_GROUP_FIELD),
                         keyboardOptions = KeyboardOptions(
                             autoCorrect = false,
                             capitalization = KeyboardCapitalization.Words,
@@ -487,6 +548,7 @@ fun PortForwardScreen(
                         onUpdate(
                             editingId.value!!,
                             label,
+                            groupState.value.trim().ifBlank { null },
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
@@ -498,6 +560,7 @@ fun PortForwardScreen(
                     } else {
                         onAdd(
                             label,
+                            groupState.value.trim().ifBlank { null },
                             PortForwardType.LOCAL,
                             bind,
                             srcPort,
@@ -512,12 +575,6 @@ fun PortForwardScreen(
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isEdit) {
-                        TextButton(onClick = {
-                            onDelete(editingId.value!!)
-                            closeDialog()
-                        }) { Text("Delete") }
-                    }
                     TextButton(onClick = { closeDialog() }) { Text("Cancel") }
                 }
             }

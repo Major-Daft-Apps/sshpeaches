@@ -43,12 +43,13 @@ import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 @Composable
 fun SnippetEditorScreen(
     initialSnippet: Snippet?,
-    onSave: (title: String, description: String, command: String) -> Unit,
+    onSave: (title: String, group: String?, description: String, command: String) -> Unit,
     onDelete: (() -> Unit)?,
     onNavigateBack: () -> Unit,
     onShowMessage: (String) -> Unit = {}
 ) {
     var title by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.title.orEmpty()) }
+    var group by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.group.orEmpty()) }
     var description by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.description.orEmpty()) }
     var command by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.command.orEmpty()) }
     var editorError by remember { mutableStateOf<String?>(null) }
@@ -100,6 +101,15 @@ fun SnippetEditorScreen(
                         .fillMaxWidth()
                         .testTag(UiTestTags.SNIPPET_EDITOR_DESCRIPTION_INPUT)
                 )
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    label = { Text("Group (optional)") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.SNIPPET_EDITOR_GROUP_INPUT)
+                )
                 Text("Command", style = MaterialTheme.typography.labelLarge)
                 ScriptEditorWithLineNumbers(
                     value = command,
@@ -123,7 +133,7 @@ fun SnippetEditorScreen(
                         editorError = "Command is required."
                         return@Button
                     }
-                    onSave(title.ifBlank { "Snippet" }, description, command)
+                    onSave(title.ifBlank { "Snippet" }, group.ifBlank { null }, description, command)
                     onShowMessage("Snippet saved.")
                     onNavigateBack()
                 },

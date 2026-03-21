@@ -10,10 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -48,7 +46,7 @@ class HostsCrudTest {
 
     @Test
     fun addEditDeleteHost_updatesList() {
-        composeRule.onNodeWithTag(UiTestTags.HOST_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
 
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("QA Host")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.2.2")
@@ -60,21 +58,9 @@ class HostsCrudTest {
 
         composeRule.onNodeWithText("QA Host").assertIsDisplayed()
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription("Edit", useUnmergedTree = true)
-                .fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithText("Edit").fetchSemanticsNodes().isNotEmpty()
-        }
-        val editIcons = composeRule
-            .onAllNodesWithContentDescription("Edit", useUnmergedTree = true)
-            .fetchSemanticsNodes()
-        if (editIcons.isNotEmpty()) {
-            composeRule.onAllNodesWithContentDescription("Edit", useUnmergedTree = true)[0].performClick()
-        }
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("Edit").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onAllNodesWithText("Edit")[0].performClick()
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
+            .performClick()
+        composeRule.onNodeWithText("Edit").performClick()
 
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("QA Host Updated")
@@ -88,7 +74,10 @@ class HostsCrudTest {
         composeRule.onNodeWithText("QA Host Updated").assertIsDisplayed()
         composeRule.onAllNodesWithText("QA Host").assertCountEquals(0)
 
-        composeRule.onAllNodesWithText("Delete")[0].performClick()
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
+            .performClick()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.onNodeWithTag(UiTestTags.DELETE_CONFIRM_BUTTON).performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("QA Host Updated").fetchSemanticsNodes().isEmpty()
         }
@@ -97,7 +86,7 @@ class HostsCrudTest {
 
     @Test
     fun addHost_invalidHostAndPort_showsValidationErrors() {
-        composeRule.onNodeWithTag(UiTestTags.HOST_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
 
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("Invalid Host")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("bad host^")
@@ -119,15 +108,8 @@ class HostsCrudTest {
     }
 
     private fun selectPasswordAuth() {
-        repeat(2) {
-            composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_SCROLL).performTouchInput { swipeUp() }
-        }
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_AUTH_FIELD).performClick()
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag(UiTestTags.hostDialogAuthOption("PASSWORD"), useUnmergedTree = true)
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onAllNodesWithTag(UiTestTags.hostDialogAuthOption("PASSWORD"), useUnmergedTree = true)[0]
+        composeRule.onNodeWithTag(UiTestTags.hostDialogAuthOption("PASSWORD"), useUnmergedTree = true)
             .performClick()
     }
 }

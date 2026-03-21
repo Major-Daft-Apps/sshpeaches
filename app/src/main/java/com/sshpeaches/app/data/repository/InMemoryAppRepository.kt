@@ -87,6 +87,8 @@ class InMemoryAppRepository : AppRepository {
                 host = "bastion.prod.sshpeaches.com",
                 username = "admin",
                 preferredAuth = AuthMethod.IDENTITY,
+                createdEpochMillis = System.currentTimeMillis() - 172_800_000,
+                updatedEpochMillis = System.currentTimeMillis() - 3_600_000,
                 lastUsedEpochMillis = System.currentTimeMillis() - 3_600_000,
                 favorite = true,
                 defaultMode = ConnectionMode.SSH,
@@ -100,6 +102,8 @@ class InMemoryAppRepository : AppRepository {
                 host = "mirror.internal",
                 username = "deploy",
                 preferredAuth = AuthMethod.PASSWORD_AND_IDENTITY,
+                createdEpochMillis = System.currentTimeMillis() - 86_400_000,
+                updatedEpochMillis = System.currentTimeMillis() - 14_400_000,
                 defaultMode = ConnectionMode.SFTP,
                 favorite = true,
                 osMetadata = OsMetadata.Known(OsFamily.FEDORA, "39"),
@@ -112,6 +116,8 @@ class InMemoryAppRepository : AppRepository {
                 host = "nixos.lab",
                 username = "nixos",
                 preferredAuth = AuthMethod.IDENTITY,
+                createdEpochMillis = System.currentTimeMillis() - 43_200_000,
+                updatedEpochMillis = System.currentTimeMillis() - 43_200_000,
                 osMetadata = OsMetadata.Known(OsFamily.NIXOS),
                 defaultMode = ConnectionMode.SSH
             )
@@ -124,6 +130,7 @@ class InMemoryAppRepository : AppRepository {
                 fingerprint = "SHA256:abcd1234",
                 username = "admin",
                 createdEpochMillis = System.currentTimeMillis() - 86_400_000,
+                updatedEpochMillis = System.currentTimeMillis() - 7_200_000,
                 lastUsedEpochMillis = System.currentTimeMillis() - 7_200_000,
                 favorite = true,
                 tags = listOf("prod", "ed25519"),
@@ -135,6 +142,7 @@ class InMemoryAppRepository : AppRepository {
                 fingerprint = "SHA256:efef9876",
                 username = "deploy",
                 createdEpochMillis = System.currentTimeMillis() - 604_800_000,
+                updatedEpochMillis = System.currentTimeMillis() - 604_800_000,
                 tags = listOf("staging")
             )
         )
@@ -149,7 +157,10 @@ class InMemoryAppRepository : AppRepository {
                 destinationPort = 5432,
                 associatedHosts = listOf("host-2"),
                 favorite = true,
-                enabled = true
+                enabled = true,
+                createdEpochMillis = System.currentTimeMillis() - 259_200_000,
+                updatedEpochMillis = System.currentTimeMillis() - 5_400_000,
+                lastUsedEpochMillis = System.currentTimeMillis() - 5_400_000
             ),
             PortForward(
                 id = "pf-2",
@@ -158,7 +169,9 @@ class InMemoryAppRepository : AppRepository {
                 sourcePort = 3000,
                 destinationHost = "grafana.internal",
                 destinationPort = 3000,
-                associatedHosts = listOf("host-1")
+                associatedHosts = listOf("host-1"),
+                createdEpochMillis = System.currentTimeMillis() - 129_600_000,
+                updatedEpochMillis = System.currentTimeMillis() - 129_600_000
             )
         )
 
@@ -171,7 +184,10 @@ class InMemoryAppRepository : AppRepository {
                 tags = listOf("Diagnostics"),
                 autoRunHostIds = listOf("host-2"),
                 requireConfirmation = false,
-                favorite = true
+                favorite = true,
+                createdEpochMillis = System.currentTimeMillis() - 172_800_000,
+                updatedEpochMillis = System.currentTimeMillis() - 1_800_000,
+                lastUsedEpochMillis = System.currentTimeMillis() - 1_800_000
             ),
             Snippet(
                 id = "snip-disk",
@@ -179,7 +195,9 @@ class InMemoryAppRepository : AppRepository {
                 description = "Show df -h",
                 command = "df -h",
                 tags = listOf("Diagnostics"),
-                favorite = false
+                favorite = false,
+                createdEpochMillis = System.currentTimeMillis() - 21_600_000,
+                updatedEpochMillis = System.currentTimeMillis() - 21_600_000
             )
         )
     }

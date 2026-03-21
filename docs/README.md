@@ -11,6 +11,12 @@ For people using SSHPeaches on Android:
 - [User Guide](user-wiki/User-Guide.md)
 - [Troubleshooting](user-wiki/Troubleshooting.md)
 
+Current app structure:
+
+- `Home` is the landing screen.
+- `Hosts`, `Identities`, `Port Forwards`, and `Snippets` use grouped, collapsible lists.
+- Add/import actions for those management screens live in the top app bar.
+
 ## Developer Section
 
 For contributors, maintainers, and release work:

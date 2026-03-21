@@ -2,13 +2,6 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,11 +18,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -43,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,15 +57,15 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
+import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.HostQrImportResult
+import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.processHostQrImport
-import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
-import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.SortMode
-import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
@@ -98,7 +92,8 @@ fun HostsScreen(
     defaultTerminalProfileId: String,
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
-    editMode: Boolean = false,
+    addRequestKey: Int = 0,
+    importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
     onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
@@ -107,12 +102,7 @@ fun HostsScreen(
     onDeleteHost: (String) -> Unit = {},
     onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
-    @Suppress("UNUSED_PARAMETER") onStopSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
-    openSessions: List<SessionService.SessionSnapshot> = emptyList(),
-    transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
-    onOpenSession: (String) -> Unit = {},
-    onDisconnectSession: (String) -> Unit = {},
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
@@ -149,9 +139,11 @@ fun HostsScreen(
     val dialogError = remember { mutableStateOf<String?>(null) }
     val showClearHostKeyDialog = remember { mutableStateOf(false) }
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
+    val pendingDeleteHost = remember { mutableStateOf<HostConnection?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     AutoHidePasswordReveal(passwordRevealIndex)
@@ -302,6 +294,42 @@ fun HostsScreen(
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
     }
+
+    LaunchedEffect(addRequestKey) {
+        if (addRequestKey > 0) {
+            openDialog(null)
+        }
+    }
+
+    LaunchedEffect(importRequestKey) {
+        if (importRequestKey > 0) {
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Scan SSH host QR")
+                setBeepEnabled(false)
+                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                setOrientationLocked(true)
+            }
+            scanLauncher.launch(options)
+        }
+    }
+    val filteredHosts = hosts.filter { host ->
+        val query = search.value.trim()
+        query.isBlank() ||
+            host.name.contains(query, ignoreCase = true) ||
+            host.host.contains(query, ignoreCase = true) ||
+            host.username.contains(query, ignoreCase = true) ||
+            (host.group?.contains(query, ignoreCase = true) == true)
+    }
+    val hostComparator = when (sortMode) {
+        SortMode.ALPHABETICAL -> compareBy<HostConnection> { it.name.lowercase() }
+        SortMode.LAST_USED -> compareByDescending<HostConnection> { it.lastUsedEpochMillis ?: 0L }
+    }
+    val groupedHosts = buildGroupedSections(
+        items = filteredHosts,
+        groupSelector = { it.group },
+        itemComparator = hostComparator
+    )
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -359,19 +387,7 @@ fun HostsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Open Sessions",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (openSessions.isEmpty()) {
-                        Text(
-                            text = "No open sessions.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    } else {
-                        openSessions.forEach { session ->
+            /*
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -410,7 +426,9 @@ fun HostsScreen(
                         }
                     }
                 }
-            }
+            
+            */
+            /*
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
@@ -438,10 +456,14 @@ fun HostsScreen(
                         Text("Import QR")
                     }
                 }
-            }
+            
+            */
             if (hosts.isEmpty()) {
                 item { EmptyState(itemLabel = "host") }
+            } else if (filteredHosts.isEmpty()) {
+                item { EmptyState(itemLabel = "result") }
             } else {
+                /*
                 items(hosts.filter { it.name.contains(search.value, ignoreCase = true) }, key = { it.id }) { host ->
                     Column(
                         modifier = Modifier.animateContentSize(),
@@ -477,10 +499,54 @@ fun HostsScreen(
                             }
                         }
                     }
+                
+                */
+                groupedHosts.forEach { section ->
+                    item(key = "header_${section.key}") {
+                        GroupSectionHeader(
+                            vertical = "hosts",
+                            label = section.label,
+                            count = section.items.size,
+                            expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
+                            onToggle = {
+                                val current = expandedSections[section.key] ?: true
+                                expandedSections[section.key] = !current
+                            }
+                        )
+                    }
+                    if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
+                        items(section.items, key = { it.id }) { host ->
+                            HostCard(
+                                host = host,
+                                snippets = snippets,
+                                onToggleFavorite = onToggleFavorite,
+                                canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
+                                onRunInfoCommand = onRunInfoCommand,
+                                onInfoCommandsChange = onInfoCommandsChange,
+                                onAction = { selected, mode, fileTransferEntryMode ->
+                                    onStartSession(selected, mode, null, fileTransferEntryMode)
+                                },
+                                onEdit = { openDialog(it) },
+                                onDelete = { pendingDeleteHost.value = it }
+                            )
+                        }
+                    }
                 }
             }
             }
         }
+    }
+
+    pendingDeleteHost.value?.let { host ->
+        DeleteConfirmationDialog(
+            title = "Delete host?",
+            message = "Delete ${host.name.ifBlank { host.host }}?",
+            onConfirm = {
+                onDeleteHost(host.id)
+                pendingDeleteHost.value = null
+            },
+            onDismiss = { pendingDeleteHost.value = null }
+        )
     }
 
     if (showDialog.value) {
@@ -543,69 +609,6 @@ fun HostsScreen(
                             keyboardType = KeyboardType.Ascii
                         ),
                         modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT)
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                    ) {
-                        ExposedDropdownMenuBox(
-                            expanded = groupExpanded.value,
-                            onExpandedChange = { groupExpanded.value = !groupExpanded.value },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            TextField(
-                                value = groupState.value.ifBlank { "None" },
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Group (optional)") },
-                                singleLine = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupExpanded.value) },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = groupExpanded.value,
-                                onDismissRequest = { groupExpanded.value = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("None") },
-                                    onClick = {
-                                        groupState.value = ""
-                                        groupExpanded.value = false
-                                    }
-                                )
-                                availableGroups.forEach { group ->
-                                    DropdownMenuItem(
-                                        text = { Text(group) },
-                                        onClick = {
-                                            groupState.value = group
-                                            groupExpanded.value = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        Button(
-                            onClick = {
-                                newGroupNameState.value = ""
-                                newGroupError.value = null
-                                showNewGroupDialog.value = true
-                            }
-                        ) {
-                            Text("New...")
-                        }
-                    }
-                    OutlinedTextField(
-                        value = notesState.value,
-                        onValueChange = { notesState.value = it },
-                        label = { Text("Notes") },
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Text
-                        )
                     )
                     ExposedDropdownMenuBox(
                         expanded = authMenuExpanded.value,
@@ -755,6 +758,69 @@ fun HostsScreen(
                             )
                         }
                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        ExposedDropdownMenuBox(
+                            expanded = groupExpanded.value,
+                            onExpandedChange = { groupExpanded.value = !groupExpanded.value },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            TextField(
+                                value = groupState.value.ifBlank { "None" },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Group (optional)") },
+                                singleLine = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupExpanded.value) },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = groupExpanded.value,
+                                onDismissRequest = { groupExpanded.value = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("None") },
+                                    onClick = {
+                                        groupState.value = ""
+                                        groupExpanded.value = false
+                                    }
+                                )
+                                availableGroups.forEach { group ->
+                                    DropdownMenuItem(
+                                        text = { Text(group) },
+                                        onClick = {
+                                            groupState.value = group
+                                            groupExpanded.value = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                newGroupNameState.value = ""
+                                newGroupError.value = null
+                                showNewGroupDialog.value = true
+                            }
+                        ) {
+                            Text("New...")
+                        }
+                    }
+                    OutlinedTextField(
+                        value = notesState.value,
+                        onValueChange = { notesState.value = it },
+                        label = { Text("Notes") },
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Text
+                        )
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween

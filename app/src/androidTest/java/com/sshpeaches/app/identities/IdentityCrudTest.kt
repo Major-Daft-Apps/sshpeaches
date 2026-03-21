@@ -4,6 +4,7 @@ import android.Manifest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -46,7 +47,7 @@ class IdentityCrudTest {
         composeRule.navigateDrawer(Routes.IDENTITIES)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_IDENTITIES).assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.IDENTITY_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.IDENTITIES)).performClick()
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT).performTextInput("QA Identity")
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_DIALOG_GENERATE_BUTTON).performClick()
         composeRule.onNodeWithText("Generate").performClick()
@@ -80,7 +81,20 @@ class IdentityCrudTest {
         composeRule.navigateDrawer(Routes.IDENTITIES)
         composeRule.onNodeWithText("Seed Identity").assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.IDENTITY_CARD_EDIT_BUTTON).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(
+                UiTestTags.identityOverflowButton("seed-identity"),
+                useUnmergedTree = true
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(
+            UiTestTags.identityOverflowButton("seed-identity"),
+            useUnmergedTree = true
+        ).performClick()
+        composeRule.onNodeWithTag(
+            UiTestTags.identityOverflowAction("seed-identity", "edit"),
+            useUnmergedTree = true
+        ).performClick()
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT)
             .performTextReplacement("QA Identity Updated")
         composeRule.onNodeWithText("Save").performClick()
@@ -94,7 +108,15 @@ class IdentityCrudTest {
 
         composeRule.onNodeWithTag(UiTestTags.IDENTITY_SEARCH_INPUT).performTextInput("Updated")
         composeRule.onNodeWithText("QA Identity Updated").assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.IDENTITY_CARD_DELETE_BUTTON).performClick()
+        composeRule.onNodeWithTag(
+            UiTestTags.identityOverflowButton("seed-identity"),
+            useUnmergedTree = true
+        ).performClick()
+        composeRule.onNodeWithTag(
+            UiTestTags.identityOverflowAction("seed-identity", "delete"),
+            useUnmergedTree = true
+        ).performClick()
+        composeRule.onNodeWithTag(UiTestTags.DELETE_CONFIRM_BUTTON).performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("QA Identity Updated").fetchSemanticsNodes().isEmpty()
         }

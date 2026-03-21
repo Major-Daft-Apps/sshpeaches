@@ -15,7 +15,11 @@ fun encodeIdentityPayload(identity: Identity, encryptedKeyPayload: String?): Str
         put("label", identity.label)
         put("fingerprint", identity.fingerprint)
         put("hasKey", identity.hasPrivateKey)
+        identity.group?.let { put("group", it) }
         identity.username?.let { put("user", it) }
+        put("createdEpochMillis", identity.createdEpochMillis)
+        put("updatedEpochMillis", identity.updatedEpochMillis ?: JSONObject.NULL)
+        put("lastUsedEpochMillis", identity.lastUsedEpochMillis ?: JSONObject.NULL)
         encryptedKeyPayload?.let { put("keyPayload", it) }
     }
     return Base64.getEncoder().encodeToString(json.toString().toByteArray(Charsets.UTF_8))

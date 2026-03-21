@@ -12,14 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,15 +39,19 @@ import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
+import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
 import com.majordaftapps.sshpeaches.app.ui.components.SnippetQrImportResult
+import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.processSnippetQrImport
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
 fun SnippetManagerScreen(
     snippets: List<Snippet>,
-    onAdd: (title: String, description: String, command: String) -> Unit = { _, _, _ -> },
+    importRequestKey: Int = 0,
+    onAdd: (title: String, group: String?, description: String, command: String) -> Unit = { _, _, _, _ -> },
     onCreateSnippet: () -> Unit = {},
     onEditSnippet: (snippetId: String) -> Unit = {},
     onDelete: (id: String) -> Unit = {},
@@ -57,6 +61,9 @@ fun SnippetManagerScreen(
 ) {
     val search = rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+    val pendingDeleteSnippet = remember { mutableStateOf<Snippet?>(null) }
+    val overflowSnippetId = remember { mutableStateOf<String?>(null) }
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
         when (val processed = processSnippetQrImport(contents)) {
@@ -66,6 +73,7 @@ fun SnippetManagerScreen(
             is SnippetQrImportResult.Ready -> {
                 onAdd(
                     processed.data.title,
+                    processed.data.group,
                     processed.data.description,
                     processed.data.command
                 )
@@ -75,11 +83,32 @@ fun SnippetManagerScreen(
         }
     }
 
-    val filteredSnippets = snippets.filter {
-        it.title.contains(search.value, ignoreCase = true) ||
-            it.description.contains(search.value, ignoreCase = true) ||
-            it.command.contains(search.value, ignoreCase = true)
+    LaunchedEffect(importRequestKey) {
+        if (importRequestKey > 0) {
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Scan snippet QR")
+                setBeepEnabled(false)
+                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
+                setOrientationLocked(true)
+            }
+            scanLauncher.launch(options)
+        }
     }
+
+    val filteredSnippets = snippets.filter {
+        val query = search.value.trim()
+        query.isBlank() ||
+            it.title.contains(query, ignoreCase = true) ||
+            it.group?.contains(query, ignoreCase = true) == true ||
+            it.description.contains(query, ignoreCase = true) ||
+            it.command.contains(query, ignoreCase = true)
+    }
+    val groupedSnippets = buildGroupedSections(
+        items = filteredSnippets,
+        groupSelector = { it.group },
+        itemComparator = compareBy<Snippet> { it.title.lowercase() }
+    )
     val showEmptyState = snippets.isEmpty() || filteredSnippets.isEmpty()
     LaunchedEffect(showEmptyState) {
         onEmptyStateVisibleChanged(showEmptyState)
@@ -109,90 +138,103 @@ fun SnippetManagerScreen(
         HorizontalDivider()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = onCreateSnippet,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(UiTestTags.SNIPPET_ADD_BUTTON)
-                    ) {
-                        Text("Add snippet")
-                    }
-                    Button(
-                        onClick = {
-                            val options = ScanOptions().apply {
-                                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                setPrompt("Scan snippet QR")
-                                setBeepEnabled(false)
-                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                                setOrientationLocked(true)
-                            }
-                            scanLauncher.launch(options)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(UiTestTags.SNIPPET_IMPORT_BUTTON)
-                    ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                        Text("Import QR")
-                    }
-                }
-            }
             if (snippets.isEmpty()) {
                 item { EmptyState(itemLabel = "snippet") }
             } else if (filteredSnippets.isEmpty()) {
                 item { EmptyState(itemLabel = "result") }
             } else {
-                items(filteredSnippets, key = { it.id }) { snippet ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(snippet.title, style = MaterialTheme.typography.titleMedium)
-                        if (snippet.description.isNotBlank()) {
-                            Text(snippet.description, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Text(snippet.command, style = MaterialTheme.typography.bodySmall)
-                        RowActions(
-                            snippetId = snippet.id,
-                            onRun = { onRun(snippet) },
-                            onEdit = { onEditSnippet(snippet.id) },
-                            onDelete = { onDelete(snippet.id) }
+                groupedSnippets.forEach { section ->
+                    item(key = "snippet_header_${section.key}") {
+                        GroupSectionHeader(
+                            vertical = "snippets",
+                            label = section.label,
+                            count = section.items.size,
+                            expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
+                            onToggle = {
+                                val current = expandedSections[section.key] ?: true
+                                expandedSections[section.key] = !current
+                            }
                         )
+                    }
+                    if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
+                        items(section.items, key = { it.id }) { snippet ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(snippet.title, style = MaterialTheme.typography.titleMedium)
+                                            if (snippet.description.isNotBlank()) {
+                                                Text(snippet.description, style = MaterialTheme.typography.bodyMedium)
+                                            }
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            FilledTonalButton(
+                                                onClick = { onRun(snippet) },
+                                                modifier = Modifier.testTag(UiTestTags.snippetRun(snippet.id))
+                                            ) {
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                                Text("Run")
+                                            }
+                                            IconButton(
+                                                onClick = { overflowSnippetId.value = snippet.id },
+                                                modifier = Modifier.testTag(UiTestTags.snippetOverflowButton(snippet.id))
+                                            ) {
+                                                Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                                            }
+                                            DropdownMenu(
+                                                expanded = overflowSnippetId.value == snippet.id,
+                                                onDismissRequest = { overflowSnippetId.value = null }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Edit") },
+                                                    onClick = {
+                                                        overflowSnippetId.value = null
+                                                        onEditSnippet(snippet.id)
+                                                    },
+                                                    modifier = Modifier.testTag(UiTestTags.snippetOverflowAction(snippet.id, "edit"))
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Delete") },
+                                                    onClick = {
+                                                        overflowSnippetId.value = null
+                                                        pendingDeleteSnippet.value = snippet
+                                                    },
+                                                    modifier = Modifier.testTag(UiTestTags.snippetOverflowAction(snippet.id, "delete"))
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(snippet.command, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                     }
                 }
             }
-            }
         }
     }
-}
 
-@Composable
-private fun RowActions(snippetId: String, onRun: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledTonalButton(
-            onClick = onRun,
-            modifier = Modifier.testTag(UiTestTags.snippetRun(snippetId))
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null)
-            Text("Run")
-        }
-        IconButton(
-            onClick = onEdit,
-            modifier = Modifier.testTag(UiTestTags.snippetEdit(snippetId))
-        ) {
-            Icon(Icons.Default.Edit, contentDescription = "Edit")
-        }
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier.testTag(UiTestTags.snippetDelete(snippetId))
-        ) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete")
-        }
+    pendingDeleteSnippet.value?.let { snippet ->
+        DeleteConfirmationDialog(
+            title = "Delete snippet?",
+            message = "Delete ${snippet.title}?",
+            onConfirm = {
+                onDelete(snippet.id)
+                pendingDeleteSnippet.value = null
+            },
+            onDismiss = { pendingDeleteSnippet.value = null }
+        )
     }
 }

@@ -79,15 +79,14 @@ class IdentityBrowserTest {
         composeRule.onNodeWithText("Share Favorite Identity").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 
-        composeRule.navigateDrawer(Routes.FAVORITES)
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_FAVORITES).assertIsDisplayed()
+        composeRule.navigateDrawer(Routes.HOME)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("Favorite Identity").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("Favorite Identity").assertIsDisplayed()
         assertTrue(
-            "Favorites screen should not surface the unfavorited identity.",
-            composeRule.onAllNodesWithText("Other Identity").fetchSemanticsNodes().isEmpty()
+            "Home should surface the favorited identity in either Favorites or Recents.",
+            composeRule.onAllNodesWithText("Favorite Identity").fetchSemanticsNodes().isNotEmpty()
         )
     }
 

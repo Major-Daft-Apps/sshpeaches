@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -44,7 +45,7 @@ class PortForwardCrudTest {
         composeRule.navigateDrawer(Routes.FORWARDS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_FORWARDS).assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.FORWARD_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.FORWARDS)).performClick()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).performTextInput("QA Tunnel")
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT).performTextInput("127.0.0.1")
@@ -61,6 +62,10 @@ class PortForwardCrudTest {
                 true
             }.getOrDefault(false)
         }
+
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
+            .performClick()
+        composeRule.onNodeWithText("Edit").assertIsDisplayed()
     }
 
     @Test
@@ -81,8 +86,8 @@ class PortForwardCrudTest {
         composeRule.navigateDrawer(Routes.FORWARDS)
         composeRule.onNodeWithText("Seed Tunnel").assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("Edit").performClick()
-        composeRule.onNodeWithTag(UiTestTags.FORWARD_CARD_EDIT_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.forwardOverflowButton("seed-forward")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.forwardOverflowAction("seed-forward", "edit")).performClick()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT)
             .performTextReplacement("QA Tunnel Updated")
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT)
@@ -96,7 +101,9 @@ class PortForwardCrudTest {
             }.getOrDefault(false)
         }
 
-        composeRule.onNodeWithTag(UiTestTags.FORWARD_CARD_DELETE_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.forwardOverflowButton("seed-forward")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.forwardOverflowAction("seed-forward", "delete")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.DELETE_CONFIRM_BUTTON).performClick()
         composeRule.onAllNodesWithText("QA Tunnel Updated").assertCountEquals(0)
     }
 }

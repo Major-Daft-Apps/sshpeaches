@@ -69,7 +69,7 @@ class QrImportUiSmokeTest {
         assertEquals("Invalid host QR", (result as HostQrImportResult.Error).message)
 
         composeRule.onNodeWithTag(UiTestTags.SCREEN_HOSTS).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.HOST_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON).performClick()
     }
 

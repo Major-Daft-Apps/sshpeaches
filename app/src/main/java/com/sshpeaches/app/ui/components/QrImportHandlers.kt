@@ -46,6 +46,7 @@ data class IdentityQrOverwriteData(
     val label: String,
     val fingerprint: String,
     val username: String?,
+    val group: String?,
     val encryptedKeyPayload: String?
 )
 
@@ -79,6 +80,7 @@ fun processIdentityQrImport(
                 label = imported.label.ifBlank { existing.label },
                 fingerprint = imported.fingerprint,
                 username = imported.username ?: existing.username,
+                group = imported.group ?: existing.group,
                 encryptedKeyPayload = payload.encryptedKeyPayload
             )
         )
@@ -116,6 +118,7 @@ fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
 
 data class SnippetQrImportData(
     val title: String,
+    val group: String?,
     val description: String,
     val command: String
 )
@@ -136,6 +139,7 @@ fun processSnippetQrImport(
     return SnippetQrImportResult.Ready(
         SnippetQrImportData(
             title = imported.title.ifBlank { "Snippet ${idProvider()}" },
+            group = imported.group,
             description = imported.description,
             command = imported.command
         )

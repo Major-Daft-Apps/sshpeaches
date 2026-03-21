@@ -40,7 +40,7 @@ class SnippetCrudTest {
         composeRule.navigateDrawer(Routes.SNIPPETS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SNIPPETS).assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.SNIPPET_ADD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.SNIPPETS)).performClick()
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SNIPPET_EDITOR).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.SNIPPET_EDITOR_TITLE_INPUT).performTextInput("QA Snippet")
         composeRule.onNodeWithTag(UiTestTags.SNIPPET_EDITOR_DESCRIPTION_INPUT).performTextInput("Smoke coverage")
@@ -50,7 +50,9 @@ class SnippetCrudTest {
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SNIPPETS).assertIsDisplayed()
         composeRule.onNodeWithText("QA Snippet").assertIsDisplayed()
 
-        composeRule.onAllNodesWithContentDescription("Edit")[0].performClick()
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
+            .performClick()
+        composeRule.onNodeWithText("Edit").performClick()
         composeRule.onNodeWithTag(UiTestTags.SNIPPET_EDITOR_TITLE_INPUT).performTextReplacement("QA Snippet Updated")
         composeRule.onNodeWithText("Save").performClick()
         composeRule.onNodeWithText("QA Snippet Updated").assertIsDisplayed()
@@ -58,7 +60,10 @@ class SnippetCrudTest {
         composeRule.onNodeWithTag(UiTestTags.SNIPPET_SEARCH_INPUT).performTextInput("Updated")
         composeRule.onNodeWithText("QA Snippet Updated").assertIsDisplayed()
 
-        composeRule.onAllNodesWithContentDescription("Delete")[0].performClick()
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
+            .performClick()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.onNodeWithTag(UiTestTags.DELETE_CONFIRM_BUTTON).performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("QA Snippet Updated").fetchSemanticsNodes().isEmpty()
         }

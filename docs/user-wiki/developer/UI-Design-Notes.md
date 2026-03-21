@@ -1,37 +1,31 @@
 ﻿# SSHPeaches UI Design Notes
 
-> **Last updated:** 2026-01-30. Pair this with `Product-Blueprint` for product context.
+> **Last updated:** 2026-03-20. Pair this with `Product-Blueprint` for product context.
 
 This document captures first-pass layouts for key SSHPeaches screens. Use it as a blueprint when building mockups (Figma/Penpot) and implementing Compose UI.
 
 ---
 
-## 1. Favorites (Landing) Screen
+## 1. Home Screen
 ```text
 +---------------- App Bar ----------------+
 | [Menu] SSHPeaches         [Quick Connect] |
 +-----------------------------------------+
 ```
 - `Quick Connect` icon opens ad-hoc bottom sheet. Drawer also includes Help (external site via Custom Tab) and About (modal moved out of Settings; shows icon, version, build info, license links). Global theme uses Carbon Black `#191919` backgrounds with Blazing Flame `#F15025` highlight accents.
-- Body uses vertically stacked sections with sticky headers:
-  - **Hosts** - list of favorited hosts. Each card mirrors Hosts layout (OS icon, name, tags, buttons). Include inline star toggle to unfavorite.
-  - **Identities** - compact rows showing key alias, fingerprint, tag, and actions (Edit/Delete/Use).
-  - **Port Forwards** - cards summarizing local <-> remote mapping, protocol, associated host; inline star toggle.
-- Empty state copy if a section has no favorites.
+- Body uses vertically stacked sections:
+  - **Open Sessions** appears only when at least one session exists. Each row has icon-only reopen and disconnect actions.
+  - **Favorites** stays grouped by type: Hosts, Identities, Port Forwards, Snippets.
+  - **Recents** is a single mixed list ordered newest-first.
+- Empty app state uses a branded welcome panel with the `sshpeaches` artwork, a short onboarding line, and four stacked buttons for adding the first resource.
 
 ## 2. Hosts Screen
 - Same app bar.
-- Secondary toolbar directly beneath header:
-  ```text
-  +------------- Toolbar --------------+
-  | Edit / Done             New        |
-  +------------------------------------+
-  ```
-  - Left button toggles edit mode (reveals pencil/dash overlays).
-  - Right button opens New Connection form.
 - Content:
-  - Search bar with filter pill for Groups and triple-dot menu for sorting (Last Used / A->Z).
-- Card layout mirrors Favorites view. OS icon: white glyph on colored background tied to distro (e.g., Ubuntu orange, Debian red, Fedora blue, SUSE green, Mint teal, macOS gray, BSD maroon, Arch cyan). Default desktop icon used until detection runs.
+  - Search bar with group-aware filtering and sort menu for Last Used / A->Z.
+  - Add and Import QR actions live in the top app bar.
+  - Hosts are rendered inside collapsible group sections.
+- Card layout keeps the existing host action buttons. Empty space on the card is not clickable. Edit and delete sit in the overflow menu. OS icon: white glyph on colored background tied to distro (e.g., Ubuntu orange, Debian red, Fedora blue, SUSE green, Mint teal, macOS gray, BSD maroon, Arch cyan). Default desktop icon used until detection runs.
 
 ### Port Forwarding UI <-> SSH flags
 - Each forward is a card with a Local (`-L`) badge, label, summary of bind/destination, enable toggle, edit/delete icons.
@@ -63,13 +57,14 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 
 ## 4. Snippet Manager
 - List shows snippet title/description/command with Run / Edit / Delete actions.
-- "Add snippet" button opens dialog for Title, Description, Command. Edit reuses the same dialog; Delete available when editing.
+- Snippets are grouped in collapsible sections.
+- Run stays visible on the card; Edit and Delete live in the overflow menu.
+- Add/import actions live in the top app bar.
 
 ## 4. New Connection Flow
 - Modal or dedicated screen with tabs **Basic** / **Advanced**.
-- **Basic**: Name, Host, Username, Password field, Identity picker (allow both). "Add to Group" button.
+- **Basic**: Name, Host, Port, Username. Directly below Username: auth selector, password controls, and identity picker. Group and notes follow after the authentication block.
 - **Advanced**:
-  - Port input (default 22).
   - Forwarded port selector (dropdown of configured forwards).
   - Optional script editor (multi-line text field) + "Choose file" button.
   - Checkbox for Mosh fallback.
@@ -97,9 +92,10 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 
 ## 6. Identities Screen
 - Toolbar with search.
-- Rows show key alias, short fingerprint (truncate SHA-256 to 8-10 chars or colon-separated hex), last used, and icons for edit, export, delete.
-- FAB (`+`) opens menu: "Enter manually", "Import from file", "Generate keypair".
-- Each identity row has a star icon for Favorites.
+- Rows show key alias, short fingerprint (truncate SHA-256 to 8-10 chars or colon-separated hex), last used, favorite, and share action.
+- Add/import actions live in the top app bar.
+- Identities are grouped in collapsible sections.
+- Edit/delete live in the overflow menu.
 
 ## 7. Snippet Manager
 - Accessible from drawer and from session toolbar.
@@ -123,8 +119,10 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
   - Bind address input (default 127.0.0.1 for local/dynamic, remote host for remote).
   - Associated host dropdown (multi-select) to auto-start when specified hosts connect.
   - Manual enable/disable toggle (works even when not connected).
-  - Icons: star (favorite), edit (pencil), delete (trash).
-- FAB opens "Add Port Forward" sheet with fields:
+  - Favorite/share controls plus overflow edit/delete.
+- Entries are grouped in collapsible sections.
+- Top app bar icons open add/import actions. The old edit mode is gone.
+- "Add Port Forward" sheet fields:
   - Type selector fixed to Local (`-L`).
   - Source port + bind address.
   - Destination host/port.
@@ -188,6 +186,6 @@ This document captures first-pass layouts for key SSHPeaches screens. Use it as 
 ### Next Steps
 - Create Figma frames for each screen with the black-and-orange palette.
 - Define shared components (cards, buttons, toggles) as reusable variants.
-- Link frames to blueprint requirements and note interactions (Edit mode, Info editor, QR scanner).
+- Link frames to blueprint requirements and note interactions (group collapse, overflow actions, info editor, QR scanner).
 
 

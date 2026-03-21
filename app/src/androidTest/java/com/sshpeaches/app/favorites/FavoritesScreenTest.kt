@@ -1,9 +1,12 @@
-package com.majordaftapps.sshpeaches.app.favorites
+package com.majordaftapps.sshpeaches.app.home
 
 import android.Manifest
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,12 +21,13 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class FavoritesScreenTest {
+class HomeScreenTest {
 
     private companion object {
         const val FAVORITES_TEST_PRIVATE_KEY = "favorites-test-private-key"
@@ -41,7 +45,7 @@ class FavoritesScreenTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun favoritesScreenShowsSeededFavoritesAcrossSections() {
+    fun homeScreenShowsSeededFavoritesAcrossSections() {
         AppStateSeeder.seedHost(
             HostConnection(
                 id = "fav-host",
@@ -86,10 +90,35 @@ class FavoritesScreenTest {
         )
 
         composeRule.activityRule.scenario.recreate()
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_FAVORITES).assertIsDisplayed()
-        composeRule.onNodeWithText("Favorite Host").assertTextContains("Favorite Host")
-        composeRule.onNodeWithText("Favorite Identity").assertTextContains("Favorite Identity")
-        composeRule.onNodeWithText("Favorite Forward").assertTextContains("Favorite Forward")
-        composeRule.onNodeWithText("Favorite Snippet").assertTextContains("Favorite Snippet")
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+        assertHomeItemVisible("Favorite Host")
+        assertHomeItemVisible("Favorite Identity")
+        assertHomeItemVisible("Favorite Forward")
+        assertHomeItemVisible("Favorite Snippet")
+    }
+
+    @Test
+    fun homeScreenShowsWelcomeActionsWhenNoResourcesExist() {
+        composeRule.activityRule.scenario.recreate()
+
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME).assertIsDisplayed()
+        composeRule.onNodeWithText("Welcome to SSHPeaches. To begin, create your first resource.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_HOST).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_IDENTITY).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_FORWARD).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HOME_WELCOME_ADD_SNIPPET).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(UiTestTags.HOME_RECENTS_SECTION).assertCountEquals(0)
+    }
+
+    private fun assertHomeItemVisible(label: String) {
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue(
+            "Expected to find $label somewhere on Home.",
+            composeRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
+        )
     }
 }
