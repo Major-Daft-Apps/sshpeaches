@@ -1,5 +1,7 @@
 package com.majordaftapps.sshpeaches.app.uptime
 
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.content.Context
 import com.majordaftapps.sshpeaches.app.data.local.HostUptimeSampleEntity
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
@@ -8,11 +10,9 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.UnverifiedReason
 import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.model.UptimeStatus
-import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,11 +35,11 @@ class UptimeMonitorRunner(
         if (dueConfigs.isEmpty()) return@withContext
 
         val hostsById = database.hostDao().getAll().associateBy { it.id }
-        val hasInternet = checkInternetReachability()
+        val hasActiveNetwork = hasActiveNetworkTransport()
 
         dueConfigs.forEach { config ->
             val host = hostsById[config.hostId]?.asModel() ?: return@forEach
-            val outcome = if (!hasInternet) {
+            val outcome = if (shouldSkipCheckForNoNetwork(host.host, hasActiveNetwork)) {
                 CheckOutcome(
                     status = UptimeStatus.UNVERIFIED,
                     reason = UnverifiedReason.NO_INTERNET
@@ -108,23 +108,33 @@ class UptimeMonitorRunner(
         }
     }
 
-    private fun checkInternetReachability(): Boolean {
-        val connection = (URL("https://example.com").openConnection() as HttpURLConnection).apply {
-            requestMethod = "HEAD"
-            connectTimeout = 2_500
-            readTimeout = 2_500
-            instanceFollowRedirects = true
-        }
-        return runCatching {
-            connection.connect()
-            connection.responseCode in 200..399
-        }.getOrDefault(false).also {
-            connection.disconnect()
-        }
+    private fun hasActiveNetworkTransport(): Boolean {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return true
+        val activeNetwork = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)
     }
 
     private data class CheckOutcome(
         val status: UptimeStatus,
         val reason: UnverifiedReason?
     )
+}
+
+internal fun shouldSkipCheckForNoNetwork(host: String, hasActiveNetwork: Boolean): Boolean =
+    !hasActiveNetwork && !isLoopbackHost(host)
+
+internal fun isLoopbackHost(host: String): Boolean {
+    val normalized = host.trim()
+        .removePrefix("[")
+        .removeSuffix("]")
+        .lowercase()
+    return normalized == "localhost" ||
+        normalized == "127.0.0.1" ||
+        normalized == "::1" ||
+        normalized == "0:0:0:0:0:0:0:1"
 }

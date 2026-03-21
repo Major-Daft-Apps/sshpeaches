@@ -88,6 +88,19 @@ class UptimeScreenTest {
         composeRule.onNodeWithTag(UiTestTags.uptimeHostOption(available.id)).assertIsDisplayed()
     }
 
+    @Test
+    fun addButtonOpensDialogFromEmptyMonitorsState() {
+        val host = host(name = "Available Host", address = "10.0.2.61")
+        AppStateSeeder.seedHost(host)
+        composeRule.activityRule.scenario.recreate()
+
+        openUptimeScreen()
+        composeRule.onNodeWithTag(UiTestTags.UPTIME_EMPTY_MONITORS).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.UPTIME)).performClick()
+
+        composeRule.onNodeWithTag(UiTestTags.UPTIME_HOST_PICKER).assertIsDisplayed()
+    }
+
     private fun waitForTag(tag: String) {
         composeRule.waitUntil(5_000) {
             runCatching {

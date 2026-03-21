@@ -146,7 +146,9 @@ fun HostsScreen(
     val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+    val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     AutoHidePasswordReveal(passwordRevealIndex)
@@ -299,7 +301,8 @@ fun HostsScreen(
     }
 
     LaunchedEffect(addRequestKey) {
-        if (addRequestKey > 0) {
+        if (addRequestKey > handledAddRequestKey.intValue) {
+            handledAddRequestKey.intValue = addRequestKey
             openDialog(null)
         }
     }
@@ -312,7 +315,8 @@ fun HostsScreen(
     }
 
     LaunchedEffect(importRequestKey) {
-        if (importRequestKey > 0) {
+        if (importRequestKey > handledImportRequestKey.intValue) {
+            handledImportRequestKey.intValue = importRequestKey
             val options = ScanOptions().apply {
                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                 setPrompt("Scan SSH host QR")

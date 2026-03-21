@@ -131,48 +131,50 @@ fun UptimeScreen(
             }
         }
 
-        if (hosts.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag(UiTestTags.UPTIME_EMPTY_SAVED_HOSTS),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Add a host in Hosts before tracking uptime.")
+        when {
+            hosts.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(UiTestTags.UPTIME_EMPTY_SAVED_HOSTS),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Add a host in Hosts before tracking uptime.")
+                }
             }
-            return
-        }
 
-        if (summaries.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag(UiTestTags.UPTIME_EMPTY_MONITORS),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No uptime monitors yet. Add a saved host to start tracking.",
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
+            summaries.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(UiTestTags.UPTIME_EMPTY_MONITORS),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No uptime monitors yet. Add a saved host to start tracking.",
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
             }
-            return
-        }
 
-        SummaryRow(summaries = summaries)
-        HorizontalDivider()
+            else -> {
+                SummaryRow(summaries = summaries)
+                HorizontalDivider()
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(summaries, key = { it.host.id }) { summary ->
-                UptimeCard(
-                    summary = summary,
-                    onRefresh = { onRefreshHost(summary.host.id) },
-                    onEdit = { openEditDialog(summary) },
-                    onRemove = { onRemoveHost(summary.host.id) },
-                    onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
-                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(summaries, key = { it.host.id }) { summary ->
+                        UptimeCard(
+                            summary = summary,
+                            onRefresh = { onRefreshHost(summary.host.id) },
+                            onEdit = { openEditDialog(summary) },
+                            onRemove = { onRemoveHost(summary.host.id) },
+                            onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -349,7 +351,7 @@ private fun SummaryRow(summaries: List<HostUptimeSummary>) {
     ) {
         SummaryChip("Up", upCount, Color(0xFF2E7D32), Modifier.weight(1f))
         SummaryChip("Down", downCount, Color(0xFFC62828), Modifier.weight(1f))
-        SummaryChip("Grey", greyCount, Color(0xFF757575), Modifier.weight(1f))
+        SummaryChip("Unknown", greyCount, Color(0xFF757575), Modifier.weight(1f))
     }
 }
 
@@ -455,8 +457,8 @@ private fun statusLabel(summary: HostUptimeSummary): String = when (summary.curr
     UptimeStatus.UP -> "Up"
     UptimeStatus.DOWN -> "Down"
     UptimeStatus.UNVERIFIED -> when (summary.currentReason?.name) {
-        "NO_INTERNET" -> "Grey • No internet"
-        else -> "Grey • Checks inactive"
+        "NO_INTERNET" -> "Unknown • No internet"
+        else -> "Unknown • Checks inactive"
     }
 }
 

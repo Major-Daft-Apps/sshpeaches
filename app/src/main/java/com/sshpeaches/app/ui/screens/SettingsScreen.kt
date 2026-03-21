@@ -705,53 +705,31 @@ fun SettingsScreen(
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Crash reports")
-                        Text("Send anonymous crash details", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = crashReportsEnabled, onCheckedChange = onCrashReportsToggle)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Usage analytics")
-                        Text("Help improve SSHPeaches by sharing usage stats", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = analyticsEnabled, onCheckedChange = onAnalyticsToggle)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Session diagnostics")
-                        Text(
-                            "Capture local session logs for troubleshooting. Not uploaded.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Switch(
-                        checked = diagnosticsLoggingEnabled,
-                        onCheckedChange = onDiagnosticsToggle,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Send usage reports")
-                        Text("Upload a usage report every 7 days", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = usageReportsEnabled, onCheckedChange = onUsageReportsToggle)
-                }
+                SettingsToggleRow(
+                    title = "Crash reports",
+                    description = "Send anonymous crash details",
+                    checked = crashReportsEnabled,
+                    onCheckedChange = onCrashReportsToggle
+                )
+                SettingsToggleRow(
+                    title = "Usage analytics",
+                    description = "Help improve SSHPeaches by sharing usage stats",
+                    checked = analyticsEnabled,
+                    onCheckedChange = onAnalyticsToggle
+                )
+                SettingsToggleRow(
+                    title = "Session diagnostics",
+                    description = "Capture local session logs for troubleshooting. Not uploaded.",
+                    checked = diagnosticsLoggingEnabled,
+                    onCheckedChange = onDiagnosticsToggle,
+                    switchModifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+                )
+                SettingsToggleRow(
+                    title = "Send usage reports",
+                    description = "Upload a usage report every 7 days",
+                    checked = usageReportsEnabled,
+                    onCheckedChange = onUsageReportsToggle
+                )
             }
         }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
@@ -820,23 +798,13 @@ fun SettingsScreen(
                         "Hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings are always included in transfer exports.",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Include passwords and private keys")
-                            Text(
-                                "Encrypt saved passwords and private key material with a passphrase.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Switch(
-                            checked = includeSecretsInQr,
-                            onCheckedChange = onIncludeSecretsInQrToggle,
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
-                        )
-                    }
+                    SettingsToggleRow(
+                        title = "Include passwords and private keys",
+                        description = "Encrypt saved passwords and private key material with a passphrase.",
+                        checked = includeSecretsInQr,
+                        onCheckedChange = onIncludeSecretsInQrToggle,
+                        switchModifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
+                    )
                     if (includeSecretsInQr) {
                         OutlinedTextField(
                             value = exportPassphraseState.value,
@@ -943,8 +911,12 @@ fun SettingsScreen(
                             onShowMessage("Unable to generate export QR.")
                         } else if (includeSecretsInQr) {
                             ExportPassphraseCache.transfer = passphrase
-                            exportPassphraseError.value = null
                         }
+                        exportPassphraseState.value = ""
+                        exportConfirmPassphraseState.value = ""
+                        exportPassphraseRevealIndex.intValue = -1
+                        exportConfirmPassphraseRevealIndex.intValue = -1
+                        exportPassphraseError.value = null
                         showTransferDialog.value = false
                     },
                     modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON)
@@ -1154,6 +1126,37 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showRestoreDefaultsDialog.value = false }) { Text("Cancel") }
             }
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    switchModifier: Modifier = Modifier
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(title)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = switchModifier.align(Alignment.CenterVertically)
         )
     }
 }

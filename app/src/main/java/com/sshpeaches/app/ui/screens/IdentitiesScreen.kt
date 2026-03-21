@@ -189,7 +189,9 @@ fun IdentitiesScreen(
     val pendingDeleteIdentity = remember { mutableStateOf<Identity?>(null) }
     val overflowIdentityId = remember { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+    val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
     AutoHidePasswordReveal(sharePassphraseRevealIndex)
     AutoHidePasswordReveal(shareConfirmPassphraseRevealIndex)
     AutoHidePasswordReveal(importPassphraseRevealIndex)
@@ -332,7 +334,8 @@ fun IdentitiesScreen(
     }
 
     LaunchedEffect(addRequestKey) {
-        if (addRequestKey > 0) {
+        if (addRequestKey > handledAddRequestKey.intValue) {
+            handledAddRequestKey.intValue = addRequestKey
             openDialog(null)
         }
     }
@@ -345,7 +348,8 @@ fun IdentitiesScreen(
     }
 
     LaunchedEffect(importRequestKey) {
-        if (importRequestKey > 0) {
+        if (importRequestKey > handledImportRequestKey.intValue) {
+            handledImportRequestKey.intValue = importRequestKey
             val options = ScanOptions().apply {
                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                 setPrompt("Scan SSH identity QR")
