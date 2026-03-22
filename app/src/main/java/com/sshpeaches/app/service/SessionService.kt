@@ -73,11 +73,13 @@ import net.schmizz.sshj.connection.channel.Channel
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.sftp.FileAttributes
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.LocalDestFile
 import net.schmizz.sshj.xfer.FileTransfer
+import net.schmizz.sshj.xfer.FilePermission
 import net.schmizz.sshj.xfer.LocalFileFilter
 import net.schmizz.sshj.xfer.LocalSourceFile
 import net.schmizz.sshj.xfer.TransferListener
@@ -759,7 +761,7 @@ class SessionService : Service() {
                 measureOperation("sftpDownloadFile", hostId) {
                     val destinationUri = localPath.toContentUriOrNull()
                     val destinationFile = destinationUri?.let { null } ?: resolveDestinationFile(hostId, source, localPath)
-                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile!!.absolutePath
+                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
                     val progress = beginFileTransfer(
                         hostId = hostId,
                         mode = ConnectionMode.SFTP,
@@ -774,7 +776,7 @@ class SessionService : Service() {
                             val target = ContentUriDestFile(destinationUri)
                             sftp.get(source, target)
                         } else {
-                            destinationFile!!.parentFile?.mkdirs()
+                            destinationFile.parentFile?.mkdirs()
                             sftp.get(source, destinationFile.absolutePath)
                         }
                     }
@@ -892,7 +894,7 @@ class SessionService : Service() {
                 measureOperation("scpDownloadFile", hostId) {
                     val destinationUri = localPath.toContentUriOrNull()
                     val destinationFile = destinationUri?.let { null } ?: resolveDestinationFile(hostId, source, localPath)
-                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile!!.absolutePath
+                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
                     val progress = beginFileTransfer(
                         hostId = hostId,
                         mode = ConnectionMode.SCP,
@@ -906,7 +908,7 @@ class SessionService : Service() {
                             val target = ContentUriDestFile(destinationUri)
                             scp.download(source, target)
                         } else {
-                            destinationFile!!.parentFile?.mkdirs()
+                            destinationFile.parentFile?.mkdirs()
                             scp.download(source, destinationFile.absolutePath)
                         }
                     }
@@ -1049,10 +1051,30 @@ class SessionService : Service() {
                         .thenBy { it.name.lowercase() }
                 )
             val entries = listing.map { item ->
+                val attributes = item.attributes
+                val isSymbolicLink = attributes.type == net.schmizz.sshj.sftp.FileMode.Type.SYMLINK
+                val linkTargetPath = if (isSymbolicLink) {
+                    runCatching { sftp.canonicalize(item.path) }.getOrNull()
+                } else {
+                    null
+                }
+                val linkTargetAttributes = linkTargetPath?.let { targetPath ->
+                    runCatching { sftp.stat(targetPath) }.getOrNull()
+                }
                 RemoteDirectoryEntry(
                     name = item.name,
                     isDirectory = item.isDirectory(),
-                    sizeBytes = item.attributes.size
+                    sizeBytes = attributes.size,
+                    absolutePath = item.path,
+                    modifiedAtEpochMillis = attributes
+                        .takeIf { it.has(FileAttributes.Flag.ACMODTIME) }
+                        ?.mtime
+                        ?.times(1000L),
+                    permissionSummary = buildPermissionSummary(attributes),
+                    isSymbolicLink = isSymbolicLink,
+                    linkTargetPath = linkTargetPath,
+                    linkTargetIsDirectory = linkTargetAttributes?.type == net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY,
+                    isBrokenLink = isSymbolicLink && linkTargetPath == null
                 )
             }
             setRemoteDirectorySnapshot(
@@ -2703,7 +2725,14 @@ class SessionService : Service() {
     data class RemoteDirectoryEntry(
         val name: String,
         val isDirectory: Boolean,
-        val sizeBytes: Long
+        val sizeBytes: Long,
+        val absolutePath: String = "",
+        val modifiedAtEpochMillis: Long? = null,
+        val permissionSummary: String = "",
+        val isSymbolicLink: Boolean = false,
+        val linkTargetPath: String? = null,
+        val linkTargetIsDirectory: Boolean? = null,
+        val isBrokenLink: Boolean = false
     )
 
     data class HostKeyPrompt(
@@ -2726,4 +2755,52 @@ class SessionService : Service() {
     )
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }
+
+    private fun buildPermissionSummary(attributes: FileAttributes): String {
+        if (!attributes.has(FileAttributes.Flag.MODE)) return ""
+        val permissions = attributes.permissions
+        fun has(permission: FilePermission): Boolean = permissions.contains(permission)
+        val type = when (attributes.type) {
+            net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY -> 'd'
+            net.schmizz.sshj.sftp.FileMode.Type.SYMLINK -> 'l'
+            net.schmizz.sshj.sftp.FileMode.Type.BLOCK_SPECIAL -> 'b'
+            net.schmizz.sshj.sftp.FileMode.Type.CHAR_SPECIAL -> 'c'
+            net.schmizz.sshj.sftp.FileMode.Type.FIFO_SPECIAL -> 'p'
+            net.schmizz.sshj.sftp.FileMode.Type.SOCKET_SPECIAL -> 's'
+            else -> '-'
+        }
+        return buildString(10) {
+            append(type)
+            append(if (has(FilePermission.USR_R)) 'r' else '-')
+            append(if (has(FilePermission.USR_W)) 'w' else '-')
+            append(
+                when {
+                    has(FilePermission.SUID) && has(FilePermission.USR_X) -> 's'
+                    has(FilePermission.SUID) -> 'S'
+                    has(FilePermission.USR_X) -> 'x'
+                    else -> '-'
+                }
+            )
+            append(if (has(FilePermission.GRP_R)) 'r' else '-')
+            append(if (has(FilePermission.GRP_W)) 'w' else '-')
+            append(
+                when {
+                    has(FilePermission.SGID) && has(FilePermission.GRP_X) -> 's'
+                    has(FilePermission.SGID) -> 'S'
+                    has(FilePermission.GRP_X) -> 'x'
+                    else -> '-'
+                }
+            )
+            append(if (has(FilePermission.OTH_R)) 'r' else '-')
+            append(if (has(FilePermission.OTH_W)) 'w' else '-')
+            append(
+                when {
+                    has(FilePermission.STICKY) && has(FilePermission.OTH_X) -> 't'
+                    has(FilePermission.STICKY) -> 'T'
+                    has(FilePermission.OTH_X) -> 'x'
+                    else -> '-'
+                }
+            )
+        }
+    }
 }

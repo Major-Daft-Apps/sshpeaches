@@ -4,10 +4,12 @@ import android.Manifest
 import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -531,18 +533,21 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "scp")).performClick()
         waitForTag(UiTestTags.CONNECTING_SCP_PANEL)
 
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
-            .performTextReplacement("/uploads")
-        composeRule.onAllNodesWithContentDescription("Go")[0].performClick()
+        repeat(3) {
+            composeRule.onNodeWithContentDescription("Up").performClick()
+            Thread.sleep(750)
+        }
 
         composeRule.waitUntil(15_000) {
-            composeRule.onAllNodesWithText("📄", substring = true)
+            composeRule.onAllNodesWithTag(UiTestTags.connectingScpRemoteRow("/uploads"))
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
 
-        composeRule.onAllNodesWithText("📄", substring = true)[0].performClick()
-        composeRule.onNodeWithText("Selected file:", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads")).performClick()
+        composeRule.onNodeWithText("Selected: /uploads", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/uploads")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT).assertTextContains("/uploads")
     }
 
     @Test

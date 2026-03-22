@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Hermetic Android Tests" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="Release Launch Check" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value=":app:allDevicesDebugAndroidTest" />
+          <option value=":app:connectedReleaseLaunchCheck" />
         </list>
       </option>
       <option name="vmOptions" value="" />

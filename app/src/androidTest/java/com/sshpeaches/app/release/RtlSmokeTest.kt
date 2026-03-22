@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.release
 
-import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.ui.PermissionRequiredDialog
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.testing.ReleaseTestHostActivity
 import com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest
 import org.junit.Rule
 import org.junit.Test
@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 class RtlSmokeTest {
 
     @get:Rule
-    val composeRule = createAndroidComposeRule<ComponentActivity>()
+    val composeRule = createAndroidComposeRule<ReleaseTestHostActivity>()
 
     @Test
     fun permissionDialogRendersInRtl() {

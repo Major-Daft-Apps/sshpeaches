@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.release
 
-import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -13,6 +12,7 @@ import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.testing.ReleaseTestHostActivity
 import com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import org.junit.Rule
@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 class VisualSmokeTest {
 
     @get:Rule
-    val composeRule = createAndroidComposeRule<ComponentActivity>()
+    val composeRule = createAndroidComposeRule<ReleaseTestHostActivity>()
 
     @Test
     fun permissionDialogRendersNonBlankLightTheme() {

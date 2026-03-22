@@ -192,8 +192,8 @@ class PortForwardCrudTest {
         composeRule.onAllNodesWithText("Enable background sessions in Settings before saving a port forward.")
             .assertCountEquals(0)
         composeRule.onNodeWithText("Add").performClick()
-        composeRule.onNodeWithText("Enable background sessions in Settings before saving a port forward.")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("Enable background sessions in Settings before saving a port forward.")
+            .assertCountEquals(1)
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).assertIsDisplayed()
     }
 

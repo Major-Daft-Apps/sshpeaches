@@ -7,6 +7,7 @@ plugins {
 }
 
 import java.util.Properties
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 import org.gradle.internal.os.OperatingSystem
 
@@ -28,11 +29,14 @@ android {
     compileSdk = 36
     val liveSuiteAnnotation = "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
     val releaseLaneAnnotation = "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    val releaseInstrumentationRequested = gradle.startParameter.taskNames.any { taskName ->
+        val lowerName = taskName.lowercase()
+        lowerName.contains("releaselaneandroidtest") ||
+            lowerName.contains("releaselanemanageddevicescheck") ||
+            (lowerName.contains("release") && lowerName.contains("androidtest"))
+    }
     val liveSuiteRequested = gradle.startParameter.taskNames.any {
         it.contains("liveAndroidTest", ignoreCase = true)
-    }
-    val releaseLaneRequested = gradle.startParameter.taskNames.any {
-        it.contains("releaseLane", ignoreCase = true)
     }
     val liveSshHost = (findProperty("liveSshHost") as? String)
         ?.takeIf { it.isNotBlank() }
@@ -83,7 +87,7 @@ android {
             testInstrumentationRunnerArguments["liveSshPassword"] = liveSshPassword
             testInstrumentationRunnerArguments["liveSshKeyUsername"] = "tester-key"
             testInstrumentationRunnerArguments["liveForwardHttpPort"] = liveForwardHttpPort.toString()
-        } else if (releaseLaneRequested) {
+        } else if (releaseInstrumentationRequested) {
             testInstrumentationRunnerArguments["annotation"] = releaseLaneAnnotation
             testInstrumentationRunnerArguments["notAnnotation"] = liveSuiteAnnotation
         } else {
@@ -181,15 +185,18 @@ android {
                     device = "Medium Phone"
                     apiLevel = 34
                     systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
                 }
                 create("nexus9Api34") {
                     device = "Nexus 9"
                     apiLevel = 34
                     systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
                 }
             }
         }
     }
+    testBuildType = if (releaseInstrumentationRequested) "release" else "debug"
 }
 
 dependencies {
@@ -277,6 +284,26 @@ fun Project.helperRuntimeClasspath(): String {
     val jarFile = jarTask.outputs.files.singleFile
     val runtimeClasspath = helperProject.configurations.getByName("runtimeClasspath").files
     return (runtimeClasspath + jarFile).joinToString(File.pathSeparator) { it.absolutePath }
+}
+
+fun adbCommand(vararg args: String): List<String> = buildList {
+    add(adbExecutablePath())
+    liveSshDeviceSerial?.let {
+        add("-s")
+        add(it)
+    }
+    addAll(args)
+}
+
+fun Project.captureCommandOutput(command: List<String>, ignoreExitValue: Boolean = false): String {
+    val output = ByteArrayOutputStream()
+    exec {
+        isIgnoreExitValue = ignoreExitValue
+        commandLine(command)
+        standardOutput = output
+        errorOutput = output
+    }
+    return output.toString(Charsets.UTF_8).trim()
 }
 
 tasks.register("startLiveSshServer") {
@@ -418,12 +445,67 @@ tasks.register("liveAndroidTest") {
 
 tasks.register("releaseLaneAndroidTest") {
     group = "verification"
-    description = "Runs the non-blocking release-lane instrumentation smoke suite on the connected device."
-    dependsOn("connectedDebugAndroidTest")
+    description = "Runs the release-lane instrumentation smoke suite against the release APK on the connected device/emulator."
+    dependsOn("connectedReleaseLaunchCheck", "connectedAndroidTest")
 }
 
 tasks.register("releaseLaneManagedDevicesCheck") {
     group = "verification"
-    description = "Runs the release-lane smoke suite on the managed phone and tablet emulators."
-    dependsOn("pixel2Api34DebugAndroidTest", "nexus9Api34DebugAndroidTest")
+    description = "Runs the release-lane instrumentation smoke suite against the release APK on the managed phone and tablet emulators."
+    dependsOn("pixel2Api34ReleaseAndroidTest", "nexus9Api34ReleaseAndroidTest")
+}
+
+tasks.register("connectedReleaseLaunchCheck") {
+    group = "verification"
+    description = "Installs the release APK on the connected device/emulator and fails if cold launch crashes."
+    dependsOn("installRelease")
+    doLast {
+        val packageName = "com.majordaftapps.sshpeaches"
+        val launcherComponent = "$packageName/com.majordaftapps.sshpeaches.app.MainActivity"
+
+        exec {
+            isIgnoreExitValue = true
+            commandLine(adbCommand("logcat", "-c"))
+        }
+        exec {
+            isIgnoreExitValue = true
+            commandLine(adbCommand("shell", "am", "force-stop", packageName))
+        }
+        exec {
+            isIgnoreExitValue = true
+            commandLine(adbCommand("shell", "pm", "clear", packageName))
+        }
+
+        val launchOutput = captureCommandOutput(
+            adbCommand("shell", "am", "start", "-W", "-n", launcherComponent)
+        )
+
+        Thread.sleep(8_000)
+
+        val pid = captureCommandOutput(
+            adbCommand("shell", "pidof", packageName),
+            ignoreExitValue = true
+        )
+        if (pid.isNotBlank()) {
+            return@doLast
+        }
+
+        val crashLog = captureCommandOutput(
+            adbCommand("logcat", "-d", "-v", "brief", "AndroidRuntime:E", "*:S"),
+            ignoreExitValue = true
+        )
+
+        throw GradleException(
+            buildString {
+                appendLine("Release app crashed or exited during cold launch.")
+                appendLine("Launch output:")
+                appendLine(launchOutput)
+                if (crashLog.isNotBlank()) {
+                    appendLine()
+                    appendLine("Crash log:")
+                    appendLine(crashLog)
+                }
+            }
+        )
+    }
 }

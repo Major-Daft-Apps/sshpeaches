@@ -52,14 +52,26 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,6 +80,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -115,6 +128,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -158,6 +172,7 @@ import android.os.VibratorManager
 import android.provider.OpenableColumns
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -168,6 +183,8 @@ import java.io.File
 import java.io.Serializable
 import java.nio.charset.StandardCharsets
 import java.net.URLEncoder
+import java.text.DateFormat
+import java.util.Date
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlinx.coroutines.Job
@@ -204,6 +221,11 @@ data class QuickConnectUiState(
     val phase: QuickConnectPhase = QuickConnectPhase.IDLE,
     val message: String = ""
 ) : Serializable
+
+private data class RemoteBreadcrumb(
+    val label: String,
+    val path: String
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -288,13 +310,25 @@ fun ConnectingScreen(
     }
     val scpPathHistory = remember(request?.sessionId) { mutableStateListOf(".") }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
-    var scpSelectedFile by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpSelectedPath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var pendingScpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpUploadSourceUri by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpTransferStatus by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var showScpUploadVertical by rememberSaveable(request?.sessionId) {
         mutableStateOf(request?.initialFileTransferEntryMode == FileTransferEntryMode.UPLOAD)
     }
+    var scpActionsExpanded by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
+    var scpPendingManualPathTarget by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpPendingManualPathFallback by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpPendingLinkPathTarget by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var scpPendingLinkPathFallback by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var showScpRenameDialog by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
+    var scpRenameValue by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var showScpMoveDialog by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
+    var scpMoveDestination by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var showScpNewFolderDialog by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
+    var scpNewFolderValue by rememberSaveable(request?.sessionId) { mutableStateOf("") }
+    var showScpDeleteDialog by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
     var pendingModifiers by remember(request?.sessionId) { mutableStateOf(setOf<KeyboardModifier>()) }
     var showSnippetPicker by remember(request?.sessionId) { mutableStateOf(false) }
     var keyboardVisibleRequested by remember(request?.sessionId) { mutableStateOf(false) }
@@ -348,6 +382,31 @@ fun ConnectingScreen(
                 if (event.action == KeyEvent.ACTION_DOWN) applyTerminalFontSizeDelta(-1f) else true
             }
             else -> false
+        }
+    }
+
+    fun browseScpPath(target: String, recordHistory: Boolean = true, clearSelection: Boolean = true, clearStatus: Boolean = true) {
+        if (scpPendingListPath != null) return
+        val normalized = target.trim().ifBlank { "." }
+        scpRemotePath = normalized
+        scpLastListedPath = normalized
+        scpPendingListPath = normalized
+        scpPendingListBaselineToken = remoteDirectory?.refreshToken
+        if (clearSelection) {
+            scpSelectedPath = null
+        }
+        if (clearStatus) {
+            scpTransferStatus = null
+        }
+        onSftpListDirectory(normalized)
+        if (recordHistory) {
+            while (scpPathHistory.size - 1 > scpPathHistoryIndex) {
+                scpPathHistory.removeAt(scpPathHistory.lastIndex)
+            }
+            if (scpPathHistory.lastOrNull() != normalized) {
+                scpPathHistory += normalized
+            }
+            scpPathHistoryIndex = scpPathHistory.lastIndex
         }
     }
 
@@ -559,10 +618,22 @@ fun ConnectingScreen(
         scpPathHistory.clear()
         scpPathHistory += "."
         scpPathHistoryIndex = 0
-        scpSelectedFile = null
+        scpSelectedPath = null
         pendingScpDownloadRemotePath = null
         scpUploadSourceUri = null
         scpTransferStatus = null
+        scpActionsExpanded = false
+        scpPendingManualPathTarget = null
+        scpPendingManualPathFallback = null
+        scpPendingLinkPathTarget = null
+        scpPendingLinkPathFallback = null
+        showScpRenameDialog = false
+        scpRenameValue = ""
+        showScpMoveDialog = false
+        scpMoveDestination = ""
+        showScpNewFolderDialog = false
+        scpNewFolderValue = ""
+        showScpDeleteDialog = false
         if (request?.mode == ConnectionMode.SFTP) {
             sftpConsoleLines += "Connected to ${request.host}:${request.port}"
             sftpConsoleLines += "Type 'help' for SFTP commands."
@@ -615,11 +686,26 @@ fun ConnectingScreen(
             latest.startsWith("SCP upload complete:") -> {
                 scpTransferStatus = "Upload completed successfully."
             }
+            latest.startsWith("Remote move completed:") -> {
+                scpTransferStatus = "Move completed successfully."
+                browseScpPath(scpLastListedPath, recordHistory = false, clearStatus = false)
+            }
+            latest.startsWith("Remote delete completed:") -> {
+                scpTransferStatus = "Delete completed successfully."
+                browseScpPath(scpLastListedPath, recordHistory = false, clearStatus = false)
+            }
+            latest.startsWith("Remote mkdir completed:") -> {
+                scpTransferStatus = "Folder created successfully."
+                browseScpPath(scpLastListedPath, recordHistory = false, clearStatus = false)
+            }
             latest.startsWith("SCP download failed") -> {
                 scpTransferStatus = "Download failed. ${latest.substringAfter(':', "").trim()}"
             }
             latest.startsWith("SCP upload failed") -> {
                 scpTransferStatus = "Upload failed. ${latest.substringAfter(':', "").trim()}"
+            }
+            latest.startsWith("SFTP operation failed:") -> {
+                scpTransferStatus = "Operation failed. ${latest.substringAfter(':', "").trim()}"
             }
         }
     }
@@ -788,6 +874,14 @@ fun ConnectingScreen(
                 scpPathHistoryIndex = scpPathHistory.lastIndex
             }
         }
+        if (scpPendingManualPathTarget == pendingPath) {
+            scpPendingManualPathTarget = null
+            scpPendingManualPathFallback = null
+        }
+        if (scpPendingLinkPathTarget == pendingPath) {
+            scpPendingLinkPathTarget = null
+            scpPendingLinkPathFallback = null
+        }
         scpVisibleEntries = snapshot.entries
         scpActivityLines.clear()
         scpActivityLines += "Listing ${snapshot.path}:"
@@ -804,16 +898,56 @@ fun ConnectingScreen(
     }
     LaunchedEffect(logs.size, request?.mode, scpPendingListPath) {
         if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
-        if (scpPendingListPath == null || logs.isEmpty()) return@LaunchedEffect
+        val failedPendingPath = scpPendingListPath ?: return@LaunchedEffect
+        if (logs.isEmpty()) return@LaunchedEffect
         val latest = logs.last().message
         if (
             latest.startsWith("Directory listing failed for") ||
             latest.startsWith("SFTP operation failed:")
         ) {
+            val manualFallback = scpPendingManualPathFallback
+            val linkFallback = scpPendingLinkPathFallback
+            val shouldRestoreManualPath =
+                scpPendingManualPathTarget == failedPendingPath && !manualFallback.isNullOrBlank()
+            val shouldRestoreLinkPath =
+                scpPendingLinkPathTarget == failedPendingPath && !linkFallback.isNullOrBlank()
             scpPendingListPath = null
             scpPendingListBaselineToken = null
             scpActivityLines.clear()
             scpActivityLines += latest
+            scpTransferStatus = latest
+            when {
+                shouldRestoreManualPath -> {
+                    val fallbackPath = manualFallback ?: return@LaunchedEffect
+                    if (scpPathHistoryIndex in scpPathHistory.indices && scpPathHistory[scpPathHistoryIndex] == failedPendingPath) {
+                        scpPathHistory.removeAt(scpPathHistoryIndex)
+                        if (scpPathHistory.isEmpty()) {
+                            scpPathHistory += fallbackPath
+                        }
+                        scpPathHistoryIndex = scpPathHistory.lastIndex.coerceAtLeast(0)
+                    }
+                    scpRemotePath = fallbackPath
+                    scpLastListedPath = fallbackPath
+                    scpPendingManualPathTarget = null
+                    scpPendingManualPathFallback = null
+                    Toast.makeText(context, "Couldn't open $failedPendingPath", Toast.LENGTH_SHORT).show()
+                }
+                shouldRestoreLinkPath -> {
+                    val fallbackPath = linkFallback ?: return@LaunchedEffect
+                    if (scpPathHistoryIndex in scpPathHistory.indices && scpPathHistory[scpPathHistoryIndex] == failedPendingPath) {
+                        scpPathHistory.removeAt(scpPathHistoryIndex)
+                        if (scpPathHistory.isEmpty()) {
+                            scpPathHistory += fallbackPath
+                        }
+                        scpPathHistoryIndex = scpPathHistory.lastIndex.coerceAtLeast(0)
+                    }
+                    scpRemotePath = fallbackPath
+                    scpLastListedPath = fallbackPath
+                    scpPendingLinkPathTarget = null
+                    scpPendingLinkPathFallback = null
+                    Toast.makeText(context, "Broken link: $failedPendingPath", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -1474,66 +1608,72 @@ fun ConnectingScreen(
         } else if (showScpTransferSession && request != null) {
             val remoteItems = remoteDirectory?.entries ?: scpVisibleEntries
             val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
-            val normalizedRemoteInput = scpRemotePath.trim().ifBlank { "." }
             val scpListingInProgress = scpPendingListPath != null
             val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
             val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex && !scpListingInProgress
-            val transferFieldColors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                disabledTextColor = Color(0xFF8E8E8E),
-                focusedLabelColor = Color(0xFFE5E5E5),
-                unfocusedLabelColor = Color(0xFFBDBDBD),
-                disabledLabelColor = Color(0xFF8E8E8E),
-                cursorColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color(0xFF7A7A7A),
-                disabledBorderColor = Color(0xFF555555),
-                focusedTrailingIconColor = Color.White,
-                unfocusedTrailingIconColor = Color(0xFFE5E5E5),
-                disabledTrailingIconColor = Color(0xFF8E8E8E)
-            )
+            val colorScheme = MaterialTheme.colorScheme
+            val entryPathFor: (com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry) -> String = { entry ->
+                entry.absolutePath.ifBlank { resolveChildPath(effectiveRemotePath, entry.name) }
+            }
+            val selectedEntry = remoteItems.firstOrNull { entryPathFor(it) == scpSelectedPath }
+            val selectedPath = selectedEntry?.let(entryPathFor)
+            val canDownloadSelected = !showScpUploadVertical &&
+                selectedEntry != null &&
+                !selectedEntry.isDirectory &&
+                !scpTransferActive &&
+                !scpListingInProgress
+            val canMutateSelection = selectedEntry != null && !scpTransferActive && !scpListingInProgress
+            val deleteProtectedSelection = selectedEntry != null &&
+                isProtectedRemoteSystemDirectory(
+                    path = selectedPath,
+                    isDirectory = selectedEntry.isDirectory
+                )
+            val moveProtectedSelection = deleteProtectedSelection
+            val canMoveSelection = canMutateSelection && !moveProtectedSelection
+            val canDeleteSelection = canMutateSelection && !deleteProtectedSelection
+            val canChooseUploadSource = showScpUploadVertical && !scpTransferActive
+            val canUploadHere = showScpUploadVertical &&
+                !scpTransferActive &&
+                !scpListingInProgress &&
+                !scpUploadSourceUri.isNullOrBlank()
             val scpDownloadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
                 val selectedRemote = pendingScpDownloadRemotePath
                 pendingScpDownloadRemotePath = null
                 if (selectedRemote.isNullOrBlank()) return@rememberLauncherForActivityResult
                 if (uri == null) {
                     scpTransferStatus = "Download cancelled."
-                    appendScpActivity("Save location selection cancelled.", clearFirst = true)
                     return@rememberLauncherForActivityResult
                 }
                 scpTransferStatus = null
                 onScpDownload(selectedRemote, uri.toString())
-                appendScpActivity("Downloading $selectedRemote -> $uri", clearFirst = true)
             }
             val scpUploadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri == null) {
-                    appendScpActivity("Local file selection cancelled.", clearFirst = true)
+                    scpTransferStatus = "Local file selection cancelled."
                     return@rememberLauncherForActivityResult
                 }
                 val displayName = queryUriDisplayName(context, uri) ?: "upload.bin"
                 scpUploadSourceUri = uri.toString()
                 uploadLocalPath = displayName
-                scpTransferStatus = null
-                appendScpActivity("Selected local file: $displayName", clearFirst = true)
+                scpTransferStatus = "Selected local file: $displayName"
+            }
+            fun submitScpPathJump() {
+                if (scpListingInProgress) return
+                val targetPath = scpRemotePath.trim().ifBlank { "." }
+                keyboardController?.hide()
+                if (targetPath == effectiveRemotePath) {
+                    scpRemotePath = effectiveRemotePath
+                    return
+                }
+                scpPendingManualPathTarget = targetPath
+                scpPendingManualPathFallback = effectiveRemotePath
+                browseScpPath(targetPath)
             }
 
-            fun browseScpPath(target: String, recordHistory: Boolean = true) {
-                if (scpPendingListPath != null) return
-                val normalized = target.trim().ifBlank { "." }
-                scpRemotePath = normalized
-                scpLastListedPath = normalized
-                scpPendingListPath = normalized
-                scpPendingListBaselineToken = remoteDirectory?.refreshToken
-                onSftpListDirectory(normalized)
-                if (recordHistory) {
-                    while (scpPathHistory.size - 1 > scpPathHistoryIndex) {
-                        scpPathHistory.removeAt(scpPathHistory.lastIndex)
-                    }
-                    if (scpPathHistory.lastOrNull() != normalized) {
-                        scpPathHistory += normalized
-                    }
-                    scpPathHistoryIndex = scpPathHistory.lastIndex
+            LaunchedEffect(remoteItems, effectiveRemotePath, scpSelectedPath) {
+                val selectedRemotePath = scpSelectedPath ?: return@LaunchedEffect
+                if (remoteItems.none { entryPathFor(it) == selectedRemotePath }) {
+                    scpSelectedPath = null
                 }
             }
 
@@ -1541,44 +1681,13 @@ fun ConnectingScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag(UiTestTags.CONNECTING_SCP_PANEL)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (showScpUploadVertical) "Upload Files" else "Download Files",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (showScpUploadVertical) {
-                        TextButton(
-                            onClick = {
-                                showScpUploadVertical = false
-                                scpTransferStatus = null
-                            },
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_BACK_TO_DOWNLOAD_BUTTON)
-                        ) {
-                            Text("Download file")
-                        }
-                    } else {
-                        TextButton(
-                            onClick = {
-                                showScpUploadVertical = true
-                                scpTransferStatus = null
-                            },
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_OPEN_UPLOAD_BUTTON)
-                        ) {
-                            Text("Upload file")
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     IconButton(
                         enabled = canGoBack,
@@ -1591,7 +1700,7 @@ fun ConnectingScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = if (canGoBack) Color.White else Color(0xFF6E6E6E)
+                            tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
@@ -1605,7 +1714,7 @@ fun ConnectingScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = "Forward",
-                            tint = if (canGoForward) Color.White else Color(0xFF6E6E6E)
+                            tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
@@ -1615,17 +1724,7 @@ fun ConnectingScreen(
                         Icon(
                             Icons.Default.ArrowUpward,
                             contentDescription = "Up",
-                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
-                        )
-                    }
-                    IconButton(
-                        enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(scpHomePath ?: ".") }
-                    ) {
-                        Icon(
-                            Icons.Default.Home,
-                            contentDescription = "Home",
-                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
+                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
                         )
                     }
                     IconButton(
@@ -1635,45 +1734,187 @@ fun ConnectingScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = if (scpListingInProgress) Color(0xFF6E6E6E) else Color.White
+                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
                         )
                     }
+                    IconButton(
+                        enabled = !scpListingInProgress,
+                        onClick = { browseScpPath(scpHomePath ?: ".") }
+                    ) {
+                        Icon(
+                            Icons.Default.Home,
+                            contentDescription = "Home",
+                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
+                        )
+                    }
+                    Box {
+                        IconButton(
+                            onClick = { scpActionsExpanded = true },
+                            enabled = !scpTransferActive,
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Actions"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = scpActionsExpanded,
+                            onDismissRequest = { scpActionsExpanded = false }
+                        ) {
+                            if (showScpUploadVertical) {
+                                DropdownMenuItem(
+                                    text = { Text("Choose local file") },
+                                    enabled = canChooseUploadSource,
+                                    onClick = {
+                                        scpActionsExpanded = false
+                                        scpUploadDocumentPicker.launch(arrayOf("*/*"))
+                                    },
+                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("choose_local_file"))
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Upload here") },
+                                    enabled = canUploadHere,
+                                    onClick = {
+                                        val sourceUri = scpUploadSourceUri ?: return@DropdownMenuItem
+                                        scpActionsExpanded = false
+                                        scpTransferStatus = null
+                                        onScpUpload(
+                                            sourceUri,
+                                            inferRemoteDestination(uploadLocalPath.ifBlank { "upload.bin" }, effectiveRemotePath)
+                                        )
+                                    },
+                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("upload_here"))
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Download") },
+                                    enabled = canDownloadSelected,
+                                    onClick = {
+                                        val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                        scpActionsExpanded = false
+                                        pendingScpDownloadRemotePath = selectedRemotePath
+                                        scpDownloadDocumentPicker.launch(
+                                            selectedRemotePath.substringAfterLast('/').ifBlank { "download.bin" }
+                                        )
+                                    },
+                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("download"))
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                enabled = canMutateSelection,
+                                onClick = {
+                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                    scpActionsExpanded = false
+                                    scpRenameValue = selectedRemotePath.substringAfterLast('/').ifBlank { selectedEntry?.name.orEmpty() }
+                                    showScpRenameDialog = true
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("rename"))
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Move") },
+                                enabled = canMoveSelection,
+                                onClick = {
+                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                    if (!canMoveSelection) return@DropdownMenuItem
+                                    scpActionsExpanded = false
+                                    scpMoveDestination = selectedRemotePath
+                                    showScpMoveDialog = true
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Copy path") },
+                                enabled = canMutateSelection,
+                                onClick = {
+                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                    scpActionsExpanded = false
+                                    clipboardManager.setText(AnnotatedString(selectedRemotePath))
+                                    scpTransferStatus = "Remote path copied."
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("copy_path"))
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                enabled = canDeleteSelection,
+                                onClick = {
+                                    scpActionsExpanded = false
+                                    if (canDeleteSelection) {
+                                        showScpDeleteDialog = true
+                                    }
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("delete"))
+                            )
+                            DropdownMenuItem(
+                                text = { Text("New folder") },
+                                enabled = !scpTransferActive && !scpListingInProgress,
+                                onClick = {
+                                    scpActionsExpanded = false
+                                    scpNewFolderValue = ""
+                                    showScpNewFolderDialog = true
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("new_folder"))
+                            )
+                        }
+                    }
                 }
-                OutlinedTextField(
+                TextField(
                     value = scpRemotePath,
                     onValueChange = { scpRemotePath = it },
-                    label = { Text("Remote path") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT),
                     singleLine = true,
                     enabled = !scpListingInProgress,
-                    trailingIcon = {
-                        if (scpListingInProgress) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color(0xFFE5E5E5),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            IconButton(onClick = { browseScpPath(normalizedRemoteInput) }) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = "Open folder", tint = Color.White)
-                            }
-                        }
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    placeholder = {
+                        Text(
+                            text = "Remote path",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.None,
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Go,
                         autoCorrect = false
                     ),
-                    colors = transferFieldColors,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
+                    keyboardActions = KeyboardActions(
+                        onGo = { submitScpPathJump() },
+                        onDone = { submitScpPathJump() }
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            enabled = !scpListingInProgress,
+                            onClick = { submitScpPathJump() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Go to path"
+                            )
+                        }
+                    }
+                )
+
+                Text(
+                    text = if (showScpUploadVertical) {
+                        if (uploadLocalPath.isBlank()) {
+                            "Choose a local file from the actions menu, then upload it into the current folder."
+                        } else {
+                            "Local file: $uploadLocalPath"
+                        }
+                    } else {
+                        selectedEntry?.let { "Selected: ${entryPathFor(it)}" } ?: "Select a remote file or folder to act on it."
+                    },
+                    color = colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
                 )
                 if (scpListingInProgress) {
-                    Text(
-                        text = "Loading directory listing...",
-                        color = Color(0xFF9E9E9E),
-                        style = MaterialTheme.typography.bodySmall
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = colorScheme.primary,
+                        trackColor = colorScheme.surfaceVariant
                     )
                 }
 
@@ -1681,181 +1922,314 @@ fun ConnectingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    color = Color(0xFF0F0F0F)
+                    color = colorScheme.surface,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "Location: $effectiveRemotePath",
-                            color = Color(0xFFBDBDBD),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                        )
-                        if (remoteItems.isEmpty()) {
-                            Text("(empty)", color = Color(0xFFBDBDBD))
-                        } else {
-                            remoteItems.forEach { item ->
-                                val absolute = resolveChildPath(effectiveRemotePath, item.name)
-                                val onRemoteItemClick = {
-                                    if (item.isDirectory) {
-                                        browseScpPath(absolute)
-                                        if (!showScpUploadVertical) {
-                                            scpSelectedFile = null
-                                        }
-                                        scpTransferStatus = null
-                                    } else if (!showScpUploadVertical) {
-                                        scpSelectedFile = absolute
-                                        scpTransferStatus = null
-                                    }
+                    if (remoteItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "This folder is empty.",
+                                color = colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            items(remoteItems, key = { entryPathFor(it) }) { item ->
+                                val absolute = entryPathFor(item)
+                                val selected = scpSelectedPath == absolute
+                                val showOpenAffordance = item.isDirectory || item.linkTargetIsDirectory == true || item.isBrokenLink
+                                val metadataText = when {
+                                    item.isBrokenLink -> "Broken link"
+                                    item.isSymbolicLink && !item.linkTargetPath.isNullOrBlank() -> "-> ${item.linkTargetPath}"
+                                    item.permissionSummary.isNotBlank() -> item.permissionSummary
+                                    else -> null
                                 }
-                                Row(
+                                Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .alpha(if (scpListingInProgress) 0.65f else 1f)
-                                        .background(
-                                            when {
-                                                !showScpUploadVertical &&
-                                                    !item.isDirectory &&
-                                                    scpSelectedFile == absolute -> Color(0xFF23435E)
-                                                else -> Color.Transparent
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable(enabled = !scpListingInProgress) {
+                                            if (item.isBrokenLink) {
+                                                Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
+                                            }
+                                            scpSelectedPath = absolute
+                                            scpTransferStatus = if (item.isBrokenLink) {
+                                                "Broken link: ${item.name}"
+                                            } else {
+                                                null
+                                            }
+                                        }
+                                        .testTag(UiTestTags.connectingScpRemoteRow(absolute)),
+                                    color = if (selected) colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = when {
+                                                item.isSymbolicLink -> Icons.Default.Link
+                                                item.isDirectory -> Icons.Default.Folder
+                                                else -> Icons.Default.Description
+                                            },
+                                            contentDescription = null,
+                                            tint = when {
+                                                item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
+                                                item.isSymbolicLink -> colorScheme.primary
+                                                item.isDirectory -> colorScheme.primary
+                                                else -> colorScheme.onSurfaceVariant
                                             }
                                         )
-                                        .semantics(mergeDescendants = true) {}
-                                        .clickable(enabled = !scpListingInProgress, onClick = onRemoteItemClick)
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (item.isDirectory) "📁 ${item.name}" else "📄 ${item.name}",
-                                        color = if (item.isDirectory) Color(0xFFFFCC80) else Color(0xFFE5E5E5),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable(enabled = !scpListingInProgress, onClick = onRemoteItemClick)
-                                    )
-                                    Text(
-                                        text = if (item.isDirectory) "dir" else item.sizeBytes.toString(),
-                                        color = Color(0xFF9E9E9E),
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = item.name,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = when {
+                                                    item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
+                                                    item.isSymbolicLink -> colorScheme.primary
+                                                    else -> colorScheme.onSurface
+                                                },
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (metadataText != null) {
+                                                Text(
+                                                    text = metadataText,
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                                    color = if (item.isBrokenLink) colorScheme.error else colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                        Column(
+                                            horizontalAlignment = Alignment.End,
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = formatRemoteModifiedTime(item.modifiedAtEpochMillis),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.End,
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = if (item.isDirectory) "Folder" else com.majordaftapps.sshpeaches.app.service.formatByteCount(item.sizeBytes),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.End,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        if (showOpenAffordance) {
+                                            IconButton(
+                                                onClick = {
+                                                    if (item.isBrokenLink) {
+                                                        Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
+                                                        return@IconButton
+                                                    }
+                                                    scpPendingLinkPathTarget = if (item.isSymbolicLink) absolute else null
+                                                    scpPendingLinkPathFallback = if (item.isSymbolicLink) effectiveRemotePath else null
+                                                    browseScpPath(absolute)
+                                                },
+                                                enabled = !scpListingInProgress,
+                                                modifier = Modifier.testTag(UiTestTags.connectingScpRemoteOpen(absolute))
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                                    contentDescription = "Open folder",
+                                                    tint = colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                if (showScpUploadVertical) {
-                    Text(
-                        text = "Choose a local file, then browse to the remote folder where it should be uploaded.",
-                        color = Color(0xFFE5E5E5),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = uploadLocalPath,
-                        onValueChange = {},
-                        label = { Text("Local file") },
-                        readOnly = true,
-                        enabled = !scpTransferActive,
-                        trailingIcon = {
-                            IconButton(
-                                enabled = !scpTransferActive,
-                                onClick = { scpUploadDocumentPicker.launch(arrayOf("*/*")) }
-                            ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = "Choose local file", tint = Color.White)
-                            }
-                        },
-                        colors = transferFieldColors,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_LOCAL_INPUT)
-                    )
-                    Text(
-                        text = "Remote folder: $effectiveRemotePath",
-                        color = Color(0xFFE5E5E5),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Button(
-                        onClick = {
-                            if (scpUploadSourceUri.isNullOrBlank()) {
-                                scpTransferStatus = "Choose a local file first."
-                                return@Button
-                            }
-                            val remoteTarget = inferRemoteDestination(
-                                uploadLocalPath.ifBlank { "upload.bin" },
-                                effectiveRemotePath
-                            )
-                            scpTransferStatus = null
-                            onScpUpload(scpUploadSourceUri!!, remoteTarget)
-                            appendScpActivity(
-                                "Uploading ${uploadLocalPath.ifBlank { "selected file" }} -> $remoteTarget",
-                                clearFirst = true
-                            )
-                        },
-                        enabled = !scpTransferActive && !scpListingInProgress,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
-                    ) {
-                        Text("Upload file")
-                    }
-                } else {
-                    Text(
-                        text = scpSelectedFile?.let { "Selected remote file: $it" }
-                            ?: "Select a remote file to download.",
-                        color = Color(0xFFE5E5E5),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Button(
-                        onClick = {
-                            if (scpSelectedFile == null) {
-                                scpTransferStatus = "Select a file first."
-                                return@Button
-                            }
-                            val selectedRemote = scpSelectedFile ?: return@Button
-                            pendingScpDownloadRemotePath = selectedRemote
-                            scpDownloadDocumentPicker.launch(
-                                selectedRemote.substringAfterLast('/').ifBlank { "download.bin" }
-                            )
-                        },
-                        enabled = !scpTransferActive && !scpListingInProgress,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
-                    ) {
-                        Text("Choose save location & Download")
-                    }
-                }
-
                 AnimatedVisibility(
-                    visible = scpTransferStatus != null,
+                    visible = activeFileTransfer != null,
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
-                    val status = scpTransferStatus ?: return@AnimatedVisibility
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (
-                            status.startsWith("Download completed") || status.startsWith("Upload completed")
-                        ) {
-                            Color(0xFF1B5E20)
-                        } else {
-                            Color(0xFF5D4037)
-                        },
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = status,
-                            color = Color.White,
-                            modifier = Modifier.padding(10.dp),
-                            style = MaterialTheme.typography.bodySmall
+                    activeFileTransfer?.let { transfer ->
+                        FileTransferStatusStrip(
+                            transfer = transfer,
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_TRANSFER_STRIP)
                         )
                     }
                 }
+                AnimatedVisibility(
+                    visible = scpTransferStatus != null && activeFileTransfer == null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    scpTransferStatus?.let { status ->
+                        ScpStatusStrip(
+                            status = status,
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_STATUS_STRIP)
+                        )
+                    }
+                }
+            }
+
+            if (showScpRenameDialog && selectedEntry != null) {
+                AlertDialog(
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_DIALOG),
+                    onDismissRequest = { showScpRenameDialog = false },
+                    title = { Text("Rename") },
+                    text = {
+                        TextField(
+                            value = scpRenameValue,
+                            onValueChange = { scpRenameValue = it },
+                            singleLine = true,
+                            label = { Text("Name") },
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_INPUT)
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            enabled = scpRenameValue.trim().isNotBlank(),
+                            onClick = {
+                                val sourcePath = scpSelectedPath ?: return@TextButton
+                                showScpRenameDialog = false
+                                scpSelectedPath = null
+                                onManageRemotePath(
+                                    "move",
+                                    sourcePath,
+                                    resolveChildPath(parentPath(sourcePath), scpRenameValue.trim())
+                                )
+                            }
+                        ) {
+                            Text("Rename")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showScpRenameDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (showScpMoveDialog && selectedEntry != null) {
+                AlertDialog(
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_DIALOG),
+                    onDismissRequest = { showScpMoveDialog = false },
+                    title = { Text("Move") },
+                    text = {
+                        TextField(
+                            value = scpMoveDestination,
+                            onValueChange = { scpMoveDestination = it },
+                            singleLine = true,
+                            label = { Text("Destination path") },
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_INPUT)
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            enabled = scpMoveDestination.trim().isNotBlank(),
+                            onClick = {
+                                val sourcePath = scpSelectedPath ?: return@TextButton
+                                showScpMoveDialog = false
+                                scpSelectedPath = null
+                                onManageRemotePath("move", sourcePath, scpMoveDestination.trim())
+                            }
+                        ) {
+                            Text("Move")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showScpMoveDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (showScpNewFolderDialog) {
+                AlertDialog(
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG),
+                    onDismissRequest = { showScpNewFolderDialog = false },
+                    title = { Text("New folder") },
+                    text = {
+                        TextField(
+                            value = scpNewFolderValue,
+                            onValueChange = { scpNewFolderValue = it },
+                            singleLine = true,
+                            label = { Text("Folder name") },
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_INPUT)
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            enabled = scpNewFolderValue.trim().isNotBlank(),
+                            onClick = {
+                                showScpNewFolderDialog = false
+                                onManageRemotePath("mkdir", resolveChildPath(effectiveRemotePath, scpNewFolderValue.trim()), null)
+                            }
+                        ) {
+                            Text("Create")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showScpNewFolderDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (showScpDeleteDialog && selectedEntry != null) {
+                AlertDialog(
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DELETE_DIALOG),
+                    onDismissRequest = { showScpDeleteDialog = false },
+                    title = { Text("Delete") },
+                    text = {
+                        Text(
+                            if (deleteProtectedSelection) {
+                                "${selectedEntry.name} is a protected system folder and cannot be deleted."
+                            } else {
+                                "Delete ${selectedEntry.name}?"
+                            }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            enabled = !deleteProtectedSelection,
+                            onClick = {
+                                if (deleteProtectedSelection) return@TextButton
+                                val sourcePath = scpSelectedPath ?: return@TextButton
+                                showScpDeleteDialog = false
+                                scpSelectedPath = null
+                                onManageRemotePath("delete", sourcePath, null)
+                            }
+                        ) {
+                            Text("Delete", color = colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showScpDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
         } else if (showSftpCliSession && request != null) {
             val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
@@ -2639,7 +3013,7 @@ private fun FileTransferProgressCard(transfer: FileTransferProgress) {
         ) {
             if (progressFraction != null && transfer.hasStarted) {
                 LinearProgressIndicator(
-                    progress = progressFraction,
+                    progress = { progressFraction },
                     modifier = Modifier.fillMaxWidth(),
                     color = colorResource(id = R.color.peachy_orange),
                     trackColor = Color(0xFF2C2C2C)
@@ -2657,6 +3031,98 @@ private fun FileTransferProgressCard(transfer: FileTransferProgress) {
             )
         }
     }
+}
+
+@Composable
+private fun FileTransferStatusStrip(
+    transfer: FileTransferProgress,
+    modifier: Modifier = Modifier
+) {
+    val progressFraction = transfer.progressFraction
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "${transfer.actionLabel} ${transfer.fileName}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${transfer.sourceLabel} -> ${transfer.destinationLabel}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (progressFraction != null && transfer.hasStarted) {
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surface
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surface
+                )
+            }
+            Text(
+                text = transfer.progressSummary(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScpStatusStrip(
+    status: String,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = when {
+        status.startsWith("Download completed", ignoreCase = true) ||
+            status.startsWith("Upload completed", ignoreCase = true) ||
+            status.startsWith("Move completed", ignoreCase = true) ||
+            status.startsWith("Delete completed", ignoreCase = true) ||
+            status.startsWith("Folder created", ignoreCase = true) ->
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+
+        status.contains("failed", ignoreCase = true) ->
+            MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
+
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when {
+        status.contains("failed", ignoreCase = true) -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = containerColor,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            text = status,
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+private fun formatRemoteModifiedTime(timestampMillis: Long?): String {
+    if (timestampMillis == null || timestampMillis <= 0L) return "Unknown"
+    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+        .format(Date(timestampMillis))
 }
 
 @Composable
@@ -2985,6 +3451,68 @@ private fun tokenizeSftpCommand(input: String): List<String> {
     return tokenPattern.findAll(input).map { match ->
         match.groups[1]?.value ?: match.groups[2]?.value ?: match.value
     }.toList()
+}
+
+private fun buildRemoteBreadcrumbs(path: String): List<RemoteBreadcrumb> {
+    val normalized = path.trim().ifBlank { "." }
+    if (normalized == "." || normalized == "/") {
+        return listOf(RemoteBreadcrumb(normalized, normalized))
+    }
+
+    val cleaned = normalized.replace('\\', '/').trimEnd('/')
+    val isAbsolute = cleaned.startsWith("/")
+    val segments = cleaned.split('/').filter { it.isNotBlank() && it != "." }
+    val breadcrumbs = mutableListOf(
+        RemoteBreadcrumb(
+            label = if (isAbsolute) "/" else ".",
+            path = if (isAbsolute) "/" else "."
+        )
+    )
+    var current = if (isAbsolute) "/" else "."
+    segments.forEach { segment ->
+        current = when {
+            isAbsolute && current == "/" -> "/$segment"
+            current.endsWith("/") -> "$current$segment"
+            else -> "$current/$segment"
+        }
+        breadcrumbs += RemoteBreadcrumb(label = segment, path = current)
+    }
+    return breadcrumbs
+}
+
+private val PROTECTED_REMOTE_SYSTEM_DIRECTORIES = setOf(
+    "/",
+    "/bin",
+    "/boot",
+    "/dev",
+    "/etc",
+    "/home",
+    "/lib",
+    "/lib64",
+    "/lost+found",
+    "/media",
+    "/mnt",
+    "/opt",
+    "/proc",
+    "/root",
+    "/run",
+    "/sbin",
+    "/srv",
+    "/sys",
+    "/tmp",
+    "/usr",
+    "/var"
+)
+
+private fun isProtectedRemoteSystemDirectory(path: String?, isDirectory: Boolean): Boolean {
+    if (!isDirectory) return false
+    val normalized = path
+        ?.trim()
+        ?.replace('\\', '/')
+        ?.trimEnd('/')
+        ?.ifBlank { "/" }
+        ?: return false
+    return normalized in PROTECTED_REMOTE_SYSTEM_DIRECTORIES
 }
 
 private fun normalizeImeChunk(chunk: String): String {

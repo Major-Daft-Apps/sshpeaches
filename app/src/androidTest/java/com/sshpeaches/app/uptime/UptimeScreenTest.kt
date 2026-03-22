@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.uptime
 
 import android.Manifest
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -64,12 +65,11 @@ class UptimeScreenTest {
         composeRule.onNodeWithTag(UiTestTags.uptimeCard(host.id)).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.uptimeRemove(host.id)).performClick()
 
-        composeRule.waitUntil(5_000) {
-            runCatching {
-                composeRule.onNodeWithTag(UiTestTags.UPTIME_EMPTY_MONITORS).assertIsDisplayed()
-                true
-            }.getOrDefault(false)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.uptimeCard(host.id))
+                .fetchSemanticsNodes().isEmpty()
         }
+        composeRule.onNodeWithTag(UiTestTags.UPTIME_EMPTY_MONITORS).assertIsDisplayed()
     }
 
     @Test

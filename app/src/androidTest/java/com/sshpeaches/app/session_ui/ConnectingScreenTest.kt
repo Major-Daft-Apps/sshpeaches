@@ -6,8 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -288,7 +289,7 @@ class ConnectingScreenTest {
     }
 
     @Test
-    fun scpPanel_selectsRemoteFileAndValidatesDownloadAction() {
+    fun scpPanel_usesSelectionModelAndOverflowActions() {
         var listedPath: String? = null
         var downloadRequest: Pair<String, String?>? = null
 
@@ -338,24 +339,122 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PANEL).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("download")).assertIsNotEnabled()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("new_folder")).assertIsEnabled()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("new_folder")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
         composeRule.runOnIdle {
             check(downloadRequest == null) {
                 "SCP download callback should not run before a file is selected."
             }
         }
 
-        composeRule.onNodeWithText("📁 subdir", substring = true).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/subdir")).performClick()
         composeRule.runOnIdle {
-            check(listedPath == "/uploads/subdir") {
-                "SCP browser did not request directory listing for selected folder"
+            check(listedPath == null) {
+                "Selecting a folder row should not navigate without the folder open affordance."
             }
         }
 
-        composeRule.onNodeWithText("📄 existing.txt", substring = true).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/existing.txt")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("download")).assertIsEnabled()
         composeRule.runOnIdle {
             check(downloadRequest == null) {
-                "SCP download callback should not run before document picker returns"
+                "SCP download callback should remain idle until a document picker result is delivered"
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/uploads/subdir")).performClick()
+        composeRule.runOnIdle {
+            check(listedPath == "/uploads/subdir") {
+                "SCP browser did not request directory listing from the folder open affordance."
+            }
+        }
+    }
+
+    @Test
+    fun scpPanel_remoteActionsInvokeManagementCallbacks() {
+        val operations = mutableListOf<Triple<String, String, String?>>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SCP transfer ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/uploads",
+                        entries = listOf(
+                            SessionService.RemoteDirectoryEntry(
+                                name = "existing.txt",
+                                isDirectory = false,
+                                sizeBytes = 24
+                            )
+                        )
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { operation, source, destination ->
+                        operations += Triple(operation, source, destination)
+                    },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/existing.txt")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("rename")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_RENAME_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_RENAME_INPUT).performTextReplacement("renamed.txt")
+        composeRule.onAllNodesWithText("Rename")[1].performClick()
+
+        composeRule.runOnIdle {
+            check(
+                operations.firstOrNull() == Triple(
+                    "move",
+                    "/uploads/existing.txt",
+                    "/uploads/renamed.txt"
+                )
+            ) {
+                "Rename action did not map to the expected move operation."
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("new_folder")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_INPUT).performTextInput("logs")
+        composeRule.onNodeWithText("Create").performClick()
+
+        composeRule.runOnIdle {
+            check(
+                operations.lastOrNull() == Triple(
+                    "mkdir",
+                    "/uploads/logs",
+                    null
+                )
+            ) {
+                "New folder action did not request mkdir for the current directory."
             }
         }
     }
@@ -413,7 +512,7 @@ class ConnectingScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("📁 docs", substring = true).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/home/tester/docs")).performClick()
         composeRule.runOnIdle {
             check(listedPaths.lastOrNull() == "/home/tester/docs") {
                 "SCP browser did not navigate into the selected subdirectory"

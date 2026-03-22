@@ -38,6 +38,8 @@ import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRootActions
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRootRuntime
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
@@ -464,37 +466,38 @@ class MainActivity : FragmentActivity() {
                 SSHPeachesRoot(
                     uiState = uiState,
                     biometricAvailable = biometricAvailable,
-                    onSortModeChange = viewModel::setSortMode,
-                    onThemeModeChange = viewModel::setThemeMode,
-                    onBackgroundModeChange = viewModel::setBackgroundSessions,
-                    onBackgroundSessionTimeoutChange = viewModel::setBackgroundSessionTimeout,
-                    onBiometricToggle = viewModel::setBiometricLock,
-                    onLockTimeoutChange = viewModel::setLockTimeout,
-                    onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
-                    onSnippetRunTimeoutSecondsChange = viewModel::setSnippetRunTimeoutSeconds,
-                    onTerminalEmulationChange = viewModel::setTerminalEmulation,
-                    onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
-                    onTerminalBellModeChange = viewModel::setTerminalBellMode,
-                    onTerminalVolumeButtonsAdjustFontSizeChange = viewModel::setTerminalVolumeButtonsAdjustFontSize,
-                    onTerminalMarginPxChange = viewModel::setTerminalMarginPx,
-                    onMoshServerCommandChange = viewModel::setMoshServerCommand,
-                    onCrashReportsToggle = viewModel::setCrashReports,
-                    onAnalyticsToggle = viewModel::setAnalytics,
-                    onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
-                    onIncludeSecretsInQrToggle = viewModel::setIncludeSecretsInQr,
-                    onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
-                    onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
-                    onAutoTrustHostKeyToggle = viewModel::setAutoTrustHostKey,
-                    onUsageReportsToggle = viewModel::setUsageReports,
-                    onDefaultTerminalProfileChange = viewModel::setDefaultTerminalProfile,
-                    onSaveTerminalProfile = viewModel::saveTerminalProfile,
-                    onDeleteTerminalProfile = viewModel::deleteTerminalProfile,
-                    onRestoreDefaultSettings = viewModel::restoreDefaultSettings,
-                    onSetPin = viewModel::setPin,
-                    onClearPin = viewModel::clearPin,
-                    onLockApp = viewModel::lockApp,
-                    onUnlockWithPin = viewModel::unlockWithPin,
-                    onBiometricUnlock = {
+                    actions = SSHPeachesRootActions(
+                        onSortModeChange = viewModel::setSortMode,
+                        onThemeModeChange = viewModel::setThemeMode,
+                        onBackgroundModeChange = viewModel::setBackgroundSessions,
+                        onBackgroundSessionTimeoutChange = viewModel::setBackgroundSessionTimeout,
+                        onBiometricToggle = viewModel::setBiometricLock,
+                        onLockTimeoutChange = viewModel::setLockTimeout,
+                        onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
+                        onSnippetRunTimeoutSecondsChange = viewModel::setSnippetRunTimeoutSeconds,
+                        onTerminalEmulationChange = viewModel::setTerminalEmulation,
+                        onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
+                        onTerminalBellModeChange = viewModel::setTerminalBellMode,
+                        onTerminalVolumeButtonsAdjustFontSizeChange = viewModel::setTerminalVolumeButtonsAdjustFontSize,
+                        onTerminalMarginPxChange = viewModel::setTerminalMarginPx,
+                        onMoshServerCommandChange = viewModel::setMoshServerCommand,
+                        onCrashReportsToggle = viewModel::setCrashReports,
+                        onAnalyticsToggle = viewModel::setAnalytics,
+                        onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
+                        onIncludeSecretsInQrToggle = viewModel::setIncludeSecretsInQr,
+                        onAutoStartForwardsToggle = viewModel::setAutoStartForwards,
+                        onHostKeyPromptToggle = viewModel::setHostKeyPrompt,
+                        onAutoTrustHostKeyToggle = viewModel::setAutoTrustHostKey,
+                        onUsageReportsToggle = viewModel::setUsageReports,
+                        onDefaultTerminalProfileChange = viewModel::setDefaultTerminalProfile,
+                        onSaveTerminalProfile = viewModel::saveTerminalProfile,
+                        onDeleteTerminalProfile = viewModel::deleteTerminalProfile,
+                        onRestoreDefaultSettings = viewModel::restoreDefaultSettings,
+                        onSetPin = viewModel::setPin,
+                        onClearPin = viewModel::clearPin,
+                        onLockApp = viewModel::lockApp,
+                        onUnlockWithPin = viewModel::unlockWithPin,
+                        onBiometricUnlock = {
                         UiDebugLog.action("uiBiometricUnlock", "promptReady=${biometricPrompt != null && biometricPromptInfo != null}")
                         val prompt = biometricPrompt
                         val info = biometricPromptInfo
@@ -504,8 +507,8 @@ class MainActivity : FragmentActivity() {
                         } else {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
                         }
-                    },
-                    onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
+                        },
+                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
                         viewModel.addHost(
                             name,
                             host,
@@ -524,8 +527,8 @@ class MainActivity : FragmentActivity() {
                             password,
                             suppliedId
                         )
-                    },
-                    onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password ->
+                        },
+                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -544,34 +547,34 @@ class MainActivity : FragmentActivity() {
                             terminalProfileId,
                             password
                         )
-                    },
-                    onHostDelete = viewModel::deleteHost,
-                    onAddHostToUptime = viewModel::addHostToUptime,
-                    onUpdateUptimeConfig = viewModel::updateUptimeConfig,
-                    onSetUptimeEnabled = viewModel::setUptimeEnabled,
-                    onRemoveHostFromUptime = viewModel::removeHostFromUptime,
-                    onRefreshUptime = viewModel::refreshUptime,
-                    onImportHost = viewModel::importHost,
-                    onHostOsMetadataImported = viewModel::updateHostOsMetadata,
-                    onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
-                    onPortForwardAdd = viewModel::addPortForward,
-                    onImportPortForward = viewModel::importPortForward,
-                    onPortForwardUpdate = viewModel::updatePortForward,
-                    onPortForwardDelete = viewModel::deletePortForward,
-                    onStartSession = startSession,
-                    onStopSession = stopSession,
-                    onIdentityAdd = viewModel::addIdentity,
-                    onImportIdentity = viewModel::importIdentity,
-                    onIdentityUpdate = viewModel::updateIdentity,
-                    onIdentityDelete = viewModel::deleteIdentity,
-                    onImportHostPasswordPayload = viewModel::importHostPasswordPayload,
-                    onImportIdentityKey = viewModel::importIdentityKeyFromPayload,
-                    onImportIdentityKeyPlain = viewModel::importIdentityKeyPlain,
-                    onStoreIdentityPublicKey = viewModel::storeIdentityPublicKey,
-                    onImportIdentityPublicKey = viewModel::importIdentityPublicKey,
-                    onStoreIdentityKeyPassphrase = viewModel::storeIdentityKeyPassphrase,
-                    onImportIdentityKeyPassphrasePayload = viewModel::importIdentityKeyPassphrasePayload,
-                    onCopyIdentityKeyToHost = { identityId, hostId, hostPassword, identityPassphrase ->
+                        },
+                        onHostDelete = viewModel::deleteHost,
+                        onAddHostToUptime = viewModel::addHostToUptime,
+                        onUpdateUptimeConfig = viewModel::updateUptimeConfig,
+                        onSetUptimeEnabled = viewModel::setUptimeEnabled,
+                        onRemoveHostFromUptime = viewModel::removeHostFromUptime,
+                        onRefreshUptime = viewModel::refreshUptime,
+                        onImportHost = viewModel::importHost,
+                        onHostOsMetadataImported = viewModel::updateHostOsMetadata,
+                        onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
+                        onPortForwardAdd = viewModel::addPortForward,
+                        onImportPortForward = viewModel::importPortForward,
+                        onPortForwardUpdate = viewModel::updatePortForward,
+                        onPortForwardDelete = viewModel::deletePortForward,
+                        onStartSession = startSession,
+                        onStopSession = stopSession,
+                        onIdentityAdd = viewModel::addIdentity,
+                        onImportIdentity = viewModel::importIdentity,
+                        onIdentityUpdate = viewModel::updateIdentity,
+                        onIdentityDelete = viewModel::deleteIdentity,
+                        onImportHostPasswordPayload = viewModel::importHostPasswordPayload,
+                        onImportIdentityKey = viewModel::importIdentityKeyFromPayload,
+                        onImportIdentityKeyPlain = viewModel::importIdentityKeyPlain,
+                        onStoreIdentityPublicKey = viewModel::storeIdentityPublicKey,
+                        onImportIdentityPublicKey = viewModel::importIdentityPublicKey,
+                        onStoreIdentityKeyPassphrase = viewModel::storeIdentityKeyPassphrase,
+                        onImportIdentityKeyPassphrasePayload = viewModel::importIdentityKeyPassphrasePayload,
+                        onCopyIdentityKeyToHost = { identityId, hostId, hostPassword, identityPassphrase ->
                         val host = uiState.hosts.firstOrNull { it.id == hostId }
                         if (host == null) {
                             false
@@ -584,61 +587,64 @@ class MainActivity : FragmentActivity() {
                                 identityPassphraseOverride = identityPassphrase
                             ).success
                         }
-                    },
-                    onRemoveIdentityKey = viewModel::removeIdentityKey,
-                    onKeyboardSlotChange = viewModel::updateKeyboardSlot,
-                    onImportKeyboardLayout = viewModel::importKeyboardLayout,
-                    onKeyboardReset = viewModel::resetKeyboardLayout,
-                    onImportTerminalProfiles = viewModel::importTerminalProfiles,
-                    onSnippetAdd = viewModel::addSnippet,
-                    onImportSnippet = viewModel::importSnippet,
-                    onSnippetUpdate = viewModel::updateSnippet,
-                    onSnippetDelete = viewModel::deleteSnippet,
-                    onToggleFavorite = viewModel::toggleFavorite,
-                    onMarkHostUsed = viewModel::markHostUsed,
-                    onMarkIdentityUsed = viewModel::markIdentityUsed,
-                    onMarkPortForwardUsed = viewModel::markPortForwardUsed,
-                    onMarkSnippetUsed = viewModel::markSnippetUsed,
-                    onSendSessionShortcut = sendSessionShortcut,
-                    onSendShellBytes = sendShellBytes,
-                    onResizeShell = resizeShell,
-                    onListSftpDirectory = listSftpDirectory,
-                    onSftpDownloadFile = sftpDownloadFile,
-                    onSftpUploadFile = sftpUploadFile,
-                    onManageRemotePath = manageRemotePath,
-                    onScpDownloadFile = scpDownloadFile,
-                    onScpUploadFile = scpUploadFile,
-                    resolveTerminalEmulator = resolveTerminalEmulator,
-                    sessions = sessionSnapshots,
-                    shellOutputs = shellOutputs,
-                    remoteDirectories = remoteDirectories,
-                    fileTransferProgresses = fileTransferProgress,
-                    hostKeyPrompts = hostKeyPrompts,
-                    passwordPrompts = passwordPrompts,
-                    requestedOpenSessionId = requestedOpenSessionHostId.value,
-                    requestedOpenSessionFileTransferEntryMode = requestedOpenSessionFileTransferEntryMode.value,
-                    onOpenSessionRequestHandled = {
+                        },
+                        onRemoveIdentityKey = viewModel::removeIdentityKey,
+                        onKeyboardSlotChange = viewModel::updateKeyboardSlot,
+                        onImportKeyboardLayout = viewModel::importKeyboardLayout,
+                        onKeyboardReset = viewModel::resetKeyboardLayout,
+                        onImportTerminalProfiles = viewModel::importTerminalProfiles,
+                        onSnippetAdd = viewModel::addSnippet,
+                        onImportSnippet = viewModel::importSnippet,
+                        onSnippetUpdate = viewModel::updateSnippet,
+                        onSnippetDelete = viewModel::deleteSnippet,
+                        onToggleFavorite = viewModel::toggleFavorite,
+                        onMarkHostUsed = viewModel::markHostUsed,
+                        onMarkIdentityUsed = viewModel::markIdentityUsed,
+                        onMarkPortForwardUsed = viewModel::markPortForwardUsed,
+                        onMarkSnippetUsed = viewModel::markSnippetUsed,
+                        onSendSessionShortcut = sendSessionShortcut,
+                        onSendShellBytes = sendShellBytes,
+                        onResizeShell = resizeShell,
+                        onListSftpDirectory = listSftpDirectory,
+                        onSftpDownloadFile = sftpDownloadFile,
+                        onSftpUploadFile = sftpUploadFile,
+                        onManageRemotePath = manageRemotePath,
+                        onScpDownloadFile = scpDownloadFile,
+                        onScpUploadFile = scpUploadFile,
+                        onOpenSessionRequestHandled = {
                         requestedOpenSessionHostId.value = null
                         requestedOpenSessionFileTransferEntryMode.value = null
-                    },
-                    onRespondToHostKeyPrompt = { promptId, trust ->
+                        },
+                        onRespondToHostKeyPrompt = { promptId, trust ->
                         sessionService?.respondToHostKeyPrompt(promptId, trust)
-                    },
-                    onRespondToPasswordPrompt = { promptId, password, savePassword ->
+                        },
+                        onRespondToPasswordPrompt = { promptId, password, savePassword ->
                         sessionService?.respondToPasswordPrompt(promptId, password, savePassword)
-                    },
-                    corePermissions = corePermissions,
-                    onRequestCorePermissions = {
+                        },
+                        onRequestCorePermissions = {
                         requestNotificationPermissionIfNeeded()
                         refreshCorePermissionStatuses()
-                    },
-                    onOpenAppPermissionSettings = {
+                        },
+                        onOpenAppPermissionSettings = {
                         openAppPermissionSettings()
-                    },
-                    requestedStartupRoute = requestedStartupRoute.value,
-                    onStartupRouteHandled = {
+                        },
+                        onStartupRouteHandled = {
                         requestedStartupRoute.value = null
-                    }
+                        }
+                    ),
+                    runtime = SSHPeachesRootRuntime(
+                        resolveTerminalEmulator = resolveTerminalEmulator,
+                        sessions = sessionSnapshots,
+                        shellOutputs = shellOutputs,
+                        remoteDirectories = remoteDirectories,
+                        fileTransferProgresses = fileTransferProgress,
+                        hostKeyPrompts = hostKeyPrompts,
+                        passwordPrompts = passwordPrompts,
+                        requestedOpenSessionId = requestedOpenSessionHostId.value,
+                        requestedOpenSessionFileTransferEntryMode = requestedOpenSessionFileTransferEntryMode.value,
+                        corePermissions = corePermissions,
+                        requestedStartupRoute = requestedStartupRoute.value
+                    )
                 )
             }
         }

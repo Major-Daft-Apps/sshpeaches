@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -49,6 +50,7 @@ class AccessibilitySmokeTest {
             .assertIsDisplayed()
             .assertHasClickAction()
         composeRule.onNodeWithTag(UiTestTags.drawerItem(Routes.HELP), useUnmergedTree = true)
+            .performScrollTo()
             .assertIsDisplayed()
             .assertHasClickAction()
     }

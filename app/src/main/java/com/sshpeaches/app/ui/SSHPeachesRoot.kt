@@ -187,113 +187,220 @@ import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class SSHPeachesRootActions(
+    val onSortModeChange: (SortMode) -> Unit,
+    val onThemeModeChange: (ThemeMode) -> Unit,
+    val onBackgroundModeChange: (Boolean) -> Unit,
+    val onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
+    val onBiometricToggle: (Boolean) -> Unit,
+    val onLockTimeoutChange: (LockTimeout) -> Unit,
+    val onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    val onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
+    val onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
+    val onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
+    val onTerminalBellModeChange: (TerminalBellMode) -> Unit,
+    val onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
+    val onTerminalMarginPxChange: (Int) -> Unit,
+    val onMoshServerCommandChange: (String) -> Unit,
+    val onCrashReportsToggle: (Boolean) -> Unit,
+    val onAnalyticsToggle: (Boolean) -> Unit,
+    val onDiagnosticsToggle: (Boolean) -> Unit,
+    val onIncludeSecretsInQrToggle: (Boolean) -> Unit,
+    val onAutoStartForwardsToggle: (Boolean) -> Unit,
+    val onHostKeyPromptToggle: (Boolean) -> Unit,
+    val onAutoTrustHostKeyToggle: (Boolean) -> Unit,
+    val onUsageReportsToggle: (Boolean) -> Unit,
+    val onDefaultTerminalProfileChange: (String) -> Unit,
+    val onSaveTerminalProfile: (TerminalProfile) -> Unit,
+    val onDeleteTerminalProfile: (String) -> Unit,
+    val onRestoreDefaultSettings: () -> Unit,
+    val onSetPin: (String) -> Unit,
+    val onClearPin: () -> Unit,
+    val onLockApp: () -> Unit,
+    val onUnlockWithPin: (String) -> Boolean,
+    val onBiometricUnlock: () -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    val onHostDelete: (String) -> Unit,
+    val onAddHostToUptime: (String) -> Unit,
+    val onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
+    val onSetUptimeEnabled: (String, Boolean) -> Unit,
+    val onRemoveHostFromUptime: (String) -> Unit,
+    val onRefreshUptime: (String?) -> Unit,
+    val onImportHost: (HostConnection) -> Unit,
+    val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
+    val onHostInfoCommandsChange: (String, List<String>) -> Unit,
+    val onPortForwardAdd: (String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    val onImportPortForward: (PortForward) -> Unit,
+    val onPortForwardUpdate: (String, String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
+    val onPortForwardDelete: (String) -> Unit,
+    val onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
+    val onStopSession: (String) -> Unit,
+    val onIdentityAdd: (String, String, String?, String?, String?) -> Unit,
+    val onImportIdentity: (Identity) -> Unit,
+    val onIdentityUpdate: (String, String, String, String?, String?) -> Unit,
+    val onIdentityDelete: (String) -> Unit,
+    val onImportHostPasswordPayload: (String, String, String) -> Boolean,
+    val onImportIdentityKey: (String, String, String) -> Boolean,
+    val onImportIdentityKeyPlain: (String, String) -> Boolean,
+    val onStoreIdentityPublicKey: (String, String) -> Boolean,
+    val onImportIdentityPublicKey: (String, String) -> Boolean,
+    val onStoreIdentityKeyPassphrase: (String, String?) -> Unit,
+    val onImportIdentityKeyPassphrasePayload: (String, String, String) -> Boolean,
+    val onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
+    val onRemoveIdentityKey: (String) -> Unit,
+    val onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
+    val onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
+    val onKeyboardReset: () -> Unit,
+    val onImportTerminalProfiles: (List<TerminalProfile>, String?) -> Unit,
+    val onSnippetAdd: (String, String?, String, String) -> Unit,
+    val onImportSnippet: (Snippet) -> Unit,
+    val onSnippetUpdate: (String, String, String?, String, String) -> Unit,
+    val onSnippetDelete: (String) -> Unit,
+    val onToggleFavorite: (String) -> Unit,
+    val onMarkHostUsed: (String) -> Unit,
+    val onMarkIdentityUsed: (String) -> Unit,
+    val onMarkPortForwardUsed: (String) -> Unit,
+    val onMarkSnippetUsed: (String) -> Unit,
+    val onSendSessionShortcut: (String, String) -> Unit,
+    val onSendShellBytes: (String, ByteArray) -> Unit,
+    val onResizeShell: (String, Int, Int) -> Unit,
+    val onListSftpDirectory: (String, String) -> Unit,
+    val onSftpDownloadFile: (String, String, String?) -> Unit,
+    val onSftpUploadFile: (String, String, String) -> Unit,
+    val onManageRemotePath: (String, String, String, String?) -> Unit,
+    val onScpDownloadFile: (String, String, String?) -> Unit,
+    val onScpUploadFile: (String, String, String) -> Unit,
+    val onOpenSessionRequestHandled: () -> Unit,
+    val onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
+    val onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
+    val onRequestCorePermissions: () -> Unit,
+    val onOpenAppPermissionSettings: () -> Unit,
+    val onStartupRouteHandled: () -> Unit
+)
+
+data class SSHPeachesRootRuntime(
+    val resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
+    val sessions: List<SessionSnapshot>,
+    val shellOutputs: Map<String, String>,
+    val remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
+    val fileTransferProgresses: Map<String, FileTransferProgress>,
+    val hostKeyPrompts: List<HostKeyPrompt>,
+    val passwordPrompts: List<PasswordPrompt>,
+    val requestedOpenSessionId: String?,
+    val requestedOpenSessionFileTransferEntryMode: FileTransferEntryMode? = null,
+    val corePermissions: List<CorePermissionStatus>,
+    val requestedStartupRoute: String? = null
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SSHPeachesRoot(
     uiState: AppUiState,
     biometricAvailable: Boolean,
-    onSortModeChange: (SortMode) -> Unit,
-    onThemeModeChange: (ThemeMode) -> Unit,
-    onBackgroundModeChange: (Boolean) -> Unit,
-    onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
-    onBiometricToggle: (Boolean) -> Unit,
-    onLockTimeoutChange: (LockTimeout) -> Unit,
-    onCustomLockTimeoutMinutesChange: (Int) -> Unit,
-    onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
-    onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
-    onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
-    onTerminalBellModeChange: (TerminalBellMode) -> Unit,
-    onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
-    onTerminalMarginPxChange: (Int) -> Unit,
-    onMoshServerCommandChange: (String) -> Unit,
-    onCrashReportsToggle: (Boolean) -> Unit,
-    onAnalyticsToggle: (Boolean) -> Unit,
-    onDiagnosticsToggle: (Boolean) -> Unit,
-    onIncludeSecretsInQrToggle: (Boolean) -> Unit,
-    onAutoStartForwardsToggle: (Boolean) -> Unit,
-    onHostKeyPromptToggle: (Boolean) -> Unit,
-    onAutoTrustHostKeyToggle: (Boolean) -> Unit,
-    onUsageReportsToggle: (Boolean) -> Unit,
-    onDefaultTerminalProfileChange: (String) -> Unit,
-    onSaveTerminalProfile: (TerminalProfile) -> Unit,
-    onDeleteTerminalProfile: (String) -> Unit,
-    onRestoreDefaultSettings: () -> Unit,
-    onSetPin: (String) -> Unit,
-    onClearPin: () -> Unit,
-    onLockApp: () -> Unit,
-    onUnlockWithPin: (String) -> Boolean,
-    onBiometricUnlock: () -> Unit,
-    onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
-    onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
-    onHostDelete: (String) -> Unit,
-    onAddHostToUptime: (String) -> Unit,
-    onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
-    onSetUptimeEnabled: (String, Boolean) -> Unit,
-    onRemoveHostFromUptime: (String) -> Unit,
-    onRefreshUptime: (String?) -> Unit,
-    onImportHost: (HostConnection) -> Unit,
-    @Suppress("UNUSED_PARAMETER")
-    onHostOsMetadataImported: (String, OsMetadata) -> Unit,
-    onHostInfoCommandsChange: (String, List<String>) -> Unit,
-    onPortForwardAdd: (String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
-    onImportPortForward: (PortForward) -> Unit,
-    onPortForwardUpdate: (String, String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
-    onPortForwardDelete: (String) -> Unit,
-    onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
-    onStopSession: (String) -> Unit,
-    onIdentityAdd: (String, String, String?, String?, String?) -> Unit,
-    onImportIdentity: (Identity) -> Unit,
-    onIdentityUpdate: (String, String, String, String?, String?) -> Unit,
-    onIdentityDelete: (String) -> Unit,
-    onImportHostPasswordPayload: (String, String, String) -> Boolean,
-    onImportIdentityKey: (String, String, String) -> Boolean,
-    onImportIdentityKeyPlain: (String, String) -> Boolean,
-    onStoreIdentityPublicKey: (String, String) -> Boolean,
-    onImportIdentityPublicKey: (String, String) -> Boolean,
-    onStoreIdentityKeyPassphrase: (String, String?) -> Unit,
-    onImportIdentityKeyPassphrasePayload: (String, String, String) -> Boolean,
-    onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
-    onRemoveIdentityKey: (String) -> Unit,
-    onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
-    onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
-    onKeyboardReset: () -> Unit,
-    onImportTerminalProfiles: (List<TerminalProfile>, String?) -> Unit,
-    onSnippetAdd: (String, String?, String, String) -> Unit,
-    onImportSnippet: (Snippet) -> Unit,
-    onSnippetUpdate: (String, String, String?, String, String) -> Unit,
-    onSnippetDelete: (String) -> Unit,
-    onToggleFavorite: (String) -> Unit,
-    onMarkHostUsed: (String) -> Unit,
-    onMarkIdentityUsed: (String) -> Unit,
-    onMarkPortForwardUsed: (String) -> Unit,
-    onMarkSnippetUsed: (String) -> Unit,
-    onSendSessionShortcut: (String, String) -> Unit,
-    onSendShellBytes: (String, ByteArray) -> Unit,
-    onResizeShell: (String, Int, Int) -> Unit,
-    onListSftpDirectory: (String, String) -> Unit,
-    onSftpDownloadFile: (String, String, String?) -> Unit,
-    onSftpUploadFile: (String, String, String) -> Unit,
-    onManageRemotePath: (String, String, String, String?) -> Unit,
-    onScpDownloadFile: (String, String, String?) -> Unit,
-    onScpUploadFile: (String, String, String) -> Unit,
-    resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
-    sessions: List<SessionSnapshot>,
-    shellOutputs: Map<String, String>,
-    remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
-    fileTransferProgresses: Map<String, FileTransferProgress>,
-    hostKeyPrompts: List<HostKeyPrompt>,
-    passwordPrompts: List<PasswordPrompt>,
-    requestedOpenSessionId: String?,
-    requestedOpenSessionFileTransferEntryMode: FileTransferEntryMode? = null,
-    onOpenSessionRequestHandled: () -> Unit,
-    onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
-    onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
-    corePermissions: List<CorePermissionStatus>,
-    onRequestCorePermissions: () -> Unit,
-    onOpenAppPermissionSettings: () -> Unit,
-    requestedStartupRoute: String? = null,
-    onStartupRouteHandled: () -> Unit = {}
+    actions: SSHPeachesRootActions,
+    runtime: SSHPeachesRootRuntime
 ) {
+    val onSortModeChange = actions.onSortModeChange
+    val onThemeModeChange = actions.onThemeModeChange
+    val onBackgroundModeChange = actions.onBackgroundModeChange
+    val onBackgroundSessionTimeoutChange = actions.onBackgroundSessionTimeoutChange
+    val onBiometricToggle = actions.onBiometricToggle
+    val onLockTimeoutChange = actions.onLockTimeoutChange
+    val onCustomLockTimeoutMinutesChange = actions.onCustomLockTimeoutMinutesChange
+    val onSnippetRunTimeoutSecondsChange = actions.onSnippetRunTimeoutSecondsChange
+    val onTerminalEmulationChange = actions.onTerminalEmulationChange
+    val onTerminalSelectionModeChange = actions.onTerminalSelectionModeChange
+    val onTerminalBellModeChange = actions.onTerminalBellModeChange
+    val onTerminalVolumeButtonsAdjustFontSizeChange = actions.onTerminalVolumeButtonsAdjustFontSizeChange
+    val onTerminalMarginPxChange = actions.onTerminalMarginPxChange
+    val onMoshServerCommandChange = actions.onMoshServerCommandChange
+    val onCrashReportsToggle = actions.onCrashReportsToggle
+    val onAnalyticsToggle = actions.onAnalyticsToggle
+    val onDiagnosticsToggle = actions.onDiagnosticsToggle
+    val onIncludeSecretsInQrToggle = actions.onIncludeSecretsInQrToggle
+    val onAutoStartForwardsToggle = actions.onAutoStartForwardsToggle
+    val onHostKeyPromptToggle = actions.onHostKeyPromptToggle
+    val onAutoTrustHostKeyToggle = actions.onAutoTrustHostKeyToggle
+    val onUsageReportsToggle = actions.onUsageReportsToggle
+    val onDefaultTerminalProfileChange = actions.onDefaultTerminalProfileChange
+    val onSaveTerminalProfile = actions.onSaveTerminalProfile
+    val onDeleteTerminalProfile = actions.onDeleteTerminalProfile
+    val onRestoreDefaultSettings = actions.onRestoreDefaultSettings
+    val onSetPin = actions.onSetPin
+    val onClearPin = actions.onClearPin
+    val onLockApp = actions.onLockApp
+    val onUnlockWithPin = actions.onUnlockWithPin
+    val onBiometricUnlock = actions.onBiometricUnlock
+    val onHostAdd = actions.onHostAdd
+    val onHostUpdate = actions.onHostUpdate
+    val onHostDelete = actions.onHostDelete
+    val onAddHostToUptime = actions.onAddHostToUptime
+    val onUpdateUptimeConfig = actions.onUpdateUptimeConfig
+    val onSetUptimeEnabled = actions.onSetUptimeEnabled
+    val onRemoveHostFromUptime = actions.onRemoveHostFromUptime
+    val onRefreshUptime = actions.onRefreshUptime
+    val onImportHost = actions.onImportHost
+    val onHostOsMetadataImported = actions.onHostOsMetadataImported
+    val onHostInfoCommandsChange = actions.onHostInfoCommandsChange
+    val onPortForwardAdd = actions.onPortForwardAdd
+    val onImportPortForward = actions.onImportPortForward
+    val onPortForwardUpdate = actions.onPortForwardUpdate
+    val onPortForwardDelete = actions.onPortForwardDelete
+    val onStartSession = actions.onStartSession
+    val onStopSession = actions.onStopSession
+    val onIdentityAdd = actions.onIdentityAdd
+    val onImportIdentity = actions.onImportIdentity
+    val onIdentityUpdate = actions.onIdentityUpdate
+    val onIdentityDelete = actions.onIdentityDelete
+    val onImportHostPasswordPayload = actions.onImportHostPasswordPayload
+    val onImportIdentityKey = actions.onImportIdentityKey
+    val onImportIdentityKeyPlain = actions.onImportIdentityKeyPlain
+    val onStoreIdentityPublicKey = actions.onStoreIdentityPublicKey
+    val onImportIdentityPublicKey = actions.onImportIdentityPublicKey
+    val onStoreIdentityKeyPassphrase = actions.onStoreIdentityKeyPassphrase
+    val onImportIdentityKeyPassphrasePayload = actions.onImportIdentityKeyPassphrasePayload
+    val onCopyIdentityKeyToHost = actions.onCopyIdentityKeyToHost
+    val onRemoveIdentityKey = actions.onRemoveIdentityKey
+    val onKeyboardSlotChange = actions.onKeyboardSlotChange
+    val onImportKeyboardLayout = actions.onImportKeyboardLayout
+    val onKeyboardReset = actions.onKeyboardReset
+    val onImportTerminalProfiles = actions.onImportTerminalProfiles
+    val onSnippetAdd = actions.onSnippetAdd
+    val onImportSnippet = actions.onImportSnippet
+    val onSnippetUpdate = actions.onSnippetUpdate
+    val onSnippetDelete = actions.onSnippetDelete
+    val onToggleFavorite = actions.onToggleFavorite
+    val onMarkHostUsed = actions.onMarkHostUsed
+    val onMarkIdentityUsed = actions.onMarkIdentityUsed
+    val onMarkPortForwardUsed = actions.onMarkPortForwardUsed
+    val onMarkSnippetUsed = actions.onMarkSnippetUsed
+    val onSendSessionShortcut = actions.onSendSessionShortcut
+    val onSendShellBytes = actions.onSendShellBytes
+    val onResizeShell = actions.onResizeShell
+    val onListSftpDirectory = actions.onListSftpDirectory
+    val onSftpDownloadFile = actions.onSftpDownloadFile
+    val onSftpUploadFile = actions.onSftpUploadFile
+    val onManageRemotePath = actions.onManageRemotePath
+    val onScpDownloadFile = actions.onScpDownloadFile
+    val onScpUploadFile = actions.onScpUploadFile
+    val onOpenSessionRequestHandled = actions.onOpenSessionRequestHandled
+    val onRespondToHostKeyPrompt = actions.onRespondToHostKeyPrompt
+    val onRespondToPasswordPrompt = actions.onRespondToPasswordPrompt
+    val onRequestCorePermissions = actions.onRequestCorePermissions
+    val onOpenAppPermissionSettings = actions.onOpenAppPermissionSettings
+    val onStartupRouteHandled = actions.onStartupRouteHandled
+    val resolveTerminalEmulator = runtime.resolveTerminalEmulator
+    val sessions = runtime.sessions
+    val shellOutputs = runtime.shellOutputs
+    val remoteDirectories = runtime.remoteDirectories
+    val fileTransferProgresses = runtime.fileTransferProgresses
+    val hostKeyPrompts = runtime.hostKeyPrompts
+    val passwordPrompts = runtime.passwordPrompts
+    val requestedOpenSessionId = runtime.requestedOpenSessionId
+    val requestedOpenSessionFileTransferEntryMode = runtime.requestedOpenSessionFileTransferEntryMode
+    val corePermissions = runtime.corePermissions
+    val requestedStartupRoute = runtime.requestedStartupRoute
     val navController = rememberNavController()
     val initialStartDestination = remember {
         requestedStartupRoute

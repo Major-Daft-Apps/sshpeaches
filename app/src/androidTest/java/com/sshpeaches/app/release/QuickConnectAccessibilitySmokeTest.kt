@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.release
 
-import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -11,6 +10,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest
 import com.majordaftapps.sshpeaches.app.ui.QuickConnectSheet
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.testing.ReleaseTestHostActivity
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
 import org.junit.Rule
@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 class QuickConnectAccessibilitySmokeTest {
 
     @get:Rule
-    val composeRule = createAndroidComposeRule<ComponentActivity>()
+    val composeRule = createAndroidComposeRule<ReleaseTestHostActivity>()
 
     @Test
     fun quickConnectControlsRemainFocusableAndClickable() {
