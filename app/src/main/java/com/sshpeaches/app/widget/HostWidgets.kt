@@ -36,39 +36,17 @@ internal object HostWidgets {
         val sessionsComponent = ComponentName(context, SessionsWidgetProvider::class.java)
         val quickIds = manager.getAppWidgetIds(quickComponent)
         val sessionsIds = manager.getAppWidgetIds(sessionsComponent)
+        val hosts = loadHosts(context)
+        val openSessions = WidgetSessionStore.read(context)
         if (quickIds.isNotEmpty()) {
-            updateWidgets(
-                context = context,
-                manager = manager,
-                appWidgetIds = quickIds,
-                includeOpenSessions = false
-            )
+            quickIds.forEach { id ->
+                manager.updateAppWidget(id, buildQuickWidgetRemoteViews(context, hosts, openSessions))
+            }
         }
         if (sessionsIds.isNotEmpty()) {
-            updateWidgets(
-                context = context,
-                manager = manager,
-                appWidgetIds = sessionsIds,
-                includeOpenSessions = true
-            )
-        }
-    }
-
-    private fun updateWidgets(
-        context: Context,
-        manager: AppWidgetManager,
-        appWidgetIds: IntArray,
-        includeOpenSessions: Boolean
-    ) {
-        val hosts = loadHosts(context)
-        val openSessions = if (includeOpenSessions) WidgetSessionStore.read(context) else emptyList()
-        appWidgetIds.forEach { id ->
-            val views = if (includeOpenSessions) {
-                buildSessionsWidgetRemoteViews(context, hosts, openSessions)
-            } else {
-                buildQuickWidgetRemoteViews(context, hosts)
+            sessionsIds.forEach { id ->
+                manager.updateAppWidget(id, buildSessionsWidgetRemoteViews(context, openSessions))
             }
-            manager.updateAppWidget(id, views)
         }
     }
 
@@ -79,73 +57,68 @@ internal object HostWidgets {
                 app.container.repository.hosts.first()
             }
         }.getOrDefault(emptyList())
-            .sortedBy { it.name.ifBlank { it.host }.lowercase() }
+            .sortedWith(
+                compareByDescending<HostConnection> {
+                    it.lastUsedEpochMillis ?: it.updatedEpochMillis ?: it.createdEpochMillis ?: 0L
+                }.thenBy { it.name.ifBlank { it.host }.lowercase() }
+            )
     }
 
     private fun buildQuickWidgetRemoteViews(
         context: Context,
-        hosts: List<HostConnection>
+        hosts: List<HostConnection>,
+        openSessions: List<WidgetSessionStore.WidgetOpenSession>
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_quick_connect)
+        views.removeAllViews(R.id.widget_open_sessions_container)
         views.removeAllViews(R.id.widget_hosts_container)
-        if (hosts.isEmpty()) {
-            views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.VISIBLE)
-            views.setViewVisibility(R.id.widget_hosts_more, android.view.View.GONE)
-            return views
-        }
-        views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.GONE)
-        val visibleHosts = hosts.take(MAX_HOST_ROWS_COMPACT)
-        visibleHosts.forEach { host ->
-            views.addView(R.id.widget_hosts_container, buildHostRow(context, host))
-        }
-        val remaining = hosts.size - visibleHosts.size
-        if (remaining > 0) {
-            views.setViewVisibility(R.id.widget_hosts_more, android.view.View.VISIBLE)
-            views.setTextViewText(
-                R.id.widget_hosts_more,
-                context.getString(R.string.widget_more_hosts, remaining)
-            )
+        val visibleSessions = openSessions.take(MAX_OPEN_SESSION_ROWS_COMPACT)
+        if (visibleSessions.isEmpty()) {
+            views.setViewVisibility(R.id.widget_open_sessions_section, android.view.View.GONE)
         } else {
-            views.setViewVisibility(R.id.widget_hosts_more, android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_open_sessions_section, android.view.View.VISIBLE)
+            views.setViewVisibility(R.id.widget_open_sessions_empty, android.view.View.GONE)
+            visibleSessions.forEach { openSession ->
+                views.addView(
+                    R.id.widget_open_sessions_container,
+                    buildOpenSessionRow(context, openSession)
+                )
+            }
+        }
+
+        val visibleHosts = hosts.take(
+            if (visibleSessions.isEmpty()) MAX_RECENT_HOST_ROWS_COMPACT_EMPTY else MAX_RECENT_HOST_ROWS_COMPACT
+        )
+        when {
+            visibleHosts.isEmpty() && visibleSessions.isEmpty() -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.VISIBLE)
+            }
+            visibleHosts.isEmpty() -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.GONE)
+            }
+            else -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.GONE)
+                visibleHosts.forEach { host ->
+                    views.addView(R.id.widget_hosts_container, buildHostRow(context, host))
+                }
+            }
         }
         return views
     }
 
     private fun buildSessionsWidgetRemoteViews(
         context: Context,
-        hosts: List<HostConnection>,
         openSessions: List<WidgetSessionStore.WidgetOpenSession>
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_sessions)
-        views.removeAllViews(R.id.widget_hosts_container)
         views.removeAllViews(R.id.widget_open_sessions_container)
-
-        if (hosts.isEmpty()) {
-            views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.VISIBLE)
-            views.setViewVisibility(R.id.widget_hosts_more, android.view.View.GONE)
-        } else {
-            views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.GONE)
-            val visibleHosts = hosts.take(MAX_HOST_ROWS_EXPANDED)
-            visibleHosts.forEach { host ->
-                views.addView(R.id.widget_hosts_container, buildHostRow(context, host))
-            }
-            val remaining = hosts.size - visibleHosts.size
-            if (remaining > 0) {
-                views.setViewVisibility(R.id.widget_hosts_more, android.view.View.VISIBLE)
-                views.setTextViewText(
-                    R.id.widget_hosts_more,
-                    context.getString(R.string.widget_more_hosts, remaining)
-                )
-            } else {
-                views.setViewVisibility(R.id.widget_hosts_more, android.view.View.GONE)
-            }
-        }
-
         if (openSessions.isEmpty()) {
             views.setViewVisibility(R.id.widget_open_sessions_empty, android.view.View.VISIBLE)
         } else {
             views.setViewVisibility(R.id.widget_open_sessions_empty, android.view.View.GONE)
-            openSessions.take(MAX_OPEN_SESSION_ROWS).forEach { openSession ->
+            openSessions.take(MAX_OPEN_SESSION_ROWS_EXPANDED).forEach { openSession ->
                 views.addView(
                     R.id.widget_open_sessions_container,
                     buildOpenSessionRow(context, openSession)
@@ -158,22 +131,7 @@ internal object HostWidgets {
     private fun buildHostRow(context: Context, host: HostConnection): RemoteViews {
         val row = RemoteViews(context.packageName, R.layout.widget_host_row)
         val title = host.name.ifBlank { "${host.username}@${host.host}:${host.port}" }
-        val subtitle = if (host.username.isBlank()) {
-            context.getString(
-                R.string.widget_host_subtitle_no_user_format,
-                host.host,
-                host.port
-            )
-        } else {
-            context.getString(
-                R.string.widget_host_subtitle_format,
-                host.username,
-                host.host,
-                host.port
-            )
-        }
         row.setTextViewText(R.id.widget_host_title, title)
-        row.setTextViewText(R.id.widget_host_subtitle, subtitle)
         row.setOnClickPendingIntent(
             R.id.widget_btn_ssh,
             createConnectPendingIntent(context, host.id, ConnectionMode.SSH)
@@ -205,7 +163,6 @@ internal object HostWidgets {
     ): RemoteViews {
         val row = RemoteViews(context.packageName, R.layout.widget_open_session_row)
         row.setTextViewText(R.id.widget_open_session_title, session.title)
-        row.setTextViewText(R.id.widget_open_session_subtitle, session.subtitle)
         row.setOnClickPendingIntent(
             R.id.widget_btn_open,
             createOpenPendingIntent(context, session.sessionId)
@@ -287,9 +244,10 @@ internal object HostWidgets {
         return generated
     }
 
-    private const val MAX_HOST_ROWS_COMPACT = 2
-    private const val MAX_HOST_ROWS_EXPANDED = 3
-    private const val MAX_OPEN_SESSION_ROWS = 4
+    private const val MAX_OPEN_SESSION_ROWS_COMPACT = 1
+    private const val MAX_RECENT_HOST_ROWS_COMPACT = 1
+    private const val MAX_RECENT_HOST_ROWS_COMPACT_EMPTY = 2
+    private const val MAX_OPEN_SESSION_ROWS_EXPANDED = 5
 }
 
 abstract class BaseHostWidgetProvider : AppWidgetProvider() {

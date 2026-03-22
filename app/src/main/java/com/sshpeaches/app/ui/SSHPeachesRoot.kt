@@ -45,8 +45,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -186,6 +189,19 @@ import com.majordaftapps.sshpeaches.app.util.snippetReference
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
+
+private enum class AppSnackbarKind {
+    DEFAULT,
+    SUCCESS
+}
+
+private data class AppSnackbarVisuals(
+    override val message: String,
+    override val actionLabel: String? = null,
+    override val withDismissAction: Boolean = false,
+    override val duration: SnackbarDuration = SnackbarDuration.Short,
+    val kind: AppSnackbarKind = AppSnackbarKind.DEFAULT
+) : SnackbarVisuals
 
 data class SSHPeachesRootActions(
     val onSortModeChange: (SortMode) -> Unit,
@@ -745,7 +761,17 @@ fun SSHPeachesRoot(
     val snackbarHostState = remember { SnackbarHostState() }
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
+    }
+    val showSuccessMessage: (String) -> Unit = { message ->
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                AppSnackbarVisuals(
+                    message = message,
+                    kind = AppSnackbarKind.SUCCESS
+                )
+            )
         }
+    }
     val sessionLogs = remember { mutableStateListOf<SessionLogBus.Entry>() }
 
     LaunchedEffect(Unit) {
@@ -1361,6 +1387,7 @@ fun SSHPeachesRoot(
             onOpenSettings = {
                 navController.navigate(Routes.SETTINGS)
             },
+            onShowMessage = showSuccessMessage,
             findRequestToken = connectingFindRequestToken.intValue
         )
     }
@@ -1415,7 +1442,17 @@ fun SSHPeachesRoot(
         ) {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Scaffold(
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    snackbarHost = {
+                        SnackbarHost(snackbarHostState) { data ->
+                            val visuals = data.visuals as? AppSnackbarVisuals
+                            val isSuccess = visuals?.kind == AppSnackbarKind.SUCCESS
+                            Snackbar(
+                                snackbarData = data,
+                                containerColor = if (isSuccess) Color(0xFF123C22) else MaterialTheme.colorScheme.inverseSurface,
+                                contentColor = if (isSuccess) Color(0xFF78E08F) else MaterialTheme.colorScheme.inverseOnSurface
+                            )
+                        }
+                    },
                     topBar = {
                         val showConnectingTopBar =
                             quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&

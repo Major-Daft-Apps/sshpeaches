@@ -255,6 +255,7 @@ fun ConnectingScreen(
     onRetry: () -> Unit,
     onToggleConnectedHostBar: () -> Unit,
     onOpenSettings: () -> Unit,
+    onShowMessage: (String) -> Unit = {},
     findRequestToken: Int
 ) {
     val listState = rememberLazyListState()
@@ -314,6 +315,7 @@ fun ConnectingScreen(
     var pendingScpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpUploadSourceUri by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpTransferStatus by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
+    var sftpTransferStatus by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var showScpUploadVertical by rememberSaveable(request?.sessionId) {
         mutableStateOf(request?.initialFileTransferEntryMode == FileTransferEntryMode.UPLOAD)
     }
@@ -622,6 +624,7 @@ fun ConnectingScreen(
         pendingScpDownloadRemotePath = null
         scpUploadSourceUri = null
         scpTransferStatus = null
+        sftpTransferStatus = null
         scpActionsExpanded = false
         scpPendingManualPathTarget = null
         scpPendingManualPathFallback = null
@@ -709,12 +712,31 @@ fun ConnectingScreen(
             }
         }
     }
+    LaunchedEffect(logs.size, request?.mode) {
+        if (request?.mode != ConnectionMode.SFTP || logs.isEmpty()) return@LaunchedEffect
+        val latest = logs.last().message
+        when {
+            latest.startsWith("SFTP download complete:") ||
+                latest.startsWith("SFTP upload complete:") -> {
+                sftpTransferStatus = SFTP_TRANSFER_SUCCESS_MESSAGE
+                onShowMessage(SFTP_TRANSFER_SUCCESS_MESSAGE)
+            }
+        }
+    }
     LaunchedEffect(scpTransferStatus, request?.mode) {
         if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
         val status = scpTransferStatus ?: return@LaunchedEffect
         delay(SCP_TRANSFER_STATUS_AUTO_DISMISS_MS)
         if (scpTransferStatus == status) {
             scpTransferStatus = null
+        }
+    }
+    LaunchedEffect(sftpTransferStatus, request?.mode) {
+        if (request?.mode != ConnectionMode.SFTP) return@LaunchedEffect
+        val status = sftpTransferStatus ?: return@LaunchedEffect
+        delay(SFTP_TRANSFER_STATUS_AUTO_DISMISS_MS)
+        if (sftpTransferStatus == status) {
+            sftpTransferStatus = null
         }
     }
     LaunchedEffect(terminalProfile.id, terminalProfile.font) {
@@ -1040,6 +1062,33 @@ fun ConnectingScreen(
             }
         }
         sftpPendingDirectoryEcho = null
+    }
+    LaunchedEffect(logs.size, request?.mode, sftpPendingDirectoryEcho, remoteDirectory?.path) {
+        if (request?.mode != ConnectionMode.SFTP) return@LaunchedEffect
+        val failedPendingPath = sftpPendingDirectoryEcho ?: return@LaunchedEffect
+        if (logs.isEmpty()) return@LaunchedEffect
+        val latest = logs.last().message
+        if (
+            latest.startsWith("Directory listing failed for") ||
+            latest.startsWith("SFTP operation failed:")
+        ) {
+            sftpPendingDirectoryEcho = null
+            remoteDirectory?.path?.let { sftpPath = it }
+            appendSftpConsole(latest)
+            val failureDetail = latest
+                .substringAfter(':', "")
+                .trim()
+                .takeIf { it.isNotBlank() && !it.equals(failedPendingPath, ignoreCase = false) }
+            val toastMessage = buildString {
+                append("Couldn't open ")
+                append(failedPendingPath)
+                if (failureDetail != null) {
+                    append(": ")
+                    append(failureDetail)
+                }
+            }
+            Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun runSnippetOnCurrentSession(snippet: Snippet) {
@@ -2512,6 +2561,14 @@ fun ConnectingScreen(
                     color = Color(0xFFBDBDBD),
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                 )
+                if (activeFileTransfer != null) {
+                    FileTransferProgressCard(transfer = activeFileTransfer)
+                } else if (sftpTransferStatus != null) {
+                    ScpStatusStrip(
+                        status = sftpTransferStatus.orEmpty(),
+                        modifier = Modifier.testTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP)
+                    )
+                }
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3088,13 +3145,9 @@ private fun ScpStatusStrip(
     status: String,
     modifier: Modifier = Modifier
 ) {
+    val success = isSuccessfulTransferStatus(status)
     val containerColor = when {
-        status.startsWith("Download completed", ignoreCase = true) ||
-            status.startsWith("Upload completed", ignoreCase = true) ||
-            status.startsWith("Move completed", ignoreCase = true) ||
-            status.startsWith("Delete completed", ignoreCase = true) ||
-            status.startsWith("Folder created", ignoreCase = true) ->
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        success -> Color(0xFF123C22)
 
         status.contains("failed", ignoreCase = true) ->
             MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
@@ -3103,6 +3156,7 @@ private fun ScpStatusStrip(
     }
     val contentColor = when {
         status.contains("failed", ignoreCase = true) -> MaterialTheme.colorScheme.error
+        success -> Color(0xFF78E08F)
         else -> MaterialTheme.colorScheme.onSurface
     }
     Surface(
@@ -3117,6 +3171,15 @@ private fun ScpStatusStrip(
             style = MaterialTheme.typography.bodySmall
         )
     }
+}
+
+private fun isSuccessfulTransferStatus(status: String): Boolean {
+    return status.startsWith("Download completed", ignoreCase = true) ||
+        status.startsWith("Upload completed", ignoreCase = true) ||
+        status.startsWith("Move completed", ignoreCase = true) ||
+        status.startsWith("Delete completed", ignoreCase = true) ||
+        status.startsWith("Folder created", ignoreCase = true) ||
+        status.equals(SFTP_TRANSFER_SUCCESS_MESSAGE, ignoreCase = true)
 }
 
 private fun formatRemoteModifiedTime(timestampMillis: Long?): String {
@@ -3566,6 +3629,8 @@ private fun commonSuffixLength(a: String, b: String, prefixLength: Int): Int {
 private const val IME_BUFFER_MAX_CHARS = 512
 private const val IME_BUFFER_KEEP_TAIL_CHARS = 160
 private const val SFTP_CANCEL_BUTTON_DELAY_MS = 220L
+private const val SFTP_TRANSFER_STATUS_AUTO_DISMISS_MS = 3_000L
+private const val SFTP_TRANSFER_SUCCESS_MESSAGE = "file transferred succesfully"
 private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L
 private const val KEY_REPEAT_INTERVAL_MS = 65L
 private val COMPACT_KEY_WIDE_LAYOUT_MIN_WIDTH = 600.dp

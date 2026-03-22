@@ -225,6 +225,7 @@ object UiTestTags {
     const val CONNECTING_SFTP_RUN_BUTTON = "connecting_sftp_run_button"
     const val CONNECTING_SFTP_HELP_BUTTON = "connecting_sftp_help_button"
     const val CONNECTING_SFTP_REFRESH_BUTTON = "connecting_sftp_refresh_button"
+    const val CONNECTING_SFTP_STATUS_STRIP = "connecting_sftp_status_strip"
     const val CONNECTING_SCP_REMOTE_DIR_INPUT = "connecting_scp_remote_dir_input"
     const val CONNECTING_SCP_DOWNLOAD_REMOTE_INPUT = "connecting_scp_download_remote_input"
     const val CONNECTING_SCP_DOWNLOAD_LOCAL_INPUT = "connecting_scp_download_local_input"

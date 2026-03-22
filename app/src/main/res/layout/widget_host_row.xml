@@ -2,94 +2,63 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="6dp"
     android:background="@drawable/widget_row_surface"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="10dp">
+    android:padding="8dp">
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/widget_host_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/widget_host_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/color_widget_text_primary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/widget_host_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/color_widget_text_secondary"
-            android:textSize="11sp" />
-    </LinearLayout>
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/color_widget_text_primary"
+        android:textSize="12sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="6dp"
         android:orientation="horizontal">
 
-        <Button
+        <ImageView
             android:id="@+id/widget_btn_ssh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:background="@drawable/widget_action_primary_background"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:paddingLeft="10dp"
-            android:paddingTop="8dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="8dp"
-            android:text="@string/widget_action_ssh_short"
-            android:textAllCaps="false"
-            android:textColor="@color/color_widget_text_primary"
-            android:textSize="10sp" />
+            android:contentDescription="@string/widget_action_ssh"
+            android:padding="7dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_widget_terminal"
+            android:tint="@color/color_widget_text_primary" />
 
-        <Button
+        <ImageView
             android:id="@+id/widget_btn_sftp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginStart="4dp"
             android:background="@drawable/widget_action_secondary_background"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:paddingLeft="8dp"
-            android:paddingTop="8dp"
-            android:paddingRight="8dp"
-            android:paddingBottom="8dp"
-            android:text="@string/widget_action_sftp_short"
-            android:textAllCaps="false"
-            android:textColor="@color/color_widget_text_primary"
-            android:textSize="10sp" />
+            android:contentDescription="@string/widget_action_sftp"
+            android:padding="7dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_widget_save"
+            android:tint="@color/color_widget_text_primary" />
 
-        <Button
+        <ImageView
             android:id="@+id/widget_btn_scp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginStart="4dp"
             android:background="@drawable/widget_action_secondary_background"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:paddingLeft="10dp"
-            android:paddingTop="8dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="8dp"
-            android:text="@string/widget_action_scp_short"
-            android:textAllCaps="false"
-            android:textColor="@color/color_widget_text_primary"
-            android:textSize="10sp" />
+            android:contentDescription="@string/widget_action_scp"
+            android:padding="7dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_widget_cloud_download"
+            android:tint="@color/color_widget_text_primary" />
     </LinearLayout>
 
 </LinearLayout>

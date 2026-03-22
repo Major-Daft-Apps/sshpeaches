@@ -15,12 +15,16 @@
     <string name="widget_open_sessions_title">Open Sessions</string>
     <string name="widget_no_hosts">No hosts saved.</string>
     <string name="widget_no_open_sessions">No open sessions.</string>
+    <string name="widget_no_connections">No connections.</string>
+    <string name="widget_no_recent_hosts">No recent hosts.</string>
     <string name="widget_more_hosts">+%1$d more hosts</string>
     <string name="widget_host_subtitle_format">%1$s@%2$s:%3$d</string>
     <string name="widget_host_subtitle_no_user_format">%1$s:%2$d</string>
     <string name="widget_action_ssh">SSH terminal</string>
     <string name="widget_action_sftp">Upload files</string>
     <string name="widget_action_scp">Download files</string>
+    <string name="widget_action_open_session">Open session</string>
+    <string name="widget_action_disconnect_session">Disconnect session</string>
     <string name="widget_action_ssh_short">SSH</string>
     <string name="widget_action_sftp_short">Upload</string>
     <string name="widget_action_scp_short">Download</string>

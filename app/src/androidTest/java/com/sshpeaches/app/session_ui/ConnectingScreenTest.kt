@@ -21,6 +21,8 @@ import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -284,6 +286,153 @@ class ConnectingScreenTest {
         composeRule.runOnIdle {
             check(listedPath == "/uploads") {
                 "SFTP list callback did not receive the requested remote path"
+            }
+        }
+    }
+
+    @Test
+    fun sftpPanel_invalidTypedPathShowsErrorToast() {
+        var listedPath: String? = null
+        var logs by mutableStateOf<List<SessionLogBus.Entry>>(emptyList())
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SFTP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SFTP browser ready"
+                    ),
+                    logs = logs,
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/docs",
+                        entries = listOf(
+                            SessionService.RemoteDirectoryEntry(
+                                name = "welcome.txt",
+                                isDirectory = false,
+                                sizeBytes = 12
+                            )
+                        )
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = { listedPath = it },
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+            .performTextReplacement("ls /missing")
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON).performClick()
+
+        composeRule.runOnIdle {
+            check(listedPath == "/missing") {
+                "SFTP list callback did not receive the invalid remote path."
+            }
+            logs = listOf(
+                SessionLogBus.Entry(
+                    hostId = "session-sftp",
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = "SFTP operation failed: No such file or directory"
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Remote: /docs", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback() {
+        val shownMessages = mutableListOf<String>()
+        var logs by mutableStateOf<List<SessionLogBus.Entry>>(emptyList())
+        var activeTransfer by mutableStateOf<FileTransferProgress?>(
+            FileTransferProgress(
+                sessionId = "session-sftp",
+                mode = ConnectionMode.SFTP,
+                direction = FileTransferDirection.DOWNLOAD,
+                fileName = "welcome.txt",
+                sourceLabel = "/docs/welcome.txt",
+                destinationLabel = "/storage/emulated/0/Download/welcome.txt",
+                bytesTransferred = 6L,
+                totalBytes = 12L,
+                hasStarted = true
+            )
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SFTP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SFTP browser ready"
+                    ),
+                    logs = logs,
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/docs",
+                        entries = listOf(
+                            SessionService.RemoteDirectoryEntry(
+                                name = "welcome.txt",
+                                isDirectory = false,
+                                sizeBytes = 12
+                            )
+                        )
+                    ),
+                    activeFileTransfer = activeTransfer,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    onShowMessage = { shownMessages += it },
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            activeTransfer = null
+            logs = listOf(
+                SessionLogBus.Entry(
+                    hostId = "session-sftp",
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "SFTP download complete: /docs/welcome.txt -> /storage/emulated/0/Download/welcome.txt"
+                )
+            )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP).assertIsDisplayed()
+        composeRule.onNodeWithText("file transferred succesfully").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            check(shownMessages == listOf("file transferred succesfully")) {
+                "SFTP completion did not trigger the snackbar callback."
             }
         }
     }
