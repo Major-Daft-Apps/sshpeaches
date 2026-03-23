@@ -1,5 +1,7 @@
 package com.termux.terminal;
 
+import java.util.Arrays;
+
 public class ScreenBufferTest extends TerminalTestCase {
 
 	public void testBasics() {
@@ -61,5 +63,15 @@ public class ScreenBufferTest extends TerminalTestCase {
 		assertEquals("GHI", mTerminal.getScreen().getWordAtLocation(0, 2));
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(1, 2));
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(2, 2));
+	}
+
+	public void testGetWordBoundsAtLocation() {
+		withTerminalSized(5, 3).enterString("ABCDEFGHIJ\r\nKLMNO");
+		assertTrue(Arrays.equals(new int[] { 0, 0, 4, 2 }, mTerminal.getScreen().getWordBoundsAtLocation(4, 1)));
+
+		withTerminalSized(5, 3).enterString("ABC DEF GHI ");
+		assertTrue(Arrays.equals(new int[] { 4, 0, 1, 1 }, mTerminal.getScreen().getWordBoundsAtLocation(0, 1)));
+		assertTrue(Arrays.equals(new int[] { 3, 1, 0, 2 }, mTerminal.getScreen().getWordBoundsAtLocation(0, 2)));
+		assertNull(mTerminal.getScreen().getWordBoundsAtLocation(3, 0));
 	}
 }

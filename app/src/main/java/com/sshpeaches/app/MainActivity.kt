@@ -318,7 +318,6 @@ class MainActivity : FragmentActivity() {
                         ensureSessionServiceConnection()
                         UiDebugLog.result("uiStartSession", false, "service-not-ready")
                     } else {
-                        requestNotificationPermissionIfNeeded()
                         sessionService.startSession(
                             requestedSessionId = sessionId,
                             host = host,

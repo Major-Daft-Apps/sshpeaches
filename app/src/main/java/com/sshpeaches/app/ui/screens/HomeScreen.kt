@@ -66,6 +66,7 @@ import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
+import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.generateHostQr
@@ -95,6 +96,8 @@ fun HomeScreen(
     transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
     activeSshSessionHostIds: Set<String> = emptySet(),
     hasAnyResources: Boolean,
+    suppressEmptyWelcome: Boolean = false,
+    onSuppressEmptyWelcomeConsumed: () -> Unit = {},
     onOpenSession: (String) -> Unit = {},
     onDisconnectSession: (String) -> Unit = {},
     onHostAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
@@ -118,6 +121,7 @@ fun HomeScreen(
     onAddSnippet: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+    val suppressEmptyWelcomeForCurrentVisit = remember { mutableStateOf(false) }
     val overflowFavoriteKey = remember { mutableStateOf<String?>(null) }
     val overflowRecentKey = remember { mutableStateOf<String?>(null) }
     val shareQrBitmap = remember { mutableStateOf<Bitmap?>(null) }
@@ -162,17 +166,35 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(suppressEmptyWelcome) {
+        if (suppressEmptyWelcome) {
+            suppressEmptyWelcomeForCurrentVisit.value = true
+            onSuppressEmptyWelcomeConsumed()
+        }
+    }
+
+    LaunchedEffect(hasAnyResources) {
+        if (hasAnyResources) {
+            suppressEmptyWelcomeForCurrentVisit.value = false
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(UiTestTags.SCREEN_HOME)
     ) {
-        if (!hasAnyResources) {
+        if (!hasAnyResources && !suppressEmptyWelcomeForCurrentVisit.value) {
             HomeWelcome(
                 onAddHost = onAddHost,
                 onAddIdentity = onAddIdentity,
                 onAddPortForward = onAddPortForward,
                 onAddSnippet = onAddSnippet
+            )
+        } else if (!hasAnyResources) {
+            EmptyState(
+                itemLabel = "resource",
+                showCreateHint = false
             )
         } else {
             LazyColumn(

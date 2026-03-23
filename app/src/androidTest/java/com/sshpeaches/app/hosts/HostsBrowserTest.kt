@@ -158,6 +158,32 @@ class HostsBrowserTest {
         composeRule.onNodeWithText("Share ${host.name}").assertIsDisplayed()
     }
 
+    @Test
+    fun sshActionNavigatesToConnectingScreenWithoutCrashing() {
+        val host = host(name = "SSH Connect Host", host = "10.0.2.50").copy(hasPassword = true)
+        AppStateSeeder.seedHost(host, password = "secret-password")
+
+        waitForHost(host.name)
+
+        composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "ssh")).performClick()
+
+        waitForTag(UiTestTags.SCREEN_CONNECTING)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_CONNECTING).assertIsDisplayed()
+    }
+
+    @Test
+    fun scpActionNavigatesToConnectingScreenWithoutCrashing() {
+        val host = host(name = "SCP Connect Host", host = "10.0.2.60").copy(hasPassword = true)
+        AppStateSeeder.seedHost(host, password = "secret-password")
+
+        waitForHost(host.name)
+
+        composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "scp")).performClick()
+
+        waitForTag(UiTestTags.SCREEN_CONNECTING)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_CONNECTING).assertIsDisplayed()
+    }
+
     private fun waitForHost(name: String) {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty()

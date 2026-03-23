@@ -106,42 +106,61 @@ public final class TerminalBuffer {
     }
 
     public String getWordAtLocation(int x, int y) {
-        // Set y1 and y2 to the lines where the wrapped line starts and ends.
-        // I.e. if a line that is wrapped to 3 lines starts at line 4, and this
-        // is called with y=5, then y1 would be set to 4 and y2 would be set to 6.
-        int y1 = y;
-        int y2 = y;
-        while (y1 > 0 && !getSelectedText(0, y1 - 1, mColumns, y, true, true).contains("\n")) {
-            y1--;
-        }
-        while (y2 < mScreenRows && !getSelectedText(0, y, mColumns, y2 + 1, true, true).contains("\n")) {
-            y2++;
+        int[] bounds = getWordBoundsAtLocation(x, y);
+        if (bounds == null) return "";
+        return getSelectedText(bounds[0], bounds[1], bounds[2], bounds[3], true, true);
+    }
+
+    public int[] getWordBoundsAtLocation(int x, int y) {
+        if (x < 0 || x >= mColumns) return null;
+
+        int minRow = -getActiveTranscriptRows();
+        if (y < minRow || y >= mScreenRows) return null;
+        if (isWhitespaceAt(x, y)) return null;
+
+        int[] lineBounds = getLineBoundsAtLocation(y);
+        int startRow = lineBounds[0];
+        int endRow = lineBounds[1];
+
+        int startX = x;
+        int startY = y;
+        while (true) {
+            int previousX = startX;
+            int previousY = startY;
+            if (previousX > 0) {
+                previousX--;
+            } else if (previousY > startRow) {
+                previousY--;
+                previousX = mColumns - 1;
+            } else {
+                break;
+            }
+
+            if (isWhitespaceAt(previousX, previousY)) break;
+            startX = previousX;
+            startY = previousY;
         }
 
-        // Get the text for the whole wrapped line
-        String text = getSelectedText(0, y1, mColumns, y2, true, true);
-        // The index of x in text
-        int textOffset = (y - y1) * mColumns + x;
+        int endX = x;
+        int endY = y;
+        while (true) {
+            int nextX = endX;
+            int nextY = endY;
+            if (nextX < mColumns - 1) {
+                nextX++;
+            } else if (nextY < endRow) {
+                nextY++;
+                nextX = 0;
+            } else {
+                break;
+            }
 
-        if (textOffset >= text.length()) {
-          // The click was to the right of the last word on the line, so
-          // there's no word to return
-          return "";
+            if (isWhitespaceAt(nextX, nextY)) break;
+            endX = nextX;
+            endY = nextY;
         }
 
-        // Set x1 and x2 to the indices of the last space before x and the
-        // first space after x in text respectively
-        int x1 = text.lastIndexOf(' ', textOffset);
-        int x2 = text.indexOf(' ', textOffset);
-        if (x2 == -1) {
-            x2 = text.length();
-        }
-
-        if (x1 == x2) {
-          // The click was on a space, so there's no word to return
-          return "";
-        }
-        return text.substring(x1 + 1, x2);
+        return new int[] { startX, startY, endX, endY };
     }
 
     public int getActiveTranscriptRows() {
@@ -190,6 +209,50 @@ public final class TerminalBuffer {
 
     public void clearLineWrap(int row) {
         mLines[externalToInternalRow(row)].mLineWrap = false;
+    }
+
+    private int[] getLineBoundsAtLocation(int y) {
+        int minRow = -getActiveTranscriptRows();
+        int startRow = y;
+        int endRow = y;
+
+        while (startRow > minRow && !getSelectedText(0, startRow - 1, mColumns, y, true, true).contains("\n")) {
+            startRow--;
+        }
+        while (endRow < mScreenRows - 1 && !getSelectedText(0, y, mColumns, endRow + 1, true, true).contains("\n")) {
+            endRow++;
+        }
+
+        return new int[] { startRow, endRow };
+    }
+
+    private boolean isWhitespaceAt(int x, int y) {
+        return Character.isWhitespace(getCodePointAt(x, y));
+    }
+
+    private int getCodePointAt(int x, int y) {
+        TerminalRow lineObject = mLines[externalToInternalRow(y)];
+        if (lineObject == null) return ' ';
+
+        int currentColumn = 0;
+        for (int i = 0, len = lineObject.getSpaceUsed(); i < len; ) {
+            char ch = lineObject.mText[i++];
+            int codePoint;
+            if (Character.isHighSurrogate(ch) && i < len) {
+                codePoint = Character.toCodePoint(ch, lineObject.mText[i++]);
+            } else {
+                codePoint = ch;
+            }
+
+            int width = WcWidth.width(codePoint);
+            if (width <= 0) continue;
+
+            int nextColumn = currentColumn + width;
+            if (x < nextColumn) return codePoint;
+            currentColumn = nextColumn;
+        }
+
+        return ' ';
     }
 
     /**

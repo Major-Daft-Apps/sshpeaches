@@ -11,8 +11,8 @@
     <string name="widget_quick_connect_subtitle">Launch straight into a terminal, file browser, upload, or download from your saved hosts.</string>
     <string name="widget_sessions_title">Session Deck</string>
     <string name="widget_sessions_subtitle">Pinned hosts up top, live sessions underneath.</string>
-    <string name="widget_hosts_title">Hosts</string>
-    <string name="widget_open_sessions_title">Open Sessions</string>
+    <string name="widget_hosts_title">Recent</string>
+    <string name="widget_open_sessions_title">Open Connections</string>
     <string name="widget_no_hosts">No hosts saved.</string>
     <string name="widget_no_open_sessions">No open sessions.</string>
     <string name="widget_no_connections">No connections.</string>

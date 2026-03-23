@@ -7,11 +7,56 @@
     android:padding="12dp">
 
     <LinearLayout
+        android:id="@+id/widget_hosts_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/widget_section_surface"
         android:orientation="vertical"
         android:padding="10dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:text="@string/widget_hosts_title"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_hosts_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_row_surface"
+            android:padding="10dp"
+            android:text="@string/widget_no_recent_hosts"
+            android:textColor="@color/color_widget_text_secondary"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/widget_hosts_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_section_surface"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:text="@string/widget_open_sessions_title"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_open_sessions_empty"

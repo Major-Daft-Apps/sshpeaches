@@ -130,6 +130,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.R
@@ -226,6 +227,11 @@ private data class RemoteBreadcrumb(
     val label: String,
     val path: String
 )
+
+private typealias RemoteDirectorySnapshot =
+    com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot
+private typealias RemoteDirectoryEntry =
+    com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1224,6 +1230,205 @@ fun ConnectingScreen(
         }
     }
 
+    fun updateTerminalView(view: TerminalView) {
+        terminalViewRef = view
+        view.setTerminalViewClient(terminalViewClient)
+        view.setSelectionJoinBackLines(
+            terminalSelectionMode == TerminalSelectionMode.NATURAL
+        )
+        val emulator = externalTerminalEmulator ?: terminalEngine.emulator()
+        view.attachEmulator(emulator)
+        applyTerminalTypeface(view, terminalProfile.font)
+        val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) }
+        view.setTextSize(textSizePx)
+        view.updateSize()
+        val resize = emulator.mColumns to emulator.mRows
+        if (lastResize != resize) {
+            lastResize = resize
+            onTerminalResize(emulator.mColumns, emulator.mRows)
+        }
+        view.setOnTouchListener { _, event ->
+            if (!swipeNavigationEnabled) {
+                swipeStart = null
+                swipeIntercepting = false
+                stopSwipeRepeat()
+                return@setOnTouchListener false
+            }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    swipeStart = SwipeGestureStart(
+                        x = event.x,
+                        y = event.y,
+                        timestampMs = event.eventTime
+                    )
+                    swipeIntercepting = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val start = swipeStart
+                    if (start != null && !swipeIntercepting) {
+                        val dx = abs(event.x - start.x)
+                        val dy = abs(event.y - start.y)
+                        if (dx >= swipeNavMinDistancePx || dy >= swipeNavMinDistancePx) {
+                            swipeIntercepting = true
+                        }
+                    }
+                    if (swipeIntercepting && start != null) {
+                        val keyCode = resolveSwipeKeyCode(
+                            start = start,
+                            endX = event.x,
+                            endY = event.y,
+                            endTimeMs = event.eventTime,
+                            minDistancePx = swipeNavMinDistancePx,
+                            maxDurationMs = null
+                        )
+                        if (keyCode != null) {
+                            startSwipeRepeat(keyCode)
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val start = swipeStart
+                    if (start != null && swipeIntercepting && swipeRepeatKeyCode == null) {
+                        val keyCode = resolveSwipeKeyCode(
+                            start = start,
+                            endX = event.x,
+                            endY = event.y,
+                            endTimeMs = event.eventTime,
+                            minDistancePx = swipeNavMinDistancePx
+                        )
+                        if (keyCode != null) {
+                            sendArrowKey(keyCode)
+                        }
+                    }
+                    stopSwipeRepeat()
+                    swipeStart = null
+                    val consumed = true
+                    swipeIntercepting = false
+                    consumed
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    stopSwipeRepeat()
+                    swipeStart = null
+                    val consumed = true
+                    swipeIntercepting = false
+                    consumed
+                }
+                else -> true
+            }
+        }
+        view.onScreenUpdated()
+    }
+
+    fun dismissFindDialog() {
+        showFindDialog = false
+        terminalViewRef?.clearSearchHighlight()
+    }
+
+    fun handleCompactKeyPress(key: CompactTerminalKey) {
+        if (!key.enabled) return
+        val action = key.action
+        if (handleIconAlias(action)) {
+            pendingModifiers = emptySet()
+            return
+        }
+        when (action.type) {
+            KeyboardActionType.MODIFIER -> {
+                val modifier = action.modifier ?: return
+                pendingModifiers = if (pendingModifiers.contains(modifier)) {
+                    pendingModifiers - modifier
+                } else {
+                    pendingModifiers + modifier
+                }
+            }
+            KeyboardActionType.TEXT -> {
+                val text = action.text
+                if (text.isBlank()) return
+                val modifiers = pendingModifiers
+                terminalInput.sendText(
+                    text = text,
+                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+                    altDown = modifiers.contains(KeyboardModifier.ALT),
+                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+                )
+                pendingModifiers = emptySet()
+            }
+            KeyboardActionType.KEY -> {
+                val keyCode = action.keyCode ?: return
+                val modifiers = pendingModifiers
+                val sent = terminalInput.sendVirtualKey(
+                    keyCode = keyCode,
+                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL) || action.ctrl,
+                    altDown = modifiers.contains(KeyboardModifier.ALT) || action.alt,
+                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT) || action.shift,
+                    fallbackSequence = action.sequence.ifBlank { null }
+                )
+                if (!sent && action.sequence.isNotBlank()) {
+                    terminalInput.sendRawSequence(action.sequence)
+                }
+                pendingModifiers = emptySet()
+            }
+            KeyboardActionType.SEQUENCE -> {
+                val sequence = action.sequence.ifBlank { action.text }
+                if (sequence.isNotBlank()) {
+                    terminalInput.sendRawSequence(sequence)
+                }
+                pendingModifiers = emptySet()
+            }
+            KeyboardActionType.PASSWORD_INJECT -> {
+                val password = resolveInjectPassword()
+                if (password.isNotEmpty()) {
+                    terminalInput.sendText(
+                        text = password,
+                        ctrlDown = false,
+                        altDown = false,
+                        shiftDown = false
+                    )
+                }
+                pendingModifiers = emptySet()
+            }
+            KeyboardActionType.SNIPPET_PICKER -> {
+                showSnippetPicker = true
+                pendingModifiers = emptySet()
+            }
+        }
+    }
+
+    fun handleImeBridgeValueChange(next: TextFieldValue) {
+        if (next == imeBridgeValue) return
+        imeBridgeValue = next
+
+        // Send deltas immediately so IME composing text is echoed in-terminal.
+        sendImeDelta(
+            previous = imeSentText,
+            next = next.text,
+            sendBackspace = terminalInput::sendBackspace,
+            sendInserted = { inserted ->
+                val modifiers = pendingModifiers
+                terminalInput.sendText(
+                    text = inserted,
+                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+                    altDown = modifiers.contains(KeyboardModifier.ALT),
+                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+                )
+                if (modifiers.isNotEmpty()) {
+                    pendingModifiers = emptySet()
+                }
+            }
+        )
+        imeSentText = next.text
+
+        if (imeSentText.length > IME_BUFFER_MAX_CHARS) {
+            val tail = imeSentText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
+            imeSentText = tail
+            imeBridgeValue = TextFieldValue(
+                text = tail,
+                selection = TextRange(tail.length)
+            )
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1232,1621 +1437,157 @@ fun ConnectingScreen(
             .testTag(UiTestTags.SCREEN_CONNECTING)
     ) {
         if (showTerminalSession) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(
-                            WindowInsets.ime
-                                .exclude(WindowInsets.navigationBars)
-                                .only(WindowInsetsSides.Bottom)
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .testTag(UiTestTags.CONNECTING_TERMINAL_PANEL),
-                        color = Color(0xFF080808)
-                    ) {
-                        AndroidView(
-                            factory = {
-                                TerminalView(it, null).apply {
-                                    isFocusable = true
-                                    isFocusableInTouchMode = true
-                                    setTerminalViewClient(terminalViewClient)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(terminalMarginDp),
-                            update = { view ->
-                                terminalViewRef = view
-                                view.setTerminalViewClient(terminalViewClient)
-                                view.setSelectionJoinBackLines(
-                                    terminalSelectionMode == TerminalSelectionMode.NATURAL
-                                )
-                                val emulator = externalTerminalEmulator ?: terminalEngine.emulator()
-                                view.attachEmulator(emulator)
-                                applyTerminalTypeface(view, terminalProfile.font)
-                                val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) }
-                                view.setTextSize(textSizePx)
-                                view.updateSize()
-                                val resize = emulator.mColumns to emulator.mRows
-                                if (lastResize != resize) {
-                                    lastResize = resize
-                                    onTerminalResize(emulator.mColumns, emulator.mRows)
-                                }
-                                view.setOnTouchListener { _, event ->
-                                    if (!swipeNavigationEnabled) {
-                                        swipeStart = null
-                                        swipeIntercepting = false
-                                        stopSwipeRepeat()
-                                        return@setOnTouchListener false
-                                    }
-                                    when (event.actionMasked) {
-                                        MotionEvent.ACTION_DOWN -> {
-                                            swipeStart = SwipeGestureStart(
-                                                x = event.x,
-                                                y = event.y,
-                                                timestampMs = event.eventTime
-                                            )
-                                            swipeIntercepting = false
-                                            true
-                                        }
-                                        MotionEvent.ACTION_MOVE -> {
-                                            val start = swipeStart
-                                            if (start != null && !swipeIntercepting) {
-                                                val dx = abs(event.x - start.x)
-                                                val dy = abs(event.y - start.y)
-                                                if (dx >= swipeNavMinDistancePx || dy >= swipeNavMinDistancePx) {
-                                                    swipeIntercepting = true
-                                                }
-                                            }
-                                            if (swipeIntercepting && start != null) {
-                                                val keyCode = resolveSwipeKeyCode(
-                                                    start = start,
-                                                    endX = event.x,
-                                                    endY = event.y,
-                                                    endTimeMs = event.eventTime,
-                                                    minDistancePx = swipeNavMinDistancePx,
-                                                    maxDurationMs = null
-                                                )
-                                                if (keyCode != null) {
-                                                    startSwipeRepeat(keyCode)
-                                                }
-                                            }
-                                            true
-                                        }
-                                        MotionEvent.ACTION_UP -> {
-                                            val start = swipeStart
-                                            if (start != null && swipeIntercepting && swipeRepeatKeyCode == null) {
-                                                val keyCode = resolveSwipeKeyCode(
-                                                    start = start,
-                                                    endX = event.x,
-                                                    endY = event.y,
-                                                    endTimeMs = event.eventTime,
-                                                    minDistancePx = swipeNavMinDistancePx
-                                                )
-                                                if (keyCode != null) {
-                                                    sendArrowKey(keyCode)
-                                                }
-                                            }
-                                            stopSwipeRepeat()
-                                            swipeStart = null
-                                            val consumed = true
-                                            swipeIntercepting = false
-                                            consumed
-                                        }
-                                        MotionEvent.ACTION_CANCEL -> {
-                                            stopSwipeRepeat()
-                                            swipeStart = null
-                                            val consumed = true
-                                            swipeIntercepting = false
-                                            consumed
-                                        }
-                                        else -> {
-                                            true
-                                        }
-                                    }
-                                }
-                                view.onScreenUpdated()
-                            }
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (showFindDialog) {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth(),
-                                color = Color(0xFF101010),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(34.dp)
-                                                .border(
-                                                    width = 1.dp,
-                                                    color = Color(0xFF2D2D2D),
-                                                    shape = RoundedCornerShape(6.dp)
-                                                ),
-                                            color = Color(0xFF161616),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(horizontal = 8.dp),
-                                                contentAlignment = Alignment.CenterStart
-                                            ) {
-                                                BasicTextField(
-                                                    value = findQuery,
-                                                    onValueChange = { findQuery = it },
-                                                    singleLine = true,
-                                                    textStyle = MaterialTheme.typography.bodySmall.copy(
-                                                        fontFamily = FontFamily.Monospace,
-                                                        color = Color(0xFFEDEDED)
-                                                    ),
-                                                    keyboardOptions = KeyboardOptions(
-                                                        capitalization = KeyboardCapitalization.None,
-                                                        keyboardType = KeyboardType.Password,
-                                                        imeAction = ImeAction.Search,
-                                                        autoCorrect = false
-                                                    ),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .testTag(UiTestTags.CONNECTING_FIND_INPUT),
-                                                    decorationBox = { inner ->
-                                                        if (findQuery.isBlank()) {
-                                                            Text(
-                                                                text = "Find",
-                                                                maxLines = 1,
-                                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                                    fontFamily = FontFamily.Monospace,
-                                                                    color = Color(0xFF8C8C8C)
-                                                                )
-                                                            )
-                                                        }
-                                                        inner()
-                                                    }
-                                                )
-                                            }
-                                        }
-                                        Surface(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clickable { findCaseSensitive = !findCaseSensitive },
-                                            color = if (findCaseSensitive) Color(0xFF5B3A0F) else Color(0xFF1B1B1B),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "Aa",
-                                                    color = Color(0xFFEDEDED),
-                                                    style = MaterialTheme.typography.labelSmall
-                                                )
-                                            }
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                if (findMatches.isNotEmpty()) {
-                                                    val size = findMatches.size
-                                                    findMatchIndex = ((findMatchIndex - 1) % size + size) % size
-                                                }
-                                            },
-                                            enabled = findMatches.isNotEmpty(),
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowUp,
-                                                contentDescription = "Previous result",
-                                                tint = Color(0xFFDEDEDE)
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                if (findMatches.isNotEmpty()) {
-                                                    val size = findMatches.size
-                                                    findMatchIndex = (findMatchIndex + 1).mod(size)
-                                                }
-                                            },
-                                            enabled = findMatches.isNotEmpty(),
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "Next result",
-                                                tint = Color(0xFFDEDEDE)
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                showFindDialog = false
-                                                terminalViewRef?.clearSearchHighlight()
-                                            },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Close find",
-                                                tint = Color(0xFFBDBDBD)
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        text = when {
-                                            findQuery.isBlank() -> "Enter search text"
-                                            findMatches.isEmpty() -> "No matches"
-                                            else -> {
-                                                val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
-                                                val active = activeFindMatch
-                                                if (active != null) {
-                                                    "${activeIndex + 1}/${findMatches.size} line ${active.line}: ${active.preview}"
-                                                } else {
-                                                    "${activeIndex + 1}/${findMatches.size}"
-                                                }
-                                            }
-                                        },
-                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                        color = Color(0xFFBDBDBD),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
-                                    )
-                                }
-                            }
-                        }
-
-                        CompactKeyRow(
-                            keys = compactKeys,
-                            activeModifiers = pendingModifiers,
-                            activeAliasIcons = activeAliasIcons,
-                            onSendKey = { key ->
-                                if (!key.enabled) return@CompactKeyRow
-                                val action = key.action
-                                if (handleIconAlias(action)) {
-                                    pendingModifiers = emptySet()
-                                    return@CompactKeyRow
-                                }
-                                when (action.type) {
-                                    KeyboardActionType.MODIFIER -> {
-                                        val modifier = action.modifier ?: return@CompactKeyRow
-                                        pendingModifiers = if (pendingModifiers.contains(modifier)) {
-                                            pendingModifiers - modifier
-                                        } else {
-                                            pendingModifiers + modifier
-                                        }
-                                    }
-                                    KeyboardActionType.TEXT -> {
-                                        val text = action.text
-                                        if (text.isBlank()) return@CompactKeyRow
-                                        val modifiers = pendingModifiers
-                                        terminalInput.sendText(
-                                            text = text,
-                                            ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
-                                            altDown = modifiers.contains(KeyboardModifier.ALT),
-                                            shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
-                                        )
-                                        pendingModifiers = emptySet()
-                                    }
-                                    KeyboardActionType.KEY -> {
-                                        val keyCode = action.keyCode ?: return@CompactKeyRow
-                                        val modifiers = pendingModifiers
-                                        val sent = terminalInput.sendVirtualKey(
-                                            keyCode = keyCode,
-                                            ctrlDown = modifiers.contains(KeyboardModifier.CTRL) || action.ctrl,
-                                            altDown = modifiers.contains(KeyboardModifier.ALT) || action.alt,
-                                            shiftDown = modifiers.contains(KeyboardModifier.SHIFT) || action.shift,
-                                            fallbackSequence = action.sequence.ifBlank { null }
-                                        )
-                                        if (!sent && action.sequence.isNotBlank()) {
-                                            terminalInput.sendRawSequence(action.sequence)
-                                        }
-                                        pendingModifiers = emptySet()
-                                    }
-                                    KeyboardActionType.SEQUENCE -> {
-                                        val sequence = action.sequence.ifBlank { action.text }
-                                        if (sequence.isNotBlank()) {
-                                            terminalInput.sendRawSequence(sequence)
-                                        }
-                                        pendingModifiers = emptySet()
-                                    }
-                                    KeyboardActionType.PASSWORD_INJECT -> {
-                                        val password = resolveInjectPassword()
-                                        if (password.isNotEmpty()) {
-                                            terminalInput.sendText(
-                                                text = password,
-                                                ctrlDown = false,
-                                                altDown = false,
-                                                shiftDown = false
-                                            )
-                                        }
-                                        pendingModifiers = emptySet()
-                                    }
-                                    KeyboardActionType.SNIPPET_PICKER -> {
-                                        showSnippetPicker = true
-                                        pendingModifiers = emptySet()
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                        )
-                    }
-                }
-
-                BasicTextField(
-                    value = imeBridgeValue,
-                    onValueChange = { next ->
-                        if (next == imeBridgeValue) return@BasicTextField
-                        imeBridgeValue = next
-
-                        // Send deltas immediately so IME composing text is echoed in-terminal.
-                        sendImeDelta(
-                            previous = imeSentText,
-                            next = next.text,
-                            sendBackspace = terminalInput::sendBackspace,
-                            sendInserted = { inserted ->
-                                val modifiers = pendingModifiers
-                                terminalInput.sendText(
-                                    text = inserted,
-                                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
-                                    altDown = modifiers.contains(KeyboardModifier.ALT),
-                                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
-                                )
-                                if (modifiers.isNotEmpty()) {
-                                    pendingModifiers = emptySet()
-                                }
-                            }
-                        )
-                        imeSentText = next.text
-
-                        if (imeSentText.length > IME_BUFFER_MAX_CHARS) {
-                            val tail = imeSentText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
-                            imeSentText = tail
-                            imeBridgeValue = TextFieldValue(
-                                text = tail,
-                                selection = TextRange(tail.length)
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .size(1.dp)
-                        .alpha(0f)
-                        .focusRequester(keyboardFocusRequester)
-                        .onFocusChanged { keyboardFocused = it.isFocused }
-                        .onPreviewKeyEvent { keyEvent ->
-                            val nativeEvent = keyEvent.nativeKeyEvent
-                            if (handleVolumeKeyForFontSize(nativeEvent)) {
-                                return@onPreviewKeyEvent true
-                            }
-                            if (nativeEvent.action != KeyEvent.ACTION_DOWN) {
-                                return@onPreviewKeyEvent false
-                            }
-                            terminalInput.onAndroidKeyDown(nativeEvent)
-                        },
-                    singleLine = false,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.None,
-                        autoCorrect = false
-                    )
-                )
-            }
+            ConnectingTerminalContent(
+                terminalViewClient = terminalViewClient,
+                terminalMarginDp = terminalMarginDp,
+                showFindDialog = showFindDialog,
+                findQuery = findQuery,
+                onFindQueryChange = { findQuery = it },
+                findCaseSensitive = findCaseSensitive,
+                onFindCaseSensitiveChange = { findCaseSensitive = it },
+                findMatches = findMatches,
+                findMatchIndex = findMatchIndex,
+                onFindMatchIndexChange = { findMatchIndex = it },
+                activeFindMatch = activeFindMatch,
+                onDismissFind = ::dismissFindDialog,
+                compactKeys = compactKeys,
+                pendingModifiers = pendingModifiers,
+                activeAliasIcons = activeAliasIcons,
+                onSendCompactKey = ::handleCompactKeyPress,
+                imeBridgeValue = imeBridgeValue,
+                onImeBridgeValueChange = ::handleImeBridgeValueChange,
+                keyboardFocusRequester = keyboardFocusRequester,
+                onKeyboardFocusChanged = { keyboardFocused = it },
+                handleVolumeKeyForFontSize = ::handleVolumeKeyForFontSize,
+                terminalInput = terminalInput,
+                updateTerminalView = ::updateTerminalView
+            )
         } else if (showScpTransferSession && request != null) {
-            val remoteItems = remoteDirectory?.entries ?: scpVisibleEntries
-            val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
-            val scpListingInProgress = scpPendingListPath != null
-            val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
-            val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex && !scpListingInProgress
-            val colorScheme = MaterialTheme.colorScheme
-            val entryPathFor: (com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry) -> String = { entry ->
-                entry.absolutePath.ifBlank { resolveChildPath(effectiveRemotePath, entry.name) }
-            }
-            val selectedEntry = remoteItems.firstOrNull { entryPathFor(it) == scpSelectedPath }
-            val selectedPath = selectedEntry?.let(entryPathFor)
-            val canDownloadSelected = !showScpUploadVertical &&
-                selectedEntry != null &&
-                !selectedEntry.isDirectory &&
-                !scpTransferActive &&
-                !scpListingInProgress
-            val canMutateSelection = selectedEntry != null && !scpTransferActive && !scpListingInProgress
-            val deleteProtectedSelection = selectedEntry != null &&
-                isProtectedRemoteSystemDirectory(
-                    path = selectedPath,
-                    isDirectory = selectedEntry.isDirectory
-                )
-            val moveProtectedSelection = deleteProtectedSelection
-            val canMoveSelection = canMutateSelection && !moveProtectedSelection
-            val canDeleteSelection = canMutateSelection && !deleteProtectedSelection
-            val canChooseUploadSource = showScpUploadVertical && !scpTransferActive
-            val canUploadHere = showScpUploadVertical &&
-                !scpTransferActive &&
-                !scpListingInProgress &&
-                !scpUploadSourceUri.isNullOrBlank()
-            val scpDownloadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
-                val selectedRemote = pendingScpDownloadRemotePath
-                pendingScpDownloadRemotePath = null
-                if (selectedRemote.isNullOrBlank()) return@rememberLauncherForActivityResult
-                if (uri == null) {
-                    scpTransferStatus = "Download cancelled."
-                    return@rememberLauncherForActivityResult
-                }
-                scpTransferStatus = null
-                onScpDownload(selectedRemote, uri.toString())
-            }
-            val scpUploadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri == null) {
-                    scpTransferStatus = "Local file selection cancelled."
-                    return@rememberLauncherForActivityResult
-                }
-                val displayName = queryUriDisplayName(context, uri) ?: "upload.bin"
-                scpUploadSourceUri = uri.toString()
-                uploadLocalPath = displayName
-                scpTransferStatus = "Selected local file: $displayName"
-            }
-            fun submitScpPathJump() {
-                if (scpListingInProgress) return
-                val targetPath = scpRemotePath.trim().ifBlank { "." }
-                keyboardController?.hide()
-                if (targetPath == effectiveRemotePath) {
-                    scpRemotePath = effectiveRemotePath
-                    return
-                }
-                scpPendingManualPathTarget = targetPath
-                scpPendingManualPathFallback = effectiveRemotePath
-                browseScpPath(targetPath)
-            }
-
-            LaunchedEffect(remoteItems, effectiveRemotePath, scpSelectedPath) {
-                val selectedRemotePath = scpSelectedPath ?: return@LaunchedEffect
-                if (remoteItems.none { entryPathFor(it) == selectedRemotePath }) {
-                    scpSelectedPath = null
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag(UiTestTags.CONNECTING_SCP_PANEL)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        enabled = canGoBack,
-                        onClick = {
-                            if (!canGoBack) return@IconButton
-                            scpPathHistoryIndex -= 1
-                            browseScpPath(scpPathHistory[scpPathHistoryIndex], recordHistory = false)
-                        }
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(
-                        enabled = canGoForward,
-                        onClick = {
-                            if (!canGoForward) return@IconButton
-                            scpPathHistoryIndex += 1
-                            browseScpPath(scpPathHistory[scpPathHistoryIndex], recordHistory = false)
-                        }
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Forward",
-                            tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(
-                        enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(parentPath(effectiveRemotePath)) }
-                    ) {
-                        Icon(
-                            Icons.Default.ArrowUpward,
-                            contentDescription = "Up",
-                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
-                        )
-                    }
-                    IconButton(
-                        enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(effectiveRemotePath, recordHistory = false) }
-                    ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
-                        )
-                    }
-                    IconButton(
-                        enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(scpHomePath ?: ".") }
-                    ) {
-                        Icon(
-                            Icons.Default.Home,
-                            contentDescription = "Home",
-                            tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
-                        )
-                    }
-                    Box {
-                        IconButton(
-                            onClick = { scpActionsExpanded = true },
-                            enabled = !scpTransferActive,
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Actions"
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = scpActionsExpanded,
-                            onDismissRequest = { scpActionsExpanded = false }
-                        ) {
-                            if (showScpUploadVertical) {
-                                DropdownMenuItem(
-                                    text = { Text("Choose local file") },
-                                    enabled = canChooseUploadSource,
-                                    onClick = {
-                                        scpActionsExpanded = false
-                                        scpUploadDocumentPicker.launch(arrayOf("*/*"))
-                                    },
-                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("choose_local_file"))
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Upload here") },
-                                    enabled = canUploadHere,
-                                    onClick = {
-                                        val sourceUri = scpUploadSourceUri ?: return@DropdownMenuItem
-                                        scpActionsExpanded = false
-                                        scpTransferStatus = null
-                                        onScpUpload(
-                                            sourceUri,
-                                            inferRemoteDestination(uploadLocalPath.ifBlank { "upload.bin" }, effectiveRemotePath)
-                                        )
-                                    },
-                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("upload_here"))
-                                )
-                            } else {
-                                DropdownMenuItem(
-                                    text = { Text("Download") },
-                                    enabled = canDownloadSelected,
-                                    onClick = {
-                                        val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                                        scpActionsExpanded = false
-                                        pendingScpDownloadRemotePath = selectedRemotePath
-                                        scpDownloadDocumentPicker.launch(
-                                            selectedRemotePath.substringAfterLast('/').ifBlank { "download.bin" }
-                                        )
-                                    },
-                                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("download"))
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("Rename") },
-                                enabled = canMutateSelection,
-                                onClick = {
-                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                                    scpActionsExpanded = false
-                                    scpRenameValue = selectedRemotePath.substringAfterLast('/').ifBlank { selectedEntry?.name.orEmpty() }
-                                    showScpRenameDialog = true
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("rename"))
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Move") },
-                                enabled = canMoveSelection,
-                                onClick = {
-                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                                    if (!canMoveSelection) return@DropdownMenuItem
-                                    scpActionsExpanded = false
-                                    scpMoveDestination = selectedRemotePath
-                                    showScpMoveDialog = true
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Copy path") },
-                                enabled = canMutateSelection,
-                                onClick = {
-                                    val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                                    scpActionsExpanded = false
-                                    clipboardManager.setText(AnnotatedString(selectedRemotePath))
-                                    scpTransferStatus = "Remote path copied."
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("copy_path"))
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete") },
-                                enabled = canDeleteSelection,
-                                onClick = {
-                                    scpActionsExpanded = false
-                                    if (canDeleteSelection) {
-                                        showScpDeleteDialog = true
-                                    }
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("delete"))
-                            )
-                            DropdownMenuItem(
-                                text = { Text("New folder") },
-                                enabled = !scpTransferActive && !scpListingInProgress,
-                                onClick = {
-                                    scpActionsExpanded = false
-                                    scpNewFolderValue = ""
-                                    showScpNewFolderDialog = true
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("new_folder"))
-                            )
-                        }
-                    }
-                }
-                TextField(
-                    value = scpRemotePath,
-                    onValueChange = { scpRemotePath = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT),
-                    singleLine = true,
-                    enabled = !scpListingInProgress,
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    placeholder = {
-                        Text(
-                            text = "Remote path",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go,
-                        autoCorrect = false
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onGo = { submitScpPathJump() },
-                        onDone = { submitScpPathJump() }
-                    ),
-                    trailingIcon = {
-                        IconButton(
-                            enabled = !scpListingInProgress,
-                            onClick = { submitScpPathJump() }
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Go to path"
-                            )
-                        }
-                    }
-                )
-
-                Text(
-                    text = if (showScpUploadVertical) {
-                        if (uploadLocalPath.isBlank()) {
-                            "Choose a local file from the actions menu, then upload it into the current folder."
-                        } else {
-                            "Local file: $uploadLocalPath"
-                        }
-                    } else {
-                        selectedEntry?.let { "Selected: ${entryPathFor(it)}" } ?: "Select a remote file or folder to act on it."
-                    },
-                    color = colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (scpListingInProgress) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = colorScheme.primary,
-                        trackColor = colorScheme.surfaceVariant
-                    )
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    color = colorScheme.surface,
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    if (remoteItems.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "This folder is empty.",
-                                color = colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 8.dp)
-                        ) {
-                            items(remoteItems, key = { entryPathFor(it) }) { item ->
-                                val absolute = entryPathFor(item)
-                                val selected = scpSelectedPath == absolute
-                                val showOpenAffordance = item.isDirectory || item.linkTargetIsDirectory == true || item.isBrokenLink
-                                val metadataText = when {
-                                    item.isBrokenLink -> "Broken link"
-                                    item.isSymbolicLink && !item.linkTargetPath.isNullOrBlank() -> "-> ${item.linkTargetPath}"
-                                    item.permissionSummary.isNotBlank() -> item.permissionSummary
-                                    else -> null
-                                }
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable(enabled = !scpListingInProgress) {
-                                            if (item.isBrokenLink) {
-                                                Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
-                                            }
-                                            scpSelectedPath = absolute
-                                            scpTransferStatus = if (item.isBrokenLink) {
-                                                "Broken link: ${item.name}"
-                                            } else {
-                                                null
-                                            }
-                                        }
-                                        .testTag(UiTestTags.connectingScpRemoteRow(absolute)),
-                                    color = if (selected) colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = when {
-                                                item.isSymbolicLink -> Icons.Default.Link
-                                                item.isDirectory -> Icons.Default.Folder
-                                                else -> Icons.Default.Description
-                                            },
-                                            contentDescription = null,
-                                            tint = when {
-                                                item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
-                                                item.isSymbolicLink -> colorScheme.primary
-                                                item.isDirectory -> colorScheme.primary
-                                                else -> colorScheme.onSurfaceVariant
-                                            }
-                                        )
-                                        Column(
-                                            modifier = Modifier.weight(1f),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(
-                                                text = item.name,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = when {
-                                                    item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
-                                                    item.isSymbolicLink -> colorScheme.primary
-                                                    else -> colorScheme.onSurface
-                                                },
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (metadataText != null) {
-                                                Text(
-                                                    text = metadataText,
-                                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                                    color = if (item.isBrokenLink) colorScheme.error else colorScheme.onSurfaceVariant,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                        Column(
-                                            horizontalAlignment = Alignment.End,
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(
-                                                text = formatRemoteModifiedTime(item.modifiedAtEpochMillis),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.End,
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = if (item.isDirectory) "Folder" else com.majordaftapps.sshpeaches.app.service.formatByteCount(item.sizeBytes),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.End,
-                                                maxLines = 1
-                                            )
-                                        }
-                                        if (showOpenAffordance) {
-                                            IconButton(
-                                                onClick = {
-                                                    if (item.isBrokenLink) {
-                                                        Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
-                                                        return@IconButton
-                                                    }
-                                                    scpPendingLinkPathTarget = if (item.isSymbolicLink) absolute else null
-                                                    scpPendingLinkPathFallback = if (item.isSymbolicLink) effectiveRemotePath else null
-                                                    browseScpPath(absolute)
-                                                },
-                                                enabled = !scpListingInProgress,
-                                                modifier = Modifier.testTag(UiTestTags.connectingScpRemoteOpen(absolute))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                                    contentDescription = "Open folder",
-                                                    tint = colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = activeFileTransfer != null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    activeFileTransfer?.let { transfer ->
-                        FileTransferStatusStrip(
-                            transfer = transfer,
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_TRANSFER_STRIP)
-                        )
-                    }
-                }
-                AnimatedVisibility(
-                    visible = scpTransferStatus != null && activeFileTransfer == null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    scpTransferStatus?.let { status ->
-                        ScpStatusStrip(
-                            status = status,
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_STATUS_STRIP)
-                        )
-                    }
-                }
-            }
-
-            if (showScpRenameDialog && selectedEntry != null) {
-                AlertDialog(
-                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_DIALOG),
-                    onDismissRequest = { showScpRenameDialog = false },
-                    title = { Text("Rename") },
-                    text = {
-                        TextField(
-                            value = scpRenameValue,
-                            onValueChange = { scpRenameValue = it },
-                            singleLine = true,
-                            label = { Text("Name") },
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_INPUT)
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            enabled = scpRenameValue.trim().isNotBlank(),
-                            onClick = {
-                                val sourcePath = scpSelectedPath ?: return@TextButton
-                                showScpRenameDialog = false
-                                scpSelectedPath = null
-                                onManageRemotePath(
-                                    "move",
-                                    sourcePath,
-                                    resolveChildPath(parentPath(sourcePath), scpRenameValue.trim())
-                                )
-                            }
-                        ) {
-                            Text("Rename")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showScpRenameDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
-
-            if (showScpMoveDialog && selectedEntry != null) {
-                AlertDialog(
-                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_DIALOG),
-                    onDismissRequest = { showScpMoveDialog = false },
-                    title = { Text("Move") },
-                    text = {
-                        TextField(
-                            value = scpMoveDestination,
-                            onValueChange = { scpMoveDestination = it },
-                            singleLine = true,
-                            label = { Text("Destination path") },
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_INPUT)
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            enabled = scpMoveDestination.trim().isNotBlank(),
-                            onClick = {
-                                val sourcePath = scpSelectedPath ?: return@TextButton
-                                showScpMoveDialog = false
-                                scpSelectedPath = null
-                                onManageRemotePath("move", sourcePath, scpMoveDestination.trim())
-                            }
-                        ) {
-                            Text("Move")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showScpMoveDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
-
-            if (showScpNewFolderDialog) {
-                AlertDialog(
-                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG),
-                    onDismissRequest = { showScpNewFolderDialog = false },
-                    title = { Text("New folder") },
-                    text = {
-                        TextField(
-                            value = scpNewFolderValue,
-                            onValueChange = { scpNewFolderValue = it },
-                            singleLine = true,
-                            label = { Text("Folder name") },
-                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_INPUT)
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            enabled = scpNewFolderValue.trim().isNotBlank(),
-                            onClick = {
-                                showScpNewFolderDialog = false
-                                onManageRemotePath("mkdir", resolveChildPath(effectiveRemotePath, scpNewFolderValue.trim()), null)
-                            }
-                        ) {
-                            Text("Create")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showScpNewFolderDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
-
-            if (showScpDeleteDialog && selectedEntry != null) {
-                AlertDialog(
-                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DELETE_DIALOG),
-                    onDismissRequest = { showScpDeleteDialog = false },
-                    title = { Text("Delete") },
-                    text = {
-                        Text(
-                            if (deleteProtectedSelection) {
-                                "${selectedEntry.name} is a protected system folder and cannot be deleted."
-                            } else {
-                                "Delete ${selectedEntry.name}?"
-                            }
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            enabled = !deleteProtectedSelection,
-                            onClick = {
-                                if (deleteProtectedSelection) return@TextButton
-                                val sourcePath = scpSelectedPath ?: return@TextButton
-                                showScpDeleteDialog = false
-                                scpSelectedPath = null
-                                onManageRemotePath("delete", sourcePath, null)
-                            }
-                        ) {
-                            Text("Delete", color = colorScheme.error)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showScpDeleteDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
+            ConnectingScpContent(
+                request = request,
+                remoteDirectory = remoteDirectory,
+                scpVisibleEntries = scpVisibleEntries,
+                scpLastListedPath = scpLastListedPath,
+                scpPendingListPath = scpPendingListPath,
+                scpPathHistory = scpPathHistory,
+                scpPathHistoryIndex = scpPathHistoryIndex,
+                onScpPathHistoryIndexChange = { scpPathHistoryIndex = it },
+                scpSelectedPath = scpSelectedPath,
+                onScpSelectedPathChange = { scpSelectedPath = it },
+                scpRemotePath = scpRemotePath,
+                onScpRemotePathChange = { scpRemotePath = it },
+                pendingScpDownloadRemotePath = pendingScpDownloadRemotePath,
+                onPendingScpDownloadRemotePathChange = { pendingScpDownloadRemotePath = it },
+                scpUploadSourceUri = scpUploadSourceUri,
+                onScpUploadSourceUriChange = { scpUploadSourceUri = it },
+                uploadLocalPath = uploadLocalPath,
+                onUploadLocalPathChange = { uploadLocalPath = it },
+                scpTransferStatus = scpTransferStatus,
+                onScpTransferStatusChange = { scpTransferStatus = it },
+                showScpUploadVertical = showScpUploadVertical,
+                scpActionsExpanded = scpActionsExpanded,
+                onScpActionsExpandedChange = { scpActionsExpanded = it },
+                onScpPendingManualPathTargetChange = { scpPendingManualPathTarget = it },
+                onScpPendingManualPathFallbackChange = { scpPendingManualPathFallback = it },
+                onScpPendingLinkPathTargetChange = { scpPendingLinkPathTarget = it },
+                onScpPendingLinkPathFallbackChange = { scpPendingLinkPathFallback = it },
+                scpHomePath = scpHomePath,
+                showScpRenameDialog = showScpRenameDialog,
+                onShowScpRenameDialogChange = { showScpRenameDialog = it },
+                scpRenameValue = scpRenameValue,
+                onScpRenameValueChange = { scpRenameValue = it },
+                showScpMoveDialog = showScpMoveDialog,
+                onShowScpMoveDialogChange = { showScpMoveDialog = it },
+                scpMoveDestination = scpMoveDestination,
+                onScpMoveDestinationChange = { scpMoveDestination = it },
+                showScpNewFolderDialog = showScpNewFolderDialog,
+                onShowScpNewFolderDialogChange = { showScpNewFolderDialog = it },
+                scpNewFolderValue = scpNewFolderValue,
+                onScpNewFolderValueChange = { scpNewFolderValue = it },
+                showScpDeleteDialog = showScpDeleteDialog,
+                onShowScpDeleteDialogChange = { showScpDeleteDialog = it },
+                activeFileTransfer = activeFileTransfer,
+                scpTransferActive = scpTransferActive,
+                context = context,
+                hideKeyboard = { keyboardController?.hide() },
+                onCopyRemotePath = { clipboardManager.setText(AnnotatedString(it)) },
+                browseScpPath = ::browseScpPath,
+                onScpDownload = onScpDownload,
+                onScpUpload = onScpUpload,
+                onManageRemotePath = onManageRemotePath,
+                inferRemoteDestination = ::inferRemoteDestination,
+                resolveChildPath = ::resolveChildPath,
+                parentPath = ::parentPath
+            )
         } else if (showSftpCliSession && request != null) {
-            val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
-            val currentRemoteSnapshotKey = remember(remoteDirectory) {
-                remoteDirectory?.let { snapshot ->
-                    buildString {
-                        append(snapshot.path)
-                        append('|')
-                        append(snapshot.entries.size)
-                        snapshot.entries.forEach { entry ->
-                            append('|')
-                            append(if (entry.isDirectory) 'd' else 'f')
-                            append(':')
-                            append(entry.name)
-                            append(':')
-                            append(entry.sizeBytes)
-                        }
-                    }
-                }.orEmpty()
-            }
-            fun beginSftpCommandWait(waitForDirectoryRefresh: Boolean) {
-                sftpCancelDelayJob?.cancel()
-                sftpCommandRunning = true
-                sftpShowCancel = false
-                sftpAwaitDirectoryRefresh = waitForDirectoryRefresh
-                sftpCommandStartLogCount = logs.size
-                sftpCommandStartDirectoryKey = currentRemoteSnapshotKey
-                sftpCancelDelayJob = scope.launch {
-                    delay(SFTP_CANCEL_BUTTON_DELAY_MS)
-                    if (sftpCommandRunning) {
-                        sftpShowCancel = true
-                    }
-                }
-            }
-            val sftpDownloadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
-                val remote = pendingSftpDownloadRemotePath
-                pendingSftpDownloadRemotePath = null
-                if (remote.isNullOrBlank()) return@rememberLauncherForActivityResult
-                if (uri == null) {
-                    appendSftpConsole("Save location selection cancelled.")
-                    return@rememberLauncherForActivityResult
-                }
-                beginSftpCommandWait(waitForDirectoryRefresh = false)
-                onSftpDownload(remote, uri.toString())
-                appendSftpConsole("Downloading $remote -> $uri")
-            }
-            val sftpUploadDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                val remoteBase = pendingSftpUploadBasePath
-                pendingSftpUploadBasePath = null
-                if (remoteBase.isNullOrBlank()) return@rememberLauncherForActivityResult
-                if (uri == null) {
-                    appendSftpConsole("Local file selection cancelled.")
-                    return@rememberLauncherForActivityResult
-                }
-                val localName = queryUriDisplayName(context, uri) ?: "upload.bin"
-                val remote = inferRemoteDestination(localName, remoteBase)
-                beginSftpCommandWait(waitForDirectoryRefresh = false)
-                onSftpUpload(uri.toString(), remote)
-                appendSftpConsole("Uploading $localName -> $remote")
-            }
-            val consoleScrollState = rememberScrollState()
-            val sftpBusy = sftpCommandRunning || sftpTransferActive
-
-            fun resolveLocalPath(raw: String): String {
-                val candidate = File(raw)
-                return if (candidate.isAbsolute) {
-                    candidate.absolutePath
-                } else {
-                    File(sftpLocalPath, raw).absolutePath
-                }
-            }
-
-            fun finishSftpCommandWait() {
-                sftpCancelDelayJob?.cancel()
-                sftpCancelDelayJob = null
-                sftpCommandRunning = false
-                sftpShowCancel = false
-                sftpAwaitDirectoryRefresh = false
-                sftpCommandStartLogCount = 0
-                sftpCommandStartDirectoryKey = ""
-            }
-
-            fun runSftpCommand(input: String) {
-                val command = input.trim()
-                if (command.isEmpty()) return
-                if (sftpTransferActive) {
-                    appendSftpConsole("A file transfer is already running for this session.")
-                    return
-                }
-                if (sftpCommandRunning) {
-                    appendSftpConsole("A command is already running. Tap Cancel to stop waiting.")
-                    return
-                }
-                appendSftpConsole("sftp> $command")
-                val tokens = tokenizeSftpCommand(command)
-                if (tokens.isEmpty()) return
-                val cmd = tokens.first().lowercase()
-                val args = tokens.drop(1)
-                when (cmd) {
-                    "help", "?" -> {
-                        appendSftpConsole("Commands: ls [path], cd <path>, pwd, get <remote> [local], put [local] [remote]")
-                        appendSftpConsole("          mkdir <path>, rm <path>, mv <src> <dst>, lcd <path>, lpwd, lls [path], refresh, clear")
-                        appendSftpConsole("          get without a local path opens a save picker; put without a local path opens a file picker")
-                    }
-                    "clear" -> sftpConsoleLines.clear()
-                    "pwd" -> appendSftpConsole(effectiveSftpPath)
-                    "lpwd" -> appendSftpConsole(sftpLocalPath)
-                    "refresh" -> {
-                        beginSftpCommandWait(waitForDirectoryRefresh = true)
-                        sftpPendingDirectoryEcho = effectiveSftpPath
-                        onSftpListDirectory(effectiveSftpPath)
-                    }
-                    "ls" -> {
-                        val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull().orEmpty())
-                        beginSftpCommandWait(waitForDirectoryRefresh = true)
-                        sftpPath = target
-                        sftpPendingDirectoryEcho = target
-                        onSftpListDirectory(target)
-                    }
-                    "cd" -> {
-                        val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull() ?: ".")
-                        beginSftpCommandWait(waitForDirectoryRefresh = true)
-                        sftpPath = target
-                        sftpPendingDirectoryEcho = target
-                        onSftpListDirectory(target)
-                    }
-                    "lcd" -> {
-                        val targetArg = args.firstOrNull()
-                        if (targetArg.isNullOrBlank()) {
-                            appendSftpConsole("usage: lcd <local-path>")
-                        } else {
-                            val target = File(resolveLocalPath(targetArg))
-                            if (target.exists() && target.isDirectory) {
-                                sftpLocalPath = target.absolutePath
-                                appendSftpConsole("Local directory: ${target.absolutePath}")
-                            } else {
-                                appendSftpConsole("lcd failed: no such directory: ${target.absolutePath}")
-                            }
-                        }
-                    }
-                    "lls" -> {
-                        val target = File(
-                            resolveLocalPath(args.firstOrNull().orEmpty().ifBlank { "." })
-                        )
-                        if (!target.exists() || !target.isDirectory) {
-                            appendSftpConsole("lls failed: no such directory: ${target.absolutePath}")
-                        } else {
-                            appendSftpConsole("Local directory: ${target.absolutePath}")
-                            val entries = listLocalFiles(target.absolutePath)
-                            if (entries.isEmpty()) {
-                                appendSftpConsole("(empty)")
-                            } else {
-                                entries.forEach { item ->
-                                    appendSftpConsole(
-                                        "${if (item.isDirectory) "d" else "-"} ${item.length()} ${item.name}"
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    "get" -> {
-                        val remoteArg = args.firstOrNull()
-                        if (remoteArg.isNullOrBlank()) {
-                            appendSftpConsole("usage: get <remote-path> [local-path]")
-                        } else {
-                            val remote = resolveRemotePath(effectiveSftpPath, remoteArg)
-                            val explicitLocal = args.getOrNull(1)?.takeIf { it.isNotBlank() }
-                            if (explicitLocal == null) {
-                                pendingSftpDownloadRemotePath = remote
-                                sftpDownloadDocumentPicker.launch(
-                                    remote.substringAfterLast('/').ifBlank { "download.bin" }
-                                )
-                            } else {
-                                val local = resolveLocalPath(explicitLocal)
-                                beginSftpCommandWait(waitForDirectoryRefresh = false)
-                                onSftpDownload(remote, local)
-                                appendSftpConsole("Downloading $remote -> $local")
-                            }
-                        }
-                    }
-                    "put" -> {
-                        val localArg = args.firstOrNull()
-                        if (localArg.isNullOrBlank()) {
-                            pendingSftpUploadBasePath = effectiveSftpPath
-                            sftpUploadDocumentPicker.launch(arrayOf("*/*"))
-                        } else {
-                            val local = resolveLocalPath(localArg)
-                            val remote = args.getOrNull(1)?.takeIf { it.isNotBlank() }?.let {
-                                resolveRemotePath(effectiveSftpPath, it)
-                            } ?: inferRemoteDestination(local, effectiveSftpPath)
-                            beginSftpCommandWait(waitForDirectoryRefresh = false)
-                            onSftpUpload(local, remote)
-                            appendSftpConsole("Uploading $local -> $remote")
-                        }
-                    }
-                    "mkdir" -> {
-                        val targetArg = args.firstOrNull()
-                        if (targetArg.isNullOrBlank()) {
-                            appendSftpConsole("usage: mkdir <remote-path>")
-                        } else {
-                            val target = resolveRemotePath(effectiveSftpPath, targetArg)
-                            beginSftpCommandWait(waitForDirectoryRefresh = false)
-                            onManageRemotePath("mkdir", target, null)
-                            appendSftpConsole("Created directory: $target")
-                        }
-                    }
-                    "rm", "delete" -> {
-                        val targetArg = args.firstOrNull()
-                        if (targetArg.isNullOrBlank()) {
-                            appendSftpConsole("usage: rm <remote-path>")
-                        } else {
-                            val target = resolveRemotePath(effectiveSftpPath, targetArg)
-                            beginSftpCommandWait(waitForDirectoryRefresh = false)
-                            onManageRemotePath("delete", target, null)
-                            appendSftpConsole("Deleted: $target")
-                        }
-                    }
-                    "mv", "rename" -> {
-                        val srcArg = args.getOrNull(0)
-                        val dstArg = args.getOrNull(1)
-                        if (srcArg.isNullOrBlank() || dstArg.isNullOrBlank()) {
-                            appendSftpConsole("usage: mv <remote-src> <remote-dst>")
-                        } else {
-                            val src = resolveRemotePath(effectiveSftpPath, srcArg)
-                            val dst = resolveRemotePath(effectiveSftpPath, dstArg)
-                            beginSftpCommandWait(waitForDirectoryRefresh = false)
-                            onManageRemotePath("move", src, dst)
-                            appendSftpConsole("Moved: $src -> $dst")
-                        }
-                    }
-                    "exit", "quit", "bye" -> {
-                        appendSftpConsole("Use the top-right close action to disconnect this session.")
-                    }
-                    else -> appendSftpConsole("Unknown command: $cmd. Type 'help' for commands.")
-                }
-            }
-
-            LaunchedEffect(sftpCommandRunning, logs.size, currentRemoteSnapshotKey) {
-                if (!sftpCommandRunning) return@LaunchedEffect
-                val completedByLog = logs.size > sftpCommandStartLogCount
-                val completedByDirectory =
-                    sftpAwaitDirectoryRefresh &&
-                        currentRemoteSnapshotKey.isNotBlank() &&
-                        currentRemoteSnapshotKey != sftpCommandStartDirectoryKey
-                if (completedByLog || completedByDirectory) {
-                    finishSftpCommandWait()
-                }
-            }
-
-            LaunchedEffect(sftpConsoleLines.size) {
-                if (sftpConsoleLines.isNotEmpty()) {
-                    consoleScrollState.animateScrollTo(consoleScrollState.maxValue)
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.ime
-                            .exclude(WindowInsets.navigationBars)
-                            .only(WindowInsetsSides.Bottom)
-                    )
-                    .testTag(UiTestTags.CONNECTING_SFTP_PANEL)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "SFTP Console",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Remote: $effectiveSftpPath",
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                )
-                Text(
-                    text = "Local: $sftpLocalPath",
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                )
-                if (activeFileTransfer != null) {
-                    FileTransferProgressCard(transfer = activeFileTransfer)
-                } else if (sftpTransferStatus != null) {
-                    ScpStatusStrip(
-                        status = sftpTransferStatus.orEmpty(),
-                        modifier = Modifier.testTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP)
-                    )
-                }
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .testTag(UiTestTags.CONNECTING_SFTP_CONSOLE),
-                    color = Color(0xFF0F0F0F)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(consoleScrollState)
-                            .padding(12.dp)
-                    ) {
-                        val activityLog = if (sftpConsoleLines.isEmpty()) {
-                            "sftp> help"
-                        } else {
-                            sftpConsoleLines.joinToString(separator = "\n")
-                        }
-                        Text(
-                            text = activityLog,
-                            color = Color(0xFFE5E5E5),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = sftpCommandInput,
-                    onValueChange = { sftpCommandInput = it },
-                    label = { Text("Command (e.g. ls, cd /, get file.txt)") },
-                    singleLine = true,
-                    enabled = !sftpBusy,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.Done,
-                        autoCorrect = false
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            if (sftpBusy) return@KeyboardActions
-                            val cmd = sftpCommandInput
-                            sftpCommandInput = ""
-                            runSftpCommand(cmd)
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            if (sftpCommandRunning && sftpShowCancel) {
-                                finishSftpCommandWait()
-                                appendSftpConsole("Cancelled waiting for command completion.")
-                                return@Button
-                            }
-                            if (sftpBusy) return@Button
-                            val cmd = sftpCommandInput
-                            sftpCommandInput = ""
-                            runSftpCommand(cmd)
-                        },
-                        enabled = (!sftpBusy) || (sftpCommandRunning && sftpShowCancel),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON)
-                    ) {
-                        Text(if (sftpCommandRunning && sftpShowCancel) "Cancel" else "Run")
-                    }
-                    Button(
-                        onClick = { runSftpCommand("help") },
-                        enabled = !sftpBusy,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(UiTestTags.CONNECTING_SFTP_HELP_BUTTON)
-                    ) { Text("Help") }
-                    Button(
-                        onClick = { runSftpCommand("refresh") },
-                        enabled = !sftpBusy,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(UiTestTags.CONNECTING_SFTP_REFRESH_BUTTON)
-                    ) { Text("Refresh") }
-                }
-            }
+            ConnectingSftpContent(
+                remoteDirectory = remoteDirectory,
+                logs = logs,
+                scope = scope,
+                context = context,
+                activeFileTransfer = activeFileTransfer,
+                sftpTransferActive = sftpTransferActive,
+                sftpTransferStatus = sftpTransferStatus,
+                sftpPath = sftpPath,
+                onSftpPathChange = { sftpPath = it },
+                sftpLocalPath = sftpLocalPath,
+                onSftpLocalPathChange = { sftpLocalPath = it },
+                sftpConsoleLines = sftpConsoleLines,
+                appendSftpConsole = ::appendSftpConsole,
+                clearSftpConsole = { sftpConsoleLines.clear() },
+                sftpCommandInput = sftpCommandInput,
+                onSftpCommandInputChange = { sftpCommandInput = it },
+                sftpPendingDirectoryEcho = sftpPendingDirectoryEcho,
+                onSftpPendingDirectoryEchoChange = { sftpPendingDirectoryEcho = it },
+                pendingSftpDownloadRemotePath = pendingSftpDownloadRemotePath,
+                onPendingSftpDownloadRemotePathChange = { pendingSftpDownloadRemotePath = it },
+                pendingSftpUploadBasePath = pendingSftpUploadBasePath,
+                onPendingSftpUploadBasePathChange = { pendingSftpUploadBasePath = it },
+                sftpCommandRunning = sftpCommandRunning,
+                onSftpCommandRunningChange = { sftpCommandRunning = it },
+                sftpShowCancel = sftpShowCancel,
+                onSftpShowCancelChange = { sftpShowCancel = it },
+                sftpAwaitDirectoryRefresh = sftpAwaitDirectoryRefresh,
+                onSftpAwaitDirectoryRefreshChange = { sftpAwaitDirectoryRefresh = it },
+                sftpCommandStartLogCount = sftpCommandStartLogCount,
+                onSftpCommandStartLogCountChange = { sftpCommandStartLogCount = it },
+                sftpCommandStartDirectoryKey = sftpCommandStartDirectoryKey,
+                onSftpCommandStartDirectoryKeyChange = { sftpCommandStartDirectoryKey = it },
+                sftpCancelDelayJob = sftpCancelDelayJob,
+                onSftpCancelDelayJobChange = { sftpCancelDelayJob = it },
+                onSftpListDirectory = onSftpListDirectory,
+                onSftpDownload = onSftpDownload,
+                onSftpUpload = onSftpUpload,
+                onManageRemotePath = onManageRemotePath,
+                inferRemoteDestination = ::inferRemoteDestination,
+                resolveRemotePath = ::resolveRemotePath,
+                listLocalFiles = ::listLocalFiles
+            )
         } else if (request != null) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-            ) {
-                val isShortHeight = maxHeight <= 520.dp
-                val heroSize = if (isShortHeight) 180.dp else 360.dp
-                val outerGlowSize = if (isShortHeight) 168.dp else 340.dp
-                val innerGlowSize = if (isShortHeight) 120.dp else 250.dp
-                val logoSize = if (isShortHeight) 72.dp else 128.dp
-                val logsHeight = if (isShortHeight) 120.dp else 220.dp
-                val contentSpacing = if (isShortHeight) 8.dp else 12.dp
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = if (isShortHeight) 12.dp else 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(contentSpacing)
-                ) {
-                    Box(
-                        modifier = Modifier.size(heroSize),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(outerGlowSize)
-                                .blur(if (isShortHeight) 36.dp else 72.dp)
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0x2EFFFFFF),
-                                            Color(0x14FFFFFF),
-                                            Color(0x08F7F4EF),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(999.dp)
-                                )
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(innerGlowSize)
-                                .blur(if (isShortHeight) 16.dp else 32.dp)
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0x18FFFFFF),
-                                            Color(0x0CFBF7F1),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(999.dp)
-                                )
-                        )
-                        Image(
-                            painter = painterResource(id = R.drawable.sshpeaches_activitybar),
-                            contentDescription = "SSHPeaches logo",
-                            colorFilter = ColorFilter.tint(Color(0xFFFA992A)),
-                            modifier = Modifier.size(logoSize),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-
-                    Text(
-                        text = statusText,
-                        style = (if (isShortHeight) {
-                            MaterialTheme.typography.headlineSmall
-                        } else {
-                            MaterialTheme.typography.headlineMedium
-                        }).copy(
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor
-                        )
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        if (state.phase == QuickConnectPhase.CONNECTING || state.phase == QuickConnectPhase.IDLE) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Text(
-                            text = hostName,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color.Gray,
-                                fontStyle = FontStyle.Italic
-                            )
-                        )
-                    }
-
-                    detailLine?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E))
-                        )
-                    }
-                    userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD))
-                        )
-                    }
-                    activeFileTransfer?.let { transfer ->
-                        FileTransferProgressCard(transfer = transfer)
-                    }
-
-                    ConnectionLogsPane(
-                        renderedLogs = renderedLogs,
-                        listState = listState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(logsHeight)
-                    )
-                }
-            }
-        }
-
-        if (showSnippetPicker && showTerminalSession) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showSnippetPicker = false },
-                title = { Text("Run Snippet") },
-                text = {
-                    if (snippets.isEmpty()) {
-                        Text("No snippets available. Create snippets in Snippets first.")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(UiTestTags.CONNECTING_SNIPPET_PICKER)
-                                .height(320.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(snippets, key = { it.id }) { snippet ->
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            runSnippetOnCurrentSession(snippet)
-                                            showSnippetPicker = false
-                                        },
-                                    color = Color(0xFF111111),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            text = snippet.title,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.White
-                                        )
-                                        if (snippet.description.isNotBlank()) {
-                                            Text(
-                                                text = snippet.description,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color(0xFFBDBDBD),
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                        Text(
-                                            text = snippet.command,
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                            color = Color(0xFFE5E5E5),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showSnippetPicker = false }) {
-                        Text("Close")
-                    }
-                }
+            ConnectingStatusContent(
+                request = request,
+                state = state,
+                statusText = statusText,
+                statusColor = statusColor,
+                hostName = hostName,
+                detailLine = detailLine,
+                userFacingStateMessage = userFacingStateMessage,
+                activeFileTransfer = activeFileTransfer,
+                renderedLogs = renderedLogs,
+                listState = listState
             )
         }
 
+        if (showSnippetPicker && showTerminalSession) {
+            SnippetPickerDialog(
+                snippets = snippets,
+                onRunSnippet = {
+                    runSnippetOnCurrentSession(it)
+                    showSnippetPicker = false
+                },
+                onDismiss = { showSnippetPicker = false }
+            )
+        }
         if (state.phase == QuickConnectPhase.ERROR) {
             IconButton(
                 onClick = onRetry,
@@ -2862,6 +1603,1401 @@ fun ConnectingScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ConnectingTerminalContent(
+    terminalViewClient: TerminalViewClient,
+    terminalMarginDp: Dp,
+    showFindDialog: Boolean,
+    findQuery: String,
+    onFindQueryChange: (String) -> Unit,
+    findCaseSensitive: Boolean,
+    onFindCaseSensitiveChange: (Boolean) -> Unit,
+    findMatches: List<TerminalFindMatch>,
+    findMatchIndex: Int,
+    onFindMatchIndexChange: (Int) -> Unit,
+    activeFindMatch: TerminalFindMatch?,
+    onDismissFind: () -> Unit,
+    compactKeys: List<CompactTerminalKey>,
+    pendingModifiers: Set<KeyboardModifier>,
+    activeAliasIcons: Set<String>,
+    onSendCompactKey: (CompactTerminalKey) -> Unit,
+    imeBridgeValue: TextFieldValue,
+    onImeBridgeValueChange: (TextFieldValue) -> Unit,
+    keyboardFocusRequester: FocusRequester,
+    onKeyboardFocusChanged: (Boolean) -> Unit,
+    handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
+    terminalInput: TerminalInputRouter,
+    updateTerminalView: (TerminalView) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(
+                    WindowInsets.ime
+                        .exclude(WindowInsets.navigationBars)
+                        .only(WindowInsetsSides.Bottom)
+                ),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .testTag(UiTestTags.CONNECTING_TERMINAL_PANEL),
+                color = Color(0xFF080808)
+            ) {
+                AndroidView(
+                    factory = {
+                        TerminalView(it, null).apply {
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                            setTerminalViewClient(terminalViewClient)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(terminalMarginDp),
+                    update = updateTerminalView
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (showFindDialog) {
+                    TerminalFindPanel(
+                        findQuery = findQuery,
+                        onFindQueryChange = onFindQueryChange,
+                        findCaseSensitive = findCaseSensitive,
+                        onFindCaseSensitiveChange = onFindCaseSensitiveChange,
+                        findMatches = findMatches,
+                        findMatchIndex = findMatchIndex,
+                        onFindMatchIndexChange = onFindMatchIndexChange,
+                        activeFindMatch = activeFindMatch,
+                        onDismiss = onDismissFind
+                    )
+                }
+
+                CompactKeyRow(
+                    keys = compactKeys,
+                    activeModifiers = pendingModifiers,
+                    activeAliasIcons = activeAliasIcons,
+                    onSendKey = onSendCompactKey,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        BasicTextField(
+            value = imeBridgeValue,
+            onValueChange = onImeBridgeValueChange,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .size(1.dp)
+                .alpha(0f)
+                .focusRequester(keyboardFocusRequester)
+                .onFocusChanged { onKeyboardFocusChanged(it.isFocused) }
+                .onPreviewKeyEvent { keyEvent ->
+                    val nativeEvent = keyEvent.nativeKeyEvent
+                    if (handleVolumeKeyForFontSize(nativeEvent)) {
+                        return@onPreviewKeyEvent true
+                    }
+                    if (nativeEvent.action != KeyEvent.ACTION_DOWN) {
+                        return@onPreviewKeyEvent false
+                    }
+                    terminalInput.onAndroidKeyDown(nativeEvent)
+                },
+            singleLine = false,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.None,
+                autoCorrect = false
+            )
+        )
+    }
+}
+
+@Composable
+private fun TerminalFindPanel(
+    findQuery: String,
+    onFindQueryChange: (String) -> Unit,
+    findCaseSensitive: Boolean,
+    onFindCaseSensitiveChange: (Boolean) -> Unit,
+    findMatches: List<TerminalFindMatch>,
+    findMatchIndex: Int,
+    onFindMatchIndexChange: (Int) -> Unit,
+    activeFindMatch: TerminalFindMatch?,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF101010),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .border(
+                            width = 1.dp,
+                            color = Color(0xFF2D2D2D),
+                            shape = RoundedCornerShape(6.dp)
+                        ),
+                    color = Color(0xFF161616),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        BasicTextField(
+                            value = findQuery,
+                            onValueChange = onFindQueryChange,
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFFEDEDED)
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.None,
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Search,
+                                autoCorrect = false
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.CONNECTING_FIND_INPUT),
+                            decorationBox = { inner ->
+                                if (findQuery.isBlank()) {
+                                    Text(
+                                        text = "Find",
+                                        maxLines = 1,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF8C8C8C)
+                                        )
+                                    )
+                                }
+                                inner()
+                            }
+                        )
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { onFindCaseSensitiveChange(!findCaseSensitive) },
+                    color = if (findCaseSensitive) Color(0xFF5B3A0F) else Color(0xFF1B1B1B),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Aa",
+                            color = Color(0xFFEDEDED),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = {
+                        if (findMatches.isNotEmpty()) {
+                            val size = findMatches.size
+                            onFindMatchIndexChange(((findMatchIndex - 1) % size + size) % size)
+                        }
+                    },
+                    enabled = findMatches.isNotEmpty(),
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Previous result",
+                        tint = Color(0xFFDEDEDE)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (findMatches.isNotEmpty()) {
+                            onFindMatchIndexChange((findMatchIndex + 1).mod(findMatches.size))
+                        }
+                    },
+                    enabled = findMatches.isNotEmpty(),
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Next result",
+                        tint = Color(0xFFDEDEDE)
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close find",
+                        tint = Color(0xFFBDBDBD)
+                    )
+                }
+            }
+            Text(
+                text = when {
+                    findQuery.isBlank() -> "Enter search text"
+                    findMatches.isEmpty() -> "No matches"
+                    else -> {
+                        val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
+                        if (activeFindMatch != null) {
+                            "${activeIndex + 1}/${findMatches.size} line ${activeFindMatch.line}: ${activeFindMatch.preview}"
+                        } else {
+                            "${activeIndex + 1}/${findMatches.size}"
+                        }
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = Color(0xFFBDBDBD),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConnectingScpContent(
+    request: QuickConnectRequest,
+    remoteDirectory: RemoteDirectorySnapshot?,
+    scpVisibleEntries: List<RemoteDirectoryEntry>,
+    scpLastListedPath: String,
+    scpPendingListPath: String?,
+    scpPathHistory: List<String>,
+    scpPathHistoryIndex: Int,
+    onScpPathHistoryIndexChange: (Int) -> Unit,
+    scpSelectedPath: String?,
+    onScpSelectedPathChange: (String?) -> Unit,
+    scpRemotePath: String,
+    onScpRemotePathChange: (String) -> Unit,
+    pendingScpDownloadRemotePath: String?,
+    onPendingScpDownloadRemotePathChange: (String?) -> Unit,
+    scpUploadSourceUri: String?,
+    onScpUploadSourceUriChange: (String?) -> Unit,
+    uploadLocalPath: String,
+    onUploadLocalPathChange: (String) -> Unit,
+    scpTransferStatus: String?,
+    onScpTransferStatusChange: (String?) -> Unit,
+    showScpUploadVertical: Boolean,
+    scpActionsExpanded: Boolean,
+    onScpActionsExpandedChange: (Boolean) -> Unit,
+    onScpPendingManualPathTargetChange: (String?) -> Unit,
+    onScpPendingManualPathFallbackChange: (String?) -> Unit,
+    onScpPendingLinkPathTargetChange: (String?) -> Unit,
+    onScpPendingLinkPathFallbackChange: (String?) -> Unit,
+    scpHomePath: String?,
+    showScpRenameDialog: Boolean,
+    onShowScpRenameDialogChange: (Boolean) -> Unit,
+    scpRenameValue: String,
+    onScpRenameValueChange: (String) -> Unit,
+    showScpMoveDialog: Boolean,
+    onShowScpMoveDialogChange: (Boolean) -> Unit,
+    scpMoveDestination: String,
+    onScpMoveDestinationChange: (String) -> Unit,
+    showScpNewFolderDialog: Boolean,
+    onShowScpNewFolderDialogChange: (Boolean) -> Unit,
+    scpNewFolderValue: String,
+    onScpNewFolderValueChange: (String) -> Unit,
+    showScpDeleteDialog: Boolean,
+    onShowScpDeleteDialogChange: (Boolean) -> Unit,
+    activeFileTransfer: FileTransferProgress?,
+    scpTransferActive: Boolean,
+    context: Context,
+    hideKeyboard: () -> Unit,
+    onCopyRemotePath: (String) -> Unit,
+    browseScpPath: (String, Boolean, Boolean, Boolean) -> Unit,
+    onScpDownload: (String, String?) -> Unit,
+    onScpUpload: (String, String) -> Unit,
+    onManageRemotePath: (String, String, String?) -> Unit,
+    inferRemoteDestination: (String, String) -> String,
+    resolveChildPath: (String, String) -> String,
+    parentPath: (String) -> String
+) {
+    val remoteItems = remoteDirectory?.entries ?: scpVisibleEntries
+    val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
+    val scpListingInProgress = scpPendingListPath != null
+    val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
+    val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex && !scpListingInProgress
+    val colorScheme = MaterialTheme.colorScheme
+    val entryPathFor: (RemoteDirectoryEntry) -> String = { entry ->
+        entry.absolutePath.ifBlank { resolveChildPath(effectiveRemotePath, entry.name) }
+    }
+    val selectedEntry = remoteItems.firstOrNull { entryPathFor(it) == scpSelectedPath }
+    val selectedPath = selectedEntry?.let(entryPathFor)
+    val canDownloadSelected = !showScpUploadVertical &&
+        selectedEntry != null &&
+        !selectedEntry.isDirectory &&
+        !scpTransferActive &&
+        !scpListingInProgress
+    val canMutateSelection = selectedEntry != null && !scpTransferActive && !scpListingInProgress
+    val deleteProtectedSelection = selectedEntry != null &&
+        isProtectedRemoteSystemDirectory(
+            path = selectedPath,
+            isDirectory = selectedEntry.isDirectory
+        )
+    val canMoveSelection = canMutateSelection && !deleteProtectedSelection
+    val canDeleteSelection = canMutateSelection && !deleteProtectedSelection
+    val canChooseUploadSource = showScpUploadVertical && !scpTransferActive
+    val canUploadHere = showScpUploadVertical &&
+        !scpTransferActive &&
+        !scpListingInProgress &&
+        !scpUploadSourceUri.isNullOrBlank()
+    val scpDownloadDocumentPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+            val selectedRemote = pendingScpDownloadRemotePath
+            onPendingScpDownloadRemotePathChange(null)
+            if (selectedRemote.isNullOrBlank()) return@rememberLauncherForActivityResult
+            if (uri == null) {
+                onScpTransferStatusChange("Download cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            onScpTransferStatusChange(null)
+            onScpDownload(selectedRemote, uri.toString())
+        }
+    val scpUploadDocumentPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) {
+                onScpTransferStatusChange("Local file selection cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            val displayName = queryUriDisplayName(context, uri) ?: "upload.bin"
+            onScpUploadSourceUriChange(uri.toString())
+            onUploadLocalPathChange(displayName)
+            onScpTransferStatusChange("Selected local file: $displayName")
+        }
+
+    fun submitScpPathJump() {
+        if (scpListingInProgress) return
+        val targetPath = scpRemotePath.trim().ifBlank { "." }
+        hideKeyboard()
+        if (targetPath == effectiveRemotePath) {
+            onScpRemotePathChange(effectiveRemotePath)
+            return
+        }
+        onScpPendingManualPathTargetChange(targetPath)
+        onScpPendingManualPathFallbackChange(effectiveRemotePath)
+        browseScpPath(targetPath, true, true, true)
+    }
+
+    LaunchedEffect(remoteItems, effectiveRemotePath, scpSelectedPath) {
+        val selectedRemotePath = scpSelectedPath ?: return@LaunchedEffect
+        if (remoteItems.none { entryPathFor(it) == selectedRemotePath }) {
+            onScpSelectedPathChange(null)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.CONNECTING_SCP_PANEL)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                enabled = canGoBack,
+                onClick = {
+                    if (!canGoBack) return@IconButton
+                    val nextIndex = scpPathHistoryIndex - 1
+                    onScpPathHistoryIndexChange(nextIndex)
+                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                }
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant)
+            }
+            IconButton(
+                enabled = canGoForward,
+                onClick = {
+                    if (!canGoForward) return@IconButton
+                    val nextIndex = scpPathHistoryIndex + 1
+                    onScpPathHistoryIndexChange(nextIndex)
+                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                }
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant)
+            }
+            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) }) {
+                Icon(Icons.Default.ArrowUpward, "Up", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+            }
+            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(effectiveRemotePath, false, true, true) }) {
+                Icon(Icons.Default.Refresh, "Refresh", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+            }
+            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) }) {
+                Icon(Icons.Default.Home, "Home", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Box {
+                IconButton(
+                    onClick = { onScpActionsExpandedChange(true) },
+                    enabled = !scpTransferActive,
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
+                ) {
+                    Icon(Icons.Default.MoreVert, "Actions")
+                }
+                DropdownMenu(
+                    expanded = scpActionsExpanded,
+                    onDismissRequest = { onScpActionsExpandedChange(false) }
+                ) {
+                    if (showScpUploadVertical) {
+                        DropdownMenuItem(
+                            text = { Text("Choose local file") },
+                            enabled = canChooseUploadSource,
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                scpUploadDocumentPicker.launch(arrayOf("*/*"))
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("choose_local_file"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Upload here") },
+                            enabled = canUploadHere,
+                            onClick = {
+                                val sourceUri = scpUploadSourceUri ?: return@DropdownMenuItem
+                                onScpActionsExpandedChange(false)
+                                onScpTransferStatusChange(null)
+                                onScpUpload(
+                                    sourceUri,
+                                    inferRemoteDestination(uploadLocalPath.ifBlank { "upload.bin" }, effectiveRemotePath)
+                                )
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("upload_here"))
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("Download") },
+                            enabled = canDownloadSelected,
+                            onClick = {
+                                val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                onScpActionsExpandedChange(false)
+                                onPendingScpDownloadRemotePathChange(selectedRemotePath)
+                                scpDownloadDocumentPicker.launch(
+                                    selectedRemotePath.substringAfterLast('/').ifBlank { "download.bin" }
+                                )
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("download"))
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Rename") },
+                        enabled = canMutateSelection,
+                        onClick = {
+                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                            onScpActionsExpandedChange(false)
+                            onScpRenameValueChange(selectedRemotePath.substringAfterLast('/').ifBlank { selectedEntry?.name.orEmpty() })
+                            onShowScpRenameDialogChange(true)
+                        },
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("rename"))
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Move") },
+                        enabled = canMoveSelection,
+                        onClick = {
+                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                            onScpActionsExpandedChange(false)
+                            onScpMoveDestinationChange(selectedRemotePath)
+                            onShowScpMoveDialogChange(true)
+                        },
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Copy path") },
+                        enabled = canMutateSelection,
+                        onClick = {
+                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                            onScpActionsExpandedChange(false)
+                            onCopyRemotePath(selectedRemotePath)
+                            onScpTransferStatusChange("Remote path copied.")
+                        },
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("copy_path"))
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        enabled = canDeleteSelection,
+                        onClick = {
+                            onScpActionsExpandedChange(false)
+                            if (canDeleteSelection) onShowScpDeleteDialogChange(true)
+                        },
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("delete"))
+                    )
+                    DropdownMenuItem(
+                        text = { Text("New folder") },
+                        enabled = !scpTransferActive && !scpListingInProgress,
+                        onClick = {
+                            onScpActionsExpandedChange(false)
+                            onScpNewFolderValueChange("")
+                            onShowScpNewFolderDialogChange(true)
+                        },
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("new_folder"))
+                    )
+                }
+            }
+        }
+        TextField(
+            value = scpRemotePath,
+            onValueChange = onScpRemotePathChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT),
+            singleLine = true,
+            enabled = !scpListingInProgress,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            placeholder = { Text("Remote path", style = MaterialTheme.typography.bodyMedium) },
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Go,
+                autoCorrect = false
+            ),
+            keyboardActions = KeyboardActions(onGo = { submitScpPathJump() }, onDone = { submitScpPathJump() }),
+            trailingIcon = {
+                IconButton(enabled = !scpListingInProgress, onClick = { submitScpPathJump() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, "Go to path")
+                }
+            }
+        )
+        Text(
+            text = if (showScpUploadVertical) {
+                if (uploadLocalPath.isBlank()) {
+                    "Choose a local file from the actions menu, then upload it into the current folder."
+                } else {
+                    "Local file: $uploadLocalPath"
+                }
+            } else {
+                selectedEntry?.let { "Selected: ${entryPathFor(it)}" } ?: "Select a remote file or folder to act on it."
+            },
+            color = colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (scpListingInProgress) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = colorScheme.primary,
+                trackColor = colorScheme.surfaceVariant
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            color = colorScheme.surface,
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            if (remoteItems.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("This folder is empty.", color = colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    items(remoteItems, key = { entryPathFor(it) }) { item ->
+                        val absolute = entryPathFor(item)
+                        val selected = scpSelectedPath == absolute
+                        val showOpenAffordance = item.isDirectory || item.linkTargetIsDirectory == true || item.isBrokenLink
+                        val metadataText = when {
+                            item.isBrokenLink -> "Broken link"
+                            item.isSymbolicLink && !item.linkTargetPath.isNullOrBlank() -> "-> ${item.linkTargetPath}"
+                            item.permissionSummary.isNotBlank() -> item.permissionSummary
+                            else -> null
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = !scpListingInProgress) {
+                                    if (item.isBrokenLink) {
+                                        Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
+                                    }
+                                    onScpSelectedPathChange(absolute)
+                                    onScpTransferStatusChange(if (item.isBrokenLink) "Broken link: ${item.name}" else null)
+                                }
+                                .testTag(UiTestTags.connectingScpRemoteRow(absolute)),
+                            color = if (selected) colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        item.isSymbolicLink -> Icons.Default.Link
+                                        item.isDirectory -> Icons.Default.Folder
+                                        else -> Icons.Default.Description
+                                    },
+                                    contentDescription = null,
+                                    tint = when {
+                                        item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
+                                        item.isSymbolicLink -> colorScheme.primary
+                                        item.isDirectory -> colorScheme.primary
+                                        else -> colorScheme.onSurfaceVariant
+                                    }
+                                )
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = when {
+                                            item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
+                                            item.isSymbolicLink -> colorScheme.primary
+                                            else -> colorScheme.onSurface
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (metadataText != null) {
+                                        Text(
+                                            text = metadataText,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = if (item.isBrokenLink) colorScheme.error else colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = formatRemoteModifiedTime(item.modifiedAtEpochMillis),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.End,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = if (item.isDirectory) "Folder" else com.majordaftapps.sshpeaches.app.service.formatByteCount(item.sizeBytes),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.End,
+                                        maxLines = 1
+                                    )
+                                }
+                                if (showOpenAffordance) {
+                                    IconButton(
+                                        onClick = {
+                                            if (item.isBrokenLink) {
+                                                Toast.makeText(context, "Broken link: ${item.name}", Toast.LENGTH_SHORT).show()
+                                                return@IconButton
+                                            }
+                                            onScpPendingLinkPathTargetChange(if (item.isSymbolicLink) absolute else null)
+                                            onScpPendingLinkPathFallbackChange(if (item.isSymbolicLink) effectiveRemotePath else null)
+                                            browseScpPath(absolute, true, true, true)
+                                        },
+                                        enabled = !scpListingInProgress,
+                                        modifier = Modifier.testTag(UiTestTags.connectingScpRemoteOpen(absolute))
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Open folder", tint = colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(visible = activeFileTransfer != null, enter = fadeIn(), exit = fadeOut()) {
+            activeFileTransfer?.let { transfer ->
+                FileTransferStatusStrip(transfer = transfer, modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_TRANSFER_STRIP))
+            }
+        }
+        AnimatedVisibility(visible = scpTransferStatus != null && activeFileTransfer == null, enter = fadeIn(), exit = fadeOut()) {
+            scpTransferStatus?.let { status ->
+                ScpStatusStrip(status = status, modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_STATUS_STRIP))
+            }
+        }
+    }
+
+    if (showScpRenameDialog && selectedEntry != null) {
+        AlertDialog(
+            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_DIALOG),
+            onDismissRequest = { onShowScpRenameDialogChange(false) },
+            title = { Text("Rename") },
+            text = {
+                TextField(
+                    value = scpRenameValue,
+                    onValueChange = onScpRenameValueChange,
+                    singleLine = true,
+                    label = { Text("Name") },
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_INPUT)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = scpRenameValue.trim().isNotBlank(),
+                    onClick = {
+                        val sourcePath = scpSelectedPath ?: return@TextButton
+                        onShowScpRenameDialogChange(false)
+                        onScpSelectedPathChange(null)
+                        onManageRemotePath("move", sourcePath, resolveChildPath(parentPath(sourcePath), scpRenameValue.trim()))
+                    }
+                ) { Text("Rename") }
+            },
+            dismissButton = { TextButton(onClick = { onShowScpRenameDialogChange(false) }) { Text("Cancel") } }
+        )
+    }
+    if (showScpMoveDialog && selectedEntry != null) {
+        AlertDialog(
+            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_DIALOG),
+            onDismissRequest = { onShowScpMoveDialogChange(false) },
+            title = { Text("Move") },
+            text = {
+                TextField(
+                    value = scpMoveDestination,
+                    onValueChange = onScpMoveDestinationChange,
+                    singleLine = true,
+                    label = { Text("Destination path") },
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_INPUT)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = scpMoveDestination.trim().isNotBlank(),
+                    onClick = {
+                        val sourcePath = scpSelectedPath ?: return@TextButton
+                        onShowScpMoveDialogChange(false)
+                        onScpSelectedPathChange(null)
+                        onManageRemotePath("move", sourcePath, scpMoveDestination.trim())
+                    }
+                ) { Text("Move") }
+            },
+            dismissButton = { TextButton(onClick = { onShowScpMoveDialogChange(false) }) { Text("Cancel") } }
+        )
+    }
+    if (showScpNewFolderDialog) {
+        AlertDialog(
+            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG),
+            onDismissRequest = { onShowScpNewFolderDialogChange(false) },
+            title = { Text("New folder") },
+            text = {
+                TextField(
+                    value = scpNewFolderValue,
+                    onValueChange = onScpNewFolderValueChange,
+                    singleLine = true,
+                    label = { Text("Folder name") },
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_INPUT)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = scpNewFolderValue.trim().isNotBlank(),
+                    onClick = {
+                        onShowScpNewFolderDialogChange(false)
+                        onManageRemotePath("mkdir", resolveChildPath(effectiveRemotePath, scpNewFolderValue.trim()), null)
+                    }
+                ) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { onShowScpNewFolderDialogChange(false) }) { Text("Cancel") } }
+        )
+    }
+    if (showScpDeleteDialog && selectedEntry != null) {
+        AlertDialog(
+            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DELETE_DIALOG),
+            onDismissRequest = { onShowScpDeleteDialogChange(false) },
+            title = { Text("Delete") },
+            text = {
+                Text(
+                    if (deleteProtectedSelection) {
+                        "${selectedEntry.name} is a protected system folder and cannot be deleted."
+                    } else {
+                        "Delete ${selectedEntry.name}?"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleteProtectedSelection,
+                    onClick = {
+                        if (deleteProtectedSelection) return@TextButton
+                        val sourcePath = scpSelectedPath ?: return@TextButton
+                        onShowScpDeleteDialogChange(false)
+                        onScpSelectedPathChange(null)
+                        onManageRemotePath("delete", sourcePath, null)
+                    }
+                ) { Text("Delete", color = colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { onShowScpDeleteDialogChange(false) }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun ConnectingSftpContent(
+    remoteDirectory: RemoteDirectorySnapshot?,
+    logs: List<SessionLogBus.Entry>,
+    scope: kotlinx.coroutines.CoroutineScope,
+    context: Context,
+    activeFileTransfer: FileTransferProgress?,
+    sftpTransferActive: Boolean,
+    sftpTransferStatus: String?,
+    sftpPath: String,
+    onSftpPathChange: (String) -> Unit,
+    sftpLocalPath: String,
+    onSftpLocalPathChange: (String) -> Unit,
+    sftpConsoleLines: List<String>,
+    appendSftpConsole: (String) -> Unit,
+    clearSftpConsole: () -> Unit,
+    sftpCommandInput: String,
+    onSftpCommandInputChange: (String) -> Unit,
+    sftpPendingDirectoryEcho: String?,
+    onSftpPendingDirectoryEchoChange: (String?) -> Unit,
+    pendingSftpDownloadRemotePath: String?,
+    onPendingSftpDownloadRemotePathChange: (String?) -> Unit,
+    pendingSftpUploadBasePath: String?,
+    onPendingSftpUploadBasePathChange: (String?) -> Unit,
+    sftpCommandRunning: Boolean,
+    onSftpCommandRunningChange: (Boolean) -> Unit,
+    sftpShowCancel: Boolean,
+    onSftpShowCancelChange: (Boolean) -> Unit,
+    sftpAwaitDirectoryRefresh: Boolean,
+    onSftpAwaitDirectoryRefreshChange: (Boolean) -> Unit,
+    sftpCommandStartLogCount: Int,
+    onSftpCommandStartLogCountChange: (Int) -> Unit,
+    sftpCommandStartDirectoryKey: String,
+    onSftpCommandStartDirectoryKeyChange: (String) -> Unit,
+    sftpCancelDelayJob: Job?,
+    onSftpCancelDelayJobChange: (Job?) -> Unit,
+    onSftpListDirectory: (String) -> Unit,
+    onSftpDownload: (String, String?) -> Unit,
+    onSftpUpload: (String, String) -> Unit,
+    onManageRemotePath: (String, String, String?) -> Unit,
+    inferRemoteDestination: (String, String) -> String,
+    resolveRemotePath: (String, String) -> String,
+    listLocalFiles: (String) -> List<File>
+) {
+    val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
+    val currentRemoteSnapshotKey = remember(remoteDirectory) {
+        remoteDirectory?.let { snapshot ->
+            buildString {
+                append(snapshot.path)
+                append('|')
+                append(snapshot.entries.size)
+                snapshot.entries.forEach { entry ->
+                    append('|')
+                    append(if (entry.isDirectory) 'd' else 'f')
+                    append(':')
+                    append(entry.name)
+                    append(':')
+                    append(entry.sizeBytes)
+                }
+            }
+        }.orEmpty()
+    }
+
+    fun beginSftpCommandWait(waitForDirectoryRefresh: Boolean) {
+        sftpCancelDelayJob?.cancel()
+        onSftpCommandRunningChange(true)
+        onSftpShowCancelChange(false)
+        onSftpAwaitDirectoryRefreshChange(waitForDirectoryRefresh)
+        onSftpCommandStartLogCountChange(logs.size)
+        onSftpCommandStartDirectoryKeyChange(currentRemoteSnapshotKey)
+        onSftpCancelDelayJobChange(
+            scope.launch {
+                delay(SFTP_CANCEL_BUTTON_DELAY_MS)
+                if (sftpCommandRunning) {
+                    onSftpShowCancelChange(true)
+                }
+            }
+        )
+    }
+
+    val sftpDownloadDocumentPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+            val remote = pendingSftpDownloadRemotePath
+            onPendingSftpDownloadRemotePathChange(null)
+            if (remote.isNullOrBlank()) return@rememberLauncherForActivityResult
+            if (uri == null) {
+                appendSftpConsole("Save location selection cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            beginSftpCommandWait(false)
+            onSftpDownload(remote, uri.toString())
+            appendSftpConsole("Downloading $remote -> $uri")
+        }
+    val sftpUploadDocumentPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            val remoteBase = pendingSftpUploadBasePath
+            onPendingSftpUploadBasePathChange(null)
+            if (remoteBase.isNullOrBlank()) return@rememberLauncherForActivityResult
+            if (uri == null) {
+                appendSftpConsole("Local file selection cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            val localName = queryUriDisplayName(context, uri) ?: "upload.bin"
+            val remote = inferRemoteDestination(localName, remoteBase)
+            beginSftpCommandWait(false)
+            onSftpUpload(uri.toString(), remote)
+            appendSftpConsole("Uploading $localName -> $remote")
+        }
+    val consoleScrollState = rememberScrollState()
+    val sftpBusy = sftpCommandRunning || sftpTransferActive
+
+    fun resolveLocalPath(raw: String): String {
+        val candidate = File(raw)
+        return if (candidate.isAbsolute) candidate.absolutePath else File(sftpLocalPath, raw).absolutePath
+    }
+
+    fun finishSftpCommandWait() {
+        sftpCancelDelayJob?.cancel()
+        onSftpCancelDelayJobChange(null)
+        onSftpCommandRunningChange(false)
+        onSftpShowCancelChange(false)
+        onSftpAwaitDirectoryRefreshChange(false)
+        onSftpCommandStartLogCountChange(0)
+        onSftpCommandStartDirectoryKeyChange("")
+    }
+
+    fun runSftpCommand(input: String) {
+        val command = input.trim()
+        if (command.isEmpty()) return
+        if (sftpTransferActive) {
+            appendSftpConsole("A file transfer is already running for this session.")
+            return
+        }
+        if (sftpCommandRunning) {
+            appendSftpConsole("A command is already running. Tap Cancel to stop waiting.")
+            return
+        }
+        appendSftpConsole("sftp> $command")
+        val tokens = tokenizeSftpCommand(command)
+        if (tokens.isEmpty()) return
+        val cmd = tokens.first().lowercase()
+        val args = tokens.drop(1)
+        when (cmd) {
+            "help", "?" -> {
+                appendSftpConsole("Commands: ls [path], cd <path>, pwd, get <remote> [local], put [local] [remote]")
+                appendSftpConsole("          mkdir <path>, rm <path>, mv <src> <dst>, lcd <path>, lpwd, lls [path], refresh, clear")
+                appendSftpConsole("          get without a local path opens a save picker; put without a local path opens a file picker")
+            }
+            "clear" -> clearSftpConsole()
+            "pwd" -> appendSftpConsole(effectiveSftpPath)
+            "lpwd" -> appendSftpConsole(sftpLocalPath)
+            "refresh" -> {
+                beginSftpCommandWait(true)
+                onSftpPendingDirectoryEchoChange(effectiveSftpPath)
+                onSftpListDirectory(effectiveSftpPath)
+            }
+            "ls" -> {
+                val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull().orEmpty())
+                beginSftpCommandWait(true)
+                onSftpPathChange(target)
+                onSftpPendingDirectoryEchoChange(target)
+                onSftpListDirectory(target)
+            }
+            "cd" -> {
+                val target = resolveRemotePath(effectiveSftpPath, args.firstOrNull() ?: ".")
+                beginSftpCommandWait(true)
+                onSftpPathChange(target)
+                onSftpPendingDirectoryEchoChange(target)
+                onSftpListDirectory(target)
+            }
+            "lcd" -> {
+                val targetArg = args.firstOrNull()
+                if (targetArg.isNullOrBlank()) {
+                    appendSftpConsole("usage: lcd <local-path>")
+                } else {
+                    val target = File(resolveLocalPath(targetArg))
+                    if (target.exists() && target.isDirectory) {
+                        onSftpLocalPathChange(target.absolutePath)
+                        appendSftpConsole("Local directory: ${target.absolutePath}")
+                    } else {
+                        appendSftpConsole("lcd failed: no such directory: ${target.absolutePath}")
+                    }
+                }
+            }
+            "lls" -> {
+                val target = File(resolveLocalPath(args.firstOrNull().orEmpty().ifBlank { "." }))
+                if (!target.exists() || !target.isDirectory) {
+                    appendSftpConsole("lls failed: no such directory: ${target.absolutePath}")
+                } else {
+                    appendSftpConsole("Local directory: ${target.absolutePath}")
+                    val entries = listLocalFiles(target.absolutePath)
+                    if (entries.isEmpty()) {
+                        appendSftpConsole("(empty)")
+                    } else {
+                        entries.forEach { item ->
+                            appendSftpConsole("${if (item.isDirectory) "d" else "-"} ${item.length()} ${item.name}")
+                        }
+                    }
+                }
+            }
+            "get" -> {
+                val remoteArg = args.firstOrNull()
+                if (remoteArg.isNullOrBlank()) {
+                    appendSftpConsole("usage: get <remote-path> [local-path]")
+                } else {
+                    val remote = resolveRemotePath(effectiveSftpPath, remoteArg)
+                    val explicitLocal = args.getOrNull(1)?.takeIf { it.isNotBlank() }
+                    if (explicitLocal == null) {
+                        onPendingSftpDownloadRemotePathChange(remote)
+                        sftpDownloadDocumentPicker.launch(remote.substringAfterLast('/').ifBlank { "download.bin" })
+                    } else {
+                        val local = resolveLocalPath(explicitLocal)
+                        beginSftpCommandWait(false)
+                        onSftpDownload(remote, local)
+                        appendSftpConsole("Downloading $remote -> $local")
+                    }
+                }
+            }
+            "put" -> {
+                val localArg = args.firstOrNull()
+                if (localArg.isNullOrBlank()) {
+                    onPendingSftpUploadBasePathChange(effectiveSftpPath)
+                    sftpUploadDocumentPicker.launch(arrayOf("*/*"))
+                } else {
+                    val local = resolveLocalPath(localArg)
+                    val remote = args.getOrNull(1)?.takeIf { it.isNotBlank() }?.let {
+                        resolveRemotePath(effectiveSftpPath, it)
+                    } ?: inferRemoteDestination(local, effectiveSftpPath)
+                    beginSftpCommandWait(false)
+                    onSftpUpload(local, remote)
+                    appendSftpConsole("Uploading $local -> $remote")
+                }
+            }
+            "mkdir" -> {
+                val targetArg = args.firstOrNull()
+                if (targetArg.isNullOrBlank()) {
+                    appendSftpConsole("usage: mkdir <remote-path>")
+                } else {
+                    val target = resolveRemotePath(effectiveSftpPath, targetArg)
+                    beginSftpCommandWait(false)
+                    onManageRemotePath("mkdir", target, null)
+                    appendSftpConsole("Created directory: $target")
+                }
+            }
+            "rm", "delete" -> {
+                val targetArg = args.firstOrNull()
+                if (targetArg.isNullOrBlank()) {
+                    appendSftpConsole("usage: rm <remote-path>")
+                } else {
+                    val target = resolveRemotePath(effectiveSftpPath, targetArg)
+                    beginSftpCommandWait(false)
+                    onManageRemotePath("delete", target, null)
+                    appendSftpConsole("Deleted: $target")
+                }
+            }
+            "mv", "rename" -> {
+                val srcArg = args.getOrNull(0)
+                val dstArg = args.getOrNull(1)
+                if (srcArg.isNullOrBlank() || dstArg.isNullOrBlank()) {
+                    appendSftpConsole("usage: mv <remote-src> <remote-dst>")
+                } else {
+                    val src = resolveRemotePath(effectiveSftpPath, srcArg)
+                    val dst = resolveRemotePath(effectiveSftpPath, dstArg)
+                    beginSftpCommandWait(false)
+                    onManageRemotePath("move", src, dst)
+                    appendSftpConsole("Moved: $src -> $dst")
+                }
+            }
+            "exit", "quit", "bye" -> appendSftpConsole("Use the top-right close action to disconnect this session.")
+            else -> appendSftpConsole("Unknown command: $cmd. Type 'help' for commands.")
+        }
+    }
+
+    LaunchedEffect(sftpCommandRunning, logs.size, currentRemoteSnapshotKey) {
+        if (!sftpCommandRunning) return@LaunchedEffect
+        val completedByLog = logs.size > sftpCommandStartLogCount
+        val completedByDirectory =
+            sftpAwaitDirectoryRefresh &&
+                currentRemoteSnapshotKey.isNotBlank() &&
+                currentRemoteSnapshotKey != sftpCommandStartDirectoryKey
+        if (completedByLog || completedByDirectory) {
+            finishSftpCommandWait()
+        }
+    }
+    LaunchedEffect(sftpConsoleLines.size) {
+        if (sftpConsoleLines.isNotEmpty()) {
+            consoleScrollState.animateScrollTo(consoleScrollState.maxValue)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(
+                WindowInsets.ime
+                    .exclude(WindowInsets.navigationBars)
+                    .only(WindowInsetsSides.Bottom)
+            )
+            .testTag(UiTestTags.CONNECTING_SFTP_PANEL)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("SFTP Console", color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Text("Remote: $effectiveSftpPath", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+        Text("Local: $sftpLocalPath", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+        if (activeFileTransfer != null) {
+            FileTransferProgressCard(transfer = activeFileTransfer)
+        } else if (sftpTransferStatus != null) {
+            ScpStatusStrip(status = sftpTransferStatus.orEmpty(), modifier = Modifier.testTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP))
+        }
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .testTag(UiTestTags.CONNECTING_SFTP_CONSOLE),
+            color = Color(0xFF0F0F0F)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(consoleScrollState)
+                    .padding(12.dp)
+            ) {
+                val activityLog = if (sftpConsoleLines.isEmpty()) "sftp> help" else sftpConsoleLines.joinToString("\n")
+                Text(activityLog, color = Color(0xFFE5E5E5), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+            }
+        }
+        OutlinedTextField(
+            value = sftpCommandInput,
+            onValueChange = onSftpCommandInputChange,
+            label = { Text("Command (e.g. ls, cd /, get file.txt)") },
+            singleLine = true,
+            enabled = !sftpBusy,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done,
+                autoCorrect = false
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (sftpBusy) return@KeyboardActions
+                    val cmd = sftpCommandInput
+                    onSftpCommandInputChange("")
+                    runSftpCommand(cmd)
+                }
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    if (sftpCommandRunning && sftpShowCancel) {
+                        finishSftpCommandWait()
+                        appendSftpConsole("Cancelled waiting for command completion.")
+                        return@Button
+                    }
+                    if (sftpBusy) return@Button
+                    val cmd = sftpCommandInput
+                    onSftpCommandInputChange("")
+                    runSftpCommand(cmd)
+                },
+                enabled = (!sftpBusy) || (sftpCommandRunning && sftpShowCancel),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON)
+            ) { Text(if (sftpCommandRunning && sftpShowCancel) "Cancel" else "Run") }
+            Button(
+                onClick = { runSftpCommand("help") },
+                enabled = !sftpBusy,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UiTestTags.CONNECTING_SFTP_HELP_BUTTON)
+            ) { Text("Help") }
+            Button(
+                onClick = { runSftpCommand("refresh") },
+                enabled = !sftpBusy,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UiTestTags.CONNECTING_SFTP_REFRESH_BUTTON)
+            ) { Text("Refresh") }
+        }
+    }
+}
+
+@Composable
+private fun ConnectingStatusContent(
+    request: QuickConnectRequest,
+    state: QuickConnectUiState,
+    statusText: String,
+    statusColor: Color,
+    hostName: String,
+    detailLine: String?,
+    userFacingStateMessage: String,
+    activeFileTransfer: FileTransferProgress?,
+    renderedLogs: List<String>,
+    listState: LazyListState
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+    ) {
+        val isShortHeight = maxHeight <= 520.dp
+        val heroSize = if (isShortHeight) 180.dp else 360.dp
+        val outerGlowSize = if (isShortHeight) 168.dp else 340.dp
+        val innerGlowSize = if (isShortHeight) 120.dp else 250.dp
+        val logoSize = if (isShortHeight) 72.dp else 128.dp
+        val logsHeight = if (isShortHeight) 120.dp else 220.dp
+        val contentSpacing = if (isShortHeight) 8.dp else 12.dp
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = if (isShortHeight) 12.dp else 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(contentSpacing)
+        ) {
+            Box(modifier = Modifier.size(heroSize), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(outerGlowSize)
+                        .blur(if (isShortHeight) 36.dp else 72.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0x2EFFFFFF), Color(0x14FFFFFF), Color(0x08F7F4EF), Color.Transparent)
+                            ),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .size(innerGlowSize)
+                        .blur(if (isShortHeight) 16.dp else 32.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0x18FFFFFF), Color(0x0CFBF7F1), Color.Transparent)
+                            ),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.sshpeaches_activitybar),
+                    contentDescription = "SSHPeaches logo",
+                    colorFilter = ColorFilter.tint(Color(0xFFFA992A)),
+                    modifier = Modifier.size(logoSize),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            Text(
+                text = statusText,
+                style = (if (isShortHeight) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium).copy(
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (state.phase == QuickConnectPhase.CONNECTING || state.phase == QuickConnectPhase.IDLE) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = hostName,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray, fontStyle = FontStyle.Italic)
+                )
+            }
+            detailLine?.let {
+                Text(text = it, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E)))
+            }
+            userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
+                Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD)))
+            }
+            activeFileTransfer?.let { transfer ->
+                FileTransferProgressCard(transfer = transfer)
+            }
+            ConnectionLogsPane(
+                renderedLogs = renderedLogs,
+                listState = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(logsHeight)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SnippetPickerDialog(
+    snippets: List<Snippet>,
+    onRunSnippet: (Snippet) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Run Snippet") },
+        text = {
+            if (snippets.isEmpty()) {
+                Text("No snippets available. Create snippets in Snippets first.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.CONNECTING_SNIPPET_PICKER)
+                        .height(320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(snippets, key = { it.id }) { snippet ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onRunSnippet(snippet) },
+                            color = Color(0xFF111111),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = snippet.title, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                if (snippet.description.isNotBlank()) {
+                                    Text(
+                                        text = snippet.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFBDBDBD),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = snippet.command,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = Color(0xFFE5E5E5),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
 }
 
 @Composable
@@ -3646,3 +3782,4 @@ private const val TERMINAL_BELL_NOTIFICATION_CHANNEL_ID = "terminal_bell"
 private const val TERMINAL_BELL_NOTIFICATION_ID_BASE = 24_000
 private const val TERMINAL_BELL_THROTTLE_MS = 750L
 private const val TERMINAL_BELL_VIBRATION_MS = 120L
+

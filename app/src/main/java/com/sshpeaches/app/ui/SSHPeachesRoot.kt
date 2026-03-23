@@ -436,6 +436,7 @@ fun SSHPeachesRoot(
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
     val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val suppressHomeWelcomeOnReturn = rememberSaveable { mutableStateOf(false) }
     val uptimeAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
@@ -1261,6 +1262,7 @@ fun SSHPeachesRoot(
         val destination = routeBeforeConnecting.value
             .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
             ?: Routes.HOME
+        suppressHomeWelcomeOnReturn.value = destination == Routes.HOME
         navController.navigate(destination) {
             popUpTo(Routes.HOME)
         }
@@ -1633,6 +1635,10 @@ fun SSHPeachesRoot(
                                     uiState.identities.isNotEmpty() ||
                                     uiState.portForwards.isNotEmpty() ||
                                     uiState.snippets.isNotEmpty(),
+                                suppressEmptyWelcome = suppressHomeWelcomeOnReturn.value,
+                                onSuppressEmptyWelcomeConsumed = {
+                                    suppressHomeWelcomeOnReturn.value = false
+                                },
                                 onOpenSession = { sessionId ->
                                     sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
                                         markHostUsage(snapshot.host)

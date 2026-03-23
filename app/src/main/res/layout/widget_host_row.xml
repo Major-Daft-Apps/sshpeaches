@@ -45,7 +45,7 @@
             android:contentDescription="@string/widget_action_sftp"
             android:padding="7dp"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_widget_save"
+            android:src="@drawable/ic_widget_cloud_download"
             android:tint="@color/color_widget_text_primary" />
 
         <ImageView

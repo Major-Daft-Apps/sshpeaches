@@ -91,14 +91,12 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
         mSelY1 = mSelY2 = columnAndRow[1];
 
         TerminalBuffer screen = terminalView.mEmulator.getScreen();
-        if (!" ".equals(screen.getSelectedText(mSelX1, mSelY1, mSelX1, mSelY1))) {
-            // Selecting something other than whitespace. Expand to word.
-            while (mSelX1 > 0 && !screen.getSelectedText(mSelX1 - 1, mSelY1, mSelX1 - 1, mSelY1).isEmpty()) {
-                mSelX1--;
-            }
-            while (mSelX2 < terminalView.mEmulator.mColumns - 1 && !screen.getSelectedText(mSelX2 + 1, mSelY1, mSelX2 + 1, mSelY1).isEmpty()) {
-                mSelX2++;
-            }
+        int[] wordBounds = screen.getWordBoundsAtLocation(mSelX1, mSelY1);
+        if (wordBounds != null) {
+            mSelX1 = wordBounds[0];
+            mSelY1 = wordBounds[1];
+            mSelX2 = wordBounds[2];
+            mSelY2 = wordBounds[3];
         }
     }
     
@@ -158,7 +156,7 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
         };
 
-        mActionMode = terminalView.startActionMode(new ActionMode.Callback2() {
+        ActionMode.Callback2 floatingCallback = new ActionMode.Callback2() {
             @Override
             public boolean onCreateActionMode(ActionMode mode, Menu menu) {
                 return callback.onCreateActionMode(mode, menu);
@@ -200,7 +198,12 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
                 outRect.set(x1, top, x2, bottom);
             }
-        }, ActionMode.TYPE_FLOATING);
+        };
+
+        mActionMode = terminalView.startActionMode(floatingCallback, ActionMode.TYPE_FLOATING);
+        if (mActionMode == null) {
+            mActionMode = terminalView.startActionMode(callback);
+        }
     }
 
     public void updatePosition(TextSelectionHandleView handle, int x, int y) {

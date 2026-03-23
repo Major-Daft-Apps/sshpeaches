@@ -45,7 +45,7 @@ internal object HostWidgets {
         }
         if (sessionsIds.isNotEmpty()) {
             sessionsIds.forEach { id ->
-                manager.updateAppWidget(id, buildSessionsWidgetRemoteViews(context, openSessions))
+                manager.updateAppWidget(id, buildSessionsWidgetRemoteViews(context, hosts, openSessions))
             }
         }
     }
@@ -110,10 +110,31 @@ internal object HostWidgets {
 
     private fun buildSessionsWidgetRemoteViews(
         context: Context,
+        hosts: List<HostConnection>,
         openSessions: List<WidgetSessionStore.WidgetOpenSession>
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_sessions)
+        views.removeAllViews(R.id.widget_hosts_container)
         views.removeAllViews(R.id.widget_open_sessions_container)
+        val visibleHosts = hosts.take(
+            if (openSessions.isEmpty()) MAX_RECENT_HOST_ROWS_EXPANDED_EMPTY else MAX_RECENT_HOST_ROWS_EXPANDED
+        )
+        when {
+            visibleHosts.isEmpty() && openSessions.isEmpty() -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.VISIBLE)
+            }
+            visibleHosts.isEmpty() -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.GONE)
+            }
+            else -> {
+                views.setViewVisibility(R.id.widget_hosts_section, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.widget_hosts_empty, android.view.View.GONE)
+                visibleHosts.forEach { host ->
+                    views.addView(R.id.widget_hosts_container, buildHostRow(context, host))
+                }
+            }
+        }
         if (openSessions.isEmpty()) {
             views.setViewVisibility(R.id.widget_open_sessions_empty, android.view.View.VISIBLE)
         } else {
@@ -247,7 +268,9 @@ internal object HostWidgets {
     private const val MAX_OPEN_SESSION_ROWS_COMPACT = 1
     private const val MAX_RECENT_HOST_ROWS_COMPACT = 1
     private const val MAX_RECENT_HOST_ROWS_COMPACT_EMPTY = 2
-    private const val MAX_OPEN_SESSION_ROWS_EXPANDED = 5
+    private const val MAX_RECENT_HOST_ROWS_EXPANDED = 2
+    private const val MAX_RECENT_HOST_ROWS_EXPANDED_EMPTY = 3
+    private const val MAX_OPEN_SESSION_ROWS_EXPANDED = 3
 }
 
 abstract class BaseHostWidgetProvider : AppWidgetProvider() {
