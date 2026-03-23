@@ -574,7 +574,7 @@ public final class TerminalView extends View {
             } else if (mEmulator.isAlternateBufferActive()) {
                 // Send up and down key events for scrolling, which is what some terminals do to make scroll work in
                 // e.g. less, which shifts to the alt screen without mouse handling.
-                handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
+                dispatchVirtualKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
             } else {
                 mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
                 if (!awakenScrollBars()) invalidate();
@@ -883,13 +883,30 @@ public final class TerminalView extends View {
             return true;
         }
 
-        TerminalEmulator term = mTermSession.getEmulator();
+        TerminalEmulator term = mTermSession != null ? mTermSession.getEmulator() : mEmulator;
+        if (term == null) return false;
         String code = KeyHandler.getCode(keyCode, keyMod, term.isCursorKeysApplicationMode(), term.isKeypadApplicationMode());
         if (code == null) {
             return false;
         }
+        if (mTermSession == null) {
+            return false;
+        }
         mTermSession.write(code);
         return true;
+    }
+
+    private boolean dispatchVirtualKeyCode(int keyCode, int keyMod) {
+        if (handleKeyCode(keyCode, keyMod)) {
+            return true;
+        }
+        if (mClient == null) {
+            return false;
+        }
+
+        long now = SystemClock.uptimeMillis();
+        KeyEvent event = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0);
+        return mClient.onKeyDown(keyCode, event, mTermSession);
     }
 
     public boolean handleKeyCodeAction(int keyCode, int keyMod) {
