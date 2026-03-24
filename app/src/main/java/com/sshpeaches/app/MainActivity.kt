@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -73,6 +74,7 @@ class MainActivity : FragmentActivity() {
     private var biometricPromptInfo: BiometricPrompt.PromptInfo? = null
     private var biometricAvailable: Boolean = false
     private var appUiBootstrapped = false
+    private var hardwareKeyHandler: ((KeyEvent) -> Boolean)? = null
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
     private val requestedOpenSessionFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
     private val requestedStartupRoute = mutableStateOf<String?>(null)
@@ -260,6 +262,17 @@ class MainActivity : FragmentActivity() {
             requestedServiceStart || bindRequested,
             "requestedServiceStart=$requestedServiceStart, bindRequested=$bindRequested"
         )
+    }
+
+    fun setHardwareKeyHandler(handler: ((KeyEvent) -> Boolean)?) {
+        hardwareKeyHandler = handler
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (hardwareKeyHandler?.invoke(event) == true) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

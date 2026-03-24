@@ -91,6 +91,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -267,6 +268,7 @@ fun ConnectingScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val activity = context as? MainActivity
     val clipboardManager = LocalClipboardManager.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -591,6 +593,9 @@ fun ConnectingScreen(
             }
         }
     }
+    val activityHardwareKeyHandler by rememberUpdatedState<(KeyEvent) -> Boolean> { event ->
+        showTerminalSession && handleVolumeKeyForFontSize(event)
+    }
 
     LaunchedEffect(renderedLogs.size) {
         if (renderedLogs.isNotEmpty()) {
@@ -760,6 +765,12 @@ fun ConnectingScreen(
             swipeRepeatJob = null
             swipeRepeatKeyCode = null
             terminalViewRef = null
+        }
+    }
+    DisposableEffect(activity, request?.sessionId) {
+        activity?.setHardwareKeyHandler { event -> activityHardwareKeyHandler(event) }
+        onDispose {
+            activity?.setHardwareKeyHandler(null)
         }
     }
     DisposableEffect(lifecycleOwner, request?.sessionId) {

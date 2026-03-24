@@ -4,6 +4,7 @@ plugins {
     id("kotlin-kapt")
 	id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
+    id("com.google.firebase.firebase-perf")
 }
 
 import java.util.Properties
@@ -69,8 +70,8 @@ android {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.9.11"
+        versionCode = 12
+        versionName = "0.9.12"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -259,6 +260,7 @@ dependencies {
     releaseImplementation("com.google.firebase:firebase-crashlytics")
     releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
     releaseImplementation("com.google.firebase:firebase-analytics")
+    releaseImplementation("com.google.firebase:firebase-perf")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

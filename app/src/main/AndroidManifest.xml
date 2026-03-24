@@ -33,6 +33,9 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.SSHPeaches">
+        <meta-data
+            android:name="firebase_performance_collection_enabled"
+            android:value="false" />
         <property
             android:name="android.adservices.AD_SERVICES_CONFIG"
             tools:node="remove" />

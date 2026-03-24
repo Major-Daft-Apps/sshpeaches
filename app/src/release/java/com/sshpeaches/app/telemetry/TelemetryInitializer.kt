@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.perf.FirebasePerformance
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ object TelemetryInitializer {
     @Volatile private var usageReportsEnabled = false
     @Volatile private var crashlytics: FirebaseCrashlytics? = null
     @Volatile private var analytics: FirebaseAnalytics? = null
+    @Volatile private var performance: FirebasePerformance? = null
 
     fun initialize(application: Application) {
         if (initialized) return
@@ -47,6 +49,9 @@ object TelemetryInitializer {
             it.setAnalyticsCollectionEnabled(analyticsEnabled || usageReportsEnabled)
             it.setUserProperty("usage_reports_opt_in", usageReportsEnabled.toString())
         }
+        performance = FirebasePerformance.getInstance().also {
+            it.isPerformanceCollectionEnabled = analyticsEnabled
+        }
 
         scope.launch {
             combine(
@@ -62,6 +67,7 @@ object TelemetryInitializer {
                 crashlytics?.setCrashlyticsCollectionEnabled(crashEnabled)
                 analytics?.setAnalyticsCollectionEnabled(analyticsEnabled || usageEnabled)
                 analytics?.setUserProperty("usage_reports_opt_in", usageEnabled.toString())
+                performance?.isPerformanceCollectionEnabled = analyticsEnabled
             }
         }
     }
