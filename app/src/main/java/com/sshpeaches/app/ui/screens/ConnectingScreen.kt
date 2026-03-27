@@ -2876,70 +2876,73 @@ private fun ConnectingStatusContent(
         val logsHeight = if (isShortHeight) 120.dp else 220.dp
         val contentSpacing = if (isShortHeight) 8.dp else 12.dp
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = if (isShortHeight) 12.dp else 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(contentSpacing)
-        ) {
-            Box(modifier = Modifier.size(heroSize), contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(outerGlowSize)
-                        .blur(if (isShortHeight) 36.dp else 72.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0x2EFFFFFF), Color(0x14FFFFFF), Color(0x08F7F4EF), Color.Transparent)
-                            ),
-                            shape = RoundedCornerShape(999.dp)
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .size(innerGlowSize)
-                        .blur(if (isShortHeight) 16.dp else 32.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0x18FFFFFF), Color(0x0CFBF7F1), Color.Transparent)
-                            ),
-                            shape = RoundedCornerShape(999.dp)
-                        )
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.sshpeaches_activitybar),
-                    contentDescription = "SSHPeaches logo",
-                    colorFilter = ColorFilter.tint(Color(0xFFFA992A)),
-                    modifier = Modifier.size(logoSize),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            Text(
-                text = statusText,
-                style = (if (isShortHeight) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium).copy(
-                    fontWeight = FontWeight.Bold,
-                    color = statusColor
-                )
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.phase == QuickConnectPhase.CONNECTING || state.phase == QuickConnectPhase.IDLE) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+        Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = true)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = if (isShortHeight) 12.dp else 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(contentSpacing)
+            ) {
+                Box(modifier = Modifier.size(heroSize), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(outerGlowSize)
+                            .blur(if (isShortHeight) 36.dp else 72.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(Color(0x2EFFFFFF), Color(0x14FFFFFF), Color(0x08F7F4EF), Color.Transparent)
+                                ),
+                                shape = RoundedCornerShape(999.dp)
+                            )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(innerGlowSize)
+                            .blur(if (isShortHeight) 16.dp else 32.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(Color(0x18FFFFFF), Color(0x0CFBF7F1), Color.Transparent)
+                                ),
+                                shape = RoundedCornerShape(999.dp)
+                            )
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.sshpeaches_activitybar),
+                        contentDescription = "SSHPeaches logo",
+                        colorFilter = ColorFilter.tint(Color(0xFFFA992A)),
+                        modifier = Modifier.size(logoSize),
+                        contentScale = ContentScale.Fit
+                    )
                 }
+
                 Text(
-                    text = hostName,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray, fontStyle = FontStyle.Italic)
+                    text = statusText,
+                    style = (if (isShortHeight) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium).copy(
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor
+                    )
                 )
-            }
-            detailLine?.let {
-                Text(text = it, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E)))
-            }
-            userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
-                Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD)))
-            }
-            activeFileTransfer?.let { transfer ->
-                FileTransferProgressCard(transfer = transfer)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (state.phase == QuickConnectPhase.CONNECTING || state.phase == QuickConnectPhase.IDLE) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(
+                        text = hostName,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray, fontStyle = FontStyle.Italic)
+                    )
+                }
+                detailLine?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E)))
+                }
+                userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
+                    Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD)))
+                }
+                activeFileTransfer?.let { transfer ->
+                    FileTransferProgressCard(transfer = transfer)
+                }
             }
             ConnectionLogsPane(
                 renderedLogs = renderedLogs,
