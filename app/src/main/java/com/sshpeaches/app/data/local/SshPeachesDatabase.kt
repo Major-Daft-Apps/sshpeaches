@@ -47,48 +47,48 @@ abstract class SshPeachesDatabase : RoomDatabase() {
             }
 
         val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                createUptimeTables(database)
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createUptimeTables(db)
             }
         }
 
         val MIGRATION_6_8 = object : Migration(6, 8) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE identities ADD COLUMN `group` TEXT")
-                database.execSQL("ALTER TABLE port_forwards ADD COLUMN `group` TEXT")
-                database.execSQL("ALTER TABLE snippets ADD COLUMN `group` TEXT")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE identities ADD COLUMN `group` TEXT")
+                db.execSQL("ALTER TABLE port_forwards ADD COLUMN `group` TEXT")
+                db.execSQL("ALTER TABLE snippets ADD COLUMN `group` TEXT")
 
-                database.execSQL("ALTER TABLE hosts ADD COLUMN `createdEpochMillis` INTEGER")
-                database.execSQL("ALTER TABLE hosts ADD COLUMN `updatedEpochMillis` INTEGER")
-                database.execSQL(
+                db.execSQL("ALTER TABLE hosts ADD COLUMN `createdEpochMillis` INTEGER")
+                db.execSQL("ALTER TABLE hosts ADD COLUMN `updatedEpochMillis` INTEGER")
+                db.execSQL(
                     "UPDATE hosts SET createdEpochMillis = COALESCE(lastUsedEpochMillis, CAST(strftime('%s','now') AS INTEGER) * 1000)"
                 )
-                database.execSQL("UPDATE hosts SET updatedEpochMillis = createdEpochMillis")
+                db.execSQL("UPDATE hosts SET updatedEpochMillis = createdEpochMillis")
 
-                database.execSQL("ALTER TABLE identities ADD COLUMN `updatedEpochMillis` INTEGER")
-                database.execSQL("UPDATE identities SET updatedEpochMillis = createdEpochMillis")
+                db.execSQL("ALTER TABLE identities ADD COLUMN `updatedEpochMillis` INTEGER")
+                db.execSQL("UPDATE identities SET updatedEpochMillis = createdEpochMillis")
 
-                database.execSQL("ALTER TABLE port_forwards ADD COLUMN `createdEpochMillis` INTEGER")
-                database.execSQL("ALTER TABLE port_forwards ADD COLUMN `updatedEpochMillis` INTEGER")
-                database.execSQL("ALTER TABLE port_forwards ADD COLUMN `lastUsedEpochMillis` INTEGER")
-                database.execSQL(
+                db.execSQL("ALTER TABLE port_forwards ADD COLUMN `createdEpochMillis` INTEGER")
+                db.execSQL("ALTER TABLE port_forwards ADD COLUMN `updatedEpochMillis` INTEGER")
+                db.execSQL("ALTER TABLE port_forwards ADD COLUMN `lastUsedEpochMillis` INTEGER")
+                db.execSQL(
                     "UPDATE port_forwards SET createdEpochMillis = CAST(strftime('%s','now') AS INTEGER) * 1000"
                 )
-                database.execSQL("UPDATE port_forwards SET updatedEpochMillis = createdEpochMillis")
+                db.execSQL("UPDATE port_forwards SET updatedEpochMillis = createdEpochMillis")
 
-                database.execSQL("ALTER TABLE snippets ADD COLUMN `createdEpochMillis` INTEGER")
-                database.execSQL("ALTER TABLE snippets ADD COLUMN `updatedEpochMillis` INTEGER")
-                database.execSQL("ALTER TABLE snippets ADD COLUMN `lastUsedEpochMillis` INTEGER")
-                database.execSQL(
+                db.execSQL("ALTER TABLE snippets ADD COLUMN `createdEpochMillis` INTEGER")
+                db.execSQL("ALTER TABLE snippets ADD COLUMN `updatedEpochMillis` INTEGER")
+                db.execSQL("ALTER TABLE snippets ADD COLUMN `lastUsedEpochMillis` INTEGER")
+                db.execSQL(
                     "UPDATE snippets SET createdEpochMillis = CAST(strftime('%s','now') AS INTEGER) * 1000"
                 )
-                database.execSQL("UPDATE snippets SET updatedEpochMillis = createdEpochMillis")
+                db.execSQL("UPDATE snippets SET updatedEpochMillis = createdEpochMillis")
             }
         }
 
         val MIGRATION_7_8 = object : Migration(7, 8) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                createUptimeTables(database)
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createUptimeTables(db)
             }
         }
 

@@ -357,7 +357,6 @@ fun SSHPeachesRoot(
     val onRemoveHostFromUptime = actions.onRemoveHostFromUptime
     val onRefreshUptime = actions.onRefreshUptime
     val onImportHost = actions.onImportHost
-    val onHostOsMetadataImported = actions.onHostOsMetadataImported
     val onHostInfoCommandsChange = actions.onHostInfoCommandsChange
     val onPortForwardAdd = actions.onPortForwardAdd
     val onImportPortForward = actions.onImportPortForward
@@ -455,14 +454,6 @@ fun SSHPeachesRoot(
     val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
-    val routeEmptyStateVisible = when (currentRoute) {
-        Routes.HOSTS -> uiState.hosts.isEmpty()
-        Routes.UPTIME -> uiState.hosts.isEmpty() && uiState.uptimeSummaries.isEmpty()
-        Routes.IDENTITIES -> emptyStateByRoute[Routes.IDENTITIES] ?: uiState.identities.isEmpty()
-        Routes.FORWARDS -> emptyStateByRoute[Routes.FORWARDS] ?: uiState.portForwards.isEmpty()
-        Routes.SNIPPETS -> emptyStateByRoute[Routes.SNIPPETS] ?: uiState.snippets.isEmpty()
-        else -> false
-    }
     val missingCorePermissions = corePermissions.filterNot { it.granted }
     val activeSshSessions = sessions.filter {
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
@@ -1910,9 +1901,6 @@ fun SSHPeachesRoot(
                                 snippets = uiState.snippets,
                                 importRequestKey = snippetImportRequestToken.intValue,
                                 onAdd = onSnippetAdd,
-                                onCreateSnippet = {
-                                    navController.navigate(Routes.snippetEditor())
-                                },
                                 onEditSnippet = { snippetId ->
                                     navController.navigate(Routes.snippetEditor(snippetId))
                                 },

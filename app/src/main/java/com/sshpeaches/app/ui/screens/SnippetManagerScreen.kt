@@ -52,7 +52,6 @@ fun SnippetManagerScreen(
     snippets: List<Snippet>,
     importRequestKey: Int = 0,
     onAdd: (title: String, group: String?, description: String, command: String) -> Unit = { _, _, _, _ -> },
-    onCreateSnippet: () -> Unit = {},
     onEditSnippet: (snippetId: String) -> Unit = {},
     onDelete: (id: String) -> Unit = {},
     onRun: (snippet: Snippet) -> Unit = {},

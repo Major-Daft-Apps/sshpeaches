@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -268,6 +269,7 @@ class MainActivity : FragmentActivity() {
         hardwareKeyHandler = handler
     }
 
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (hardwareKeyHandler?.invoke(event) == true) {
             return true

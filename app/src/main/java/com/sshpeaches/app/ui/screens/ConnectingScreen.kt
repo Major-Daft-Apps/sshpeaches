@@ -1478,7 +1478,6 @@ fun ConnectingScreen(
             )
         } else if (showScpTransferSession && request != null) {
             ConnectingScpContent(
-                request = request,
                 remoteDirectory = remoteDirectory,
                 scpVisibleEntries = scpVisibleEntries,
                 scpLastListedPath = scpLastListedPath,
@@ -1551,7 +1550,6 @@ fun ConnectingScreen(
                 clearSftpConsole = { sftpConsoleLines.clear() },
                 sftpCommandInput = sftpCommandInput,
                 onSftpCommandInputChange = { sftpCommandInput = it },
-                sftpPendingDirectoryEcho = sftpPendingDirectoryEcho,
                 onSftpPendingDirectoryEchoChange = { sftpPendingDirectoryEcho = it },
                 pendingSftpDownloadRemotePath = pendingSftpDownloadRemotePath,
                 onPendingSftpDownloadRemotePathChange = { pendingSftpDownloadRemotePath = it },
@@ -1579,7 +1577,6 @@ fun ConnectingScreen(
             )
         } else if (request != null) {
             ConnectingStatusContent(
-                request = request,
                 state = state,
                 statusText = statusText,
                 statusColor = statusColor,
@@ -1900,7 +1897,6 @@ private fun TerminalFindPanel(
 
 @Composable
 private fun ConnectingScpContent(
-    request: QuickConnectRequest,
     remoteDirectory: RemoteDirectorySnapshot?,
     scpVisibleEntries: List<RemoteDirectoryEntry>,
     scpLastListedPath: String,
@@ -2486,7 +2482,6 @@ private fun ConnectingSftpContent(
     clearSftpConsole: () -> Unit,
     sftpCommandInput: String,
     onSftpCommandInputChange: (String) -> Unit,
-    sftpPendingDirectoryEcho: String?,
     onSftpPendingDirectoryEchoChange: (String?) -> Unit,
     pendingSftpDownloadRemotePath: String?,
     onPendingSftpDownloadRemotePathChange: (String?) -> Unit,
@@ -2858,7 +2853,6 @@ private fun ConnectingSftpContent(
 
 @Composable
 private fun ConnectingStatusContent(
-    request: QuickConnectRequest,
     state: QuickConnectUiState,
     statusText: String,
     statusColor: Color,
