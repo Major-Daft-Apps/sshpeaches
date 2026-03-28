@@ -20,7 +20,6 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
-import com.majordaftapps.sshpeaches.app.data.repository.InMemoryAppRepository
 import com.majordaftapps.sshpeaches.app.data.repository.InMemoryUptimeRepository
 import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
@@ -49,7 +48,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class AppViewModel(
-    private val repository: AppRepository = InMemoryAppRepository(),
+    private val repository: AppRepository,
     private val uptimeRepository: UptimeRepository = InMemoryUptimeRepository(),
     private val uptimeMonitorRunner: UptimeMonitorRunnerDelegate = NoOpUptimeMonitorRunner()
 ) : ViewModel() {

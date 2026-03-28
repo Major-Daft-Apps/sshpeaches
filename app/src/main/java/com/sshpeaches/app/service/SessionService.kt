@@ -2125,22 +2125,22 @@ class SessionService : Service() {
                 token == "ubuntu" -> OsFamily.UBUNTU
                 token == "debian" -> OsFamily.DEBIAN
                 token == "fedora" -> OsFamily.FEDORA
-                token == "centos" -> OsFamily.CENTOS
+                token == "centos" -> OsFamily.REDHAT
                 token == "arch" || token == "archlinux" -> OsFamily.ARCH
                 token == "linuxmint" || token == "mint" -> OsFamily.MINT
                 token == "suse" || token.startsWith("opensuse") || token == "sles" -> OsFamily.SUSE
                 token == "rhel" || token == "redhat" || token.contains("redhat") -> OsFamily.REDHAT
-                token == "gentoo" -> OsFamily.GENTOO
-                token == "pop" || token == "pop_os" || token == "pop!_os" -> OsFamily.POP_OS
-                token == "manjaro" -> OsFamily.MANJARO
-                token == "elementary" || token == "elementaryos" -> OsFamily.ELEMENTARY
-                token == "peppermint" -> OsFamily.PEPPERMINT
-                token == "lite" || token == "linuxlite" -> OsFamily.LITE
-                token == "zorin" -> OsFamily.ZORIN
-                token == "rocky" || token == "rockylinux" -> OsFamily.ROCKY
-                token == "alma" || token == "almalinux" -> OsFamily.ALMA
-                token == "asahi" -> OsFamily.ASAHI
-                token == "nixos" -> OsFamily.NIXOS
+                token == "gentoo" -> OsFamily.GENERIC
+                token == "pop" || token == "pop_os" || token == "pop!_os" -> OsFamily.GENERIC
+                token == "manjaro" -> OsFamily.GENERIC
+                token == "elementary" || token == "elementaryos" -> OsFamily.GENERIC
+                token == "peppermint" -> OsFamily.GENERIC
+                token == "lite" || token == "linuxlite" -> OsFamily.GENERIC
+                token == "zorin" -> OsFamily.GENERIC
+                token == "rocky" || token == "rockylinux" -> OsFamily.REDHAT
+                token == "alma" || token == "almalinux" -> OsFamily.REDHAT
+                token == "asahi" -> OsFamily.GENERIC
+                token == "nixos" -> OsFamily.GENERIC
                 token == "freebsd" || token == "openbsd" || token == "netbsd" || token == "bsd" -> OsFamily.BSD
                 token == "windows" || token == "msys" || token == "mingw" || token == "cygwin" -> OsFamily.WINDOWS
                 token == "linux" -> OsFamily.GENERIC

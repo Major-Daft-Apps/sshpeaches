@@ -612,10 +612,7 @@ private fun OsMetadata.iconResOrNull(): Int? = when (this) {
         OsFamily.MINT -> R.raw.linux_mint
         OsFamily.ARCH -> R.raw.arch
         OsFamily.SUSE -> R.raw.suse
-        OsFamily.REDHAT,
-        OsFamily.CENTOS,
-        OsFamily.ROCKY,
-        OsFamily.ALMA -> R.raw.redhat
+        OsFamily.REDHAT -> R.raw.redhat
         OsFamily.MAC -> R.raw.apple
         OsFamily.WINDOWS -> R.raw.windows
         OsFamily.BSD -> R.raw.bsd

@@ -1272,6 +1272,16 @@ fun SSHPeachesRoot(
 
     @Composable
     fun SessionVerticalContent() {
+        val showConnectingTopBar =
+            quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
+                !connectedHostBarCollapsed.value
+        val showSessionTopBar =
+            currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
+        val showTopBarForCurrentSessionRoute = when (currentRoute) {
+            Routes.CONNECTING -> showConnectingTopBar
+            Routes.SESSION -> showSessionTopBar
+            else -> false
+        }
         val request = effectiveQuickConnectRequest
         val screenState = when {
             currentRoute == Routes.SESSION && request != null -> {
@@ -1390,7 +1400,8 @@ fun SSHPeachesRoot(
                 navController.navigate(Routes.SETTINGS)
             },
             onShowMessage = showSuccessMessage,
-            findRequestToken = connectingFindRequestToken.intValue
+            findRequestToken = connectingFindRequestToken.intValue,
+            applyStatusBarsPadding = !showTopBarForCurrentSessionRoute
         )
     }
 
@@ -1443,6 +1454,11 @@ fun SSHPeachesRoot(
             scrimColor = Color.Black.copy(alpha = 0.4f)
         ) {
             Surface(color = MaterialTheme.colorScheme.background) {
+                val showConnectingTopBar =
+                    quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
+                        !connectedHostBarCollapsed.value
+                val showSessionTopBar =
+                    currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(snackbarHostState) { data ->
@@ -1456,11 +1472,6 @@ fun SSHPeachesRoot(
                         }
                     },
                     topBar = {
-                        val showConnectingTopBar =
-                            quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
-                                !connectedHostBarCollapsed.value
-                        val showSessionTopBar =
-                            currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
                         val showTopBar =
                             showSessionTopBar &&
                                 (currentRoute != Routes.CONNECTING || showConnectingTopBar)

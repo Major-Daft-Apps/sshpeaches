@@ -263,7 +263,8 @@ fun ConnectingScreen(
     onToggleConnectedHostBar: () -> Unit,
     onOpenSettings: () -> Unit,
     onShowMessage: (String) -> Unit = {},
-    findRequestToken: Int
+    findRequestToken: Int,
+    applyStatusBarsPadding: Boolean = true
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -441,9 +442,10 @@ fun ConnectingScreen(
         QuickConnectPhase.IDLE -> "Preparing..."
     }
     val statusColor = when (state.phase) {
-        QuickConnectPhase.ERROR -> Color(0xFFFF6B6B)
+        QuickConnectPhase.ERROR -> MaterialTheme.colorScheme.error
         else -> colorResource(id = R.color.peachy_orange)
     }
+    val terminalPanelColor = parseComposeColor(terminalProfile.backgroundHex, MaterialTheme.colorScheme.surface)
 
     val hostName = request?.let { "${it.username}@${it.host}:${it.port}" } ?: "Quick Connect"
     val renderedLogs = logs.map { "[${it.level}] ${it.message}" }
@@ -1443,12 +1445,13 @@ fun ConnectingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .statusBarsPadding()
+            .background(MaterialTheme.colorScheme.background)
+            .then(if (applyStatusBarsPadding) Modifier.statusBarsPadding() else Modifier)
             .testTag(UiTestTags.SCREEN_CONNECTING)
     ) {
         if (showTerminalSession) {
             ConnectingTerminalContent(
+                terminalPanelColor = terminalPanelColor,
                 terminalViewClient = terminalViewClient,
                 terminalMarginDp = terminalMarginDp,
                 showFindDialog = showFindDialog,
@@ -1609,7 +1612,7 @@ fun ConnectingScreen(
             ) {
                 Text(
                     text = "Retry",
-                    style = MaterialTheme.typography.labelLarge.copy(color = Color.White)
+                    style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary)
                 )
             }
         }
@@ -1618,6 +1621,7 @@ fun ConnectingScreen(
 
 @Composable
 private fun ConnectingTerminalContent(
+    terminalPanelColor: Color,
     terminalViewClient: TerminalViewClient,
     terminalMarginDp: Dp,
     showFindDialog: Boolean,
@@ -1661,7 +1665,7 @@ private fun ConnectingTerminalContent(
                     .fillMaxWidth()
                     .weight(1f)
                     .testTag(UiTestTags.CONNECTING_TERMINAL_PANEL),
-                color = Color(0xFF080808)
+                color = terminalPanelColor
             ) {
                 AndroidView(
                     factory = {
@@ -1748,9 +1752,10 @@ private fun TerminalFindPanel(
     activeFindMatch: TerminalFindMatch?,
     onDismiss: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF101010),
+        color = colorScheme.surface,
         shape = RoundedCornerShape(6.dp)
     ) {
         Column(
@@ -1768,10 +1773,10 @@ private fun TerminalFindPanel(
                         .height(34.dp)
                         .border(
                             width = 1.dp,
-                            color = Color(0xFF2D2D2D),
+                            color = colorScheme.outline.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(6.dp)
                         ),
-                    color = Color(0xFF161616),
+                    color = colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Box(
@@ -1786,7 +1791,7 @@ private fun TerminalFindPanel(
                             singleLine = true,
                             textStyle = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = FontFamily.Monospace,
-                                color = Color(0xFFEDEDED)
+                                color = colorScheme.onSurface
                             ),
                             keyboardOptions = KeyboardOptions(
                                 capitalization = KeyboardCapitalization.None,
@@ -1804,7 +1809,7 @@ private fun TerminalFindPanel(
                                         maxLines = 1,
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF8C8C8C)
+                                            color = colorScheme.onSurfaceVariant
                                         )
                                     )
                                 }
@@ -1817,13 +1822,13 @@ private fun TerminalFindPanel(
                     modifier = Modifier
                         .size(40.dp)
                         .clickable { onFindCaseSensitiveChange(!findCaseSensitive) },
-                    color = if (findCaseSensitive) Color(0xFF5B3A0F) else Color(0xFF1B1B1B),
+                    color = if (findCaseSensitive) colorScheme.primaryContainer else colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "Aa",
-                            color = Color(0xFFEDEDED),
+                            color = if (findCaseSensitive) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -1841,7 +1846,7 @@ private fun TerminalFindPanel(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowUp,
                         contentDescription = "Previous result",
-                        tint = Color(0xFFDEDEDE)
+                        tint = if (findMatches.isNotEmpty()) colorScheme.onSurface else colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(
@@ -1856,7 +1861,7 @@ private fun TerminalFindPanel(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Next result",
-                        tint = Color(0xFFDEDEDE)
+                        tint = if (findMatches.isNotEmpty()) colorScheme.onSurface else colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(
@@ -1866,7 +1871,7 @@ private fun TerminalFindPanel(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close find",
-                        tint = Color(0xFFBDBDBD)
+                        tint = colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1884,7 +1889,7 @@ private fun TerminalFindPanel(
                     }
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = Color(0xFFBDBDBD),
+                color = colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
@@ -2507,6 +2512,7 @@ private fun ConnectingSftpContent(
     resolveRemotePath: (String, String) -> String,
     listLocalFiles: (String) -> List<File>
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val effectiveSftpPath = remoteDirectory?.path ?: sftpPath
     val currentRemoteSnapshotKey = remember(remoteDirectory) {
         remoteDirectory?.let { snapshot ->
@@ -2765,9 +2771,9 @@ private fun ConnectingSftpContent(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("SFTP Console", color = Color.White, style = MaterialTheme.typography.titleMedium)
-        Text("Remote: $effectiveSftpPath", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
-        Text("Local: $sftpLocalPath", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+        Text("SFTP Console", color = colorScheme.onBackground, style = MaterialTheme.typography.titleMedium)
+        Text("Remote: $effectiveSftpPath", color = colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+        Text("Local: $sftpLocalPath", color = colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
         if (activeFileTransfer != null) {
             FileTransferProgressCard(transfer = activeFileTransfer)
         } else if (sftpTransferStatus != null) {
@@ -2778,7 +2784,7 @@ private fun ConnectingSftpContent(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(UiTestTags.CONNECTING_SFTP_CONSOLE),
-            color = Color(0xFF0F0F0F)
+            color = colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -2787,7 +2793,7 @@ private fun ConnectingSftpContent(
                     .padding(12.dp)
             ) {
                 val activityLog = if (sftpConsoleLines.isEmpty()) "sftp> help" else sftpConsoleLines.joinToString("\n")
-                Text(activityLog, color = Color(0xFFE5E5E5), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                Text(activityLog, color = colorScheme.onSurface, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
             }
         }
         OutlinedTextField(
@@ -2863,6 +2869,7 @@ private fun ConnectingStatusContent(
     renderedLogs: List<String>,
     listState: LazyListState
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -2927,18 +2934,18 @@ private fun ConnectingStatusContent(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (state.phase == QuickConnectPhase.CONNECTING || state.phase == QuickConnectPhase.IDLE) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = colorScheme.primary)
                     }
                     Text(
                         text = hostName,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray, fontStyle = FontStyle.Italic)
+                        style = MaterialTheme.typography.bodyMedium.copy(color = colorScheme.onSurfaceVariant, fontStyle = FontStyle.Italic)
                     )
                 }
                 detailLine?.let {
-                    Text(text = it, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF9E9E9E)))
+                    Text(text = it, style = MaterialTheme.typography.bodySmall.copy(color = colorScheme.onSurfaceVariant))
                 }
                 userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
-                    Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD)))
+                    Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = colorScheme.onSurfaceVariant))
                 }
                 activeFileTransfer?.let { transfer ->
                     FileTransferProgressCard(transfer = transfer)
@@ -2961,6 +2968,7 @@ private fun SnippetPickerDialog(
     onRunSnippet: (Snippet) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Run Snippet") },
@@ -2980,19 +2988,19 @@ private fun SnippetPickerDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onRunSnippet(snippet) },
-                            color = Color(0xFF111111),
+                            color = colorScheme.surface,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Column(
                                 modifier = Modifier.padding(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(text = snippet.title, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                Text(text = snippet.title, style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurface)
                                 if (snippet.description.isNotBlank()) {
                                     Text(
                                         text = snippet.description,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFBDBDBD),
+                                        color = colorScheme.onSurfaceVariant,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -3000,7 +3008,7 @@ private fun SnippetPickerDialog(
                                 Text(
                                     text = snippet.command,
                                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = Color(0xFFE5E5E5),
+                                    color = colorScheme.onSurface,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -3133,6 +3141,7 @@ private fun RowScope.CompactKeyButton(
     testTag: String,
     onSendKey: (CompactTerminalKey) -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     var repeatJob by remember(key) { mutableStateOf<Job?>(null) }
     var pressed by remember(key) { mutableStateOf(false) }
@@ -3148,13 +3157,13 @@ private fun RowScope.CompactKeyButton(
             .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
             .testTag(testTag)
             .clip(keyShape)
-            .border(width = 1.dp, color = Color(0xFF474747), shape = keyShape)
+            .border(width = 1.dp, color = colorScheme.outline.copy(alpha = 0.7f), shape = keyShape)
             .background(
                 when {
-                    pressed && key.enabled -> Color(0xFF5B3A0F)
-                    modifierActive || aliasActive -> Color(0xFF5B3A0F)
-                    key.enabled -> Color(0xFF121212)
-                    else -> Color(0xFF090909)
+                    pressed && key.enabled -> colorScheme.primaryContainer
+                    modifierActive || aliasActive -> colorScheme.primaryContainer
+                    key.enabled -> colorScheme.surfaceVariant
+                    else -> colorScheme.surface
                 }
             )
             .pointerInteropFilter { event: MotionEvent ->
@@ -3191,13 +3200,13 @@ private fun RowScope.CompactKeyButton(
             Icon(
                 imageVector = icon.icon,
                 contentDescription = icon.label,
-                tint = if (key.enabled) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+                tint = if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(15.dp)
             )
         } else {
             Text(
                 text = key.label,
-                color = if (key.enabled) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
+                color = if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant,
                 fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -3208,10 +3217,11 @@ private fun RowScope.CompactKeyButton(
 
 @Composable
 private fun FileTransferProgressCard(transfer: FileTransferProgress) {
+    val colorScheme = MaterialTheme.colorScheme
     val progressFraction = transfer.progressFraction
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF111111),
+        color = colorScheme.surfaceVariant,
         shape = RoundedCornerShape(10.dp)
     ) {
         Column(
@@ -3223,18 +3233,18 @@ private fun FileTransferProgressCard(transfer: FileTransferProgress) {
                     progress = { progressFraction },
                     modifier = Modifier.fillMaxWidth(),
                     color = colorResource(id = R.color.peachy_orange),
-                    trackColor = Color(0xFF2C2C2C)
+                    trackColor = colorScheme.surface
                 )
             } else {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = colorResource(id = R.color.peachy_orange),
-                    trackColor = Color(0xFF2C2C2C)
+                    trackColor = colorScheme.surface
                 )
             }
             Text(
                 text = transfer.progressSummary(),
-                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFBDBDBD))
+                style = MaterialTheme.typography.bodySmall.copy(color = colorScheme.onSurfaceVariant)
             )
         }
     }
@@ -3344,9 +3354,11 @@ private fun ConnectionLogsPane(
     listState: LazyListState,
     modifier: Modifier
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+    val containerColor = colorScheme.surfaceVariant
     Surface(
         modifier = modifier.testTag(UiTestTags.CONNECTING_LOG_PANEL),
-        color = Color(0xFF080808)
+        color = containerColor
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -3360,7 +3372,7 @@ private fun ConnectionLogsPane(
                         text = log,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
-                            color = Color(0xFFBDBDBD),
+                            color = colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
                     )
@@ -3374,8 +3386,8 @@ private fun ConnectionLogsPane(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFF080808),
-                                Color(0x00080808)
+                                containerColor,
+                                containerColor.copy(alpha = 0f)
                             )
                         )
                     )
@@ -3383,6 +3395,9 @@ private fun ConnectionLogsPane(
         }
     }
 }
+
+private fun parseComposeColor(value: String, fallback: Color): Color =
+    runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrDefault(fallback)
 
 private data class CompactTerminalKey(
     val label: String,
