@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.set
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
@@ -722,7 +724,7 @@ fun SettingsScreen(
                     description = "Capture local session logs for troubleshooting. Not uploaded.",
                     checked = diagnosticsLoggingEnabled,
                     onCheckedChange = onDiagnosticsToggle,
-                    switchModifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
                 )
                 SettingsToggleRow(
                     title = "Send usage reports",
@@ -803,7 +805,7 @@ fun SettingsScreen(
                         description = "Encrypt saved passwords and private key material with a passphrase.",
                         checked = includeSecretsInQr,
                         onCheckedChange = onIncludeSecretsInQrToggle,
-                        switchModifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
                     )
                     if (includeSecretsInQr) {
                         OutlinedTextField(
@@ -891,18 +893,15 @@ fun SettingsScreen(
                         }
                         exportQrBitmap.value = runCatching {
                             val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
-                            val bmp = android.graphics.Bitmap.createBitmap(
+                            val bmp = createBitmap(
                                 matrix.width,
                                 matrix.height,
                                 android.graphics.Bitmap.Config.ARGB_8888
                             )
                             for (x in 0 until matrix.width) {
                                 for (y in 0 until matrix.height) {
-                                    bmp.setPixel(
-                                        x,
-                                        y,
+                                    bmp[x, y] =
                                         if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-                                    )
                                 }
                             }
                             bmp
@@ -1136,7 +1135,7 @@ private fun SettingsToggleRow(
     description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    switchModifier: Modifier = Modifier
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1156,7 +1155,7 @@ private fun SettingsToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            modifier = switchModifier.align(Alignment.CenterVertically)
+            modifier = modifier.align(Alignment.CenterVertically)
         )
     }
 }

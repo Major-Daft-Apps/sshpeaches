@@ -3,6 +3,7 @@ package com.majordaftapps.sshpeaches.app.security
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.MessageDigest
@@ -71,10 +72,10 @@ object SecurityManager {
         val securePrefs = awaitPrefs()
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val hash = hashPin(pin, salt)
-        securePrefs.edit()
-            .putString(KEY_PIN_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
-            .putString(KEY_PIN_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
-            .apply()
+        securePrefs.edit {
+            putString(KEY_PIN_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
+            putString(KEY_PIN_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
+        }
         pinConfiguredState.value = true
         // Keep the current session unlocked after creating/changing a PIN.
         unlock()
@@ -82,10 +83,10 @@ object SecurityManager {
 
     fun clearPin() {
         val securePrefs = awaitPrefs()
-        securePrefs.edit()
-            .remove(KEY_PIN_HASH)
-            .remove(KEY_PIN_SALT)
-            .apply()
+        securePrefs.edit {
+            remove(KEY_PIN_HASH)
+            remove(KEY_PIN_SALT)
+        }
         pinConfiguredState.value = false
         lockState.value = false
     }
@@ -107,9 +108,9 @@ object SecurityManager {
     fun storeHostPassword(hostId: String, password: String) {
         val securePrefs = awaitPrefs()
         ensureUnlocked("store password")
-        securePrefs.edit()
-            .putString(KEY_PASSWORD_PREFIX + hostId, password)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_PASSWORD_PREFIX + hostId, password)
+        }
     }
 
     fun getHostPassword(hostId: String): String? {
@@ -119,15 +120,17 @@ object SecurityManager {
     }
 
     fun clearHostPassword(hostId: String) {
-        awaitPrefs().edit().remove(KEY_PASSWORD_PREFIX + hostId).apply()
+        awaitPrefs().edit {
+            remove(KEY_PASSWORD_PREFIX + hostId)
+        }
     }
 
     fun storeIdentityKey(identityId: String, key: String) {
         val securePrefs = awaitPrefs()
         ensureUnlocked("store identity key")
-        securePrefs.edit()
-            .putString(KEY_IDENTITY_PREFIX + identityId, key)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_IDENTITY_PREFIX + identityId, key)
+        }
     }
 
     fun getIdentityKey(identityId: String): String? {
@@ -137,19 +140,19 @@ object SecurityManager {
     }
 
     fun clearIdentityKey(identityId: String) {
-        awaitPrefs().edit()
-            .remove(KEY_IDENTITY_PREFIX + identityId)
-            .remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId)
-            .remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
-            .apply()
+        awaitPrefs().edit {
+            remove(KEY_IDENTITY_PREFIX + identityId)
+            remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId)
+            remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
+        }
     }
 
     fun storeIdentityPublicKey(identityId: String, publicKey: String) {
         val securePrefs = awaitPrefs()
         ensureUnlocked("store identity public key")
-        securePrefs.edit()
-            .putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
+        }
     }
 
     fun getIdentityPublicKey(identityId: String): String? {
@@ -159,19 +162,21 @@ object SecurityManager {
     }
 
     fun clearIdentityPublicKey(identityId: String) {
-        awaitPrefs().edit().remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId).apply()
+        awaitPrefs().edit {
+            remove(KEY_IDENTITY_PUBLIC_PREFIX + identityId)
+        }
     }
 
     fun storeIdentityKeyPassphrase(identityId: String, passphrase: String?) {
         val securePrefs = awaitPrefs()
         ensureUnlocked("store identity key passphrase")
-        val editor = securePrefs.edit()
-        if (passphrase.isNullOrBlank()) {
-            editor.remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
-        } else {
-            editor.putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, passphrase)
+        securePrefs.edit {
+            if (passphrase.isNullOrBlank()) {
+                remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
+            } else {
+                putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, passphrase)
+            }
         }
-        editor.apply()
     }
 
     fun getIdentityKeyPassphrase(identityId: String): String? {
@@ -181,7 +186,9 @@ object SecurityManager {
     }
 
     fun clearIdentityKeyPassphrase(identityId: String) {
-        awaitPrefs().edit().remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId).apply()
+        awaitPrefs().edit {
+            remove(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId)
+        }
     }
 
     fun exportIdentityPublicKey(identityId: String): String? {
@@ -191,9 +198,9 @@ object SecurityManager {
 
     fun importIdentityPublicKey(identityId: String, publicKey: String) {
         val securePrefs = awaitPrefs()
-        securePrefs.edit()
-            .putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_IDENTITY_PUBLIC_PREFIX + identityId, publicKey)
+        }
     }
 
     fun exportHostPasswordPayload(hostId: String, passphrase: String): String? {
@@ -208,9 +215,9 @@ object SecurityManager {
         val securePrefs = awaitPrefs()
         requireValidSecretPassphrase(passphrase)
         val plaintext = decryptTransferPayload(payload, passphrase)
-        securePrefs.edit()
-            .putString(KEY_PASSWORD_PREFIX + hostId, plaintext)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_PASSWORD_PREFIX + hostId, plaintext)
+        }
     }
 
     fun exportIdentityKeyPayload(identityId: String, passphrase: String): String? {
@@ -225,9 +232,9 @@ object SecurityManager {
         val securePrefs = awaitPrefs()
         requireValidSecretPassphrase(passphrase)
         val plaintext = decryptTransferPayload(payload, passphrase)
-        securePrefs.edit()
-            .putString(KEY_IDENTITY_PREFIX + identityId, plaintext)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_IDENTITY_PREFIX + identityId, plaintext)
+        }
     }
 
     fun exportIdentityKeyPassphrasePayload(identityId: String, passphrase: String): String? {
@@ -242,9 +249,9 @@ object SecurityManager {
         val securePrefs = awaitPrefs()
         requireValidSecretPassphrase(passphrase)
         val plaintext = decryptTransferPayload(payload, passphrase)
-        securePrefs.edit()
-            .putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, plaintext)
-            .apply()
+        securePrefs.edit {
+            putString(KEY_IDENTITY_PASSPHRASE_PREFIX + identityId, plaintext)
+        }
     }
 
     private fun hashPin(pin: String, salt: ByteArray): ByteArray {

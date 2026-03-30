@@ -115,7 +115,7 @@ fun ThemeProfileEditorScreen(
                     value = font.label,
                     buttonText = "Select",
                     onClick = { showFontFamilyDialog = true },
-                    buttonModifier = Modifier.testTag(UiTestTags.THEME_PROFILE_FONT_BUTTON)
+                    modifier = Modifier.testTag(UiTestTags.THEME_PROFILE_FONT_BUTTON)
                 )
                 EditorRow(
                     label = "Font Size",
@@ -443,7 +443,7 @@ private fun EditorRow(
     value: String,
     buttonText: String,
     onClick: () -> Unit,
-    buttonModifier: Modifier = Modifier
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -454,7 +454,7 @@ private fun EditorRow(
             Text(label)
             Text(value, style = MaterialTheme.typography.bodySmall)
         }
-        TextButton(onClick = onClick, modifier = buttonModifier) { Text(buttonText) }
+        TextButton(onClick = onClick, modifier = modifier) { Text(buttonText) }
     }
 }
 

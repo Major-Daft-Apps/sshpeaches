@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.widget
 
 import android.content.Context
+import androidx.core.content.edit
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import org.json.JSONArray
@@ -16,7 +17,6 @@ object WidgetSessionStore {
     fun write(context: Context, snapshots: List<SessionService.SessionSnapshot>) {
         val payload = JSONArray()
         snapshots
-            .filter { it.status != SessionService.SessionStatus.ERROR }
             .forEach { snapshot ->
             val title = snapshot.host.name.ifBlank {
                 "${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}"
@@ -31,9 +31,9 @@ object WidgetSessionStore {
             )
         }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_OPEN_SESSIONS, payload.toString())
-            .apply()
+            .edit {
+                putString(KEY_OPEN_SESSIONS, payload.toString())
+            }
     }
 
     fun read(context: Context): List<WidgetOpenSession> {

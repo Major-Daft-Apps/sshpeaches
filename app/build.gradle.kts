@@ -11,6 +11,7 @@ import java.util.Properties
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.tasks.bundling.Zip
 
 // The Firebase project currently has a release client only; skip non-release processing.
 tasks.configureEach {
@@ -24,6 +25,7 @@ tasks.configureEach {
 }
 
 val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
+val releaseAbiFilters = listOf("arm64-v8a", "x86_64")
 
 android {
     namespace = "com.majordaftapps.sshpeaches.app"
@@ -74,7 +76,7 @@ android {
         versionName = "0.9.13"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += releaseAbiFilters
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -132,7 +134,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -455,6 +461,21 @@ tasks.register("releaseLaneManagedDevicesCheck") {
     group = "verification"
     description = "Runs the release-lane instrumentation smoke suite against the release APK on the managed phone and tablet emulators."
     dependsOn("pixel2Api34ReleaseAndroidTest", "nexus9Api34ReleaseAndroidTest")
+}
+
+val packageReleaseNativeDebugSymbols = tasks.register<Zip>("packageReleaseNativeDebugSymbols") {
+    group = "build"
+    description = "Packages Play Console native debug symbols for the release build."
+    dependsOn("mergeReleaseNativeLibs")
+    from(layout.buildDirectory.dir("intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib")) {
+        include(releaseAbiFilters.map { "$it/**" })
+    }
+    destinationDirectory.set(layout.buildDirectory.dir("outputs/native-debug-symbols/release"))
+    archiveFileName.set("native-debug-symbols.zip")
+}
+
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    finalizedBy(packageReleaseNativeDebugSymbols)
 }
 
 tasks.register("connectedReleaseLaunchCheck") {

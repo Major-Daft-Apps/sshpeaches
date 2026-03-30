@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import androidx.core.content.edit
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
@@ -261,7 +262,9 @@ internal object HostWidgets {
         val existing = prefs.getString(KEY_ACTION_TOKEN, null)
         if (!existing.isNullOrBlank()) return existing
         val generated = UUID.randomUUID().toString()
-        prefs.edit().putString(KEY_ACTION_TOKEN, generated).apply()
+        prefs.edit {
+            putString(KEY_ACTION_TOKEN, generated)
+        }
         return generated
     }
 

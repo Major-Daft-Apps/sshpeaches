@@ -251,6 +251,7 @@ fun UptimeScreen(
                             UptimeCheckMethod.values().forEach { method ->
                                 DropdownMenuItem(
                                     text = { Text(method.name) },
+                                    modifier = Modifier.testTag(UiTestTags.uptimeMethodOption(method.name)),
                                     onClick = {
                                         dialogMethod.value = method
                                         methodMenuExpanded.value = false

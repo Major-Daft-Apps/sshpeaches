@@ -41,29 +41,32 @@ class SessionLaunchWithoutNotificationPermissionTest {
         )
         AppStateSeeder.seedHost(host, password = "widget-secret")
 
-        uiAutomation.executeShellCommand("pm revoke $packageName ${Manifest.permission.POST_NOTIFICATIONS}").close()
-        uiAutomation.executeShellCommand("pm clear-permission-flags $packageName ${Manifest.permission.POST_NOTIFICATIONS} user-set user-fixed").close()
+        uiAutomation.executeShellCommand("cmd appops set $packageName POST_NOTIFICATION ignore").close()
 
-        ActivityScenario.launch<MainActivity>(
-            Intent(targetContext, MainActivity::class.java).apply {
-                action = MainActivity.ACTION_WIDGET_CONNECT
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-                )
-                putExtra(MainActivity.EXTRA_WIDGET_HOST_ID, host.id)
-                putExtra(MainActivity.EXTRA_WIDGET_MODE, ConnectionMode.SSH.name)
+        try {
+            ActivityScenario.launch<MainActivity>(
+                Intent(targetContext, MainActivity::class.java).apply {
+                    action = MainActivity.ACTION_WIDGET_CONNECT
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    )
+                    putExtra(MainActivity.EXTRA_WIDGET_HOST_ID, host.id)
+                    putExtra(MainActivity.EXTRA_WIDGET_MODE, ConnectionMode.SSH.name)
+                }
+            ).use { scenario ->
+                waitForScenarioState(scenario, Lifecycle.State.RESUMED)
+                check(scenario.state == Lifecycle.State.RESUMED) {
+                    "Session launch should not destroy MainActivity when notifications are revoked; state=${scenario.state}"
+                }
+                SystemClock.sleep(2_000)
+                check(scenario.state == Lifecycle.State.RESUMED) {
+                    "Session launch regressed after connect start when notifications are revoked; state=${scenario.state}"
+                }
             }
-        ).use { scenario ->
-            waitForScenarioState(scenario, Lifecycle.State.RESUMED)
-            check(scenario.state == Lifecycle.State.RESUMED) {
-                "Session launch should not destroy MainActivity when notifications are revoked; state=${scenario.state}"
-            }
-            SystemClock.sleep(2_000)
-            check(scenario.state == Lifecycle.State.RESUMED) {
-                "Session launch regressed after connect start when notifications are revoked; state=${scenario.state}"
-            }
+        } finally {
+            uiAutomation.executeShellCommand("cmd appops set $packageName POST_NOTIFICATION allow").close()
         }
     }
 

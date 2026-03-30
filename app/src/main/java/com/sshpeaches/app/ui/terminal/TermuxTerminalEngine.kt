@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.termux.terminal.TerminalEmulator
@@ -132,5 +133,5 @@ class TermuxTerminalEngine(
     }
 
     private fun parseColor(value: String, fallback: Int): Int =
-        runCatching { Color.parseColor(value) }.getOrDefault(fallback)
+        runCatching { value.toColorInt() }.getOrDefault(fallback)
 }

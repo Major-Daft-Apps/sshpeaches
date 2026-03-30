@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -118,6 +119,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.core.graphics.toColorInt
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -1243,6 +1245,7 @@ fun ConnectingScreen(
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     fun updateTerminalView(view: TerminalView) {
         terminalViewRef = view
         view.setTerminalViewClient(terminalViewClient)
@@ -1260,7 +1263,7 @@ fun ConnectingScreen(
             lastResize = resize
             onTerminalResize(emulator.mColumns, emulator.mRows)
         }
-        view.setOnTouchListener { _, event ->
+        view.setOnTouchListener { touchedView, event ->
             if (!swipeNavigationEnabled) {
                 swipeStart = null
                 swipeIntercepting = false
@@ -1314,6 +1317,8 @@ fun ConnectingScreen(
                         if (keyCode != null) {
                             sendArrowKey(keyCode)
                         }
+                    } else if (start != null) {
+                        touchedView.performClick()
                     }
                     stopSwipeRepeat()
                     swipeStart = null
@@ -3391,7 +3396,7 @@ private fun ConnectionLogsPane(
 }
 
 private fun parseComposeColor(value: String, fallback: Color): Color =
-    runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrDefault(fallback)
+    runCatching { Color(value.toColorInt()) }.getOrDefault(fallback)
 
 private data class CompactTerminalKey(
     val label: String,
@@ -3606,17 +3611,12 @@ private fun vibrateTerminalBell(context: Context) {
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     } ?: return
     if (!vibrator.hasVibrator()) return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        vibrator.vibrate(
-            VibrationEffect.createOneShot(
-                TERMINAL_BELL_VIBRATION_MS,
-                VibrationEffect.DEFAULT_AMPLITUDE
-            )
+    vibrator.vibrate(
+        VibrationEffect.createOneShot(
+            TERMINAL_BELL_VIBRATION_MS,
+            VibrationEffect.DEFAULT_AMPLITUDE
         )
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(TERMINAL_BELL_VIBRATION_MS)
-    }
+    )
 }
 
 private fun showTerminalBellNotification(context: Context, request: QuickConnectRequest?) {
@@ -3629,19 +3629,17 @@ private fun showTerminalBellNotification(context: Context, request: QuickConnect
     val notificationManager = NotificationManagerCompat.from(context)
     if (!notificationManager.areNotificationsEnabled()) return
     val systemNotificationManager = ContextCompat.getSystemService(context, NotificationManager::class.java) ?: return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        systemNotificationManager.createNotificationChannel(
-            NotificationChannel(
-                TERMINAL_BELL_NOTIFICATION_CHANNEL_ID,
-                "SSHPeaches Terminal Bell",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Alerts for terminal bell events"
-                setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-            }
-        )
-    }
+    systemNotificationManager.createNotificationChannel(
+        NotificationChannel(
+            TERMINAL_BELL_NOTIFICATION_CHANNEL_ID,
+            "SSHPeaches Terminal Bell",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Alerts for terminal bell events"
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
+    )
     val content = request?.let { "${it.username}@${it.host}:${it.port} requested attention" }
         ?: "An active session requested attention"
     val openIntent = Intent(context, MainActivity::class.java).apply {

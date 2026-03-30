@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -182,10 +183,14 @@ class MainActivity : FragmentActivity() {
         val notificationsGranted = postNotificationsGranted && notificationsEnabled
         val notificationsRemediation = notificationPermissionRemediation(postNotificationsGranted)
 
-        val foregroundServiceGranted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.FOREGROUND_SERVICE
-        ) == PackageManager.PERMISSION_GRANTED
+        val foregroundServiceGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ContextCompat.checkSelfPermission(
+                this,
+                FOREGROUND_SERVICE_PERMISSION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
 
         val foregroundServiceTypeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val dataSyncGranted = ContextCompat.checkSelfPermission(
@@ -235,9 +240,9 @@ class MainActivity : FragmentActivity() {
 
     private fun markNotificationPermissionRequested() {
         getSharedPreferences(CORE_PERMISSION_PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true)
-            .apply()
+            .edit {
+                putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true)
+            }
     }
 
     private fun ensureSessionServiceConnection() {
@@ -835,6 +840,7 @@ class MainActivity : FragmentActivity() {
         const val EXTRA_WIDGET_MODE = "extra_widget_mode"
         const val EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE = "extra_widget_file_transfer_entry_mode"
         const val EXTRA_START_ROUTE = "extra_start_route"
+        private const val FOREGROUND_SERVICE_PERMISSION = "android.permission.FOREGROUND_SERVICE"
         private const val CORE_PERMISSION_PREFS = "core_permission_state"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
         private const val STATE_REQUESTED_OPEN_SESSION_ID = "state_requested_open_session_id"

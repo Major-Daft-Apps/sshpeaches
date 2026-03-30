@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.compose.foundation.text.KeyboardOptions
 import android.content.Intent
 import android.content.Intent.ACTION_SEND
@@ -85,8 +86,8 @@ import com.majordaftapps.sshpeaches.app.util.snippetReference
 @Composable
 fun HostCard(
     host: HostConnection,
-    snippets: List<Snippet> = emptyList(),
     modifier: Modifier = Modifier,
+    snippets: List<Snippet> = emptyList(),
     onToggleFavorite: (String) -> Unit = {},
     onAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
     canRunInfoCommands: Boolean = false,
@@ -600,8 +601,8 @@ private fun OsMetadata.label(): String = when (this) {
 
 @Composable
 private fun OsMetadata.toColor(): Color = when (this) {
-    is OsMetadata.Known -> Color(android.graphics.Color.parseColor(family.colorHex))
-    else -> Color(android.graphics.Color.parseColor(OsFamily.UNKNOWN.colorHex))
+    is OsMetadata.Known -> Color(family.colorHex.toColorInt())
+    else -> Color(OsFamily.UNKNOWN.colorHex.toColorInt())
 }
 
 private fun OsMetadata.iconResOrNull(): Int? = when (this) {

@@ -1,7 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -144,7 +144,7 @@ fun OpenSourceLicensesScreen() {
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.clickable {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                                context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()))
                             }
                         )
                     }
@@ -187,7 +187,7 @@ fun OpenSourceLicensesScreen() {
                                     color = MaterialTheme.colorScheme.primary,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.clickable {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()))
                                     }
                                 )
                             }
@@ -198,7 +198,7 @@ fun OpenSourceLicensesScreen() {
                                 color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.clickable {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()))
                                 }
                             )
                         }

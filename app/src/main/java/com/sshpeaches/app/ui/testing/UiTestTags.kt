@@ -73,6 +73,7 @@ object UiTestTags {
     const val UPTIME_HOST_PICKER = "uptime_host_picker"
     fun uptimeHostOption(hostId: String): String = "uptime_host_option_$hostId"
     const val UPTIME_METHOD_FIELD = "uptime_method_field"
+    fun uptimeMethodOption(method: String): String = "uptime_method_option_$method"
     const val UPTIME_PORT_INPUT = "uptime_port_input"
     const val UPTIME_INTERVAL_INPUT = "uptime_interval_input"
     const val UPTIME_ENABLED_SWITCH = "uptime_enabled_switch"

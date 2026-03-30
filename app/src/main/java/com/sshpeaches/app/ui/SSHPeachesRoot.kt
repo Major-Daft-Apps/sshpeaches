@@ -108,8 +108,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
-import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -1413,7 +1413,7 @@ fun SSHPeachesRoot(
                             scope.launch { drawerState.close() }
                             when (destination.route) {
                                 Routes.HELP -> {
-                                    val helpUri = Uri.parse(helpUrl)
+                                    val helpUri = helpUrl.toUri()
                                     val customTab = CustomTabsIntent.Builder()
                                         .setShowTitle(true)
                                         .build()
@@ -2530,13 +2530,13 @@ fun SSHPeachesRoot(
         AboutDialog(
             onDismiss = { showAbout.value = false },
             onOpenWebsite = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(website)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, website.toUri()))
             },
             onOpenSupport = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(supportUrl)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, supportUrl.toUri()))
             },
             onOpenPrivacy = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(privacy)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, privacy.toUri()))
             },
             onOpenSourceLicenses = {
                 showAbout.value = false
