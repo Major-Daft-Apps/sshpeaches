@@ -1,22 +1,19 @@
 package com.majordaftapps.sshpeaches.app.data.ssh
 
 import android.content.Context
-import android.util.Log
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PublicKey
-import java.security.Security
-import java.util.Base64
-import java.util.concurrent.atomic.AtomicBoolean
 import java.security.spec.X509EncodedKeySpec
+import java.util.Base64
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.LoggerFactory
+import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 /**
  * Minimal SSHJ provider. Callers are responsible for threading/coroutine dispatch.
@@ -24,8 +21,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 object SshClientProvider {
 
     private val knownHostsWriteLock = Any()
-    private val bcInstalled = AtomicBoolean(false)
-    private val bcInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
 
     data class HostKeyPrompt(
@@ -48,9 +43,27 @@ object SshClientProvider {
         autoTrustUnknownHostKey: Boolean = true,
         onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
     ): SSHClient {
-        ensureBouncyCastleInstalled()
+        // Keep SSHJ on Android's default provider. bcprov is bundled for key generation,
+        // but letting SSHJ auto-register BC breaks transport digests on Android.
+        SecurityUtils.setRegisterBouncyCastle(false)
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
+        // Keep the Android-compatible KEX set from the last known-good release.
+        val compatibleKex = config.keyExchangeFactories.filterNot { factory ->
+            factory.name.contains("curve25519", ignoreCase = true)
+        }
+        if (compatibleKex.isNotEmpty()) {
+            config.keyExchangeFactories = compatibleKex
+        }
+        // Android host-key decoding is currently reliable only for RSA in this stack.
+        // Prefer RSA host keys until SSHJ/provider handling is stabilized.
+        val compatibleHostKeys = config.keyAlgorithms.filterNot { factory ->
+            factory.name.contains("ed25519", ignoreCase = true) ||
+                factory.name.contains("ecdsa", ignoreCase = true)
+        }
+        if (compatibleHostKeys.isNotEmpty()) {
+            config.keyAlgorithms = compatibleHostKeys
+        }
         val knownHostsFile = File(context.filesDir, "known_hosts")
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
@@ -232,23 +245,5 @@ object SshClientProvider {
         val digest = MessageDigest.getInstance("SHA-256").digest(key.encoded)
         val value = Base64.getEncoder().withoutPadding().encodeToString(digest)
         return "SHA256:$value"
-    }
-
-    private fun ensureBouncyCastleInstalled() {
-        if (bcInstalled.get()) return
-        synchronized(bcInstallLock) {
-            if (bcInstalled.get()) return
-            val provider = runCatching {
-                Security.removeProvider("BC")
-                Security.addProvider(BouncyCastleProvider())
-                Security.getProvider("BC")
-            }.onFailure { error ->
-                Log.w("SSHPeaches", "Unable to install full BouncyCastle provider", error)
-            }.getOrNull()
-            if (provider != null) {
-                Log.i("SSHPeaches", "Active BC provider: ${provider.javaClass.name} (${provider.info})")
-            }
-            bcInstalled.set(true)
-        }
     }
 }
