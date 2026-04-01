@@ -35,5 +35,6 @@ object AppStateResetter {
         }
         appContext.deleteFile("known_hosts")
         appContext.stopService(Intent(appContext, SessionService::class.java))
+        SecurityManager.resetForTesting()
     }
 }

@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.crypto.Cipher
 
 class AppViewModel(
     private val repository: AppRepository,
@@ -575,6 +576,7 @@ class AppViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) {
+        themeModeFlow.value = mode
         launchLogged("setThemeMode", "mode=$mode") {
             SettingsStore.setThemeMode(mode)
         }
@@ -1384,14 +1386,17 @@ class AppViewModel(
         return ok
     }
 
-    fun unlockWithBiometric() {
+    fun unlockWithBiometric(cipher: Cipher?): Boolean {
         logAction("unlockWithBiometric")
-        SecurityManager.unlock()
-        lockedFlow.value = SecurityManager.isLocked()
-        if (!lockedFlow.value && appInBackground) {
-            scheduleLockTimer(lockTimeoutFlow.value)
+        val ok = SecurityManager.unlockWithBiometric(cipher)
+        if (ok) {
+            lockedFlow.value = SecurityManager.isLocked()
+            if (!lockedFlow.value && appInBackground) {
+                scheduleLockTimer(lockTimeoutFlow.value)
+            }
         }
-        logResult("unlockWithBiometric", true, "locked=${lockedFlow.value}")
+        logResult("unlockWithBiometric", ok, "locked=${lockedFlow.value}")
+        return ok
     }
 
     fun onUserInteraction() {

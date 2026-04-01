@@ -38,6 +38,7 @@ import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
@@ -55,6 +56,7 @@ import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.termux.terminal.TerminalEmulator
 import androidx.lifecycle.lifecycleScope
 import java.util.UUID
+import javax.crypto.Cipher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -131,8 +133,8 @@ class MainActivity : FragmentActivity() {
         biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
-                UiDebugLog.result("biometricAuthentication", true)
-                appViewModel.unlockWithBiometric()
+                val ok = appViewModel.unlockWithBiometric(result.cryptoObject?.cipher)
+                UiDebugLog.result("biometricAuthentication", ok)
             }
         })
         biometricPromptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -318,7 +320,12 @@ class MainActivity : FragmentActivity() {
             LaunchedEffect(uiState.hosts) {
                 HostWidgets.updateAll(this@MainActivity)
             }
-            val startSession: (String, HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?) -> Unit =
+            LaunchedEffect(uiState.isLocked, sessionService) {
+                if (uiState.isLocked) {
+                    sessionService?.clearAllRuntimeSessionPasswords()
+                }
+            }
+            val startSession: (String, HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?, Boolean) -> Unit =
                 remember(
                     sessionService,
                     uiState.portForwards,
@@ -326,13 +333,12 @@ class MainActivity : FragmentActivity() {
                     uiState.autoStartForwards,
                     uiState.hostKeyPromptEnabled,
                     uiState.autoTrustHostKey,
-                    uiState.hosts,
                     uiState.terminalEmulation
                 ) {
-                { sessionId: String, host: HostConnection, mode: com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, password: String? ->
+                { sessionId: String, host: HostConnection, mode: com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, password: String?, allowPasswordSave: Boolean ->
                     UiDebugLog.action(
                         "uiStartSession",
-                        "sessionId=$sessionId, hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}"
+                        "sessionId=$sessionId, hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}, allowPasswordSave=$allowPasswordSave"
                     )
                     if (sessionService == null) {
                         ensureSessionServiceConnection()
@@ -348,7 +354,7 @@ class MainActivity : FragmentActivity() {
                             autoStartForwards = uiState.autoStartForwards,
                             autoTrustUnknownHostKey = uiState.autoTrustHostKey,
                             hostKeyPromptEnabled = uiState.hostKeyPromptEnabled,
-                            allowPasswordSave = uiState.hosts.any { saved -> saved.id == host.id },
+                            allowPasswordSave = allowPasswordSave,
                             terminalEmulation = uiState.terminalEmulation
                         )
                         UiDebugLog.result("uiStartSession", true, "sessionId=$sessionId, hostId=${host.id}")
@@ -377,7 +383,7 @@ class MainActivity : FragmentActivity() {
                     return@LaunchedEffect
                 }
                 val sessionId = "$hostId|${mode.name}|${UUID.randomUUID()}"
-                startSession(sessionId, host, mode, null)
+                startSession(sessionId, host, mode, null, true)
                 requestedOpenSessionHostId.value = sessionId
                 requestedOpenSessionFileTransferEntryMode.value =
                     pendingWidgetConnectFileTransferEntryMode.value
@@ -469,6 +475,16 @@ class MainActivity : FragmentActivity() {
                     sessionService?.resolveTerminalEmulator(hostId)
                 }
             }
+            val resolveRuntimeSessionPassword: (String) -> String? = remember(sessionService) {
+                { sessionId: String ->
+                    sessionService?.getRuntimeSessionPassword(sessionId)
+                }
+            }
+            val moveRuntimeSessionPassword: (String, String) -> Unit = remember(sessionService) {
+                { fromSessionId: String, toSessionId: String ->
+                    sessionService?.moveRuntimeSessionPassword(fromSessionId, toSessionId)
+                }
+            }
             LaunchedEffect(sessionSnapshots, uiState.hosts) {
                 sessionSnapshots.forEach { snapshot ->
                     val detected = snapshot.host.osMetadata
@@ -520,8 +536,9 @@ class MainActivity : FragmentActivity() {
                         UiDebugLog.action("uiBiometricUnlock", "promptReady=${biometricPrompt != null && biometricPromptInfo != null}")
                         val prompt = biometricPrompt
                         val info = biometricPromptInfo
-                        if (prompt != null && info != null) {
-                            prompt.authenticate(info)
+                        val cipher: Cipher? = SecurityManager.prepareBiometricUnlockCipher()
+                        if (prompt != null && info != null && cipher != null) {
+                            prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
                             UiDebugLog.result("uiBiometricUnlock", true)
                         } else {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
@@ -581,6 +598,7 @@ class MainActivity : FragmentActivity() {
                         onPortForwardUpdate = viewModel::updatePortForward,
                         onPortForwardDelete = viewModel::deletePortForward,
                         onStartSession = startSession,
+                        onMoveRuntimeSessionPassword = moveRuntimeSessionPassword,
                         onStopSession = stopSession,
                         onIdentityAdd = viewModel::addIdentity,
                         onImportIdentity = viewModel::importIdentity,
@@ -653,6 +671,7 @@ class MainActivity : FragmentActivity() {
                     ),
                     runtime = SSHPeachesRootRuntime(
                         resolveTerminalEmulator = resolveTerminalEmulator,
+                        resolveRuntimeSessionPassword = resolveRuntimeSessionPassword,
                         sessions = sessionSnapshots,
                         shellOutputs = shellOutputs,
                         remoteDirectories = remoteDirectories,

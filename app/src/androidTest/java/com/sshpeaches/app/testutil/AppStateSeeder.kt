@@ -135,6 +135,7 @@ object AppStateSeeder {
             runCatching { SecurityManager.unlock() }
             return
         }
+        runCatching { SecurityManager.unlock() }
         SecurityManager.setPin(pin)
         if (locked) {
             SecurityManager.lock()

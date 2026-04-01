@@ -203,7 +203,6 @@ data class QuickConnectRequest(
     val port: Int,
     val username: String,
     val auth: AuthMethod,
-    val password: String,
     val mode: ConnectionMode = ConnectionMode.SSH,
     val savedHostId: String? = null,
     val useMosh: Boolean = false,
@@ -261,6 +260,7 @@ fun ConnectingScreen(
     onScpUpload: (String, String) -> Unit,
     onManageRemotePath: (operation: String, sourcePath: String, destinationPath: String?) -> Unit,
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
+    resolveRuntimeSessionPassword: (String) -> String? = { null },
     onRetry: () -> Unit,
     onToggleConnectedHostBar: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1164,10 +1164,12 @@ fun ConnectingScreen(
     }
 
     fun resolveInjectPassword(): String {
-        val inline = request?.password.orEmpty()
-        if (inline.isNotBlank()) return inline
-        val hostId = request?.savedHostId ?: return ""
-        return runCatching { SecurityManager.getHostPassword(hostId) }.getOrNull().orEmpty()
+        val current = request ?: return ""
+        return if (current.savedHostId != null) {
+            runCatching { SecurityManager.getHostPassword(current.savedHostId) }.getOrNull().orEmpty()
+        } else {
+            resolveRuntimeSessionPassword(current.sessionId).orEmpty()
+        }
     }
 
     fun handleIconAlias(action: KeyboardSlotAction): Boolean {

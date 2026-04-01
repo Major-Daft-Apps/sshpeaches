@@ -4,11 +4,13 @@ import android.content.Context
 import android.util.Log
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
+import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PublicKey
 import java.security.Security
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
+import java.security.spec.X509EncodedKeySpec
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.KeyType
@@ -147,14 +149,23 @@ object SshClientProvider {
         ): Boolean {
             return runCatching {
                 synchronized(knownHostsWriteLock) {
-                    val keyType = KeyType.fromKey(key)
-                    if (keyType == KeyType.UNKNOWN) return false
+                    val normalizedKey = normalizeKnownHostKey(key)
+                    val keyType = resolveKnownHostKeyType(normalizedKey)
+                    if (keyType == KeyType.UNKNOWN) {
+                        log.warn(
+                            "Unable to resolve host key type for {} using algorithm {} ({})",
+                            hostname,
+                            normalizedKey.algorithm,
+                            normalizedKey.javaClass.name
+                        )
+                        return false
+                    }
                     if (replaceExisting) {
                         entries().removeAll { entry ->
                             runCatching { entry.appliesTo(keyType, hostname) }.getOrDefault(false)
                         }
                     }
-                    entries().add(OpenSSHKnownHosts.HostEntry(null, hostname, keyType, key))
+                    entries().add(OpenSSHKnownHosts.HostEntry(null, hostname, keyType, normalizedKey))
                     if (replaceExisting) {
                         write()
                     } else {
@@ -165,6 +176,54 @@ object SshClientProvider {
             }.getOrElse { error ->
                 log.warn("Failed to persist accepted host key for {}", hostname, error)
                 true
+            }
+        }
+
+        /**
+         * Conscrypt can surface provider-specific Ed25519 key classes that SSHJ later struggles to
+         * serialize into known_hosts. Re-wrapping from X.509 keeps the same key material while
+         * producing a standard JCA key implementation.
+         */
+        private fun normalizeKnownHostKey(key: PublicKey): PublicKey {
+            val encoded = runCatching { key.encoded }.getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?: return key
+            val candidates = buildList {
+                val algorithm = key.algorithm.trim()
+                if (algorithm.isNotBlank()) add(algorithm)
+                val lower = algorithm.lowercase()
+                when {
+                    lower.contains("eddsa") || lower.contains("ed25519") || lower.contains("ed") -> {
+                        add("Ed25519")
+                        add("EdDSA")
+                    }
+                    lower.contains("ecdsa") || lower.contains("ec") -> add("EC")
+                    lower.contains("rsa") -> add("RSA")
+                }
+                add("Ed25519")
+                add("EC")
+                add("RSA")
+            }.distinct()
+            candidates.forEach { algorithm ->
+                val normalized = runCatching {
+                    KeyFactory.getInstance(algorithm).generatePublic(X509EncodedKeySpec(encoded))
+                }.getOrNull()
+                if (normalized != null) {
+                    return normalized
+                }
+            }
+            return key
+        }
+
+        private fun resolveKnownHostKeyType(key: PublicKey): KeyType {
+            val direct = KeyType.fromKey(key)
+            if (direct != KeyType.UNKNOWN) return direct
+            val algorithm = key.algorithm.trim().lowercase()
+            return when {
+                algorithm.contains("ed25519") || algorithm.contains("eddsa") -> KeyType.ED25519
+                algorithm.contains("rsa") -> KeyType.RSA
+                algorithm.contains("dsa") -> KeyType.DSA
+                else -> KeyType.UNKNOWN
             }
         }
     }

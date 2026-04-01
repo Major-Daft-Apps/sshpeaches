@@ -17,14 +17,17 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
@@ -40,6 +43,9 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ConnectingScreenTest {
+
+    @get:Rule(order = 0)
+    val appStateResetRule = AppStateResetRule()
 
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -140,6 +146,7 @@ class ConnectingScreenTest {
                     onScpDownload = { _, _ -> },
                     onScpUpload = { _, _ -> },
                     onManageRemotePath = { _, _, _ -> },
+                    resolveRuntimeSessionPassword = { "secret" },
                     onRetry = {},
                     onToggleConnectedHostBar = {},
                     onOpenSettings = { openedSettings += 1 },
@@ -170,6 +177,63 @@ class ConnectingScreenTest {
             }
             check(openedSettings == 1) {
                 "Settings alias custom key did not invoke the settings callback"
+            }
+        }
+    }
+
+    @Test
+    fun passwordInjectUsesSavedHostPasswordAfterVaultMigration() {
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        SecurityManager.init(appContext)
+        SecurityManager.unlock()
+        SecurityManager.storeHostPassword("saved-host", "vaulted-secret")
+        SecurityManager.setPin("2468")
+        SecurityManager.lock()
+        check(SecurityManager.verifyPin("2468")) {
+            "Expected PIN verification to unlock the migrated vault"
+        }
+
+        val sentPayloads = mutableListOf<ByteArray>()
+        val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[0] = KeyboardLayoutDefaults.passwordInjectAction()
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH).copy(savedHostId = "saved-host"),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = customSlots,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+
+        composeRule.runOnIdle {
+            check(sentPayloads.any { String(it, StandardCharsets.UTF_8) == "vaulted-secret" }) {
+                "Password inject key did not send the saved host password from vault-backed storage"
             }
         }
     }
@@ -688,7 +752,6 @@ class ConnectingScreenTest {
         port = 2222,
         username = "tester",
         auth = AuthMethod.PASSWORD,
-        password = "secret",
         mode = mode
     )
 }

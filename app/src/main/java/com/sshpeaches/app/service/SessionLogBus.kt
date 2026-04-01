@@ -2,6 +2,8 @@
 
 package com.majordaftapps.sshpeaches.app.service
 
+import android.util.Log
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus.LogLevel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -48,6 +50,9 @@ private class SessionLogger(
     private val hostId: String,
     private val delegate: Logger
 ) : MarkerIgnoringBase() {
+    companion object {
+        private const val LOGCAT_TAG = "SSHPeachesSSH"
+    }
 
     override fun getName(): String = delegate.name
 
@@ -193,6 +198,15 @@ private class SessionLogger(
             else -> MessageFormatter.arrayFormat(message, args).message
         }
         if (text.isNullOrBlank()) return
+        if (BuildConfig.DEBUG) {
+            val logcatMessage = "[$hostId] $text"
+            when (level) {
+                LogLevel.DEBUG -> Log.d(LOGCAT_TAG, logcatMessage, throwable)
+                LogLevel.INFO -> Log.i(LOGCAT_TAG, logcatMessage, throwable)
+                LogLevel.WARN -> Log.w(LOGCAT_TAG, logcatMessage, throwable)
+                LogLevel.ERROR -> Log.e(LOGCAT_TAG, logcatMessage, throwable)
+            }
+        }
         SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text))
     }
 }

@@ -54,6 +54,7 @@ import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun UptimeScreen(
     hosts: List<HostConnection>,
@@ -308,9 +309,6 @@ fun UptimeScreen(
                             interval == null || interval !in 1..60 ->
                                 dialogError.value = "Interval must be between 1 and 60 minutes."
                             else -> {
-                                if (editingSummary.value == null) {
-                                    onAddHost(hostId)
-                                }
                                 onUpdateConfig(
                                     hostId,
                                     dialogMethod.value,

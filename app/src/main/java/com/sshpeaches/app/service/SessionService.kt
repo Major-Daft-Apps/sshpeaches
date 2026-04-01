@@ -97,6 +97,7 @@ class SessionService : Service() {
     private val binder = SessionBinder()
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
+    private val runtimeSessionPasswords = ConcurrentHashMap<String, String>()
     private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
     private val hostKeyPrompts = MutableStateFlow<List<HostKeyPrompt>>(emptyList())
     private val hostKeyPromptWaiters = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
@@ -154,6 +155,7 @@ class SessionService : Service() {
         stopAllSessions()
         clearAllHostKeyPrompts()
         clearAllPasswordPrompts()
+        runtimeSessionPasswords.clear()
         shellOutputPublishJobs.values.forEach { it.cancel() }
         shellOutputPublishJobs.clear()
         moshTranscriptPublishJobs.values.forEach { it.cancel() }
@@ -199,11 +201,16 @@ class SessionService : Service() {
             return
         }
         val sessionId = resolvedSessionId
+        val useRuntimePasswordCache = !allowPasswordSave
+        if (useRuntimePasswordCache && !passwordOverride.isNullOrBlank()) {
+            runtimeSessionPasswords[sessionId] = passwordOverride
+        }
         val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
         val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
         val initialPassword = if (needsPassword) {
             when {
                 !passwordOverride.isNullOrBlank() -> passwordOverride
+                useRuntimePasswordCache -> runtimeSessionPasswords[sessionId]
                 else -> runCatching { SecurityManager.getHostPassword(host.id) }.getOrNull()
             }
         } else {
@@ -245,7 +252,8 @@ class SessionService : Service() {
                             mode = mode,
                             initialPassword = initialPassword,
                             deadlineMillis = attemptDeadlineMillis,
-                            allowPasswordSave = allowPasswordSave
+                            allowPasswordSave = allowPasswordSave,
+                            useRuntimePasswordCache = useRuntimePasswordCache
                         )
                     }
                     AuthMethod.IDENTITY -> {
@@ -273,7 +281,8 @@ class SessionService : Service() {
                                 mode = mode,
                                 initialPassword = initialPassword,
                                 deadlineMillis = attemptDeadlineMillis,
-                                allowPasswordSave = allowPasswordSave
+                                allowPasswordSave = allowPasswordSave,
+                                useRuntimePasswordCache = useRuntimePasswordCache
                             )
                         }
                     }
@@ -420,6 +429,7 @@ class SessionService : Service() {
             activeConnections.remove(sessionId)
             clearHostKeyPromptsForHost(sessionId, trust = false)
             clearPasswordPromptsForHost(sessionId, password = null)
+            clearRuntimeSessionPassword(sessionId)
             clearShellOutputForHost(sessionId)
             clearRemoteDirectoryForHost(sessionId)
             clearFileTransferProgress(sessionId)
@@ -427,6 +437,7 @@ class SessionService : Service() {
         job.invokeOnCompletion {
             activeJobs.remove(sessionId)
             activeConnections.remove(sessionId)
+            clearRuntimeSessionPassword(sessionId)
             clearFileTransferProgress(sessionId)
             updateSessionNotifications()
             if (it is CancellationException) {
@@ -441,6 +452,7 @@ class SessionService : Service() {
         UiDebugLog.action("stopSession", "hostId=$hostId")
         clearHostKeyPromptsForHost(hostId, trust = false)
         clearPasswordPromptsForHost(hostId, password = null)
+        clearRuntimeSessionPassword(hostId)
         moshReconnectJobs.remove(hostId)?.cancel()
         val connection = activeConnections.remove(hostId)
         connection?.let {
@@ -572,6 +584,10 @@ class SessionService : Service() {
     }
 
     fun respondToPasswordPrompt(promptId: String, password: String?, savePassword: Boolean) {
+        val prompt = passwordPrompts.value.firstOrNull { it.id == promptId }
+        if (prompt?.allowSave == false && !password.isNullOrBlank()) {
+            runtimeSessionPasswords[prompt.hostId] = password
+        }
         passwordPromptWaiters.remove(promptId)?.complete(
             PasswordResponse(
                 password = password,
@@ -579,6 +595,22 @@ class SessionService : Service() {
             )
         )
         passwordPrompts.value = passwordPrompts.value.filterNot { it.id == promptId }
+    }
+
+    fun getRuntimeSessionPassword(sessionId: String): String? = runtimeSessionPasswords[sessionId]
+
+    fun moveRuntimeSessionPassword(fromSessionId: String, toSessionId: String) {
+        if (fromSessionId == toSessionId) return
+        val password = runtimeSessionPasswords.remove(fromSessionId) ?: return
+        runtimeSessionPasswords[toSessionId] = password
+    }
+
+    fun clearRuntimeSessionPassword(sessionId: String) {
+        runtimeSessionPasswords.remove(sessionId)
+    }
+
+    fun clearAllRuntimeSessionPasswords() {
+        runtimeSessionPasswords.clear()
     }
 
     fun sendShellInput(hostId: String, text: String) {
@@ -1655,7 +1687,8 @@ class SessionService : Service() {
         mode: ConnectionMode,
         initialPassword: String?,
         deadlineMillis: Long,
-        allowPasswordSave: Boolean
+        allowPasswordSave: Boolean,
+        useRuntimePasswordCache: Boolean
     ) {
         var password = initialPassword
         var savePassword = false
@@ -1678,6 +1711,9 @@ class SessionService : Service() {
                 )
                 password = response?.password
                 savePassword = response?.savePassword == true && allowPasswordSave
+                if (useRuntimePasswordCache && !password.isNullOrBlank()) {
+                    runtimeSessionPasswords[sessionId] = password
+                }
                 if (password.isNullOrBlank()) {
                     throw RuntimeException("Connection canceled while waiting for password.")
                 }
@@ -1691,6 +1727,9 @@ class SessionService : Service() {
                 }
                 return
             } catch (_: UserAuthException) {
+                if (useRuntimePasswordCache) {
+                    clearRuntimeSessionPassword(sessionId)
+                }
                 failedAttempts += 1
                 if (failedAttempts >= MAX_PASSWORD_PROMPT_ATTEMPTS) {
                     throw RuntimeException("Authentication failed after $MAX_PASSWORD_PROMPT_ATTEMPTS attempts.")

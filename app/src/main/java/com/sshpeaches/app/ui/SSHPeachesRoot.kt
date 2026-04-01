@@ -250,7 +250,8 @@ data class SSHPeachesRootActions(
     val onImportPortForward: (PortForward) -> Unit,
     val onPortForwardUpdate: (String, String, String?, PortForwardType, String, Int, String, Int, Boolean, List<String>) -> Unit,
     val onPortForwardDelete: (String) -> Unit,
-    val onStartSession: (String, HostConnection, ConnectionMode, String?) -> Unit,
+    val onStartSession: (String, HostConnection, ConnectionMode, String?, Boolean) -> Unit,
+    val onMoveRuntimeSessionPassword: (String, String) -> Unit,
     val onStopSession: (String) -> Unit,
     val onIdentityAdd: (String, String, String?, String?, String?) -> Unit,
     val onImportIdentity: (Identity) -> Unit,
@@ -297,6 +298,7 @@ data class SSHPeachesRootActions(
 
 data class SSHPeachesRootRuntime(
     val resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
+    val resolveRuntimeSessionPassword: (String) -> String?,
     val sessions: List<SessionSnapshot>,
     val shellOutputs: Map<String, String>,
     val remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
@@ -393,6 +395,7 @@ fun SSHPeachesRoot(
     val onSendSessionShortcut = actions.onSendSessionShortcut
     val onSendShellBytes = actions.onSendShellBytes
     val onResizeShell = actions.onResizeShell
+    val onMoveRuntimeSessionPassword = actions.onMoveRuntimeSessionPassword
     val onListSftpDirectory = actions.onListSftpDirectory
     val onSftpDownloadFile = actions.onSftpDownloadFile
     val onSftpUploadFile = actions.onSftpUploadFile
@@ -406,6 +409,7 @@ fun SSHPeachesRoot(
     val onOpenAppPermissionSettings = actions.onOpenAppPermissionSettings
     val onStartupRouteHandled = actions.onStartupRouteHandled
     val resolveTerminalEmulator = runtime.resolveTerminalEmulator
+    val resolveRuntimeSessionPassword = runtime.resolveRuntimeSessionPassword
     val sessions = runtime.sessions
     val shellOutputs = runtime.shellOutputs
     val remoteDirectories = runtime.remoteDirectories
@@ -507,7 +511,6 @@ fun SSHPeachesRoot(
             port = host.port,
             username = host.username,
             auth = host.preferredAuth,
-            password = "",
             mode = snapshot.mode,
             savedHostId = savedHostId,
             useMosh = host.useMosh,
@@ -835,7 +838,6 @@ fun SSHPeachesRoot(
                 port = host.port,
                 username = host.username,
                 auth = host.preferredAuth,
-                password = password ?: "",
                 mode = mode,
                 savedHostId = host.id,
                 useMosh = host.useMosh,
@@ -849,7 +851,7 @@ fun SSHPeachesRoot(
                 phase = QuickConnectPhase.CONNECTING,
                 message = "Connecting to ${host.host}:${host.port}..."
             )
-            onStartSession(sessionId, host, mode, password)
+            onStartSession(sessionId, host, mode, password, true)
         }
         scope.launch {
             drawerState.close()
@@ -1357,9 +1359,9 @@ fun SSHPeachesRoot(
                 }
             },
             resolveTerminalEmulator = resolveTerminalEmulator,
+            resolveRuntimeSessionPassword = resolveRuntimeSessionPassword,
             onRetry = {
                 quickConnectRequest.value?.let { current ->
-                    onStopSession(current.sessionId)
                     val next = if (current.savedHostId == null) {
                         current.copy(
                             sessionId = sessionIdFor("quick-${UUID.randomUUID()}", current.mode)
@@ -1369,6 +1371,10 @@ fun SSHPeachesRoot(
                             sessionId = sessionIdFor(current.savedHostId, current.mode)
                         )
                     }
+                    if (current.savedHostId == null) {
+                        onMoveRuntimeSessionPassword(current.sessionId, next.sessionId)
+                    }
+                    onStopSession(current.sessionId)
                     resetSessionLogs(next.sessionId)
                     quickConnectRequest.value = next
                     quickConnectState.value = QuickConnectUiState(
@@ -1380,7 +1386,8 @@ fun SSHPeachesRoot(
                         next.sessionId,
                         quickConnectHost(next),
                         next.mode,
-                        next.password
+                        null,
+                        current.savedHostId != null
                     )
                 }
             },
@@ -2143,7 +2150,6 @@ fun SSHPeachesRoot(
                     port = port,
                     username = username,
                     auth = auth,
-                    password = password,
                     mode = ConnectionMode.SSH,
                     savedHostId = savedHostId,
                     useMosh = useMosh,
@@ -2189,7 +2195,8 @@ fun SSHPeachesRoot(
                         request.sessionId,
                         quickConnectHost(request),
                         request.mode,
-                        request.password
+                        if (request.savedHostId == null) password.takeIf { it.isNotBlank() } else null,
+                        request.savedHostId != null
                     )
                 }
                 showQuickConnect.value = false
