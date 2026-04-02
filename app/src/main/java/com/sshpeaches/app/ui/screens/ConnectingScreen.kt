@@ -108,6 +108,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInteropFilter
@@ -3149,6 +3150,11 @@ private fun RowScope.CompactKeyButton(
     var repeatJob by remember(key) { mutableStateOf<Job?>(null) }
     var pressed by remember(key) { mutableStateOf(false) }
     val useLegacyDarkKeyPalette = colorScheme.background.luminance() < 0.5f
+    val lightModePeachAccentColor = run {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(peachAccentColor.toArgb(), hsv)
+        Color.hsv(hsv[0], hsv[1] * 0.82f, hsv[2])
+    }
     val keyBorderColor = if (useLegacyDarkKeyPalette) {
         Color(0xFF474747)
     } else {
@@ -3159,8 +3165,8 @@ private fun RowScope.CompactKeyButton(
         (modifierActive || aliasActive) && useLegacyDarkKeyPalette -> Color(0xFF5B3A0F)
         key.enabled && useLegacyDarkKeyPalette -> Color(0xFF121212)
         useLegacyDarkKeyPalette -> Color(0xFF090909)
-        pressed && key.enabled -> peachAccentColor
-        modifierActive || aliasActive -> peachAccentColor
+        pressed && key.enabled -> lightModePeachAccentColor
+        modifierActive || aliasActive -> lightModePeachAccentColor
         key.enabled -> colorScheme.surfaceVariant
         else -> colorScheme.surface
     }
