@@ -107,6 +107,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInteropFilter
@@ -3143,9 +3144,31 @@ private fun RowScope.CompactKeyButton(
     onSendKey: (CompactTerminalKey) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val peachAccentColor = colorResource(id = R.color.peachy_orange)
     val scope = rememberCoroutineScope()
     var repeatJob by remember(key) { mutableStateOf<Job?>(null) }
     var pressed by remember(key) { mutableStateOf(false) }
+    val useLegacyDarkKeyPalette = colorScheme.background.luminance() < 0.5f
+    val keyBorderColor = if (useLegacyDarkKeyPalette) {
+        Color(0xFF474747)
+    } else {
+        colorScheme.outline.copy(alpha = 0.7f)
+    }
+    val keyBackgroundColor = when {
+        pressed && key.enabled && useLegacyDarkKeyPalette -> Color(0xFF5B3A0F)
+        (modifierActive || aliasActive) && useLegacyDarkKeyPalette -> Color(0xFF5B3A0F)
+        key.enabled && useLegacyDarkKeyPalette -> Color(0xFF121212)
+        useLegacyDarkKeyPalette -> Color(0xFF090909)
+        pressed && key.enabled -> peachAccentColor
+        modifierActive || aliasActive -> peachAccentColor
+        key.enabled -> colorScheme.surfaceVariant
+        else -> colorScheme.surface
+    }
+    val keyContentColor = if (useLegacyDarkKeyPalette) {
+        if (key.enabled) Color(0xFFEDEDED) else Color(0xFF7B7B7B)
+    } else {
+        if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant
+    }
     DisposableEffect(Unit) {
         onDispose {
             repeatJob?.cancel()
@@ -3158,15 +3181,8 @@ private fun RowScope.CompactKeyButton(
             .height(KeyboardLayoutDefaults.COMPACT_KEY_HEIGHT_DP.dp)
             .testTag(testTag)
             .clip(keyShape)
-            .border(width = 1.dp, color = colorScheme.outline.copy(alpha = 0.7f), shape = keyShape)
-            .background(
-                when {
-                    pressed && key.enabled -> colorScheme.primaryContainer
-                    modifierActive || aliasActive -> colorScheme.primaryContainer
-                    key.enabled -> colorScheme.surfaceVariant
-                    else -> colorScheme.surface
-                }
-            )
+            .border(width = 1.dp, color = keyBorderColor, shape = keyShape)
+            .background(keyBackgroundColor)
             .pointerInteropFilter { event: MotionEvent ->
                 if (!key.enabled) return@pointerInteropFilter false
                 when (event.actionMasked) {
@@ -3201,13 +3217,13 @@ private fun RowScope.CompactKeyButton(
             Icon(
                 imageVector = icon.icon,
                 contentDescription = icon.label,
-                tint = if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant,
+                tint = keyContentColor,
                 modifier = Modifier.size(15.dp)
             )
         } else {
             Text(
                 text = key.label,
-                color = if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant,
+                color = keyContentColor,
                 fontSize = KeyboardLayoutDefaults.COMPACT_KEY_FONT_SP.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -3805,4 +3821,3 @@ private const val TERMINAL_BELL_NOTIFICATION_CHANNEL_ID = "terminal_bell"
 private const val TERMINAL_BELL_NOTIFICATION_ID_BASE = 24_000
 private const val TERMINAL_BELL_THROTTLE_MS = 750L
 private const val TERMINAL_BELL_VIBRATION_MS = 120L
-
