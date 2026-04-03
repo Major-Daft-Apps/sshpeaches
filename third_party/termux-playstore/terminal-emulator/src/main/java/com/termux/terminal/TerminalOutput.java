@@ -29,4 +29,8 @@ public abstract class TerminalOutput {
 
     public abstract void onColorsChanged();
 
+    /** Optional debug hook for parser and terminal protocol instrumentation. */
+    public void onTerminalDebug(String message) {
+    }
+
 }

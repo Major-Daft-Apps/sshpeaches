@@ -9,6 +9,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
@@ -34,14 +35,14 @@ data class AppUiState(
     val moshServerCommand: String = DEFAULT_MOSH_SERVER_COMMAND,
     val terminalProfiles: List<TerminalProfile> = TerminalProfileDefaults.builtInProfiles,
     val defaultTerminalProfileId: String = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
-    val crashReportsEnabled: Boolean = true,
-    val analyticsEnabled: Boolean = true,
-    val diagnosticsLoggingEnabled: Boolean = false,
+    val crashReportsEnabled: Boolean = SettingsStore.defaultCrashReportsEnabled,
+    val analyticsEnabled: Boolean = SettingsStore.defaultAnalyticsEnabled,
+    val diagnosticsLoggingEnabled: Boolean = SettingsStore.defaultDiagnosticsEnabled,
     val includeSecretsInQr: Boolean = false,
     val autoStartForwards: Boolean = true,
     val hostKeyPromptEnabled: Boolean = true,
     val autoTrustHostKey: Boolean = false,
-    val usageReportsEnabled: Boolean = false,
+    val usageReportsEnabled: Boolean = SettingsStore.defaultUsageReportsEnabled,
     val snippetRunTimeoutSeconds: Int = 10,
     val pinConfigured: Boolean = false,
     val isLocked: Boolean = false,

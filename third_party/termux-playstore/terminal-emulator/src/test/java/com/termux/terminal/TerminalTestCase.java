@@ -22,6 +22,7 @@ public abstract class TerminalTestCase extends TestCase {
 		final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		public final List<ChangedTitle> titleChanges = new ArrayList<>();
 		public final List<String> clipboardPuts = new ArrayList<>();
+		public final List<String> terminalDebug = new ArrayList<>();
 		public int bellsRung = 0;
 		public int colorsChanged = 0;
 
@@ -58,6 +59,11 @@ public abstract class TerminalTestCase extends TestCase {
 		@Override
 		public void onColorsChanged() {
 			colorsChanged++;
+		}
+
+		@Override
+		public void onTerminalDebug(String message) {
+			terminalDebug.add(message);
 		}
 	}
 

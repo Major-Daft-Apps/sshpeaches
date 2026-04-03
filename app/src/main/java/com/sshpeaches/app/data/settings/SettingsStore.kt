@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
@@ -69,6 +70,11 @@ object SettingsStore {
     private val usageReportsKey = booleanPreferencesKey("usage_reports")
     private val snippetRunTimeoutSecondsKey = intPreferencesKey("snippet_run_timeout_seconds")
 
+    val defaultCrashReportsEnabled: Boolean = true
+    val defaultAnalyticsEnabled: Boolean = true
+    val defaultDiagnosticsEnabled: Boolean = BuildConfig.DEBUG
+    val defaultUsageReportsEnabled: Boolean = BuildConfig.DEBUG
+
     fun init(context: Context) {
         appContext = context.applicationContext
     }
@@ -90,19 +96,22 @@ object SettingsStore {
     fun getStartupCrashReportsEnabled(): Boolean =
         telemetryPrefs().getBoolean(
             startupCrashReportsKey,
-            runCatching { runBlocking { crashReportsEnabled.first() } }.getOrDefault(true)
+            runCatching { runBlocking { crashReportsEnabled.first() } }
+                .getOrDefault(defaultCrashReportsEnabled)
         )
 
     fun getStartupAnalyticsEnabled(): Boolean =
         telemetryPrefs().getBoolean(
             startupAnalyticsKey,
-            runCatching { runBlocking { analyticsEnabled.first() } }.getOrDefault(true)
+            runCatching { runBlocking { analyticsEnabled.first() } }
+                .getOrDefault(defaultAnalyticsEnabled)
         )
 
     fun getStartupUsageReportsEnabled(): Boolean =
         telemetryPrefs().getBoolean(
             startupUsageReportsKey,
-            runCatching { runBlocking { usageReportsEnabled.first() } }.getOrDefault(false)
+            runCatching { runBlocking { usageReportsEnabled.first() } }
+                .getOrDefault(defaultUsageReportsEnabled)
         )
 
     val allowBackgroundSessions: Flow<Boolean> by lazy {
@@ -222,15 +231,15 @@ object SettingsStore {
     }
 
     val crashReportsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[crashReportsKey] ?: true }
+        dataStore.data.map { prefs -> prefs[crashReportsKey] ?: defaultCrashReportsEnabled }
     }
 
     val analyticsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[analyticsKey] ?: true }
+        dataStore.data.map { prefs -> prefs[analyticsKey] ?: defaultAnalyticsEnabled }
     }
 
     val diagnosticsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[diagnosticsKey] ?: false }
+        dataStore.data.map { prefs -> prefs[diagnosticsKey] ?: defaultDiagnosticsEnabled }
     }
 
     val includeSecretsInQr: Flow<Boolean> by lazy {
@@ -250,7 +259,7 @@ object SettingsStore {
     }
 
     val usageReportsEnabled: Flow<Boolean> by lazy {
-        dataStore.data.map { prefs -> prefs[usageReportsKey] ?: false }
+        dataStore.data.map { prefs -> prefs[usageReportsKey] ?: defaultUsageReportsEnabled }
     }
 
     val snippetRunTimeoutSeconds: Flow<Int> by lazy {

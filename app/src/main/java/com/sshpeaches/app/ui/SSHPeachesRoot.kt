@@ -1314,6 +1314,7 @@ fun SSHPeachesRoot(
             terminalProfile = activeTerminalProfile,
             terminalSelectionMode = uiState.terminalSelectionMode,
             terminalBellMode = uiState.terminalBellMode,
+            diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
             useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
             terminalMarginPx = uiState.terminalMarginPx,
             keyboardSlots = uiState.keyboardSlots,

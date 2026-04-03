@@ -14,7 +14,8 @@ class TermuxTerminalEngine(
     private val onWriteToRemote: (ByteArray) -> Unit,
     private val onCopyToClipboard: (String) -> Unit = {},
     private val onRequestPasteText: () -> String? = { null },
-    private var onBellAction: () -> Unit = {}
+    private var onBellAction: () -> Unit = {},
+    private val onTerminalDiagnostic: (String) -> Unit = {}
 ) : TerminalOutput(), TerminalSessionClient {
 
     private val emulator = TerminalEmulator(
@@ -28,9 +29,12 @@ class TermuxTerminalEngine(
     )
     private var terminalCursorStyle: Int = TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE
     private var terminalBackgroundColor: Int = Color.BLACK
+    private var incomingSequenceNumber = 0
+    private var outgoingSequenceNumber = 0
 
     fun appendIncoming(bytes: ByteArray) {
         if (bytes.isEmpty()) return
+        emitByteDiagnostic(direction = "RX", data = bytes, offset = 0, count = bytes.size)
         emulator.append(bytes, bytes.size)
     }
 
@@ -79,6 +83,7 @@ class TermuxTerminalEngine(
         if (count <= 0) return
         val end = offset + count
         if (offset < 0 || end > data.size || offset >= end) return
+        emitByteDiagnostic(direction = "TX", data = data, offset = offset, count = count)
         onWriteToRemote(data.copyOfRange(offset, end))
     }
 
@@ -99,6 +104,10 @@ class TermuxTerminalEngine(
     }
 
     override fun onColorsChanged() {}
+
+    override fun onTerminalDebug(message: String) {
+        onTerminalDiagnostic(message)
+    }
 
     override fun onTextChanged(changedSession: TerminalSession) {}
 
@@ -130,8 +139,44 @@ class TermuxTerminalEngine(
         private const val DEFAULT_TRANSCRIPT_ROWS = 5_000
         private const val DEFAULT_FOREGROUND_COLOR = 0xFFE6E6E6.toInt()
         private const val DEFAULT_CURSOR_COLOR = 0xFFFFB74D.toInt()
+        private const val DIAGNOSTIC_PREVIEW_BYTES = 48
     }
 
     private fun parseColor(value: String, fallback: Int): Int =
         runCatching { value.toColorInt() }.getOrDefault(fallback)
+
+    private fun emitByteDiagnostic(direction: String, data: ByteArray, offset: Int, count: Int) {
+        if (count <= 0) return
+        val sequence = if (direction == "RX") {
+            incomingSequenceNumber += 1
+            incomingSequenceNumber
+        } else {
+            outgoingSequenceNumber += 1
+            outgoingSequenceNumber
+        }
+        val previewLength = minOf(count, DIAGNOSTIC_PREVIEW_BYTES)
+        val hex = buildString {
+            for (index in 0 until previewLength) {
+                if (index > 0) append(' ')
+                val value = data[offset + index].toInt() and 0xFF
+                append(value.toString(16).padStart(2, '0'))
+            }
+        }
+        val ascii = buildString {
+            for (index in 0 until previewLength) {
+                val value = data[offset + index].toInt() and 0xFF
+                append(
+                    when (value) {
+                        0x1B -> "\\e"
+                        0x0D -> "\\r"
+                        0x0A -> "\\n"
+                        in 0x20..0x7E -> value.toChar().toString()
+                        else -> "\\x" + value.toString(16).padStart(2, '0')
+                    }
+                )
+            }
+        }
+        val truncated = if (count > previewLength) " (+${count - previewLength} bytes)" else ""
+        onTerminalDiagnostic("TERM-EMU $direction#$sequence bytes=$count hex=$hex ascii=\"$ascii\"$truncated")
+    }
 }

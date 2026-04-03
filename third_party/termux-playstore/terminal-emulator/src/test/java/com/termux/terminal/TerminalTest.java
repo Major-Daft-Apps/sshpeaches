@@ -1,5 +1,7 @@
 package com.termux.terminal;
 
+import java.util.List;
+
 public class TerminalTest extends TerminalTestCase {
 
 	public void testCursorPositioning() {
@@ -104,6 +106,23 @@ public class TerminalTest extends TerminalTestCase {
 		assertEnteringStringGivesResponse("\033[6n", "\033[1;3R");
 		enterString("\r\n");
 		assertEnteringStringGivesResponse("\033[6n", "\033[2;1R");
+	}
+
+	public void testDeviceStatusReportDebugMessages() {
+		withTerminalSized(5, 5);
+
+		enterString("\033[5n");
+		assertEquals(List.of("TERM-EMU CSI 5 n -> \\e[0n"), mOutput.terminalDebug);
+		mOutput.terminalDebug.clear();
+		mOutput.getOutputAndClear();
+
+		enterString("\033[6n");
+		assertEquals(List.of("TERM-EMU CSI 6 n -> \\e[1;1R"), mOutput.terminalDebug);
+		mOutput.terminalDebug.clear();
+		mOutput.getOutputAndClear();
+
+		enterString("\033[?6n");
+		assertEquals(List.of("TERM-EMU CSI ? 6 n -> \\e[?1;1;1R"), mOutput.terminalDebug);
 	}
 
 	/** Test the cursor shape changes using DECSCUSR. */

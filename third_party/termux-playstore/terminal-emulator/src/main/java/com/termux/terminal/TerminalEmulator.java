@@ -1231,7 +1231,9 @@ public final class TerminalEmulator {
                 switch (getArg0(-1)) {
                     case 6:
                         // Extended Cursor Position (DECXCPR - http://www.vt100.net/docs/vt510-rm/DECXCPR). Page=1.
-                        mSession.write(String.format(Locale.US, "\033[?%d;%d;1R", mCursorRow + 1, mCursorCol + 1));
+                        String decxcpr = String.format(Locale.US, "\033[?%d;%d;1R", mCursorRow + 1, mCursorCol + 1);
+                        mSession.write(decxcpr);
+                        emitTerminalDebug("TERM-EMU CSI ? 6 n -> " + toDebugSequence(decxcpr));
                         break;
                     default:
                         finishSequence();
@@ -1845,11 +1847,14 @@ public final class TerminalEmulator {
                         // Answer is ESC [ 0 n (Terminal OK).
                         byte[] dsr = {(byte) 27, (byte) '[', (byte) '0', (byte) 'n'};
                         mSession.write(dsr, 0, dsr.length);
+                        emitTerminalDebug("TERM-EMU CSI 5 n -> \\e[0n");
                         break;
                     case 6: // Cursor position report (CPR):
                         // Answer is ESC [ y ; x R, where x,y is
                         // the cursor location.
-                        mSession.write(String.format(Locale.US, "\033[%d;%dR", mCursorRow + 1, mCursorCol + 1));
+                        String cpr = String.format(Locale.US, "\033[%d;%dR", mCursorRow + 1, mCursorCol + 1);
+                        mSession.write(cpr);
+                        emitTerminalDebug("TERM-EMU CSI 6 n -> " + toDebugSequence(cpr));
                         break;
                     default:
                         break;
@@ -2400,28 +2405,45 @@ public final class TerminalEmulator {
     }
 
     private void logError(String errorType) {
+        emitTerminalDebug("TERM-EMU " + buildParserErrorMessage(errorType));
         if (LOG_ESCAPE_SEQUENCES) {
-            StringBuilder buf = new StringBuilder();
-            buf.append(errorType);
-            buf.append(", escapeState=");
-            buf.append(mEscapeState);
-            boolean firstArg = true;
-            if (mArgIndex >= mArgs.length) mArgIndex = mArgs.length - 1;
-            for (int i = 0; i <= mArgIndex; i++) {
-                int value = mArgs[i];
-                if (value >= 0) {
-                    if (firstArg) {
-                        firstArg = false;
-                        buf.append(", args={");
-                    } else {
-                        buf.append(',');
-                    }
-                    buf.append(value);
-                }
-            }
-            if (!firstArg) buf.append('}');
-            finishSequenceAndLogError(buf.toString());
+            finishSequenceAndLogError(buildParserErrorMessage(errorType));
         }
+    }
+
+    private String buildParserErrorMessage(String errorType) {
+        StringBuilder buf = new StringBuilder();
+        buf.append(errorType);
+        buf.append(", escapeState=");
+        buf.append(mEscapeState);
+        boolean firstArg = true;
+        if (mArgIndex >= mArgs.length) mArgIndex = mArgs.length - 1;
+        for (int i = 0; i <= mArgIndex; i++) {
+            int value = mArgs[i];
+            if (value >= 0) {
+                if (firstArg) {
+                    firstArg = false;
+                    buf.append(", args={");
+                } else {
+                    buf.append(',');
+                }
+                buf.append(value);
+            }
+        }
+        if (!firstArg) buf.append('}');
+        return buf.toString();
+    }
+
+    private void emitTerminalDebug(String message) {
+        if (message == null || message.isEmpty()) return;
+        mSession.onTerminalDebug(message);
+    }
+
+    private static String toDebugSequence(String value) {
+        return value
+            .replace("\033", "\\e")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n");
     }
 
     private void finishSequenceAndLogError(String error) {

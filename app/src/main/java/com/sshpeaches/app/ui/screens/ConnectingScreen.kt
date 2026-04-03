@@ -249,6 +249,7 @@ fun ConnectingScreen(
     terminalProfile: TerminalProfile,
     terminalSelectionMode: TerminalSelectionMode,
     terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
+    diagnosticsLoggingEnabled: Boolean = false,
     useVolumeButtonsToAdjustFontSize: Boolean = false,
     terminalMarginPx: Int = 0,
     keyboardSlots: List<KeyboardSlotAction>,
@@ -286,7 +287,18 @@ fun ConnectingScreen(
         TermuxTerminalEngine(
             onWriteToRemote = onSendShellBytes,
             onCopyToClipboard = { text -> clipboardManager.setText(AnnotatedString(text)) },
-            onRequestPasteText = { clipboardManager.getText()?.text }
+            onRequestPasteText = { clipboardManager.getText()?.text },
+            onTerminalDiagnostic = { message ->
+                val sessionId = request?.sessionId ?: return@TermuxTerminalEngine
+                if (!diagnosticsLoggingEnabled) return@TermuxTerminalEngine
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.DEBUG,
+                        message = message
+                    )
+                )
+            }
         )
     }
     val terminalInput = remember(request?.sessionId) {
@@ -811,9 +823,27 @@ fun ConnectingScreen(
         if (snapshot.startsWith(lastShellSnapshot)) {
             val delta = snapshot.substring(lastShellSnapshot.length)
             if (delta.isNotEmpty()) {
+                if (diagnosticsLoggingEnabled) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = request.sessionId,
+                            level = SessionLogBus.LogLevel.DEBUG,
+                            message = "TERM-REPLAY append-delta prev=${lastShellSnapshot.length} next=${snapshot.length} delta=${delta.length}"
+                        )
+                    )
+                }
                 terminalEngine.appendIncoming(delta.toByteArray(StandardCharsets.UTF_8))
             }
         } else {
+            if (diagnosticsLoggingEnabled) {
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = request.sessionId,
+                        level = SessionLogBus.LogLevel.DEBUG,
+                        message = "TERM-REPLAY reset-snapshot prev=${lastShellSnapshot.length} next=${snapshot.length}"
+                    )
+                )
+            }
             terminalEngine.reset()
             if (snapshot.isNotEmpty()) {
                 terminalEngine.appendIncoming(snapshot.toByteArray(StandardCharsets.UTF_8))
