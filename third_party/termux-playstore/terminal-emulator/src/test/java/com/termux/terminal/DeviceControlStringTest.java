@@ -39,6 +39,28 @@ public class DeviceControlStringTest extends TerminalTestCase {
 		assertCapabilityResponse("kB", "\033[Z");
 	}
 
+	public void testDecrqssReportsDecscl() {
+		withTerminalSized(4, 2);
+		assertEnteringStringGivesResponse("\033P$q\"p\033\\", "\033P1$r64;1\"p\033\\");
+		assertLinesAre("    ", "    ");
+	}
+
+	public void testFragmentedDecrqssReportsDecscl() {
+		withTerminalSized(4, 2).enterString("A");
+		enterString("\033P$q\"p\033");
+		assertEquals("", mOutput.getOutputAndClear());
+		enterString("\\");
+		assertEquals("\033P1$r64;1\"p\033\\", mOutput.getOutputAndClear());
+		assertLinesAre("A   ", "    ");
+	}
+
+	public void testUnknownDecrqssDoesNotPrintLiteralGarbage() {
+		withTerminalSized(6, 2).enterString("AB");
+		enterString("\033P$qzzz\033\\");
+		assertEquals("", mOutput.getOutputAndClear());
+		assertLinesAre("AB    ", "      ");
+	}
+
 	public void testReallyLongDeviceControlString() {
 		withTerminalSized(3, 3).enterString("\033P");
 		for (int i = 0; i < 10000; i++) {

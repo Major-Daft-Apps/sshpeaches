@@ -31,6 +31,7 @@ import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
 import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
 import com.majordaftapps.sshpeaches.app.util.legacyLoopbackDestinationHost
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
@@ -571,7 +572,9 @@ class SessionService : Service() {
     fun remoteDirectoryFlow(): StateFlow<Map<String, RemoteDirectorySnapshot>> = remoteDirectories.asStateFlow()
     fun fileTransferProgressFlow(): StateFlow<Map<String, FileTransferProgress>> = fileTransferProgress.asStateFlow()
     fun resolveTerminalEmulator(hostId: String): TerminalEmulator? {
-        return activeConnections[hostId]?.moshBinding?.session?.emulator
+        val connection = activeConnections[hostId] ?: return null
+        return connection.shellBinding?.terminalEngine?.emulator()
+            ?: connection.moshBinding?.session?.emulator
     }
 
     fun resolveMoshTerminalEmulator(hostId: String): TerminalEmulator? {
@@ -679,7 +682,9 @@ class SessionService : Service() {
             }
             return
         }
-        val shell = connection.shellBinding?.shell ?: return
+        val shellBinding = connection.shellBinding ?: return
+        shellBinding.terminalEngine.resize(columns, rows, 0, 0)
+        val shell = shellBinding.shell
         serviceScope.launch {
             runCatching {
                 shell.changeWindowDimensions(columns, rows, 0, 0)
@@ -2214,6 +2219,19 @@ class SessionService : Service() {
             session.allocateDefaultPTY()
         }
         val shell = session.startShell()
+        val terminalEngine = TermuxTerminalEngine(
+            onWriteToRemote = {},
+            onTerminalDiagnostic = { message ->
+                if (!diagnosticsEnabled) return@TermuxTerminalEngine
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.DEBUG,
+                        message = message
+                    )
+                )
+            }
+        )
         serviceScope.launch {
             var reachedEof = false
             runCatching {
@@ -2226,6 +2244,7 @@ class SessionService : Service() {
                         break
                     }
                     if (read > 0) {
+                        terminalEngine.appendIncoming(buffer.copyOf(read))
                         val text = String(buffer, 0, read, StandardCharsets.UTF_8)
                         appendShellOutput(hostId, text)
                         emitShellStreamDiagnostic(hostId = hostId, direction = "RX", payload = buffer, size = read)
@@ -2252,7 +2271,7 @@ class SessionService : Service() {
                 closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
             }
         }
-        return ShellBinding(session = session, shell = shell)
+        return ShellBinding(session = session, shell = shell, terminalEngine = terminalEngine)
     }
 
     private fun closeSessionAfterShellExit(hostId: String, reason: String) {
@@ -2722,7 +2741,8 @@ class SessionService : Service() {
 
     private data class ShellBinding(
         val session: Session,
-        val shell: Session.Shell
+        val shell: Session.Shell,
+        val terminalEngine: TermuxTerminalEngine
     )
 
     private data class MoshBinding(

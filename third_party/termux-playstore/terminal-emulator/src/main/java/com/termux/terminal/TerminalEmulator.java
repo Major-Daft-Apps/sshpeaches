@@ -136,6 +136,10 @@ public final class TerminalEmulator {
     private static final int ESC_CSI_UNSUPPORTED_PARAMETER_BYTE = 22;
     /** Escape processing: ESC [ <parameter bytes> <intermediate bytes> */
     private static final int ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE = 23;
+    /** Escape processing: VT52 direct cursor addressing row byte after ESC Y. */
+    private static final int ESC_VT52_CURSOR_ROW = 24;
+    /** Escape processing: VT52 direct cursor addressing column byte after ESC Y. */
+    private static final int ESC_VT52_CURSOR_COL = 25;
 
     /** The number of parameter arguments including colon separated sub-parameters. */
     private static final int MAX_ESCAPE_PARAMETERS = 32;
@@ -225,6 +229,8 @@ public final class TerminalEmulator {
 
     private String mTitle;
     private final Stack<String> mTitleStack = new Stack<>();
+    private boolean mInVt52Mode;
+    private int mVt52DirectCursorRow;
 
     /**
      * The cursor position. Between (0,0) and (mRows-1, mColumns-1).
@@ -555,6 +561,10 @@ public final class TerminalEmulator {
         return isDecsetInternalBitSet(DECSET_BIT_APPLICATION_CURSOR_KEYS);
     }
 
+    public boolean isVt52Mode() {
+        return mInVt52Mode;
+    }
+
     /**
      * If mouse events are being sent as escape codes to the terminal.
      */
@@ -682,7 +692,7 @@ public final class TerminalEmulator {
                 //       printf "\033[41m\t\r\033[42m\tXX\033[0m\n"
                 // the first cells are created with a red background, but when tabbing over
                 // them again with a green background they are not overwritten.
-                mCursorCol = nextTabStop(1);
+                setCursorCol(nextTabStop(1));
                 break;
             case 10: // Line feed (LF, \n).
             case 11: // Vertical tab (VT, \v).
@@ -741,6 +751,13 @@ public final class TerminalEmulator {
                     case ESC_CSI_UNSUPPORTED_PARAMETER_BYTE:
                     case ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE:
                         doCsiUnsupportedParameterOrIntermediateByte(b);
+                        break;
+                    case ESC_VT52_CURSOR_ROW:
+                        mVt52DirectCursorRow = Math.max(0, Math.min(mRows - 1, b - 32));
+                        continueSequence(ESC_VT52_CURSOR_COL);
+                        break;
+                    case ESC_VT52_CURSOR_COL:
+                        setCursorPosition(Math.max(0, Math.min(mColumns - 1, b - 32)), mVt52DirectCursorRow);
                         break;
                     case ESC_CSI_EXCLAMATION:
                         if (b == 'p') { // Soft terminal reset (DECSTR, http://vt100.net/docs/vt510-rm/DECSTR).
@@ -1273,9 +1290,15 @@ public final class TerminalEmulator {
         switch (externalBit) {
             case 1: // Application Cursor Keys (DECCKM).
                 break;
+            case 2: // ANSI Mode (DECANM). Reset enters VT52 mode, set returns to ANSI mode.
+                mInVt52Mode = !setting;
+                break;
             case 3: // Set: 132 column mode (. Reset: 80 column mode. ANSI name: DECCOLM.
-                // We don't actually set/reset 132 cols, but we do want the side effects
-                // (FIXME: Should only do this if the 95 DECSET bit (DECNCSM) is set, and if changing value?):
+                // DECCOLM changes between 80/132 columns and clears page memory.
+                // The view may still be physically wider than 80 columns, but the emulator must
+                // honor the logical column mode for applications such as vttest.
+                int newColumns = setting ? 132 : 80;
+                resize(newColumns, mRows, mCellWidthPixels, mCellHeightPixels);
                 // Sets the left, right, top and bottom scrolling margins to their default positions, which is important for
                 // the "reset" utility to really reset the terminal:
                 mLeftMargin = mTopMargin = 0;
@@ -1489,6 +1512,11 @@ public final class TerminalEmulator {
      * Encountering a character in the {@link #ESC} state.
      */
     private void doEsc(int b) {
+        if (mInVt52Mode) {
+            doVt52Esc(b);
+            return;
+        }
+
         switch (b) {
             case '#':
                 continueSequence(ESC_POUND);
@@ -1574,6 +1602,67 @@ public final class TerminalEmulator {
                 break;
             case '_': // APC - Application Program Command.
                 continueSequence(ESC_APC);
+                break;
+            default:
+                unknownSequence(b);
+                break;
+        }
+    }
+
+    private void doVt52Esc(int b) {
+        switch (b) {
+            case '<': // Exit VT52 mode.
+                mInVt52Mode = false;
+                break;
+            case 'A': // Cursor up.
+                setCursorRow(Math.max(0, mCursorRow - 1));
+                break;
+            case 'B': // Cursor down.
+                setCursorRow(Math.min(mRows - 1, mCursorRow + 1));
+                break;
+            case 'C': // Cursor right.
+                setCursorCol(Math.min(mColumns - 1, mCursorCol + 1));
+                break;
+            case 'D': // Cursor left.
+                setCursorCol(Math.max(0, mCursorCol - 1));
+                break;
+            case 'F': // Enter graphics mode.
+                mUseLineDrawingUsesG0 = true;
+                mUseLineDrawingG0 = true;
+                break;
+            case 'G': // Exit graphics mode.
+                mUseLineDrawingUsesG0 = true;
+                mUseLineDrawingG0 = false;
+                break;
+            case 'H': // Cursor home.
+                setCursorPosition(0, 0);
+                break;
+            case 'I': // Reverse line feed.
+                if (mCursorRow == 0) {
+                    mScreen.blockCopy(0, 0, mColumns, mRows - 1, 0, 1);
+                    blockClear(0, 0, mColumns);
+                } else {
+                    mCursorRow--;
+                }
+                break;
+            case 'J': // Erase to end of screen.
+                blockClear(mCursorCol, mCursorRow, mColumns - mCursorCol);
+                blockClear(0, mCursorRow + 1, mColumns, mRows - (mCursorRow + 1));
+                break;
+            case 'K': // Erase to end of line.
+                blockClear(mCursorCol, mCursorRow, mColumns - mCursorCol);
+                break;
+            case 'Y': // Direct cursor addressing.
+                continueSequence(ESC_VT52_CURSOR_ROW);
+                break;
+            case 'Z': // Identify.
+                mSession.write("\033/Z");
+                break;
+            case '=': // Alternate keypad mode.
+                setDecsetinternalBit(DECSET_BIT_APPLICATION_KEYPAD, true);
+                break;
+            case '>': // Numeric keypad mode.
+                setDecsetinternalBit(DECSET_BIT_APPLICATION_KEYPAD, false);
                 break;
             default:
                 unknownSequence(b);
@@ -2661,6 +2750,7 @@ public final class TerminalEmulator {
         mArgIndex = 0;
         mContinueSequence = false;
         mEscapeState = ESC_NONE;
+        mInVt52Mode = false;
         mInsertMode = false;
         mTopMargin = mLeftMargin = 0;
         mBottomMargin = mRows;

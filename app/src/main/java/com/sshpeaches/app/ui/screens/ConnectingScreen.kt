@@ -303,7 +303,10 @@ fun ConnectingScreen(
     }
     val terminalInput = remember(request?.sessionId) {
         TerminalInputRouter(
-            emulatorProvider = { terminalEngine.emulator() },
+            emulatorProvider = {
+                request?.let { resolveTerminalEmulator(it.sessionId) }
+                    ?: terminalEngine.emulator()
+            },
             onWriteToRemote = onSendShellBytes
         )
     }

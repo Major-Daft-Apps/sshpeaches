@@ -66,8 +66,26 @@ public final class TerminalRenderer {
         final int[] palette = mEmulator.mColors.mCurrentColors;
         final int cursorShape = mEmulator.getCursorStyle();
 
-        if (reverseVideo)
-            canvas.drawColor(palette[TextStyle.COLOR_INDEX_FOREGROUND], PorterDuff.Mode.SRC);
+        // Clear the full canvas every frame so shorter/default-background runs erase
+        // pixels from the previous frame. Without this, stale glyphs can survive when
+        // a line redraw replaces visible text with spaces using the default background.
+        canvas.drawColor(
+            reverseVideo ? palette[TextStyle.COLOR_INDEX_FOREGROUND] : palette[TextStyle.COLOR_INDEX_BACKGROUND],
+            PorterDuff.Mode.SRC
+        );
+
+        // Some escape sequences, notably DECCOLM, can change the emulator geometry without a
+        // corresponding Android view relayout. Fit the rendered terminal to the available canvas
+        // instead of clipping the last columns/rows.
+        final float naturalWidth = columns * mFontWidth;
+        final float naturalHeight = mFontLineSpacingAndAscent + (mEmulator.mRows * mFontLineSpacing);
+        final float scaleX = naturalWidth > canvas.getWidth() ? (canvas.getWidth() / naturalWidth) : 1.f;
+        final float scaleY = naturalHeight > canvas.getHeight() ? (canvas.getHeight() / naturalHeight) : 1.f;
+        final boolean scaledToCanvas = scaleX < 1.f || scaleY < 1.f;
+        if (scaledToCanvas) {
+            canvas.save();
+            canvas.scale(scaleX, scaleY);
+        }
 
         float heightOffset = mFontLineSpacingAndAscent;
         for (int row = topRow; row < endRow; row++) {
@@ -148,6 +166,8 @@ public final class TerminalRenderer {
             drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun, lastRunStartIndex, charsSinceLastRun,
                 measuredWidthForRun, cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
         }
+
+        if (scaledToCanvas) canvas.restore();
     }
 
     private void drawTextRun(Canvas canvas, char[] text, int[] palette, float y, int startColumn, int runWidthColumns,

@@ -60,7 +60,18 @@ public class ScrollRegionTest extends TerminalTestCase {
 		// DECCOLM — Select 80 or 132 Columns per Page (http://www.vt100.net/docs/vt510-rm/DECCOLM) has the important
 		// side effect to clear scroll margins, which is useful for e.g. the "reset" utility to clear scroll margins.
 		withTerminalSized(3, 4).enterString("111222333444").assertLinesAre("111", "222", "333", "444");
-		enterString("\033[2r\033[?3h\r\nABCDEFGHIJKL").assertLinesAre("ABC", "DEF", "GHI", "JKL");
+		enterString("\033[2r\033[?3h");
+		assertEquals(132, mTerminal.mColumns);
+
+		enterString("A\r\nB\r\nC\r\nD\r\nE");
+		TerminalRow row0 = mTerminal.getScreen().allocateFullLineIfNecessary(mTerminal.getScreen().externalToInternalRow(0));
+		TerminalRow row1 = mTerminal.getScreen().allocateFullLineIfNecessary(mTerminal.getScreen().externalToInternalRow(1));
+		TerminalRow row2 = mTerminal.getScreen().allocateFullLineIfNecessary(mTerminal.getScreen().externalToInternalRow(2));
+		TerminalRow row3 = mTerminal.getScreen().allocateFullLineIfNecessary(mTerminal.getScreen().externalToInternalRow(3));
+		assertEquals('B', row0.mText[0]);
+		assertEquals('C', row1.mText[0]);
+		assertEquals('D', row2.mText[0]);
+		assertEquals('E', row3.mText[0]);
 	}
 
 	public void testScrollOutsideVerticalRegion() {
