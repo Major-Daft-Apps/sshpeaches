@@ -22,6 +22,12 @@ tasks.configureEach {
     ) {
         enabled = false
     }
+    if (
+        name.startsWith("uploadCrashlyticsMappingFile") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
 }
 
 val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
@@ -268,6 +274,8 @@ dependencies {
     releaseImplementation("com.google.firebase:firebase-analytics")
     releaseImplementation("com.google.firebase:firebase-perf")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
+    add("benchmarkImplementation", firebaseBom)
+    add("benchmarkImplementation", "com.google.firebase:firebase-perf")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
@@ -530,5 +538,14 @@ tasks.register("connectedReleaseLaunchCheck") {
                 }
             }
         )
+    }
+}
+
+tasks.matching { it.name == "installBenchmark" }.configureEach {
+    doFirst {
+        exec {
+            isIgnoreExitValue = true
+            commandLine(adbCommand("uninstall", "com.majordaftapps.sshpeaches"))
+        }
     }
 }

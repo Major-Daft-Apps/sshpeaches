@@ -19,6 +19,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
@@ -65,8 +66,13 @@ class SettingsPreferencesTest {
             .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
 
         scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        val diagnosticsInitiallyOn = SettingsStore.defaultDiagnosticsEnabled
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        if (diagnosticsInitiallyOn) {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+        } else {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        }
 
         composeRule.activityRule.scenario.recreate()
         composeRule.waitForIdle()
@@ -80,7 +86,11 @@ class SettingsPreferencesTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
             .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
         scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        if (diagnosticsInitiallyOn) {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+        } else {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        }
     }
 
     @Test

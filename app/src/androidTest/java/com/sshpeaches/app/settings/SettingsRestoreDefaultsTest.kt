@@ -14,6 +14,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
@@ -75,16 +76,25 @@ class SettingsRestoreDefaultsTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_CONFIRM)
             .performClick()
 
+        val diagnosticsExpectedAfterReset = SettingsStore.defaultDiagnosticsEnabled
         composeRule.waitUntil(20_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH).assertIsOn()
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH).assertIsOff()
-                composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+                if (diagnosticsExpectedAfterReset) {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+                } else {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+                }
                 true
             }.getOrDefault(false)
         }
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH).assertIsOn()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH).assertIsOff()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+        if (diagnosticsExpectedAfterReset) {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        } else {
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+        }
     }
 }
