@@ -32,10 +32,9 @@ class QuickConnectAccessibilitySmokeTest {
                     onDismiss = {},
                     portForwards = emptyList(),
                     identities = emptyList(),
-                    snippets = emptyList(),
                     terminalProfiles = TerminalProfileDefaults.builtInProfiles,
                     defaultTerminalProfileId = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
-                    onConnect = { _, _, _, _, _, _, _, _, _, _, _ -> }
+                    onConnect = { _, _, _, _, _, _, _, _, _, _ -> }
                 )
             }
         }

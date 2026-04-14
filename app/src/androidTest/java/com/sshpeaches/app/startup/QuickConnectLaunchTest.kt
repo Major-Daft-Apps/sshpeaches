@@ -28,8 +28,8 @@ class QuickConnectLaunchTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private fun setQuickConnectContent(
-        onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String, String?) -> Unit =
-            { _, _, _, _, _, _, _, _, _, _, _ -> }
+        onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String?) -> Unit =
+            { _, _, _, _, _, _, _, _, _, _ -> }
     ) {
         composeRule.setContent {
             SSHPeachesTheme(themeMode = ThemeMode.DARK) {
@@ -37,7 +37,6 @@ class QuickConnectLaunchTest {
                     onDismiss = {},
                     portForwards = emptyList(),
                     identities = emptyList(),
-                    snippets = emptyList(),
                     terminalProfiles = TerminalProfileDefaults.builtInProfiles,
                     defaultTerminalProfileId = TerminalProfileDefaults.DEFAULT_PROFILE_ID,
                     onConnect = onConnect
@@ -58,7 +57,7 @@ class QuickConnectLaunchTest {
     @Test
     fun quickConnectRejectsInvalidPort() {
         val attemptedPort = AtomicReference<Int?>(null)
-        setQuickConnectContent { _, port, _, _, _, _, _, _, _, _, _ ->
+        setQuickConnectContent { _, port, _, _, _, _, _, _, _, _ ->
             attemptedPort.set(port)
         }
         composeRule.onNodeWithTag(UiTestTags.QUICK_CONNECT_HOST_INPUT).performScrollTo().assertIsDisplayed()

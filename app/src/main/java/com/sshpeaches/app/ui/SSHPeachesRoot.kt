@@ -2109,10 +2109,9 @@ fun SSHPeachesRoot(
             onDismiss = { showQuickConnect.value = false },
             portForwards = uiState.portForwards,
             identities = uiState.identities,
-            snippets = uiState.snippets,
             terminalProfiles = uiState.terminalProfiles,
             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
-            onConnect = { host, port, username, auth, password, saveToHosts, useMosh, preferredIdentityId, forwardId, script, terminalProfileId ->
+            onConnect = { host, port, username, auth, password, saveToHosts, useMosh, preferredIdentityId, forwardId, terminalProfileId ->
                 var savedHostId: String? = null
                 if (saveToHosts) {
                     val pinnedId = UUID.randomUUID().toString()
@@ -2129,7 +2128,7 @@ fun SSHPeachesRoot(
                         useMosh,
                         preferredIdentityId,
                         forwardId,
-                        script,
+                        "",
                         BackgroundBehavior.INHERIT,
                         terminalProfileId,
                         password,
@@ -2151,7 +2150,7 @@ fun SSHPeachesRoot(
                     useMosh = useMosh,
                     preferredIdentityId = preferredIdentityId,
                     forwardId = forwardId,
-                    script = script,
+                    script = "",
                     terminalProfileId = terminalProfileId
                 )
                 quickConnectRequest.value?.let { request ->
@@ -2668,10 +2667,9 @@ internal fun QuickConnectSheet(
     onDismiss: () -> Unit,
     portForwards: List<PortForward>,
     identities: List<Identity>,
-    snippets: List<Snippet>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
-    onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String, String?) -> Unit
+    onConnect: (String, Int, String, AuthMethod, String, Boolean, Boolean, String?, String?, String?) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetMaxHeight = rememberBottomSheetMaxHeight()
@@ -2690,8 +2688,6 @@ internal fun QuickConnectSheet(
         val selectedIdentityId = rememberSaveable { mutableStateOf<String?>(null) }
         val identityExpanded = remember { mutableStateOf(false) }
         val selectedForwardId = rememberSaveable { mutableStateOf<String?>(null) }
-        val selectedStartupSnippetId = rememberSaveable { mutableStateOf<String?>(null) }
-        val startupSnippetExpanded = remember { mutableStateOf(false) }
         val selectedTerminalProfileId = rememberSaveable { mutableStateOf<String?>(null) }
         val terminalProfileExpanded = remember { mutableStateOf(false) }
         val hostHistory = rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -2911,61 +2907,6 @@ internal fun QuickConnectSheet(
                     }
                 }
             }
-            ExposedDropdownMenuBox(
-                expanded = startupSnippetExpanded.value,
-                onExpandedChange = {
-                    if (snippets.isNotEmpty()) {
-                        startupSnippetExpanded.value = !startupSnippetExpanded.value
-                    }
-                }
-            ) {
-                val selectedSnippet = snippets.firstOrNull { it.id == selectedStartupSnippetId.value }
-                TextField(
-                    value = selectedSnippet?.title ?: "None",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Startup command") },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = startupSnippetExpanded.value)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = startupSnippetExpanded.value,
-                    onDismissRequest = { startupSnippetExpanded.value = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("None") },
-                        onClick = {
-                            selectedStartupSnippetId.value = null
-                            startupSnippetExpanded.value = false
-                        }
-                    )
-                    snippets.forEach { snippet ->
-                        DropdownMenuItem(
-                            text = { Text(snippet.title) },
-                            onClick = {
-                                selectedStartupSnippetId.value = snippet.id
-                                startupSnippetExpanded.value = false
-                            }
-                        )
-                    }
-                }
-            }
-            val selectedStartupSnippet = snippets.firstOrNull { it.id == selectedStartupSnippetId.value }
-            if (selectedStartupSnippet != null) {
-                Text(
-                    selectedStartupSnippet.command,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            } else if (snippets.isEmpty()) {
-                Text(
-                    "No snippets available for startup command.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -3025,7 +2966,6 @@ internal fun QuickConnectSheet(
                         useMosh.value,
                         selectedIdentityId.value,
                         selectedForwardId.value,
-                        selectedStartupSnippetId.value?.let { snippetReference(it) }.orEmpty(),
                         selectedTerminalProfileId.value
                     )
                 },
