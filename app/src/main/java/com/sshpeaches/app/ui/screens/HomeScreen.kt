@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -35,6 +37,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -895,38 +898,77 @@ private fun HomeWelcome(
                 .padding(top = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(
-                onClick = onAddHost,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.HOME_WELCOME_ADD_HOST)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Add Host")
+                WelcomeActionButton(
+                    label = "Add Host",
+                    icon = Icons.Default.Storage,
+                    onClick = onAddHost,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(UiTestTags.HOME_WELCOME_ADD_HOST)
+                )
+                WelcomeActionButton(
+                    label = "Add Identity",
+                    icon = Icons.Default.Key,
+                    onClick = onAddIdentity,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(UiTestTags.HOME_WELCOME_ADD_IDENTITY)
+                )
             }
-            Button(
-                onClick = onAddIdentity,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.HOME_WELCOME_ADD_IDENTITY)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Add Identity")
+                WelcomeActionButton(
+                    label = "Add Port Forward",
+                    icon = Icons.Default.Bolt,
+                    onClick = onAddPortForward,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(UiTestTags.HOME_WELCOME_ADD_FORWARD)
+                )
+                WelcomeActionButton(
+                    label = "Add Snippet",
+                    icon = Icons.Default.Code,
+                    onClick = onAddSnippet,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(UiTestTags.HOME_WELCOME_ADD_SNIPPET)
+                )
             }
-            Button(
-                onClick = onAddPortForward,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.HOME_WELCOME_ADD_FORWARD)
-            ) {
-                Text("Add Port Forward")
-            }
-            Button(
-                onClick = onAddSnippet,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.HOME_WELCOME_ADD_SNIPPET)
-            ) {
-                Text("Add Snippet")
-            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(120.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
