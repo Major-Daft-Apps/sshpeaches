@@ -544,6 +544,13 @@ public final class TerminalEmulator {
         mCursorStyle = DEFAULT_TERMINAL_CURSOR_STYLE;
     }
 
+    /**
+     * Set the terminal cursor style to a specific value.
+     */
+    public void setCursorStyle(int style) {
+        mCursorStyle = style;
+    }
+
     public boolean isReverseVideo() {
         return isDecsetInternalBitSet(DECSET_BIT_REVERSE_VIDEO);
     }

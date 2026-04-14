@@ -141,7 +141,7 @@ class ThemeEditorTest {
             useUnmergedTree = true
         ).assertIsDisplayed()
         composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("XTerm"),
+            UiTestTags.themeDefaultOption("xterm"),
             useUnmergedTree = true
         ).assertIsDisplayed()
     }

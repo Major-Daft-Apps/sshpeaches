@@ -773,6 +773,9 @@ fun ConnectingScreen(
     }
     LaunchedEffect(terminalProfile.id, terminalProfile.font) {
         terminalEngine.applyProfile(terminalProfile)
+        externalTerminalEmulator?.let { emulator ->
+            TermuxTerminalEngine.applyProfileToEmulator(emulator, terminalProfile)
+        }
         terminalViewRef?.let { view ->
             applyTerminalTypeface(view, terminalProfile.font)
         }
@@ -1291,6 +1294,7 @@ fun ConnectingScreen(
         )
         val emulator = externalTerminalEmulator ?: terminalEngine.emulator()
         view.attachEmulator(emulator)
+        TermuxTerminalEngine.applyProfileToEmulator(emulator, terminalProfile)
         applyTerminalTypeface(view, terminalProfile.font)
         val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) }
         view.setTextSize(textSizePx)

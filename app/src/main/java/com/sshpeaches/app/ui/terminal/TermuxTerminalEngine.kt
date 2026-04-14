@@ -27,7 +27,6 @@ class TermuxTerminalEngine(
         DEFAULT_TRANSCRIPT_ROWS,
         this
     )
-    private var terminalCursorStyle: Int = TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE
     private var terminalBackgroundColor: Int = Color.BLACK
     private var incomingSequenceNumber = 0
     private var outgoingSequenceNumber = 0
@@ -52,19 +51,7 @@ class TermuxTerminalEngine(
     }
 
     fun applyProfile(profile: TerminalProfile) {
-        val foreground = parseColor(profile.foregroundHex, DEFAULT_FOREGROUND_COLOR)
-        val background = parseColor(profile.backgroundHex, Color.BLACK)
-        val cursor = parseColor(profile.cursorHex, DEFAULT_CURSOR_COLOR)
-        terminalBackgroundColor = background
-        emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground
-        emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = background
-        emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = cursor
-        terminalCursorStyle = when (profile.cursorStyle) {
-            TerminalCursorStyle.BLOCK -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK
-            TerminalCursorStyle.UNDERLINE -> TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE
-            TerminalCursorStyle.BAR -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
-        }
-        emulator.setCursorStyle()
+        terminalBackgroundColor = applyProfileToEmulator(emulator, profile)
     }
 
     fun backgroundColor(): Int = terminalBackgroundColor
@@ -131,7 +118,7 @@ class TermuxTerminalEngine(
 
     override fun onTerminalCursorStateChange(state: Boolean) {}
 
-    private companion object {
+    companion object {
         private const val DEFAULT_COLUMNS = 120
         private const val DEFAULT_ROWS = 40
         private const val DEFAULT_CELL_WIDTH_PX = 0
@@ -140,10 +127,29 @@ class TermuxTerminalEngine(
         private const val DEFAULT_FOREGROUND_COLOR = 0xFFE6E6E6.toInt()
         private const val DEFAULT_CURSOR_COLOR = 0xFFFFB74D.toInt()
         private const val DIAGNOSTIC_PREVIEW_BYTES = 48
-    }
+        fun applyProfileToEmulator(
+            emulator: TerminalEmulator,
+            profile: TerminalProfile
+        ): Int {
+            val foreground = parseColorValue(profile.foregroundHex, DEFAULT_FOREGROUND_COLOR)
+            val background = parseColorValue(profile.backgroundHex, Color.BLACK)
+            val cursor = parseColorValue(profile.cursorHex, DEFAULT_CURSOR_COLOR)
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = background
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = cursor
+            emulator.setCursorStyle(profile.cursorStyle.toTerminalCursorStyle())
+            return background
+        }
 
-    private fun parseColor(value: String, fallback: Int): Int =
-        runCatching { value.toColorInt() }.getOrDefault(fallback)
+        private fun parseColorValue(value: String, fallback: Int): Int =
+            runCatching { value.toColorInt() }.getOrDefault(fallback)
+
+        private fun TerminalCursorStyle.toTerminalCursorStyle(): Int = when (this) {
+            TerminalCursorStyle.BLOCK -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK
+            TerminalCursorStyle.UNDERLINE -> TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE
+            TerminalCursorStyle.BAR -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
+        }
+    }
 
     private fun emitByteDiagnostic(direction: String, data: ByteArray, offset: Int, count: Int) {
         if (count <= 0) return

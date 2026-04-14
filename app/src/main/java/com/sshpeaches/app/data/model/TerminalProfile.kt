@@ -158,7 +158,7 @@ object TerminalProfileDefaults {
         ),
         TerminalProfile(
             id = "builtin-xterm-default",
-            name = "XTerm",
+            name = "xterm",
             font = TerminalFont.DROID_SANS_MONO,
             fontSizeSp = 10,
             foregroundHex = "#000000",
