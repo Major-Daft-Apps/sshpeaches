@@ -96,6 +96,57 @@ class ThemeEditorTest {
     }
 
     @Test
+    fun stockThemePickerIncludesAddedBuiltinThemes() {
+        composeRule.navigateDrawer(Routes.THEME_EDITOR)
+        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performClick()
+
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Dracula"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Tango"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("GitHub Light"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("GitHub Dark"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("One Dark"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Gruvbox"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Nord"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Monokai"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Solarized Dark"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("Solarized Light"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(
+            UiTestTags.themeDefaultOption("XTerm"),
+            useUnmergedTree = true
+        ).assertIsDisplayed()
+    }
+
+    @Test
     fun duplicateThemeNameShowsValidationError() {
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
         composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON).performClick()

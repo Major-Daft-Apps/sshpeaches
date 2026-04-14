@@ -67,6 +67,105 @@ object TerminalProfileDefaults {
             cursorHex = "#586E75",
             cursorStyle = TerminalCursorStyle.BLOCK,
             cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-dracula",
+            name = "Dracula",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#F8F8F2",
+            backgroundHex = "#282A36",
+            cursorHex = "#F8F8F2",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-tango",
+            name = "Tango",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#D3D7CF",
+            backgroundHex = "#2E3436",
+            cursorHex = "#D3D7CF",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-github-light",
+            name = "GitHub Light",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#24292F",
+            backgroundHex = "#FFFFFF",
+            cursorHex = "#0969DA",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-github-dark",
+            name = "GitHub Dark",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#E6EDF3",
+            backgroundHex = "#0D1117",
+            cursorHex = "#2F81F7",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-one-dark",
+            name = "One Dark",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#ABB2BF",
+            backgroundHex = "#282C34",
+            cursorHex = "#528BFF",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-gruvbox-dark",
+            name = "Gruvbox",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#EBDBB2",
+            backgroundHex = "#282828",
+            cursorHex = "#FABD2F",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-nord",
+            name = "Nord",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#D8DEE9",
+            backgroundHex = "#2E3440",
+            cursorHex = "#88C0D0",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-monokai",
+            name = "Monokai",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#F8F8F2",
+            backgroundHex = "#272822",
+            cursorHex = "#A6E22E",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
+        ),
+        TerminalProfile(
+            id = "builtin-xterm-default",
+            name = "XTerm",
+            font = TerminalFont.DROID_SANS_MONO,
+            fontSizeSp = 10,
+            foregroundHex = "#000000",
+            backgroundHex = "#FFFFFF",
+            cursorHex = "#000000",
+            cursorStyle = TerminalCursorStyle.BLOCK,
+            cursorBlink = true
         )
     )
 

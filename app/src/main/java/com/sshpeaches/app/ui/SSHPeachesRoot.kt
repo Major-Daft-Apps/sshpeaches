@@ -1949,11 +1949,6 @@ fun SSHPeachesRoot(
                                         onSnippetUpdate(initialSnippet.id, title, group, description, command)
                                     }
                                 },
-                                onDelete = initialSnippet?.let {
-                                    {
-                                        onSnippetDelete(it.id)
-                                    }
-                                },
                                 onNavigateBack = { navController.popBackStack() },
                                 onShowMessage = showMessage
                             )

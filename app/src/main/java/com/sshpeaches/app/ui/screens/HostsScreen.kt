@@ -57,6 +57,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
@@ -854,8 +855,17 @@ fun HostsScreen(
                         onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
                     ) {
                         val effectiveProfileId = terminalProfileIdState.value ?: defaultTerminalProfileId
+                        val defaultTerminalProfileName =
+                            terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
+                                ?: TerminalProfileDefaults.profileById(defaultTerminalProfileId)?.name
+                                ?: "Termux"
                         TextField(
-                            value = terminalProfiles.firstOrNull { it.id == effectiveProfileId }?.name ?: "App default",
+                            value = if (terminalProfileIdState.value == null) {
+                                "$defaultTerminalProfileName (Default)"
+                            } else {
+                                terminalProfiles.firstOrNull { it.id == effectiveProfileId }?.name
+                                    ?: defaultTerminalProfileName
+                            },
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Terminal profile") },
@@ -872,13 +882,14 @@ fun HostsScreen(
                             onDismissRequest = { terminalProfileExpanded.value = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("App default") },
+                                text = { Text("$defaultTerminalProfileName (Default)") },
                                 onClick = {
                                     terminalProfileIdState.value = null
                                     terminalProfileExpanded.value = false
                                 }
                             )
                             terminalProfiles.forEach { profile ->
+                                if (profile.id == defaultTerminalProfileId) return@forEach
                                 DropdownMenuItem(
                                     text = { Text(profile.name) },
                                     onClick = {
