@@ -3,7 +3,9 @@ package com.majordaftapps.sshpeaches.app.testutil
 import android.content.Context
 import android.content.Intent
 import androidx.work.WorkManager
+import com.majordaftapps.sshpeaches.app.AppIconManager
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.service.SessionService
@@ -25,6 +27,7 @@ object AppStateResetter {
             SshPeachesDatabase.get(appContext).clearAllTables()
             WorkManager.getInstance(appContext).cancelAllWork()
         }
+        AppIconManager.apply(appContext, AppIconOption.DEFAULT)
 
         SecurityManager.init(appContext)
         runCatching { SecurityManager.clearPin() }

@@ -32,6 +32,13 @@ class SSHPeachesApplication : Application() {
         SecurityManager.init(this)
         SettingsStore.init(this)
         applyConfiguredNightMode()
+        appScope.launch {
+            SettingsStore.appIcon
+                .distinctUntilChanged()
+                .collect { option ->
+                    AppIconManager.apply(this@SSHPeachesApplication, option)
+                }
+        }
         AppCheckInitializer.initialize(this)
         TelemetryInitializer.initialize(this)
         UptimeNotifications.ensureChannel(this)

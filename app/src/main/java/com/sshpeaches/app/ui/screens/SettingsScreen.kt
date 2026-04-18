@@ -1,5 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,9 +40,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -47,7 +53,9 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.set
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -70,6 +78,8 @@ import com.journeyapps.barcodescanner.ScanOptions
 fun SettingsScreen(
     currentTheme: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
+    currentAppIcon: AppIconOption,
+    onAppIconChange: (AppIconOption) -> Unit,
     allowBackgroundSessions: Boolean,
     onBackgroundToggle: (Boolean) -> Unit,
     backgroundSessionTimeout: BackgroundSessionTimeout,
@@ -133,6 +143,35 @@ fun SettingsScreen(
         ThemeMode.SYSTEM to "Automatic",
         ThemeMode.LIGHT to "Light",
         ThemeMode.DARK to "Dark"
+    )
+    val appIconOptions = listOf(
+        AppIconChoice(
+            option = AppIconOption.DEFAULT,
+            title = "Default",
+            description = "Current SSHPeaches icon.",
+            backgroundColorResId = R.color.ic_launcher_background,
+            tintColorResId = null,
+            previewAssetResId = R.drawable.sshpeaches,
+            previewPaddingDp = 2
+        ),
+        AppIconChoice(
+            option = AppIconOption.PEACH_LIGHT,
+            title = "Orange Peach",
+            description = "Orange peach on the light-mode navbar background.",
+            backgroundColorResId = R.color.color_vanilla,
+            tintColorResId = R.color.peachy_orange,
+            previewAssetResId = R.drawable.sshpeaches_activitybar,
+            previewPaddingDp = 15
+        ),
+        AppIconChoice(
+            option = AppIconOption.PEACH_DARK,
+            title = "White Peach",
+            description = "White peach on the dark-mode background.",
+            backgroundColorResId = R.color.color_hard_black,
+            tintColorResId = android.R.color.white,
+            previewAssetResId = R.drawable.sshpeaches_activitybar,
+            previewPaddingDp = 15
+        )
     )
     val timeoutOptions = listOf(
         LockTimeout.IMMEDIATE,
@@ -245,41 +284,69 @@ fun SettingsScreen(
             }
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
-                ExposedDropdownMenuBox(
-                    expanded = expanded.value,
-                    onExpandedChange = { expanded.value = !expanded.value }
-                ) {
-                    TextField(
-                        value = themeOptions.first { it.first == currentTheme }.second,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Mode") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
-                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.SETTINGS_THEME_MODE_FIELD)
-                    )
-                    ExposedDropdownMenu(
+                    Text("Theme", style = MaterialTheme.typography.titleMedium)
+                    ExposedDropdownMenuBox(
                         expanded = expanded.value,
-                        onDismissRequest = { expanded.value = false }
+                        onExpandedChange = { expanded.value = !expanded.value }
                     ) {
-                        themeOptions.forEach { (mode, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    expanded.value = false
-                                    onThemeChange(mode)
-                                },
-                                modifier = Modifier.testTag(UiTestTags.settingsThemeOption(label))
+                        TextField(
+                            value = themeOptions.first { it.first == currentTheme }.second,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Mode") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.SETTINGS_THEME_MODE_FIELD)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded.value,
+                            onDismissRequest = { expanded.value = false }
+                        ) {
+                            themeOptions.forEach { (mode, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        expanded.value = false
+                                        onThemeChange(mode)
+                                    },
+                                    modifier = Modifier.testTag(UiTestTags.settingsThemeOption(label))
+                                )
+                            }
+                        }
+                    }
+                    Text("App Icon", style = MaterialTheme.typography.titleSmall)
+                    appIconOptions.forEach { choice ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAppIconChange(choice.option) }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppIconPreview(choice)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 12.dp, end = 12.dp)
+                            ) {
+                                Text(choice.title)
+                                Text(
+                                    choice.description,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            RadioButton(
+                                selected = currentAppIcon == choice.option,
+                                onClick = { onAppIconChange(choice.option) },
+                                modifier = Modifier.testTag(UiTestTags.settingsAppIconOption(choice.title))
                             )
                         }
                     }
                 }
             }
-        }
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
@@ -1125,6 +1192,33 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showRestoreDefaultsDialog.value = false }) { Text("Cancel") }
             }
+        )
+    }
+}
+
+private data class AppIconChoice(
+    val option: AppIconOption,
+    val title: String,
+    val description: String,
+    val backgroundColorResId: Int,
+    val tintColorResId: Int?,
+    val previewAssetResId: Int,
+    val previewPaddingDp: Int
+)
+
+@Composable
+private fun AppIconPreview(choice: AppIconChoice) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colorResource(choice.backgroundColorResId)),
+        modifier = Modifier.size(84.dp)
+    ) {
+        Image(
+            painter = painterResource(id = choice.previewAssetResId),
+            contentDescription = null,
+            colorFilter = choice.tintColorResId?.let { ColorFilter.tint(colorResource(it)) },
+            modifier = Modifier
+                .size(84.dp)
+                .padding(choice.previewPaddingDp.dp)
         )
     }
 }

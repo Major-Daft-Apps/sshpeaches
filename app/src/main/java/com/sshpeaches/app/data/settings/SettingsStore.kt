@@ -50,6 +50,7 @@ object SettingsStore {
     private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
     private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val appIconKey = stringPreferencesKey("app_icon")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
     private val terminalEmulationKey = stringPreferencesKey("terminal_emulation")
     private val terminalSelectionModeKey = stringPreferencesKey("terminal_selection_mode")
@@ -147,6 +148,12 @@ object SettingsStore {
             runCatching {
                 ThemeMode.valueOf(prefs[themeModeKey] ?: ThemeMode.SYSTEM.name)
             }.getOrDefault(ThemeMode.SYSTEM)
+        }
+    }
+
+    val appIcon: Flow<AppIconOption> by lazy {
+        dataStore.data.map { prefs ->
+            AppIconOption.fromStoredValue(prefs[appIconKey])
         }
     }
 
@@ -313,6 +320,12 @@ object SettingsStore {
             prefs[themeModeKey] = mode.name
         }
         startupThemePrefs().edit().putString(startupThemeKey, mode.name).apply()
+    }
+
+    suspend fun setAppIcon(option: AppIconOption) {
+        dataStore.edit { prefs ->
+            prefs[appIconKey] = option.name
+        }
     }
 
     suspend fun setLockTimeout(timeout: LockTimeout) {

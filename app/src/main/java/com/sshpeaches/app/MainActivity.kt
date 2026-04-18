@@ -504,6 +504,7 @@ class MainActivity : FragmentActivity() {
                     actions = SSHPeachesRootActions(
                         onSortModeChange = viewModel::setSortMode,
                         onThemeModeChange = viewModel::setThemeMode,
+                        onAppIconChange = viewModel::setAppIcon,
                         onBackgroundModeChange = viewModel::setBackgroundSessions,
                         onBackgroundSessionTimeoutChange = viewModel::setBackgroundSessionTimeout,
                         onBiometricToggle = viewModel::setBiometricLock,

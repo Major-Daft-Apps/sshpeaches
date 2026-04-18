@@ -8,6 +8,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -22,6 +23,7 @@ data class AppUiState(
     val snippets: List<Snippet> = emptyList(),
     val sortMode: SortMode = SortMode.LAST_USED,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val appIcon: AppIconOption = AppIconOption.DEFAULT,
     val allowBackgroundSessions: Boolean = true,
     val backgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER,
     val biometricLockEnabled: Boolean = false,

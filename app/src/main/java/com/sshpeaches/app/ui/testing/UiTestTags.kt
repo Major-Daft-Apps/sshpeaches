@@ -173,6 +173,8 @@ object UiTestTags {
     const val SETTINGS_THEME_MODE_FIELD = "settings_theme_mode_field"
     fun settingsThemeOption(name: String): String =
         "settings_theme_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsAppIconOption(name: String): String =
+        "settings_app_icon_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     fun settingsTerminalOption(name: String): String =
         "settings_terminal_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     fun settingsTerminalBellOption(name: String): String =

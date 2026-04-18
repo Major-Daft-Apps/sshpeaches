@@ -4,6 +4,7 @@ import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
@@ -47,11 +49,17 @@ class SettingsPreferencesTest {
 
     @Test
     fun themeModeAndTogglesPersistAcrossRecreate() {
-        AppStateSeeder.configureSettings(themeMode = ThemeMode.DARK)
+        AppStateSeeder.configureSettings(
+            themeMode = ThemeMode.DARK,
+            appIcon = AppIconOption.PEACH_LIGHT
+        )
         composeRule.activityRule.scenario.recreate()
         openSettings()
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
+        composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("Orange Peach")).assertIsSelected()
+        composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).assertIsSelected()
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
         scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
@@ -79,6 +87,7 @@ class SettingsPreferencesTest {
         openSettings()
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
+        composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).assertIsSelected()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
         scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")

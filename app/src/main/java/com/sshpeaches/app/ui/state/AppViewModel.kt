@@ -22,6 +22,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
 import com.majordaftapps.sshpeaches.app.data.repository.InMemoryUptimeRepository
 import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
@@ -56,6 +57,7 @@ class AppViewModel(
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
+    private val appIconFlow = MutableStateFlow(AppIconOption.DEFAULT)
     private val backgroundSessionsFlow = MutableStateFlow(true)
     private val backgroundSessionTimeoutFlow = MutableStateFlow(BackgroundSessionTimeout.FOREVER)
     private val biometricFlow = MutableStateFlow(false)
@@ -118,6 +120,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.themeMode.collect { mode ->
                 themeModeFlow.value = mode
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.appIcon.collect { option ->
+                appIconFlow.value = option
             }
         }
         viewModelScope.launch {
@@ -475,9 +482,13 @@ class AppViewModel(
 
     private val coreUiState = combine(
         coreUiStateBase,
-        snippetRunTimeoutSecondsFlow
-    ) { state, snippetTimeout ->
-        state.copy(snippetRunTimeoutSeconds = snippetTimeout)
+        snippetRunTimeoutSecondsFlow,
+        appIconFlow
+    ) { state, snippetTimeout, appIcon ->
+        state.copy(
+            snippetRunTimeoutSeconds = snippetTimeout,
+            appIcon = appIcon
+        )
     }
 
     private val uptimeUiState = combine(
@@ -579,6 +590,13 @@ class AppViewModel(
         themeModeFlow.value = mode
         launchLogged("setThemeMode", "mode=$mode") {
             SettingsStore.setThemeMode(mode)
+        }
+    }
+
+    fun setAppIcon(option: AppIconOption) {
+        appIconFlow.value = option
+        launchLogged("setAppIcon", "option=$option") {
+            SettingsStore.setAppIcon(option)
         }
     }
 

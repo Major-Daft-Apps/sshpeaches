@@ -134,6 +134,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.local.Converters
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -206,6 +207,7 @@ private data class AppSnackbarVisuals(
 data class SSHPeachesRootActions(
     val onSortModeChange: (SortMode) -> Unit,
     val onThemeModeChange: (ThemeMode) -> Unit,
+    val onAppIconChange: (AppIconOption) -> Unit,
     val onBackgroundModeChange: (Boolean) -> Unit,
     val onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
     val onBiometricToggle: (Boolean) -> Unit,
@@ -321,6 +323,7 @@ fun SSHPeachesRoot(
 ) {
     val onSortModeChange = actions.onSortModeChange
     val onThemeModeChange = actions.onThemeModeChange
+    val onAppIconChange = actions.onAppIconChange
     val onBackgroundModeChange = actions.onBackgroundModeChange
     val onBackgroundSessionTimeoutChange = actions.onBackgroundSessionTimeoutChange
     val onBiometricToggle = actions.onBiometricToggle
@@ -2024,6 +2027,8 @@ fun SSHPeachesRoot(
                             SettingsScreen(
                                 currentTheme = uiState.themeMode,
                                 onThemeChange = onThemeModeChange,
+                                currentAppIcon = uiState.appIcon,
+                                onAppIconChange = onAppIconChange,
                                 allowBackgroundSessions = uiState.allowBackgroundSessions,
                                 onBackgroundToggle = onBackgroundModeChange,
                                 backgroundSessionTimeout = uiState.backgroundSessionTimeout,

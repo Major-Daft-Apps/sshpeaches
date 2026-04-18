@@ -11,6 +11,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -99,6 +100,7 @@ object AppStateSeeder {
 
     fun configureSettings(
         themeMode: ThemeMode? = null,
+        appIcon: AppIconOption? = null,
         hostKeyPrompt: Boolean? = null,
         autoTrustHostKey: Boolean? = null,
         diagnostics: Boolean? = null,
@@ -114,6 +116,7 @@ object AppStateSeeder {
         runBlocking {
             SettingsStore.init(appContext)
             themeMode?.let { SettingsStore.setThemeMode(it) }
+            appIcon?.let { SettingsStore.setAppIcon(it) }
             hostKeyPrompt?.let { SettingsStore.setHostKeyPromptEnabled(it) }
             autoTrustHostKey?.let { SettingsStore.setAutoTrustHostKeyEnabled(it) }
             diagnostics?.let { SettingsStore.setDiagnosticsEnabled(it) }
