@@ -111,36 +111,37 @@ fun HostsScreen(
 ) {
     val search = rememberSaveable { mutableStateOf("") }
     val showMenu = remember { mutableStateOf(false) }
-    val showDialog = remember { mutableStateOf(false) }
-    val editingHost = remember { mutableStateOf<HostConnection?>(null) }
-    val nameState = remember { mutableStateOf("") }
-    val hostState = remember { mutableStateOf("") }
-    val portState = remember { mutableStateOf("22") }
-    val userState = remember { mutableStateOf("") }
-    val groupState = remember { mutableStateOf("") }
+    val showDialog = rememberSaveable { mutableStateOf(false) }
+    val editingHostId = rememberSaveable { mutableStateOf<String?>(null) }
+    val editingHostHasPassword = rememberSaveable { mutableStateOf(false) }
+    val nameState = rememberSaveable { mutableStateOf("") }
+    val hostState = rememberSaveable { mutableStateOf("") }
+    val portState = rememberSaveable { mutableStateOf("22") }
+    val userState = rememberSaveable { mutableStateOf("") }
+    val groupState = rememberSaveable { mutableStateOf("") }
     val groupExpanded = remember { mutableStateOf(false) }
-    val showNewGroupDialog = remember { mutableStateOf(false) }
-    val newGroupNameState = remember { mutableStateOf("") }
-    val newGroupError = remember { mutableStateOf<String?>(null) }
-    val notesState = remember { mutableStateOf("") }
-    val authState = remember { mutableStateOf(AuthMethod.PASSWORD) }
+    val showNewGroupDialog = rememberSaveable { mutableStateOf(false) }
+    val newGroupNameState = rememberSaveable { mutableStateOf("") }
+    val newGroupError = rememberSaveable { mutableStateOf<String?>(null) }
+    val notesState = rememberSaveable { mutableStateOf("") }
+    val authState = rememberSaveable { mutableStateOf(AuthMethod.PASSWORD) }
     val authMenuExpanded = remember { mutableStateOf(false) }
-    val preferredIdentityIdState = remember { mutableStateOf<String?>(null) }
+    val preferredIdentityIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val identityExpanded = remember { mutableStateOf(false) }
-    val useMoshState = remember { mutableStateOf(false) }
-    val terminalProfileIdState = remember { mutableStateOf<String?>(null) }
+    val useMoshState = rememberSaveable { mutableStateOf(false) }
+    val terminalProfileIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val terminalProfileExpanded = remember { mutableStateOf(false) }
-    val preferredForwardIdState = remember { mutableStateOf<String?>(null) }
+    val preferredForwardIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val forwardExpanded = remember { mutableStateOf(false) }
-    val startupScriptState = remember { mutableStateOf("") }
+    val startupScriptState = rememberSaveable { mutableStateOf("") }
     val startupSnippetExpanded = remember { mutableStateOf(false) }
-    val backgroundBehaviorState = remember { mutableStateOf(BackgroundBehavior.INHERIT) }
+    val backgroundBehaviorState = rememberSaveable { mutableStateOf(BackgroundBehavior.INHERIT) }
     val backgroundExpanded = remember { mutableStateOf(false) }
-    val passwordState = remember { mutableStateOf("") }
+    val passwordState = rememberSaveable { mutableStateOf("") }
     val passwordRevealIndex = remember { mutableIntStateOf(-1) }
-    val clearPasswordState = remember { mutableStateOf(false) }
-    val dialogError = remember { mutableStateOf<String?>(null) }
-    val showClearHostKeyDialog = remember { mutableStateOf(false) }
+    val clearPasswordState = rememberSaveable { mutableStateOf(false) }
+    val dialogError = rememberSaveable { mutableStateOf<String?>(null) }
+    val showClearHostKeyDialog = rememberSaveable { mutableStateOf(false) }
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val pendingDeleteHost = remember { mutableStateOf<HostConnection?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
@@ -152,6 +153,8 @@ fun HostsScreen(
     val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
+    val editingHost = hosts.firstOrNull { it.id == editingHostId.value }
+    val isEditingHost = editingHostId.value != null
     AutoHidePasswordReveal(passwordRevealIndex)
     AutoHidePasswordReveal(importPassphraseRevealIndex)
     val availableGroups = (
@@ -264,7 +267,8 @@ fun HostsScreen(
     }
 
     fun openDialog(host: HostConnection?) {
-        editingHost.value = host
+        editingHostId.value = host?.id
+        editingHostHasPassword.value = host?.hasPassword == true
         nameState.value = host?.name ?: ""
         hostState.value = host?.host ?: ""
         portState.value = host?.port?.toString() ?: "22"
@@ -292,13 +296,15 @@ fun HostsScreen(
 
     fun closeDialog() {
         showDialog.value = false
-        editingHost.value = null
+        editingHostId.value = null
+        editingHostHasPassword.value = false
         groupExpanded.value = false
         showNewGroupDialog.value = false
         newGroupNameState.value = ""
         newGroupError.value = null
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
+        dialogError.value = null
     }
 
     LaunchedEffect(addRequestKey) {
@@ -310,8 +316,9 @@ fun HostsScreen(
 
     LaunchedEffect(editRequestKey, editRequestId, hosts) {
         if (editRequestKey > handledEditRequestKey.intValue) {
+            val requestedHost = hosts.firstOrNull { it.id == editRequestId } ?: return@LaunchedEffect
             handledEditRequestKey.intValue = editRequestKey
-            hosts.firstOrNull { it.id == editRequestId }?.let(::openDialog)
+            openDialog(requestedHost)
         }
     }
 
@@ -567,7 +574,7 @@ fun HostsScreen(
     if (showDialog.value) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { closeDialog() },
-            title = { Text(if (editingHost.value != null) "Edit Host" else "Add Host") },
+            title = { Text(if (isEditingHost) "Edit Host" else "Add Host") },
             text = {
                 Column(
                     modifier = Modifier
@@ -662,7 +669,7 @@ fun HostsScreen(
                         onValueChange = { updatePasswordStateWithReveal(passwordState, passwordRevealIndex, it) },
                         label = {
                             Text(
-                                if (editingHost.value?.hasPassword == true)
+                                if (editingHostHasPassword.value)
                                     "Password (leave blank to keep)"
                                 else
                                     "Password (optional)"
@@ -676,7 +683,7 @@ fun HostsScreen(
                             keyboardType = KeyboardType.Password
                         )
                     )
-                    if (editingHost.value?.hasPassword == true) {
+                    if (editingHostHasPassword.value) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             androidx.compose.material3.Checkbox(
                                 checked = clearPasswordState.value,
@@ -685,7 +692,7 @@ fun HostsScreen(
                             Text("Remove stored password")
                         }
                     }
-                    if (editingHost.value != null) {
+                    if (isEditingHost) {
                         TextButton(
                             onClick = {
                                 dialogError.value = null
@@ -1081,7 +1088,7 @@ fun HostsScreen(
                             dialogError.value = "Enter a valid hostname or IP address."
                             return@TextButton
                         }
-                        hosts.any { it.name.equals(nameState.value.trim(), true) && it.id != editingHost.value?.id } -> {
+                        hosts.any { it.name.equals(nameState.value.trim(), true) && it.id != editingHostId.value } -> {
                             dialogError.value = "A host with that name already exists."
                             return@TextButton
                         }
@@ -1097,7 +1104,7 @@ fun HostsScreen(
                         passwordState.value.isNotBlank() -> passwordState.value
                         else -> null
                     }
-                    if (editingHost.value == null) {
+                    if (!isEditingHost) {
                         onAdd(
                             nameState.value.trim(),
                             hostState.value.trim(),
@@ -1118,7 +1125,7 @@ fun HostsScreen(
                         )
                     } else {
                         onUpdate(
-                            editingHost.value!!.id,
+                            editingHostId.value!!,
                             nameState.value.trim(),
                             hostState.value.trim(),
                             port,
@@ -1140,7 +1147,7 @@ fun HostsScreen(
                 },
                     modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
                 ) {
-                    Text(if (editingHost.value == null) "Add" else "Save")
+                    Text(if (isEditingHost) "Save" else "Add")
                 }
             },
             dismissButton = {
@@ -1230,7 +1237,7 @@ fun HostsScreen(
                 TextButton(
                     onClick = {
                         val hostValue = hostState.value.trim()
-                        val portValue = parsePort(portState.value) ?: editingHost.value?.port ?: 22
+                        val portValue = parsePort(portState.value) ?: editingHost?.port ?: 22
                         if (hostValue.isBlank()) {
                             dialogError.value = "Enter a host before clearing its key."
                         } else {
