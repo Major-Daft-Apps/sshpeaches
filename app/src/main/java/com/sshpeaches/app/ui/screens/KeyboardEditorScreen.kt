@@ -30,6 +30,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +52,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPack
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -60,6 +63,7 @@ import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 @Composable
 fun KeyboardEditorScreen(
     slots: List<KeyboardSlotAction>,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     onSlotChange: (Int, KeyboardSlotAction) -> Unit,
     onReset: () -> Unit
 ) {
@@ -72,7 +76,7 @@ fun KeyboardEditorScreen(
         editorIndex.value = null
     }
 
-    if (activeEditorIndex != null) {
+    if (shellLayoutMode != ShellLayoutMode.WIDE && activeEditorIndex != null) {
         val current = normalizedSlots.getOrNull(activeEditorIndex) ?: KeyboardLayoutDefaults.emptyAction()
         KeyActionEditorVertical(
             slotIndex = activeEditorIndex,
@@ -90,19 +94,23 @@ fun KeyboardEditorScreen(
         return
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_KEYBOARD)
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 980.dp)
-                .fillMaxSize()
-                .align(Alignment.TopCenter)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    AdaptivePaneScaffold(
+        shellLayoutMode = shellLayoutMode,
+        secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE && activeEditorIndex != null,
+        primaryPane = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(UiTestTags.SCREEN_KEYBOARD)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1400.dp else 980.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
             Text("Tap a slot to open the full key-action editor.")
 
             BoxWithConstraints(
@@ -188,8 +196,43 @@ fun KeyboardEditorScreen(
             ) {
                 Text("Reset layout")
             }
+                }
+            }
+        },
+        secondaryPane = {
+            val current = normalizedSlots.getOrNull(activeEditorIndex ?: -1) ?: KeyboardLayoutDefaults.emptyAction()
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Modify Key", style = MaterialTheme.typography.titleLarge)
+                    OutlinedButton(onClick = { editorIndex.value = null }) {
+                        Text("Close")
+                    }
+                }
+                KeyActionEditorVertical(
+                    slotIndex = activeEditorIndex ?: 0,
+                    current = current,
+                    onApply = { action ->
+                        val index = activeEditorIndex ?: return@KeyActionEditorVertical
+                        onSlotChange(index, action)
+                        editorIndex.value = null
+                    },
+                    onRemove = {
+                        val index = activeEditorIndex ?: return@KeyActionEditorVertical
+                        onSlotChange(index, KeyboardLayoutDefaults.emptyAction())
+                        editorIndex.value = null
+                    },
+                    onCancel = { editorIndex.value = null }
+                )
+            }
         }
-    }
+    )
 }
 
 @Composable

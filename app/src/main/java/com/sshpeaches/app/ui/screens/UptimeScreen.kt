@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -114,66 +115,73 @@ fun UptimeScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(UiTestTags.SCREEN_UPTIME)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .widthIn(max = 1200.dp)
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Tracked hosts", style = MaterialTheme.typography.titleMedium)
-                Text("${summaries.size} monitored", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-
-        when {
-            hosts.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag(UiTestTags.UPTIME_EMPTY_SAVED_HOSTS),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Add a host in Hosts before tracking uptime.")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Tracked hosts", style = MaterialTheme.typography.titleMedium)
+                    Text("${summaries.size} monitored", style = MaterialTheme.typography.bodySmall)
                 }
             }
 
-            summaries.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag(UiTestTags.UPTIME_EMPTY_MONITORS),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "No uptime monitors yet. Add a saved host to start tracking.",
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
+            when {
+                hosts.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(UiTestTags.UPTIME_EMPTY_SAVED_HOSTS),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Add a host in Hosts before tracking uptime.")
+                    }
                 }
-            }
 
-            else -> {
-                SummaryRow(summaries = summaries)
-                HorizontalDivider()
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(summaries, key = { it.host.id }) { summary ->
-                        UptimeCard(
-                            summary = summary,
-                            onRefresh = { onRefreshHost(summary.host.id) },
-                            onEdit = { openEditDialog(summary) },
-                            onRemove = { onRemoveHost(summary.host.id) },
-                            onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
+                summaries.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(UiTestTags.UPTIME_EMPTY_MONITORS),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No uptime monitors yet. Add a saved host to start tracking.",
+                            modifier = Modifier.padding(horizontal = 24.dp)
                         )
+                    }
+                }
+
+                else -> {
+                    SummaryRow(summaries = summaries)
+                    HorizontalDivider()
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(summaries, key = { it.host.id }) { summary ->
+                            UptimeCard(
+                                summary = summary,
+                                onRefresh = { onRefreshHost(summary.host.id) },
+                                onEdit = { openEditDialog(summary) },
+                                onRemove = { onRemoveHost(summary.host.id) },
+                                onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
+                            )
+                        }
                     }
                 }
             }

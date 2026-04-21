@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,9 +27,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,20 +40,25 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.terminal.resolveTerminalTypeface
-import androidx.compose.ui.viewinterop.AndroidView
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeEditorScreen(
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     onDefaultTerminalProfileChange: (String) -> Unit,
     onDeleteTerminalProfile: (String) -> Unit,
     onCreateTheme: () -> Unit,
+    onSaveTheme: (TerminalProfile) -> Unit = {},
     onEditTheme: (String) -> Unit,
     onDuplicateTheme: (String) -> Unit,
     onShowMessage: (String) -> Unit = {}
@@ -57,113 +66,228 @@ fun ThemeEditorScreen(
     val defaultTerminalProfileExpanded = remember { mutableStateOf(false) }
     val showDeleteProfileDialog = remember { mutableStateOf<String?>(null) }
     val builtInProfileIds = remember { TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet() }
+    var paneProfileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var paneDuplicateSourceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var paneDirty by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    var pendingPaneProfileId by remember { mutableStateOf<String?>(null) }
+    var pendingPaneDuplicateId by remember { mutableStateOf<String?>(null) }
+    var pendingPaneClose by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_THEME_EDITOR)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Terminal Themes", style = MaterialTheme.typography.titleMedium)
-                ExposedDropdownMenuBox(
-                    expanded = defaultTerminalProfileExpanded.value,
-                    onExpandedChange = {
-                        defaultTerminalProfileExpanded.value = !defaultTerminalProfileExpanded.value
-                    }
-                ) {
-                    TextField(
-                        value = terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
-                            ?: terminalProfiles.firstOrNull()?.name.orEmpty(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Default theme") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultTerminalProfileExpanded.value)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                            .testTag(UiTestTags.THEME_DEFAULT_FIELD)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = defaultTerminalProfileExpanded.value,
-                        onDismissRequest = { defaultTerminalProfileExpanded.value = false }
-                    ) {
-                        terminalProfiles.forEach { profile ->
-                            DropdownMenuItem(
-                                text = { Text(profile.name) },
-                                onClick = {
-                                    defaultTerminalProfileExpanded.value = false
-                                    onDefaultTerminalProfileChange(profile.id)
-                                },
-                                modifier = Modifier.testTag(UiTestTags.themeDefaultOption(profile.name))
-                            )
-                        }
-                    }
-                }
-                terminalProfiles.forEach { profile ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp)
+    fun requestPaneNavigation(profileId: String?, duplicateSourceId: String?) {
+        if (paneDirty) {
+            pendingPaneProfileId = profileId
+            pendingPaneDuplicateId = duplicateSourceId
+            pendingPaneClose = false
+            showDiscardDialog = true
+            return
+        }
+        paneProfileId = profileId
+        paneDuplicateSourceId = duplicateSourceId
+    }
+
+    fun closePane() {
+        if (paneDirty) {
+            pendingPaneClose = true
+            pendingPaneProfileId = null
+            pendingPaneDuplicateId = null
+            showDiscardDialog = true
+            return
+        }
+        paneProfileId = null
+        paneDuplicateSourceId = null
+    }
+
+    AdaptivePaneScaffold(
+        shellLayoutMode = shellLayoutMode,
+        secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE &&
+            (paneProfileId != null || paneDuplicateSourceId != null),
+        primaryPane = {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(UiTestTags.SCREEN_THEME_EDITOR)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Terminal Themes", style = MaterialTheme.typography.titleMedium)
+                        ExposedDropdownMenuBox(
+                            expanded = defaultTerminalProfileExpanded.value,
+                            onExpandedChange = {
+                                defaultTerminalProfileExpanded.value = !defaultTerminalProfileExpanded.value
+                            }
                         ) {
-                            Text(profile.name)
-                            ThemeListPreview(
-                                profile = profile,
+                            TextField(
+                                value = terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
+                                    ?: terminalProfiles.firstOrNull()?.name.orEmpty(),
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Default theme") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = defaultTerminalProfileExpanded.value)
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 6.dp)
+                                    .menuAnchor()
+                                    .testTag(UiTestTags.THEME_DEFAULT_FIELD)
                             )
-                        }
-                        if (builtInProfileIds.contains(profile.id)) {
-                            TextButton(
-                                onClick = { onDuplicateTheme(profile.id) },
-                                modifier = Modifier.testTag(UiTestTags.themeDuplicate(profile.id))
+                            ExposedDropdownMenu(
+                                expanded = defaultTerminalProfileExpanded.value,
+                                onDismissRequest = { defaultTerminalProfileExpanded.value = false }
                             ) {
-                                Text("Duplicate")
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = { onEditTheme(profile.id) },
-                                    modifier = Modifier.testTag(UiTestTags.themeEdit(profile.id))
-                                ) {
-                                    Text("Edit")
-                                }
-                                TextButton(
-                                    onClick = { showDeleteProfileDialog.value = profile.id },
-                                    modifier = Modifier.testTag(UiTestTags.themeDelete(profile.id))
-                                ) {
-                                    Text("Delete")
+                                terminalProfiles.forEach { profile ->
+                                    DropdownMenuItem(
+                                        text = { Text(profile.name) },
+                                        onClick = {
+                                            defaultTerminalProfileExpanded.value = false
+                                            onDefaultTerminalProfileChange(profile.id)
+                                        },
+                                        modifier = Modifier.testTag(UiTestTags.themeDefaultOption(profile.name))
+                                    )
                                 }
                             }
                         }
+                        terminalProfiles.forEach { profile ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(end = 8.dp)
+                                ) {
+                                    Text(profile.name)
+                                    ThemeListPreview(
+                                        profile = profile,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
+                                    )
+                                }
+                                if (builtInProfileIds.contains(profile.id)) {
+                                    TextButton(
+                                        onClick = {
+                                            if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                                requestPaneNavigation(profileId = null, duplicateSourceId = profile.id)
+                                            } else {
+                                                onDuplicateTheme(profile.id)
+                                            }
+                                        },
+                                        modifier = Modifier.testTag(UiTestTags.themeDuplicate(profile.id))
+                                    ) {
+                                        Text("Duplicate")
+                                    }
+                                } else {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = {
+                                                if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                                    requestPaneNavigation(profileId = profile.id, duplicateSourceId = null)
+                                                } else {
+                                                    onEditTheme(profile.id)
+                                                }
+                                            },
+                                            modifier = Modifier.testTag(UiTestTags.themeEdit(profile.id))
+                                        ) {
+                                            Text("Edit")
+                                        }
+                                        TextButton(
+                                            onClick = { showDeleteProfileDialog.value = profile.id },
+                                            modifier = Modifier.testTag(UiTestTags.themeDelete(profile.id))
+                                        ) {
+                                            Text("Delete")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                    requestPaneNavigation(profileId = null, duplicateSourceId = null)
+                                } else {
+                                    onCreateTheme()
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.THEME_CREATE_BUTTON)
+                        ) {
+                            Text("New Terminal Theme")
+                        }
+                        Text(
+                            "Open a theme to edit name, font, text size, and colors using dedicated picker modals.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
-                Button(
-                    onClick = onCreateTheme,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.THEME_CREATE_BUTTON)
-                ) {
-                    Text("New Terminal Theme")
+            }
+        },
+        secondaryPane = {
+            val selected = terminalProfiles.firstOrNull { it.id == paneProfileId }
+            val initialProfile = remember(paneProfileId, paneDuplicateSourceId, terminalProfiles) {
+                when {
+                    paneDuplicateSourceId != null -> {
+                        val source = terminalProfiles.firstOrNull { it.id == paneDuplicateSourceId }
+                        if (source == null) {
+                            TerminalProfileDefaults.customTemplate(name = "Custom Theme")
+                        } else {
+                            source.copy(
+                                id = "custom-${UUID.randomUUID()}",
+                                name = "${source.name} Copy"
+                            )
+                        }
+                    }
+
+                    selected != null -> selected
+                    else -> TerminalProfileDefaults.customTemplate(name = "Custom Theme")
                 }
-                Text(
-                    "Open a theme to edit name, font, text size, and colors using dedicated picker modals.",
-                    style = MaterialTheme.typography.bodySmall
+            }
+            val isEditingExisting = selected != null && paneDuplicateSourceId == null && !builtInProfileIds.contains(selected.id)
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (isEditingExisting) "Edit Terminal Theme" else "Terminal Theme",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    TextButton(onClick = ::closePane) {
+                        Text("Close")
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                ThemeProfileEditorScreen(
+                    initialProfile = initialProfile,
+                    existingProfiles = terminalProfiles,
+                    isEditingExisting = isEditingExisting,
+                    onSaveTheme = {
+                        onSaveTheme(it)
+                        paneDirty = false
+                        paneProfileId = null
+                        paneDuplicateSourceId = null
+                    },
+                    onNavigateBack = {
+                        paneDirty = false
+                        paneProfileId = null
+                        paneDuplicateSourceId = null
+                    },
+                    onDirtyStateChange = { paneDirty = it },
+                    onShowMessage = onShowMessage
                 )
             }
         }
-    }
+    )
 
     showDeleteProfileDialog.value?.let { profileId ->
         val profileName = terminalProfiles.firstOrNull { it.id == profileId }?.name ?: "this theme"
@@ -186,6 +310,42 @@ fun ThemeEditorScreen(
                     onClick = { showDeleteProfileDialog.value = null },
                     modifier = Modifier.testTag(UiTestTags.THEME_DELETE_CANCEL)
                 ) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved terminal theme changes.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    paneDirty = false
+                    showDiscardDialog = false
+                    if (pendingPaneClose) {
+                        paneProfileId = null
+                        paneDuplicateSourceId = null
+                    } else {
+                        paneProfileId = pendingPaneProfileId
+                        paneDuplicateSourceId = pendingPaneDuplicateId
+                    }
+                    pendingPaneProfileId = null
+                    pendingPaneDuplicateId = null
+                    pendingPaneClose = false
+                }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    pendingPaneProfileId = null
+                    pendingPaneDuplicateId = null
+                    pendingPaneClose = false
+                }) {
+                    Text("Keep editing")
+                }
             }
         )
     }

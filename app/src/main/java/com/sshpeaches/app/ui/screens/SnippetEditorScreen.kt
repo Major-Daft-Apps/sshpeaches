@@ -21,12 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +46,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
@@ -52,6 +55,7 @@ fun SnippetEditorScreen(
     initialSnippet: Snippet?,
     onSave: (title: String, group: String?, description: String, command: String) -> Unit,
     onNavigateBack: () -> Unit,
+    onDirtyStateChange: (Boolean) -> Unit = {},
     onShowMessage: (String) -> Unit = {}
 ) {
     var title by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.title.orEmpty()) }
@@ -59,7 +63,28 @@ fun SnippetEditorScreen(
     var description by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.description.orEmpty()) }
     var command by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.command.orEmpty()) }
     var editorError by remember { mutableStateOf<String?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
     val isEditingExisting = initialSnippet != null
+    val isDirty = title != initialSnippet?.title.orEmpty() ||
+        group != initialSnippet?.group.orEmpty() ||
+        description != initialSnippet?.description.orEmpty() ||
+        command != initialSnippet?.command.orEmpty()
+
+    fun requestClose() {
+        if (isDirty) {
+            showDiscardDialog = true
+        } else {
+            onNavigateBack()
+        }
+    }
+
+    BackHandler(enabled = isDirty) {
+        requestClose()
+    }
+
+    LaunchedEffect(isDirty) {
+        onDirtyStateChange(isDirty)
+    }
 
     Box(
         modifier = Modifier
@@ -148,13 +173,36 @@ fun SnippetEditorScreen(
                 Text("Save")
             }
             OutlinedButton(
-                onClick = onNavigateBack,
+                onClick = ::requestClose,
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Cancel")
             }
         }
     }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved snippet changes.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDiscardDialog = false
+                        onNavigateBack()
+                    }
+                ) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 }
 

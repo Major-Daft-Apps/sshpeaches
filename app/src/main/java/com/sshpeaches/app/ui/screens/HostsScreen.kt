@@ -30,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -58,6 +59,8 @@ import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
@@ -82,6 +85,30 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 
+private enum class HostPaneMode {
+    DETAILS,
+    EDITOR
+}
+
+private data class HostEditorSnapshot(
+    val editingHostId: String?,
+    val name: String,
+    val host: String,
+    val port: String,
+    val username: String,
+    val group: String,
+    val notes: String,
+    val authMethod: AuthMethod,
+    val preferredIdentityId: String?,
+    val useMosh: Boolean,
+    val terminalProfileId: String?,
+    val preferredForwardId: String?,
+    val startupScript: String,
+    val backgroundBehavior: BackgroundBehavior,
+    val password: String,
+    val clearPassword: Boolean
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HostsScreen(
@@ -91,6 +118,7 @@ fun HostsScreen(
     snippets: List<Snippet>,
     terminalProfiles: List<TerminalProfile>,
     defaultTerminalProfileId: String,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     sortMode: SortMode,
     onSortModeChange: (SortMode) -> Unit,
     addRequestKey: Int = 0,
@@ -119,6 +147,8 @@ fun HostsScreen(
     val portState = rememberSaveable { mutableStateOf("22") }
     val userState = rememberSaveable { mutableStateOf("") }
     val groupState = rememberSaveable { mutableStateOf("") }
+    val paneHostId = rememberSaveable { mutableStateOf<String?>(null) }
+    val paneMode = rememberSaveable { mutableStateOf<HostPaneMode?>(null) }
     val groupExpanded = remember { mutableStateOf(false) }
     val showNewGroupDialog = rememberSaveable { mutableStateOf(false) }
     val newGroupNameState = rememberSaveable { mutableStateOf("") }
@@ -151,6 +181,11 @@ fun HostsScreen(
     val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val initialEditorSnapshot = remember { mutableStateOf<HostEditorSnapshot?>(null) }
+    val showDiscardDialog = remember { mutableStateOf(false) }
+    val pendingPaneMode = remember { mutableStateOf<HostPaneMode?>(null) }
+    val pendingPaneHostId = remember { mutableStateOf<String?>(null) }
+    val pendingPaneClose = remember { mutableStateOf(false) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val editingHost = hosts.firstOrNull { it.id == editingHostId.value }
@@ -266,9 +301,46 @@ fun HostsScreen(
         )
     }
 
-    fun openDialog(host: HostConnection?) {
+    fun currentEditorSnapshot(): HostEditorSnapshot = HostEditorSnapshot(
+        editingHostId = editingHostId.value,
+        name = nameState.value,
+        host = hostState.value,
+        port = portState.value,
+        username = userState.value,
+        group = groupState.value,
+        notes = notesState.value,
+        authMethod = authState.value,
+        preferredIdentityId = preferredIdentityIdState.value,
+        useMosh = useMoshState.value,
+        terminalProfileId = terminalProfileIdState.value,
+        preferredForwardId = preferredForwardIdState.value,
+        startupScript = startupScriptState.value,
+        backgroundBehavior = backgroundBehaviorState.value,
+        password = passwordState.value,
+        clearPassword = clearPasswordState.value
+    )
+
+    fun resetPaneNavigationRequest() {
+        pendingPaneMode.value = null
+        pendingPaneHostId.value = null
+        pendingPaneClose.value = false
+    }
+
+    fun closePane() {
+        showDialog.value = false
+        editingHostId.value = null
+        editingHostHasPassword.value = false
+        paneHostId.value = null
+        paneMode.value = null
+        initialEditorSnapshot.value = null
+        resetPaneNavigationRequest()
+    }
+
+    fun showEditor(host: HostConnection?) {
         editingHostId.value = host?.id
         editingHostHasPassword.value = host?.hasPassword == true
+        paneHostId.value = host?.id
+        paneMode.value = if (shellLayoutMode == ShellLayoutMode.WIDE) HostPaneMode.EDITOR else null
         nameState.value = host?.name ?: ""
         hostState.value = host?.host ?: ""
         portState.value = host?.port?.toString() ?: "22"
@@ -280,18 +352,45 @@ fun HostsScreen(
         newGroupError.value = null
         notesState.value = host?.notes ?: ""
         authState.value = host?.preferredAuth ?: AuthMethod.PASSWORD
+        authMenuExpanded.value = false
         preferredIdentityIdState.value = host?.preferredIdentityId
+        identityExpanded.value = false
         useMoshState.value = host?.useMosh ?: false
         terminalProfileIdState.value = host?.terminalProfileId
+        terminalProfileExpanded.value = false
         preferredForwardIdState.value = host?.preferredForwardId
+        forwardExpanded.value = false
         startupScriptState.value = host?.startupScript ?: ""
         startupSnippetExpanded.value = false
         backgroundBehaviorState.value = host?.backgroundBehavior ?: BackgroundBehavior.INHERIT
+        backgroundExpanded.value = false
         showDialog.value = true
         passwordState.value = ""
         clearPasswordState.value = false
         dialogError.value = null
         showClearHostKeyDialog.value = false
+        initialEditorSnapshot.value = currentEditorSnapshot()
+    }
+
+    fun completePendingPaneNavigation() {
+        val targetMode = pendingPaneMode.value
+        val targetHost = hosts.firstOrNull { it.id == pendingPaneHostId.value }
+        val closeOnly = pendingPaneClose.value
+        showDiscardDialog.value = false
+        resetPaneNavigationRequest()
+        closePane()
+        when {
+            closeOnly -> Unit
+            targetMode == HostPaneMode.DETAILS && targetHost != null -> {
+                paneMode.value = HostPaneMode.DETAILS
+                paneHostId.value = targetHost.id
+            }
+            targetMode == HostPaneMode.EDITOR -> showEditor(targetHost)
+        }
+    }
+
+    fun openDialog(host: HostConnection?) {
+        showEditor(host)
     }
 
     fun closeDialog() {
@@ -305,6 +404,41 @@ fun HostsScreen(
         startupSnippetExpanded.value = false
         showClearHostKeyDialog.value = false
         dialogError.value = null
+        initialEditorSnapshot.value = null
+        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+            paneMode.value = null
+            paneHostId.value = null
+        }
+        resetPaneNavigationRequest()
+    }
+
+    fun requestPaneNavigation(mode: HostPaneMode?, host: HostConnection? = null, closeOnly: Boolean = false) {
+        val editorIsDirty = showDialog.value && initialEditorSnapshot.value != null &&
+            currentEditorSnapshot() != initialEditorSnapshot.value
+        if (shellLayoutMode == ShellLayoutMode.WIDE && editorIsDirty) {
+            pendingPaneMode.value = mode
+            pendingPaneHostId.value = host?.id
+            pendingPaneClose.value = closeOnly
+            showDiscardDialog.value = true
+            return
+        }
+        if (closeOnly) {
+            closePane()
+            return
+        }
+        when (mode) {
+            HostPaneMode.DETAILS -> {
+                closePane()
+                paneMode.value = HostPaneMode.DETAILS
+                paneHostId.value = host?.id
+            }
+            HostPaneMode.EDITOR -> openDialog(host)
+            null -> closePane()
+        }
+    }
+
+    fun openDetails(host: HostConnection) {
+        requestPaneNavigation(mode = HostPaneMode.DETAILS, host = host)
     }
 
     LaunchedEffect(addRequestKey) {
@@ -352,17 +486,667 @@ fun HostsScreen(
         groupSelector = { it.group },
         itemComparator = hostComparator
     )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_HOSTS)
+    val editorIsDirty = showDialog.value &&
+        initialEditorSnapshot.value != null &&
+        currentEditorSnapshot() != initialEditorSnapshot.value
+
+    fun saveHost(): Boolean {
+        val port = parsePort(portState.value) ?: run {
+            dialogError.value = "Enter a valid port between 1 and 65535."
+            return false
+        }
+        when {
+            nameState.value.isBlank() || hostState.value.isBlank() || userState.value.isBlank() -> {
+                dialogError.value = "Name, host, and username are required."
+                return false
+            }
+            !isValidHostAddress(hostState.value) -> {
+                dialogError.value = "Enter a valid hostname or IP address."
+                return false
+            }
+            hosts.any { it.name.equals(nameState.value.trim(), true) && it.id != editingHostId.value } -> {
+                dialogError.value = "A host with that name already exists."
+                return false
+            }
+            authState.value != AuthMethod.PASSWORD && preferredIdentityIdState.value == null -> {
+                dialogError.value = "Select an identity key for identity authentication."
+                return false
+            }
+            else -> dialogError.value = null
+        }
+        val passwordValue = when {
+            !canStoreCredentials -> null
+            clearPasswordState.value -> ""
+            passwordState.value.isNotBlank() -> passwordState.value
+            else -> null
+        }
+        if (!isEditingHost) {
+            onAdd(
+                nameState.value.trim(),
+                hostState.value.trim(),
+                port,
+                userState.value.trim(),
+                authState.value,
+                groupState.value.ifBlank { null },
+                notesState.value,
+                ConnectionMode.SSH,
+                useMoshState.value,
+                preferredIdentityIdState.value,
+                preferredForwardIdState.value,
+                startupScriptState.value,
+                backgroundBehaviorState.value,
+                terminalProfileIdState.value,
+                passwordValue,
+                null
+            )
+        } else {
+            onUpdate(
+                editingHostId.value!!,
+                nameState.value.trim(),
+                hostState.value.trim(),
+                port,
+                userState.value.trim(),
+                authState.value,
+                groupState.value.ifBlank { null },
+                notesState.value,
+                ConnectionMode.SSH,
+                useMoshState.value,
+                preferredIdentityIdState.value,
+                preferredForwardIdState.value,
+                startupScriptState.value,
+                backgroundBehaviorState.value,
+                terminalProfileIdState.value,
+                passwordValue
+            )
+        }
+        closeDialog()
+        return true
+    }
+
+    @Composable
+    fun HostEditorContent(
+        modifier: Modifier = Modifier,
+        showHeader: Boolean,
+        includeActions: Boolean,
+        onCancel: () -> Unit
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = 980.dp)
-                .fillMaxSize()
-                .align(Alignment.TopCenter)
+            modifier = modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (showHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (isEditingHost) "Edit Host" else "Add Host",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    OutlinedButton(onClick = onCancel) {
+                        Text("Close")
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = nameState.value,
+                onValueChange = { nameState.value = it },
+                label = { Text("Name") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text
+                ),
+                modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_NAME_INPUT)
+            )
+            OutlinedTextField(
+                value = hostState.value,
+                onValueChange = { hostState.value = it },
+                label = { Text("Host / IP") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii
+                ),
+                modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_HOST_INPUT)
+            )
+            OutlinedTextField(
+                value = portState.value,
+                onValueChange = { portState.value = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Port") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Number
+                ),
+                modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_PORT_INPUT)
+            )
+            OutlinedTextField(
+                value = userState.value,
+                onValueChange = { userState.value = it },
+                label = { Text("Username") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii
+                ),
+                modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT)
+            )
+            ExposedDropdownMenuBox(
+                expanded = authMenuExpanded.value,
+                onExpandedChange = { authMenuExpanded.value = !authMenuExpanded.value }
+            ) {
+                TextField(
+                    value = authState.value.toSentenceCaseLabel(),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Authentication") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authMenuExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                        .testTag(UiTestTags.HOST_DIALOG_AUTH_FIELD)
+                )
+                ExposedDropdownMenu(
+                    expanded = authMenuExpanded.value,
+                    onDismissRequest = { authMenuExpanded.value = false }
+                ) {
+                    AuthMethod.values().forEach { method ->
+                        DropdownMenuItem(
+                            text = { Text(method.toSentenceCaseLabel()) },
+                            modifier = Modifier.testTag(UiTestTags.hostDialogAuthOption(method.name)),
+                            onClick = {
+                                authState.value = method
+                                authMenuExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = passwordState.value,
+                onValueChange = { updatePasswordStateWithReveal(passwordState, passwordRevealIndex, it) },
+                label = {
+                    Text(
+                        if (editingHostHasPassword.value)
+                            "Password (leave blank to keep)"
+                        else
+                            "Password (optional)"
+                    )
+                },
+                singleLine = true,
+                visualTransformation = TailRevealPasswordVisualTransformation(passwordRevealIndex.intValue),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Password
+                )
+            )
+            if (editingHostHasPassword.value) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Checkbox(
+                        checked = clearPasswordState.value,
+                        onCheckedChange = { clearPasswordState.value = it }
+                    )
+                    Text("Remove stored password")
+                }
+            }
+            if (isEditingHost) {
+                TextButton(
+                    onClick = {
+                        dialogError.value = null
+                        showClearHostKeyDialog.value = true
+                    }
+                ) {
+                    Text("Clear stored host key")
+                }
+                Text(
+                    "Use this if you hit host key verification failures after server key changes.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (!canStoreCredentials) {
+                Text(
+                    "Passwords cannot be saved while the secure store is locked.",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            dialogError.value?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_ERROR)
+                )
+            }
+            val selectedIdentity = identities.firstOrNull { it.id == preferredIdentityIdState.value }
+            ExposedDropdownMenuBox(
+                expanded = identityExpanded.value,
+                onExpandedChange = { identityExpanded.value = !identityExpanded.value }
+            ) {
+                TextField(
+                    value = selectedIdentity?.label ?: "None",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Identity key") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = identityExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = identityExpanded.value,
+                    onDismissRequest = { identityExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            preferredIdentityIdState.value = null
+                            identityExpanded.value = false
+                        }
+                    )
+                    identities.forEach { identity ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (identity.hasPrivateKey) identity.label else "${identity.label} (no key)")
+                            },
+                            onClick = {
+                                preferredIdentityIdState.value = identity.id
+                                identityExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            if (authState.value != AuthMethod.PASSWORD && preferredIdentityIdState.value == null) {
+                Text(
+                    "Select an identity key for identity authentication.",
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else if (authState.value != AuthMethod.PASSWORD) {
+                val selectedHasKey = identities.firstOrNull { it.id == preferredIdentityIdState.value }?.hasPrivateKey == true
+                if (!selectedHasKey) {
+                    Text(
+                        "Selected identity has no private key imported.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = groupExpanded.value,
+                    onExpandedChange = { groupExpanded.value = !groupExpanded.value },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    TextField(
+                        value = groupState.value.ifBlank { "None" },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Group (optional)") },
+                        singleLine = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupExpanded.value) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = groupExpanded.value,
+                        onDismissRequest = { groupExpanded.value = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("None") },
+                            onClick = {
+                                groupState.value = ""
+                                groupExpanded.value = false
+                            }
+                        )
+                        availableGroups.forEach { group ->
+                            DropdownMenuItem(
+                                text = { Text(group) },
+                                onClick = {
+                                    groupState.value = group
+                                    groupExpanded.value = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Button(
+                    onClick = {
+                        newGroupNameState.value = ""
+                        newGroupError.value = null
+                        showNewGroupDialog.value = true
+                    }
+                ) {
+                    Text("New...")
+                }
+            }
+            OutlinedTextField(
+                value = notesState.value,
+                onValueChange = { notesState.value = it },
+                label = { Text("Notes") },
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Text
+                )
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Transport")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { useMoshState.value = false }) {
+                        Text(if (!useMoshState.value) "SSH \u2713" else "SSH")
+                    }
+                    TextButton(onClick = { useMoshState.value = true }) {
+                        Text(if (useMoshState.value) "Mosh \u2713" else "Mosh")
+                    }
+                }
+            }
+            ExposedDropdownMenuBox(
+                expanded = terminalProfileExpanded.value,
+                onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
+            ) {
+                val effectiveProfileId = terminalProfileIdState.value ?: defaultTerminalProfileId
+                val defaultTerminalProfileName =
+                    terminalProfiles.firstOrNull { it.id == defaultTerminalProfileId }?.name
+                        ?: TerminalProfileDefaults.profileById(defaultTerminalProfileId)?.name
+                        ?: "Termux"
+                TextField(
+                    value = if (terminalProfileIdState.value == null) {
+                        "$defaultTerminalProfileName (Default)"
+                    } else {
+                        terminalProfiles.firstOrNull { it.id == effectiveProfileId }?.name
+                            ?: defaultTerminalProfileName
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Terminal profile") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalProfileExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = terminalProfileExpanded.value,
+                    onDismissRequest = { terminalProfileExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("$defaultTerminalProfileName (Default)") },
+                        onClick = {
+                            terminalProfileIdState.value = null
+                            terminalProfileExpanded.value = false
+                        }
+                    )
+                    terminalProfiles.forEach { profile ->
+                        if (profile.id == defaultTerminalProfileId) return@forEach
+                        DropdownMenuItem(
+                            text = { Text(profile.name) },
+                            onClick = {
+                                terminalProfileIdState.value = profile.id
+                                terminalProfileExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            ExposedDropdownMenuBox(
+                expanded = forwardExpanded.value,
+                onExpandedChange = { forwardExpanded.value = !forwardExpanded.value }
+            ) {
+                val localForwards = portForwards.filter {
+                    it.type == com.majordaftapps.sshpeaches.app.data.model.PortForwardType.LOCAL
+                }
+                TextField(
+                    value = localForwards.firstOrNull { it.id == preferredForwardIdState.value }?.label ?: "None",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Use local forwarded port") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = forwardExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = forwardExpanded.value,
+                    onDismissRequest = { forwardExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            preferredForwardIdState.value = null
+                            forwardExpanded.value = false
+                        }
+                    )
+                    localForwards.forEach { forward ->
+                        DropdownMenuItem(
+                            text = { Text(forward.label) },
+                            onClick = {
+                                preferredForwardIdState.value = forward.id
+                                forwardExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            ExposedDropdownMenuBox(
+                expanded = startupSnippetExpanded.value,
+                onExpandedChange = {
+                    if (snippets.isNotEmpty()) {
+                        startupSnippetExpanded.value = !startupSnippetExpanded.value
+                    }
+                }
+            ) {
+                val startupSnippetId = parseSnippetReference(startupScriptState.value)
+                val startupSnippet = snippets.firstOrNull { it.id == startupSnippetId }
+                val startupDisplay = when {
+                    startupScriptState.value.isBlank() -> "None"
+                    startupSnippet != null -> startupSnippet.title
+                    startupSnippetId != null -> "Missing snippet"
+                    else -> "Legacy command"
+                }
+                TextField(
+                    value = startupDisplay,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Startup snippet") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = startupSnippetExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = startupSnippetExpanded.value,
+                    onDismissRequest = { startupSnippetExpanded.value = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("None") },
+                        onClick = {
+                            startupScriptState.value = ""
+                            startupSnippetExpanded.value = false
+                        }
+                    )
+                    snippets.forEach { snippet ->
+                        DropdownMenuItem(
+                            text = { Text(snippet.title) },
+                            onClick = {
+                                startupScriptState.value = snippetReference(snippet.id)
+                                startupSnippetExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            val startupSnippetId = parseSnippetReference(startupScriptState.value)
+            val startupSnippet = snippets.firstOrNull { it.id == startupSnippetId }
+            when {
+                startupSnippet != null -> {
+                    Text(startupSnippet.command, style = MaterialTheme.typography.bodySmall)
+                }
+                startupSnippetId != null -> {
+                    Text(
+                        "Selected startup snippet no longer exists.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                startupScriptState.value.isNotBlank() -> {
+                    Text(
+                        "Legacy startup command detected. Pick a snippet to replace it.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(startupScriptState.value, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { startupScriptState.value = "" }) {
+                        Text("Clear legacy command")
+                    }
+                }
+            }
+            ExposedDropdownMenuBox(
+                expanded = backgroundExpanded.value,
+                onExpandedChange = { backgroundExpanded.value = !backgroundExpanded.value }
+            ) {
+                TextField(
+                    value = when (backgroundBehaviorState.value) {
+                        BackgroundBehavior.INHERIT -> "Inherit global"
+                        BackgroundBehavior.ALWAYS_ALLOW -> "Always allow"
+                        BackgroundBehavior.ALWAYS_STOP -> "Always stop"
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Background behavior") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundExpanded.value) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = backgroundExpanded.value,
+                    onDismissRequest = { backgroundExpanded.value = false }
+                ) {
+                    BackgroundBehavior.values().forEach { behavior ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    when (behavior) {
+                                        BackgroundBehavior.INHERIT -> "Inherit global"
+                                        BackgroundBehavior.ALWAYS_ALLOW -> "Always allow"
+                                        BackgroundBehavior.ALWAYS_STOP -> "Always stop"
+                                    }
+                                )
+                            },
+                            onClick = {
+                                backgroundBehaviorState.value = behavior
+                                backgroundExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            if (includeActions) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { saveHost() }) {
+                        Text(if (isEditingHost) "Save" else "Add")
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun HostDetailsPaneContent(host: HostConnection) {
+        val preferredIdentity = identities.firstOrNull { it.id == host.preferredIdentityId }
+        val preferredForward = portForwards.firstOrNull { it.id == host.preferredForwardId }
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(host.name.ifBlank { host.host }, style = MaterialTheme.typography.titleLarge)
+                OutlinedButton(onClick = { requestPaneNavigation(mode = null, closeOnly = true) }) {
+                    Text("Close")
+                }
+            }
+            Text("${host.username}@${host.host}:${host.port}", style = MaterialTheme.typography.bodyMedium)
+            host.group?.takeIf { it.isNotBlank() }?.let {
+                Text("Group: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                if (host.useMosh) "Preferred transport: Mosh" else "Preferred transport: SSH",
+                style = MaterialTheme.typography.bodySmall
+            )
+            preferredIdentity?.let {
+                Text("Identity: ${it.label}", style = MaterialTheme.typography.bodySmall)
+            }
+            preferredForward?.let {
+                Text("Forward: ${it.label}", style = MaterialTheme.typography.bodySmall)
+            }
+            host.notes.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        onStartSession(
+                            host,
+                            ConnectionMode.SSH,
+                            null,
+                            null
+                        )
+                    }
+                ) {
+                    Text("Connect")
+                }
+                OutlinedButton(onClick = { requestPaneNavigation(HostPaneMode.EDITOR, host) }) {
+                    Text("Edit")
+                }
+                OutlinedButton(onClick = { pendingDeleteHost.value = host }) {
+                    Text("Delete")
+                }
+            }
+        }
+    }
+    AdaptivePaneScaffold(
+        shellLayoutMode = shellLayoutMode,
+        modifier = Modifier.testTag(UiTestTags.SCREEN_HOSTS),
+        secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE &&
+            (paneMode.value == HostPaneMode.DETAILS || showDialog.value),
+        primaryPane = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(UiTestTags.SCREEN_HOSTS)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1200.dp else 980.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -548,15 +1332,59 @@ fun HostsScreen(
                                 onAction = { selected, mode, fileTransferEntryMode ->
                                     onStartSession(selected, mode, null, fileTransferEntryMode)
                                 },
+                                onDetails = if (shellLayoutMode == ShellLayoutMode.WIDE) ::openDetails else null,
                                 onEdit = { openDialog(it) },
                                 onDelete = { pendingDeleteHost.value = it }
                             )
                         }
                     }
                 }
-            }
+                    }
+                }
             }
         }
+        },
+        secondaryPane = {
+            when {
+                showDialog.value -> {
+                    HostEditorContent(
+                        modifier = Modifier.fillMaxSize(),
+                        showHeader = true,
+                        includeActions = true,
+                        onCancel = { requestPaneNavigation(mode = null, closeOnly = true) }
+                    )
+                }
+                paneMode.value == HostPaneMode.DETAILS -> {
+                    hosts.firstOrNull { it.id == paneHostId.value }?.let { host ->
+                        HostDetailsPaneContent(host)
+                    }
+                }
+            }
+        }
+    )
+
+    if (showDiscardDialog.value) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                showDiscardDialog.value = false
+                resetPaneNavigationRequest()
+            },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved host changes.") },
+            confirmButton = {
+                TextButton(onClick = { completePendingPaneNavigation() }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDiscardDialog.value = false
+                    resetPaneNavigationRequest()
+                }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 
     pendingDeleteHost.value?.let { host ->
@@ -571,7 +1399,7 @@ fun HostsScreen(
         )
     }
 
-    if (showDialog.value) {
+    if (showDialog.value && shellLayoutMode != ShellLayoutMode.WIDE) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEditingHost) "Edit Host" else "Add Host") },

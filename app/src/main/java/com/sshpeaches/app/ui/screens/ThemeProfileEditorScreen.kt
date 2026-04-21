@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.TextView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,6 +72,7 @@ fun ThemeProfileEditorScreen(
     isEditingExisting: Boolean,
     onSaveTheme: (TerminalProfile) -> Unit,
     onNavigateBack: () -> Unit,
+    onDirtyStateChange: (Boolean) -> Unit = {},
     onShowMessage: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -89,8 +91,33 @@ fun ThemeProfileEditorScreen(
     var showCursorStyleDialog by remember { mutableStateOf(false) }
     var colorFieldDialog by remember { mutableStateOf<ThemeColorField?>(null) }
     var editorError by remember { mutableStateOf<String?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
 
     val title = if (isEditingExisting) "Edit Terminal Theme" else "New Terminal Theme"
+    val isDirty = name != initialProfile.name ||
+        font != initialProfile.font ||
+        fontSizePt != initialProfile.fontSizeSp.toFloat() ||
+        foregroundHex != initialProfile.foregroundHex ||
+        backgroundHex != initialProfile.backgroundHex ||
+        cursorHex != initialProfile.cursorHex ||
+        cursorStyle != initialProfile.cursorStyle ||
+        cursorBlink != initialProfile.cursorBlink
+
+    fun requestClose() {
+        if (isDirty) {
+            showDiscardDialog = true
+        } else {
+            onNavigateBack()
+        }
+    }
+
+    BackHandler(enabled = isDirty) {
+        requestClose()
+    }
+
+    LaunchedEffect(isDirty) {
+        onDirtyStateChange(isDirty)
+    }
 
     Column(
         modifier = Modifier
@@ -224,7 +251,7 @@ fun ThemeProfileEditorScreen(
                 Text("Save")
             }
             Button(
-                onClick = onNavigateBack,
+                onClick = ::requestClose,
                 modifier = Modifier
                     .weight(1f)
                     .testTag(UiTestTags.THEME_PROFILE_CANCEL_BUTTON)
@@ -432,6 +459,27 @@ fun ThemeProfileEditorScreen(
                 }
                 editorError = null
                 colorFieldDialog = null
+            }
+        )
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved terminal theme changes.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onNavigateBack()
+                }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
             }
         )
     }

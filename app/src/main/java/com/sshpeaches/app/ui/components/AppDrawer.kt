@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +26,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
 import com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
@@ -35,8 +35,7 @@ import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 fun AppDrawer(
     destinations: List<DrawerDestination>,
     currentRoute: String,
-    onDestinationSelected: (DrawerDestination) -> Unit,
-    onQuickConnect: () -> Unit
+    onDestinationSelected: (DrawerDestination) -> Unit
 ) {
     val drawerScroll = rememberScrollState()
     val isDarkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
@@ -68,29 +67,14 @@ fun AppDrawer(
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .testTag(UiTestTags.DRAWER_QUICK_CONNECT)
-                .clickable { onQuickConnect() },
-            color = MaterialTheme.colorScheme.primary
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                androidx.compose.material3.Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-                Text("Quick Connect", color = MaterialTheme.colorScheme.onPrimary)
-            }
-        }
         destinations.forEach { dest ->
+            val (interactionSource, hovered) = rememberDesktopHoverState(enabled = true)
             val selected = currentRoute == dest.route
-            val background = if (selected) Color(0xFFFA992A).copy(alpha = 0.18f) else Color.Transparent
+            val background = when {
+                selected -> Color(0xFFFA992A).copy(alpha = 0.18f)
+                hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                else -> Color.Transparent
+            }
             val foreground = if (selected) Color(0xFFFA992A) else MaterialTheme.colorScheme.onSurface
             Row(
                 modifier = Modifier
@@ -98,6 +82,10 @@ fun AppDrawer(
                     .clip(RoundedCornerShape(8.dp))
                     .background(background)
                     .testTag(UiTestTags.drawerItem(dest.route))
+                    .desktopHoverable(
+                        enabled = true,
+                        interactionSource = interactionSource
+                    )
                     .clickable { onDestinationSelected(dest) }
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)

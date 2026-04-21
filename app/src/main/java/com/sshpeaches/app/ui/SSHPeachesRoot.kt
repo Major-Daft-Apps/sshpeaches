@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -65,6 +67,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +76,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -101,6 +105,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
@@ -108,6 +113,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import android.content.Intent
+import android.view.KeyEvent
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.net.toUri
 import kotlinx.coroutines.flow.collect
@@ -115,6 +121,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.window.core.layout.WindowWidthSizeClass
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Base64
@@ -144,6 +151,9 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
 import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
@@ -187,6 +197,7 @@ import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.majordaftapps.sshpeaches.app.util.snippetReference
+import com.majordaftapps.sshpeaches.app.MainActivity
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -432,6 +443,7 @@ fun SSHPeachesRoot(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val showQuickConnect = rememberSaveable { mutableStateOf(false) }
+    val showShortcutHelp = rememberSaveable { mutableStateOf(false) }
     val showAbout = rememberSaveable { mutableStateOf(false) }
     val quickConnectRequest = rememberSaveable { mutableStateOf<QuickConnectRequest?>(null) }
     val quickConnectState = rememberSaveable { mutableStateOf(QuickConnectUiState()) }
@@ -455,12 +467,19 @@ fun SSHPeachesRoot(
     val forwardEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val forwardEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val forwardImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val snippetImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
     val context = LocalContext.current
+    val activity = context as? MainActivity
     val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
+    val shellLayoutMode = rememberShellLayoutMode(
+        sessionRoute = currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+    )
     val missingCorePermissions = corePermissions.filterNot { it.granted }
     val activeSshSessions = sessions.filter {
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
@@ -1407,55 +1426,97 @@ fun SSHPeachesRoot(
         )
     }
 
-    Box {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            gesturesEnabled = !isSessionVerticalRoute,
-            drawerContent = {
-                ModalDrawerSheet(
-                    drawerContainerColor = MaterialTheme.colorScheme.surface,
-                    drawerContentColor = MaterialTheme.colorScheme.onSurface,
-                    drawerTonalElevation = 0.dp
-                ) {
-                    AppDrawer(
-                        destinations = drawerDestinations,
-                        currentRoute = currentRoute,
-                        onDestinationSelected = { destination ->
-                            scope.launch { drawerState.close() }
-                            when (destination.route) {
-                                Routes.HELP -> {
-                                    val helpUri = helpUrl.toUri()
-                                    val customTab = CustomTabsIntent.Builder()
-                                        .setShowTitle(true)
-                                        .build()
-                                    runCatching {
-                                        customTab.launchUrl(context, helpUri)
-                                    }.onFailure {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, helpUri))
-                                    }
-                                }
-                                Routes.ABOUT -> showAbout.value = true
-                                else -> {
-                                    if (destination.route != currentRoute) {
-                                        navController.navigate(destination.route) {
-                                            popUpTo(Routes.HOME) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        onQuickConnect = {
-                            scope.launch { drawerState.close() }
-                            showQuickConnect.value = true
-                        }
-                    )
+    val onDrawerDestinationSelected: (com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination) -> Unit = { destination ->
+        if (shellLayoutMode == ShellLayoutMode.COMPACT) {
+            scope.launch { drawerState.close() }
+        }
+        when (destination.route) {
+            Routes.HELP -> {
+                val helpUri = helpUrl.toUri()
+                val customTab = CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                runCatching {
+                    customTab.launchUrl(context, helpUri)
+                }.onFailure {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, helpUri))
                 }
-            },
-            scrimColor = Color.Black.copy(alpha = 0.4f)
-        ) {
-            Surface(color = MaterialTheme.colorScheme.background) {
+            }
+
+            Routes.ABOUT -> showAbout.value = true
+            else -> {
+                if (destination.route != currentRoute) {
+                    navController.navigate(destination.route) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            }
+        }
+    }
+
+    val updatedGlobalShortcutHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { event ->
+        if (uiState.isLocked || isSessionVerticalRoute) return@rememberUpdatedState false
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return@rememberUpdatedState false
+
+        when {
+            event.isCtrlPressed && !event.isAltPressed && event.keyCode == KeyEvent.KEYCODE_K -> {
+                showQuickConnect.value = true
+                true
+            }
+
+            event.isCtrlPressed && !event.isAltPressed && event.keyCode == KeyEvent.KEYCODE_SLASH -> {
+                showShortcutHelp.value = true
+                true
+            }
+
+            event.keyCode == KeyEvent.KEYCODE_F1 -> {
+                drawerDestinations.firstOrNull { it.route == Routes.HELP }?.let(onDrawerDestinationSelected)
+                true
+            }
+
+            event.isAltPressed -> {
+                val shortcutRoute = when (event.keyCode) {
+                    KeyEvent.KEYCODE_1 -> Routes.HOME
+                    KeyEvent.KEYCODE_2 -> Routes.HOSTS
+                    KeyEvent.KEYCODE_3 -> Routes.UPTIME
+                    KeyEvent.KEYCODE_4 -> Routes.IDENTITIES
+                    KeyEvent.KEYCODE_5 -> Routes.FORWARDS
+                    KeyEvent.KEYCODE_6 -> Routes.SNIPPETS
+                    KeyEvent.KEYCODE_7 -> Routes.KEYBOARD
+                    KeyEvent.KEYCODE_8 -> Routes.THEME_EDITOR
+                    KeyEvent.KEYCODE_9 -> Routes.SETTINGS
+                    else -> null
+                }
+                if (shortcutRoute != null) {
+                    drawerDestinations.firstOrNull { it.route == shortcutRoute }?.let(onDrawerDestinationSelected)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            else -> false
+        }
+    }
+
+    DisposableEffect(activity, isSessionVerticalRoute, uiState.isLocked) {
+        if (!isSessionVerticalRoute) {
+            activity?.setHardwareKeyHandler { event -> updatedGlobalShortcutHandler.value(event) }
+        }
+        onDispose {
+            if (!isSessionVerticalRoute) {
+                activity?.setHardwareKeyHandler(null)
+            }
+        }
+    }
+
+    @Composable
+    fun RootScaffoldContent(
+        showWideSidebar: Boolean
+    ) {
+        Surface(color = MaterialTheme.colorScheme.background) {
                 val showConnectingTopBar =
                     quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
                         !connectedHostBarCollapsed.value
@@ -1485,13 +1546,39 @@ fun SSHPeachesRoot(
                                         IconButton(onClick = { navigateBackFromConnecting() }) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                         }
-                                    } else {
+                                    } else if (!showWideSidebar) {
                                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                             Icon(Icons.Default.Menu, contentDescription = "Menu")
                                         }
                                     }
                                 },
                                 actions = {
+                                    if (!isSessionVerticalRoute) {
+                                        IconButton(
+                                            onClick = { showQuickConnect.value = true },
+                                            modifier = Modifier.testTag(UiTestTags.DRAWER_QUICK_CONNECT)
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = "Quick Connect")
+                                        }
+                                        val activeSnapshot = quickConnectRequest.value?.let { request ->
+                                            sessions.firstOrNull { it.hostId == request.sessionId }
+                                        }
+                                        if (activeSnapshot != null) {
+                                            IconButton(
+                                                onClick = {
+                                                    pendingConnectingNavigation.value = false
+                                                    navController.navigate(routeForSnapshot(activeSnapshot)) {
+                                                        launchSingleTop = true
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                                    contentDescription = "Open active session"
+                                                )
+                                            }
+                                        }
+                                    }
                                     if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
                                             IconButton(
@@ -1503,20 +1590,6 @@ fun SSHPeachesRoot(
                                                 Icon(
                                                     imageVector = Icons.Default.Search,
                                                     contentDescription = "Find"
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = {
-                                                    if (currentRoute != Routes.SETTINGS) {
-                                                        navController.navigate(Routes.SETTINGS) {
-                                                            launchSingleTop = true
-                                                        }
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Build,
-                                                    contentDescription = "Settings"
                                                 )
                                             }
                                         }
@@ -1604,8 +1677,13 @@ fun SSHPeachesRoot(
                                             }
                                             IconButton(
                                                 onClick = {
-                                                    navController.navigate(Routes.snippetEditor()) {
-                                                        launchSingleTop = true
+                                                    if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                                        snippetEditRequestId.value = null
+                                                        snippetAddRequestToken.intValue += 1
+                                                    } else {
+                                                        navController.navigate(Routes.snippetEditor()) {
+                                                            launchSingleTop = true
+                                                        }
                                                     }
                                                 },
                                                 modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.SNIPPETS))
@@ -1756,8 +1834,14 @@ fun SSHPeachesRoot(
                                 },
                                 onEditSnippet = { snippetId ->
                                     scope.launch {
-                                        drawerState.close()
-                                        navController.navigate(Routes.snippetEditor(snippetId)) { launchSingleTop = true }
+                                        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                            snippetEditRequestId.value = snippetId
+                                            snippetEditRequestToken.intValue += 1
+                                            navController.navigate(Routes.SNIPPETS) { launchSingleTop = true }
+                                        } else {
+                                            drawerState.close()
+                                            navController.navigate(Routes.snippetEditor(snippetId)) { launchSingleTop = true }
+                                        }
                                     }
                                 },
                                 onDeleteSnippet = onSnippetDelete,
@@ -1785,8 +1869,14 @@ fun SSHPeachesRoot(
                                 },
                                 onAddSnippet = {
                                     scope.launch {
-                                        drawerState.close()
-                                        navController.navigate(Routes.snippetEditor()) { launchSingleTop = true }
+                                        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                            snippetEditRequestId.value = null
+                                            snippetAddRequestToken.intValue += 1
+                                            navController.navigate(Routes.SNIPPETS) { launchSingleTop = true }
+                                        } else {
+                                            drawerState.close()
+                                            navController.navigate(Routes.snippetEditor()) { launchSingleTop = true }
+                                        }
                                     }
                                 }
                             )
@@ -1807,6 +1897,7 @@ fun SSHPeachesRoot(
                             .toSet()
                         HostsScreen(
                             hosts = uiState.hosts,
+                            shellLayoutMode = shellLayoutMode,
                             identities = uiState.identities,
                             portForwards = uiState.portForwards,
                             snippets = uiState.snippets,
@@ -1869,6 +1960,7 @@ fun SSHPeachesRoot(
                     composable(Routes.IDENTITIES) {
                         IdentitiesScreen(
                             items = uiState.identities,
+                            shellLayoutMode = shellLayoutMode,
                             hosts = uiState.hosts,
                             isLocked = uiState.isLocked,
                             addRequestKey = identityAddRequestToken.intValue,
@@ -1893,6 +1985,7 @@ fun SSHPeachesRoot(
                         composable(Routes.FORWARDS) {
                             PortForwardScreen(
                                 items = uiState.portForwards,
+                                shellLayoutMode = shellLayoutMode,
                                 hosts = uiState.hosts,
                                 allowBackgroundSessions = uiState.allowBackgroundSessions,
                                 addRequestKey = forwardAddRequestToken.intValue,
@@ -1910,10 +2003,20 @@ fun SSHPeachesRoot(
                         composable(Routes.SNIPPETS) {
                             SnippetManagerScreen(
                                 snippets = uiState.snippets,
+                                shellLayoutMode = shellLayoutMode,
+                                addRequestKey = snippetAddRequestToken.intValue,
+                                editRequestKey = snippetEditRequestToken.intValue,
+                                editRequestId = snippetEditRequestId.value,
                                 importRequestKey = snippetImportRequestToken.intValue,
                                 onAdd = onSnippetAdd,
+                                onUpdate = onSnippetUpdate,
                                 onEditSnippet = { snippetId ->
-                                    navController.navigate(Routes.snippetEditor(snippetId))
+                                    if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                        snippetEditRequestId.value = snippetId
+                                        snippetEditRequestToken.intValue += 1
+                                    } else {
+                                        navController.navigate(Routes.snippetEditor(snippetId))
+                                    }
                                 },
                                 onDelete = onSnippetDelete,
                                 onImportFromQr = { showMessage("Snippet imported from QR") },
@@ -1959,6 +2062,7 @@ fun SSHPeachesRoot(
                     composable(Routes.KEYBOARD) {
                         KeyboardEditorScreen(
                             slots = uiState.keyboardSlots,
+                            shellLayoutMode = shellLayoutMode,
                             onSlotChange = onKeyboardSlotChange,
                             onReset = onKeyboardReset
                         )
@@ -1967,11 +2071,13 @@ fun SSHPeachesRoot(
                         ThemeEditorScreen(
                             terminalProfiles = uiState.terminalProfiles,
                             defaultTerminalProfileId = uiState.defaultTerminalProfileId,
+                            shellLayoutMode = shellLayoutMode,
                             onDefaultTerminalProfileChange = onDefaultTerminalProfileChange,
                             onDeleteTerminalProfile = onDeleteTerminalProfile,
                             onCreateTheme = {
                                 navController.navigate(Routes.themeEditorEdit())
                             },
+                            onSaveTheme = onSaveTerminalProfile,
                             onEditTheme = { profileId ->
                                 navController.navigate(Routes.themeEditorEdit(profileId = profileId))
                             },
@@ -2026,6 +2132,7 @@ fun SSHPeachesRoot(
                         composable(Routes.SETTINGS) {
                             SettingsScreen(
                                 currentTheme = uiState.themeMode,
+                                shellLayoutMode = shellLayoutMode,
                                 onThemeChange = onThemeModeChange,
                                 currentAppIcon = uiState.appIcon,
                                 onAppIconChange = onAppIconChange,
@@ -2090,6 +2197,49 @@ fun SSHPeachesRoot(
                 }
             }
         }
+    Box {
+        when (shellLayoutMode) {
+            ShellLayoutMode.COMPACT -> {
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = !isSessionVerticalRoute,
+                    drawerContent = {
+                        ModalDrawerSheet(
+                            drawerContainerColor = MaterialTheme.colorScheme.surface,
+                            drawerContentColor = MaterialTheme.colorScheme.onSurface,
+                            drawerTonalElevation = 0.dp
+                        ) {
+                            AppDrawer(
+                                destinations = drawerDestinations,
+                                currentRoute = currentRoute,
+                                onDestinationSelected = onDrawerDestinationSelected
+                            )
+                        }
+                    },
+                    scrimColor = Color.Black.copy(alpha = 0.4f)
+                ) {
+                    RootScaffoldContent(showWideSidebar = false)
+                }
+            }
+
+            ShellLayoutMode.WIDE -> {
+                WideSidebarScaffold(
+                    sidebar = {
+                        AppDrawer(
+                            destinations = drawerDestinations,
+                            currentRoute = currentRoute,
+                            onDestinationSelected = onDrawerDestinationSelected
+                        )
+                    }
+                ) {
+                    RootScaffoldContent(showWideSidebar = true)
+                }
+            }
+
+            ShellLayoutMode.SESSION -> {
+                RootScaffoldContent(showWideSidebar = false)
+            }
+        }
         if (uiState.isLocked) {
             LockScreenOverlay(
                 biometricEnabled = uiState.biometricLockEnabled,
@@ -2109,9 +2259,38 @@ fun SSHPeachesRoot(
         )
     }
 
+    if (showShortcutHelp.value && !uiState.isLocked) {
+        AlertDialog(
+            onDismissRequest = { showShortcutHelp.value = false },
+            title = { Text("Keyboard shortcuts") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ctrl+K  Quick Connect")
+                    Text("Ctrl+/  Show shortcuts")
+                    Text("F1  Help")
+                    Text("Alt+1  Home")
+                    Text("Alt+2  Hosts")
+                    Text("Alt+3  Uptime")
+                    Text("Alt+4  Identities")
+                    Text("Alt+5  Port Forwards")
+                    Text("Alt+6  Snippets")
+                    Text("Alt+7  Keyboard Editor")
+                    Text("Alt+8  Theme Editor")
+                    Text("Alt+9  Settings")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showShortcutHelp.value = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     if (showQuickConnect.value && !uiState.isLocked) {
         QuickConnectSheet(
             onDismiss = { showQuickConnect.value = false },
+            shellLayoutMode = shellLayoutMode,
             portForwards = uiState.portForwards,
             identities = uiState.identities,
             terminalProfiles = uiState.terminalProfiles,
@@ -2670,6 +2849,7 @@ private fun sanitizeSnippetOutput(value: String): String {
 @Composable
 internal fun QuickConnectSheet(
     onDismiss: () -> Unit,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     portForwards: List<PortForward>,
     identities: List<Identity>,
     terminalProfiles: List<TerminalProfile>,
@@ -2678,10 +2858,7 @@ internal fun QuickConnectSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetMaxHeight = rememberBottomSheetMaxHeight()
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
+    val containerContent: @Composable () -> Unit = {
         val host = rememberSaveable { mutableStateOf("") }
         val port = rememberSaveable { mutableStateOf("22") }
         val username = rememberSaveable { mutableStateOf("") }
@@ -2981,6 +3158,30 @@ internal fun QuickConnectSheet(
             ) {
                 Text("Connect")
             }
+        }
+    }
+
+    if (shellLayoutMode == ShellLayoutMode.WIDE) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                containerContent()
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState
+        ) {
+            containerContent()
         }
     }
 }

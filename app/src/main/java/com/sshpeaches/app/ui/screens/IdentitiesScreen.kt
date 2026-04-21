@@ -47,6 +47,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -73,6 +74,8 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
@@ -113,12 +116,28 @@ private enum class DialogKeyFileType {
     PUBLIC_KEY
 }
 
+private enum class IdentityPaneMode {
+    DETAILS,
+    EDITOR
+}
+
+private data class IdentityEditorSnapshot(
+    val editingId: String?,
+    val label: String,
+    val group: String,
+    val fingerprint: String,
+    val privateKey: String,
+    val publicKey: String,
+    val keyPassphrase: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IdentitiesScreen(
     items: List<Identity>,
     hosts: List<HostConnection>,
     isLocked: Boolean,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     addRequestKey: Int = 0,
     editRequestKey: Int = 0,
     editRequestId: String? = null,
@@ -140,6 +159,8 @@ fun IdentitiesScreen(
     val search = rememberSaveable { mutableStateOf("") }
     val showDialog = remember { mutableStateOf(false) }
     val editingId = remember { mutableStateOf<String?>(null) }
+    val paneIdentityId = rememberSaveable { mutableStateOf<String?>(null) }
+    val paneMode = rememberSaveable { mutableStateOf<IdentityPaneMode?>(null) }
     val labelState = remember { mutableStateOf("") }
     val groupState = remember { mutableStateOf("") }
     val fingerprintState = remember { mutableStateOf("") }
@@ -192,6 +213,11 @@ fun IdentitiesScreen(
     val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledEditRequestKey = rememberSaveable { mutableIntStateOf(0) }
     val handledImportRequestKey = rememberSaveable { mutableIntStateOf(0) }
+    val initialEditorSnapshot = remember { mutableStateOf<IdentityEditorSnapshot?>(null) }
+    val showDiscardDialog = remember { mutableStateOf(false) }
+    val pendingPaneMode = remember { mutableStateOf<IdentityPaneMode?>(null) }
+    val pendingPaneIdentityId = remember { mutableStateOf<String?>(null) }
+    val pendingPaneClose = remember { mutableStateOf(false) }
     AutoHidePasswordReveal(sharePassphraseRevealIndex)
     AutoHidePasswordReveal(shareConfirmPassphraseRevealIndex)
     AutoHidePasswordReveal(importPassphraseRevealIndex)
@@ -294,8 +320,35 @@ fun IdentitiesScreen(
         }
     }
 
-    fun openDialog(identity: Identity?) {
+    fun currentEditorSnapshot(): IdentityEditorSnapshot = IdentityEditorSnapshot(
+        editingId = editingId.value,
+        label = labelState.value,
+        group = groupState.value,
+        fingerprint = fingerprintState.value,
+        privateKey = dialogPrivateKeyState.value,
+        publicKey = dialogPublicKeyState.value,
+        keyPassphrase = dialogKeyPassphraseState.value
+    )
+
+    fun resetPaneNavigationRequest() {
+        pendingPaneMode.value = null
+        pendingPaneIdentityId.value = null
+        pendingPaneClose.value = false
+    }
+
+    fun closePane() {
+        showDialog.value = false
+        editingId.value = null
+        paneIdentityId.value = null
+        paneMode.value = null
+        initialEditorSnapshot.value = null
+        resetPaneNavigationRequest()
+    }
+
+    fun showEditor(identity: Identity?) {
         editingId.value = identity?.id
+        paneIdentityId.value = identity?.id
+        paneMode.value = if (shellLayoutMode == ShellLayoutMode.WIDE) IdentityPaneMode.EDITOR else null
         labelState.value = identity?.label ?: ""
         groupState.value = identity?.group ?: ""
         fingerprintState.value = identity?.fingerprint ?: ""
@@ -310,14 +363,141 @@ fun IdentitiesScreen(
         generationRsaBitsExpanded.value = false
         showGenerateDialog.value = false
         showDialog.value = true
+        initialEditorSnapshot.value = currentEditorSnapshot()
     }
 
-    fun closeDialog() {
+    fun closeEditorState() {
         showDialog.value = false
         dialogFileType.value = null
         generationAlgorithmExpanded.value = false
         generationRsaBitsExpanded.value = false
         showGenerateDialog.value = false
+        initialEditorSnapshot.value = null
+        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+            paneMode.value = null
+            paneIdentityId.value = null
+        }
+        resetPaneNavigationRequest()
+    }
+
+    fun completePendingPaneNavigation() {
+        val targetMode = pendingPaneMode.value
+        val targetIdentity = items.firstOrNull { it.id == pendingPaneIdentityId.value }
+        val closeOnly = pendingPaneClose.value
+        showDiscardDialog.value = false
+        resetPaneNavigationRequest()
+        closePane()
+        when {
+            closeOnly -> Unit
+            targetMode == IdentityPaneMode.DETAILS && targetIdentity != null -> {
+                paneMode.value = IdentityPaneMode.DETAILS
+                paneIdentityId.value = targetIdentity.id
+            }
+            targetMode == IdentityPaneMode.EDITOR -> showEditor(targetIdentity)
+        }
+    }
+
+    fun requestPaneNavigation(mode: IdentityPaneMode?, identity: Identity? = null, closeOnly: Boolean = false) {
+        val editorIsDirty = showDialog.value && initialEditorSnapshot.value != null &&
+            currentEditorSnapshot() != initialEditorSnapshot.value
+        if (shellLayoutMode == ShellLayoutMode.WIDE && editorIsDirty) {
+            pendingPaneMode.value = mode
+            pendingPaneIdentityId.value = identity?.id
+            pendingPaneClose.value = closeOnly
+            showDiscardDialog.value = true
+            return
+        }
+        if (closeOnly) {
+            closePane()
+            return
+        }
+        when (mode) {
+            IdentityPaneMode.DETAILS -> {
+                closePane()
+                paneMode.value = IdentityPaneMode.DETAILS
+                paneIdentityId.value = identity?.id
+            }
+            IdentityPaneMode.EDITOR -> showEditor(identity)
+            null -> closePane()
+        }
+    }
+
+    fun openDetails(identity: Identity) {
+        requestPaneNavigation(mode = IdentityPaneMode.DETAILS, identity = identity)
+    }
+
+    fun openShareQr(identity: Identity) {
+        if (identity.hasPrivateKey) {
+            sharePassphrasePrompt.value = identity
+            sharePassphraseState.value = ExportPassphraseCache.identity.orEmpty()
+            shareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
+            sharePassphraseError.value = null
+        } else {
+            shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
+            shareIdentity.value = identity
+        }
+    }
+
+    fun saveIdentity(): Boolean {
+        val fp = fingerprintState.value.trim()
+        if (fp.isEmpty()) {
+            dialogError.value = "Select a key file so fingerprint can be calculated."
+            return false
+        }
+        val duplicate = items.any { it.fingerprint.equals(fp, true) && it.id != editingId.value }
+        if (duplicate) {
+            dialogError.value = "An identity with that fingerprint already exists."
+            return false
+        }
+        if (!isValidFingerprint(fp)) {
+            dialogError.value = "Fingerprint format looks invalid."
+            return false
+        }
+        dialogError.value = null
+        val privateKey = dialogPrivateKeyState.value.trim()
+        val publicKeyInput = dialogPublicKeyState.value.trim()
+        val keyPassphrase = dialogKeyPassphraseState.value.trim().takeIf { it.isNotBlank() }
+        val identityId = editingId.value ?: UUID.randomUUID().toString()
+        if (editingId.value != null) {
+            onUpdate(
+                identityId,
+                labelState.value,
+                fp,
+                null,
+                groupState.value.trim().ifBlank { null }
+            )
+        } else {
+            onAdd(
+                labelState.value.ifBlank { "Identity ${UUID.randomUUID()}" },
+                fp,
+                null,
+                groupState.value.trim().ifBlank { null },
+                identityId
+            )
+        }
+        if (privateKey.isNotBlank()) {
+            val imported = onImportIdentityKeyPlain(identityId, privateKey)
+            onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
+        }
+        val publicKey = when {
+            publicKeyInput.isNotBlank() -> publicKeyInput
+            privateKey.isNotBlank() -> SshKeyGenerator.derivePublicKeyFromPrivate(privateKey, labelState.value.trim()).orEmpty()
+            else -> ""
+        }.trim()
+        if (publicKey.isNotBlank()) {
+            onStoreIdentityPublicKey(identityId, publicKey)
+        }
+        onStoreIdentityKeyPassphrase(identityId, keyPassphrase)
+        closeEditorState()
+        return true
+    }
+
+    fun openDialog(identity: Identity?) {
+        showEditor(identity)
+    }
+
+    fun closeDialog() {
+        closeEditorState()
     }
 
     fun openCopyKeyDialog(identity: Identity) {
@@ -379,161 +559,394 @@ fun IdentitiesScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_IDENTITIES)
+    @Composable
+    fun IdentityEditorContent(
+        modifier: Modifier = Modifier,
+        showHeader: Boolean,
+        includeActions: Boolean,
+        onCancel: () -> Unit
     ) {
+        val isEdit = editingId.value != null
+        val editingIdentity = items.firstOrNull { it.id == editingId.value }
         Column(
-            modifier = Modifier
-                .widthIn(max = 980.dp)
-                .fillMaxSize()
-                .align(Alignment.TopCenter)
-        ) {
-        Row(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.IDENTITY_SEARCH_INPUT),
-                value = search.value,
-                onValueChange = { search.value = it },
-                placeholder = { Text("Search identities") },
-                trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
-            )
-        }
-        HorizontalDivider()
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (items.isEmpty()) {
-                item { EmptyState(itemLabel = "identity") }
-            } else if (filteredItems.isEmpty()) {
-                item { EmptyState(itemLabel = "result") }
-            } else {
-                groupedItems.forEach { section ->
-                    item(key = "identity_header_${section.key}") {
-                        GroupSectionHeader(
-                            vertical = "identities",
-                            label = section.label,
-                            count = section.items.size,
-                            expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
-                            onToggle = {
-                                val current = expandedSections[section.key] ?: true
-                                expandedSections[section.key] = !current
-                            }
+            if (showHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (isEdit) "Edit identity" else "Add identity",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    OutlinedButton(onClick = onCancel) {
+                        Text("Close")
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = labelState.value,
+                onValueChange = { labelState.value = it },
+                label = { Text("Label") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text
+                )
+            )
+            OutlinedTextField(
+                value = groupState.value,
+                onValueChange = { groupState.value = it },
+                label = { Text("Group") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.IDENTITY_GROUP_FIELD),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text
+                )
+            )
+            KeyInputRow(
+                label = "Private key",
+                value = dialogPrivateKeyState.value,
+                onValueChange = { next ->
+                    dialogPrivateKeyState.value = next
+                    if (dialogError.value != null) {
+                        dialogError.value = null
+                    }
+                    val trimmed = next.trim()
+                    if (trimmed.isNotBlank() && dialogPublicKeyState.value.isBlank()) {
+                        fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
+                    }
+                },
+                onBrowse = {
+                    if (isLocked) {
+                        dialogError.value = "Unlock the app before importing keys."
+                    } else {
+                        dialogFileType.value = DialogKeyFileType.PRIVATE_KEY
+                        fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                    }
+                }
+            )
+            KeyInputRow(
+                label = "Public key",
+                value = dialogPublicKeyState.value,
+                onValueChange = { next ->
+                    dialogPublicKeyState.value = next
+                    if (dialogError.value != null) {
+                        dialogError.value = null
+                    }
+                    val trimmed = next.trim()
+                    if (trimmed.isNotBlank()) {
+                        fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
+                    } else {
+                        val privateTrimmed = dialogPrivateKeyState.value.trim()
+                        if (privateTrimmed.isNotBlank()) {
+                            fingerprintState.value = computeFingerprintFromKeyMaterial(privateTrimmed)
+                        }
+                    }
+                },
+                onBrowse = {
+                    dialogFileType.value = DialogKeyFileType.PUBLIC_KEY
+                    fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                }
+            )
+            OutlinedTextField(
+                value = dialogKeyPassphraseState.value,
+                onValueChange = { updatePasswordStateWithReveal(dialogKeyPassphraseState, dialogKeyPassphraseRevealIndex, it) },
+                label = { Text("Key passphrase (optional)") },
+                singleLine = true,
+                visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Password
+                )
+            )
+            Button(
+                onClick = {
+                    generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
+                    generationRsaBits.value = 4096
+                    generationCurve.value = IdentityEcdsaCurve.P256
+                    generationPassphrase.value = ""
+                    generationConfirmPassphrase.value = ""
+                    generationError.value = null
+                    showGenerateDialog.value = true
+                },
+                modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_GENERATE_BUTTON)
+            ) {
+                Text("Generate keypair")
+            }
+            OutlinedTextField(
+                value = fingerprintState.value,
+                onValueChange = {},
+                label = { Text("Fingerprint") },
+                singleLine = true,
+                readOnly = true,
+                modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_FINGERPRINT_INPUT)
+            )
+            dialogKeyStatus.value?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall)
+            }
+            dialogError.value?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            if (includeActions) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { saveIdentity() }) {
+                        Text(if (isEdit) "Save" else "Add")
+                    }
+                    OutlinedButton(onClick = onCancel) {
+                        Text("Cancel")
+                    }
+                }
+                if (isEdit && editingIdentity?.hasPrivateKey == true) {
+                    TextButton(onClick = {
+                        if (isLocked) {
+                            onShowMessage("Unlock the app before removing keys.")
+                        } else {
+                            onRemoveIdentityKey(editingId.value!!)
+                            onShowMessage("Private key removed")
+                            closeDialog()
+                        }
+                    }) {
+                        Text("Remove key")
+                    }
+                }
+                if (isEdit) {
+                    TextButton(onClick = {
+                        pendingDeleteIdentity.value = editingIdentity
+                        closeDialog()
+                    }) {
+                        Text("Delete")
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun IdentityDetailsPaneContent(identity: Identity) {
+        val attachedHosts = hosts.filter { it.preferredIdentityId == identity.id }
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(identity.label, style = MaterialTheme.typography.titleLarge)
+                OutlinedButton(onClick = { requestPaneNavigation(mode = null, closeOnly = true) }) {
+                    Text("Close")
+                }
+            }
+            Text(identity.fingerprint, style = MaterialTheme.typography.bodySmall)
+            identity.username?.let {
+                Text("Username: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            identity.group?.takeIf { it.isNotBlank() }?.let {
+                Text("Group: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                if (identity.hasPrivateKey) "Private key imported" else "Public key only",
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (attachedHosts.isNotEmpty()) {
+                Text(
+                    "Used by ${attachedHosts.size} host${if (attachedHosts.size == 1) "" else "s"}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { requestPaneNavigation(IdentityPaneMode.EDITOR, identity) }) {
+                    Text("Edit")
+                }
+                OutlinedButton(onClick = { openShareQr(identity) }) {
+                    Text("Share")
+                }
+                OutlinedButton(onClick = { openCopyKeyDialog(identity) }) {
+                    Text("Install Key")
+                }
+                OutlinedButton(onClick = { pendingDeleteIdentity.value = identity }) {
+                    Text("Delete")
+                }
+            }
+        }
+    }
+
+    AdaptivePaneScaffold(
+        shellLayoutMode = shellLayoutMode,
+        modifier = Modifier.testTag(UiTestTags.SCREEN_IDENTITIES),
+        secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE &&
+            (paneMode.value == IdentityPaneMode.DETAILS || showDialog.value),
+        primaryPane = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(UiTestTags.SCREEN_IDENTITIES)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1200.dp else 980.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.IDENTITY_SEARCH_INPUT),
+                            value = search.value,
+                            onValueChange = { search.value = it },
+                            placeholder = { Text("Search identities") },
+                            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
                         )
                     }
-                    if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
-                        items(section.items, key = { it.id }) { identity ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(identity.label, style = MaterialTheme.typography.titleMedium)
-                                            Text(identity.fingerprint, style = MaterialTheme.typography.bodySmall)
-                                            identity.username?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    HorizontalDivider()
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (items.isEmpty()) {
+                            item { EmptyState(itemLabel = "identity") }
+                        } else if (filteredItems.isEmpty()) {
+                            item { EmptyState(itemLabel = "result") }
+                        } else {
+                            groupedItems.forEach { section ->
+                                item(key = "identity_header_${section.key}") {
+                                    GroupSectionHeader(
+                                        vertical = "identities",
+                                        label = section.label,
+                                        count = section.items.size,
+                                        expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
+                                        onToggle = {
+                                            val current = expandedSections[section.key] ?: true
+                                            expandedSections[section.key] = !current
                                         }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Icon(
-                                                Icons.Default.Star,
-                                                contentDescription = if (identity.favorite) "Unfavorite" else "Favorite",
-                                                tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .testTag(UiTestTags.identityFavorite(identity.id))
-                                                    .clickable { onToggleFavorite(identity.id) }
-                                            )
-                                            if (identity.hasPrivateKey) {
-                                                Icon(
-                                                    Icons.Default.VpnKey,
-                                                    contentDescription = "Has private key",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                            Icon(
-                                                Icons.Default.QrCode,
-                                                contentDescription = "Share identity",
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .testTag(UiTestTags.identityShare(identity.id))
-                                                    .clickable {
+                                    )
+                                }
+                                if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
+                                    items(section.items, key = { it.id }) { identity ->
+                                        Card(modifier = Modifier.fillMaxWidth()) {
+                                            Column(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(identity.label, style = MaterialTheme.typography.titleMedium)
+                                                        Text(identity.fingerprint, style = MaterialTheme.typography.bodySmall)
+                                                        identity.username?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                                    }
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Icon(
+                                                            Icons.Default.Star,
+                                                            contentDescription = if (identity.favorite) "Unfavorite" else "Favorite",
+                                                            tint = if (identity.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                            modifier = Modifier
+                                                                .size(20.dp)
+                                                                .testTag(UiTestTags.identityFavorite(identity.id))
+                                                                .clickable { onToggleFavorite(identity.id) }
+                                                        )
                                                         if (identity.hasPrivateKey) {
-                                                            sharePassphrasePrompt.value = identity
-                                                            sharePassphraseState.value = ExportPassphraseCache.identity.orEmpty()
-                                                            shareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
-                                                            sharePassphraseError.value = null
-                                                        } else {
-                                                            shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
-                                                            shareIdentity.value = identity
+                                                            Icon(
+                                                                Icons.Default.VpnKey,
+                                                                contentDescription = "Has private key",
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                        Icon(
+                                                            Icons.Default.QrCode,
+                                                            contentDescription = "Share identity",
+                                                            modifier = Modifier
+                                                                .size(20.dp)
+                                                                .testTag(UiTestTags.identityShare(identity.id))
+                                                                .clickable { openShareQr(identity) }
+                                                        )
+                                                        Icon(
+                                                            Icons.Default.VpnKey,
+                                                            contentDescription = "Import key file",
+                                                            modifier = Modifier
+                                                                .size(20.dp)
+                                                                .clickable {
+                                                                    if (isLocked) {
+                                                                        onShowMessage("Unlock the app before importing keys.")
+                                                                    } else {
+                                                                        fileImportTarget.value = identity.id
+                                                                        fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
+                                                                    }
+                                                                }
+                                                        )
+                                                        Icon(
+                                                            Icons.Default.ContentCopy,
+                                                            contentDescription = "Copy key to host",
+                                                            modifier = Modifier
+                                                                .size(20.dp)
+                                                                .clickable { openCopyKeyDialog(identity) }
+                                                        )
+                                                        IconButton(
+                                                            onClick = { overflowIdentityId.value = identity.id },
+                                                            modifier = Modifier.testTag(UiTestTags.identityOverflowButton(identity.id))
+                                                        ) {
+                                                            Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                                                        }
+                                                        DropdownMenu(
+                                                            expanded = overflowIdentityId.value == identity.id,
+                                                            onDismissRequest = { overflowIdentityId.value = null }
+                                                        ) {
+                                                            if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                                                DropdownMenuItem(
+                                                                    text = { Text("Details") },
+                                                                    onClick = {
+                                                                        overflowIdentityId.value = null
+                                                                        openDetails(identity)
+                                                                    },
+                                                                    modifier = Modifier.testTag(UiTestTags.identityOverflowAction(identity.id, "details"))
+                                                                )
+                                                            }
+                                                            DropdownMenuItem(
+                                                                text = { Text("Edit") },
+                                                                onClick = {
+                                                                    overflowIdentityId.value = null
+                                                                    openDialog(identity)
+                                                                },
+                                                                modifier = Modifier.testTag(UiTestTags.identityOverflowAction(identity.id, "edit"))
+                                                            )
+                                                            DropdownMenuItem(
+                                                                text = { Text("Delete") },
+                                                                onClick = {
+                                                                    overflowIdentityId.value = null
+                                                                    pendingDeleteIdentity.value = identity
+                                                                },
+                                                                modifier = Modifier.testTag(UiTestTags.identityOverflowAction(identity.id, "delete"))
+                                                            )
                                                         }
                                                     }
-                                            )
-                                            Icon(
-                                                Icons.Default.VpnKey,
-                                                contentDescription = "Import key file",
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .clickable {
-                                                        if (isLocked) {
-                                                            onShowMessage("Unlock the app before importing keys.")
-                                                        } else {
-                                                            fileImportTarget.value = identity.id
-                                                            fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
-                                                        }
-                                                    }
-                                            )
-                                            Icon(
-                                                Icons.Default.ContentCopy,
-                                                contentDescription = "Copy key to host",
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .clickable { openCopyKeyDialog(identity) }
-                                            )
-                                            IconButton(
-                                                onClick = { overflowIdentityId.value = identity.id },
-                                                modifier = Modifier.testTag(UiTestTags.identityOverflowButton(identity.id))
-                                            ) {
-                                                Icon(Icons.Default.MoreVert, contentDescription = "More actions")
-                                            }
-                                            DropdownMenu(
-                                                expanded = overflowIdentityId.value == identity.id,
-                                                onDismissRequest = { overflowIdentityId.value = null }
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Edit") },
-                                                    onClick = {
-                                                        overflowIdentityId.value = null
-                                                        openDialog(identity)
-                                                    },
-                                                    modifier = Modifier.testTag(UiTestTags.identityOverflowAction(identity.id, "edit"))
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Delete") },
-                                                    onClick = {
-                                                        overflowIdentityId.value = null
-                                                        pendingDeleteIdentity.value = identity
-                                                    },
-                                                    modifier = Modifier.testTag(UiTestTags.identityOverflowAction(identity.id, "delete"))
-                                                )
+                                                }
+                                                TextButton(onClick = { openCopyKeyDialog(identity) }) {
+                                                    Text("Install Key To Host")
+                                                }
                                             }
                                         }
-                                    }
-                                    TextButton(onClick = { openCopyKeyDialog(identity) }) {
-                                        Text("Install Key To Host")
                                     }
                                 }
                             }
@@ -541,8 +954,48 @@ fun IdentitiesScreen(
                     }
                 }
             }
+        },
+        secondaryPane = {
+            when {
+                showDialog.value -> {
+                    IdentityEditorContent(
+                        modifier = Modifier.fillMaxSize(),
+                        showHeader = true,
+                        includeActions = true,
+                        onCancel = { requestPaneNavigation(mode = null, closeOnly = true) }
+                    )
+                }
+                paneMode.value == IdentityPaneMode.DETAILS -> {
+                    items.firstOrNull { it.id == paneIdentityId.value }?.let { identity ->
+                        IdentityDetailsPaneContent(identity)
+                    }
+                }
+            }
         }
-    }
+    )
+
+    if (showDiscardDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                showDiscardDialog.value = false
+                resetPaneNavigationRequest()
+            },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved identity changes.") },
+            confirmButton = {
+                TextButton(onClick = { completePendingPaneNavigation() }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDiscardDialog.value = false
+                    resetPaneNavigationRequest()
+                }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 
     pendingDeleteIdentity.value?.let { identity ->
@@ -557,196 +1010,26 @@ fun IdentitiesScreen(
         )
     }
 
-    if (showDialog.value) {
-        val isEdit = editingId.value != null
-        val editingIdentity = items.firstOrNull { it.id == editingId.value }
+    if (showDialog.value && shellLayoutMode != ShellLayoutMode.WIDE) {
         AlertDialog(
             onDismissRequest = { closeDialog() },
-            title = { Text(if (isEdit) "Edit identity" else "Add identity") },
+            title = { Text(if (editingId.value != null) "Edit identity" else "Add identity") },
             text = {
-                Column(
+                IdentityEditorContent(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = dialogBodyMaxHeight)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = labelState.value,
-                        onValueChange = { labelState.value = it },
-                        label = { Text("Label") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_LABEL_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        )
-                    )
-                    OutlinedTextField(
-                        value = groupState.value,
-                        onValueChange = { groupState.value = it },
-                        label = { Text("Group") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.IDENTITY_GROUP_FIELD),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        )
-                    )
-                    KeyInputRow(
-                        label = "Private key",
-                        value = dialogPrivateKeyState.value,
-                        onValueChange = { next ->
-                            dialogPrivateKeyState.value = next
-                            if (dialogError.value != null) {
-                                dialogError.value = null
-                            }
-                            val trimmed = next.trim()
-                            if (trimmed.isNotBlank() && dialogPublicKeyState.value.isBlank()) {
-                                fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
-                            }
-                        },
-                        onBrowse = {
-                            if (isLocked) {
-                                dialogError.value = "Unlock the app before importing keys."
-                            } else {
-                                dialogFileType.value = DialogKeyFileType.PRIVATE_KEY
-                                fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
-                            }
-                        }
-                    )
-                    KeyInputRow(
-                        label = "Public key",
-                        value = dialogPublicKeyState.value,
-                        onValueChange = { next ->
-                            dialogPublicKeyState.value = next
-                            if (dialogError.value != null) {
-                                dialogError.value = null
-                            }
-                            val trimmed = next.trim()
-                            if (trimmed.isNotBlank()) {
-                                fingerprintState.value = computeFingerprintFromKeyMaterial(trimmed)
-                            } else {
-                                val privateTrimmed = dialogPrivateKeyState.value.trim()
-                                if (privateTrimmed.isNotBlank()) {
-                                    fingerprintState.value = computeFingerprintFromKeyMaterial(privateTrimmed)
-                                }
-                            }
-                        },
-                        onBrowse = {
-                            dialogFileType.value = DialogKeyFileType.PUBLIC_KEY
-                            fileLauncher.launch(arrayOf("text/*", "application/octet-stream"))
-                        }
-                    )
-                    OutlinedTextField(
-                        value = dialogKeyPassphraseState.value,
-                        onValueChange = { updatePasswordStateWithReveal(dialogKeyPassphraseState, dialogKeyPassphraseRevealIndex, it) },
-                        label = { Text("Key passphrase (optional)") },
-                        singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Password
-                        )
-                    )
-                    Button(
-                        onClick = {
-                            generationAlgorithm.value = IdentityKeyAlgorithm.ED25519
-                            generationRsaBits.value = 4096
-                            generationCurve.value = IdentityEcdsaCurve.P256
-                            generationPassphrase.value = ""
-                            generationConfirmPassphrase.value = ""
-                            generationError.value = null
-                            showGenerateDialog.value = true
-                        },
-                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_GENERATE_BUTTON)
-                    ) {
-                        Text("Generate keypair")
-                    }
-                    OutlinedTextField(
-                        value = fingerprintState.value,
-                        onValueChange = {},
-                        label = { Text("Fingerprint") },
-                        singleLine = true,
-                        readOnly = true,
-                        modifier = Modifier.testTag(UiTestTags.IDENTITY_DIALOG_FINGERPRINT_INPUT)
-                    )
-                    dialogKeyStatus.value?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                    dialogError.value?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                        .heightIn(max = dialogBodyMaxHeight),
+                    showHeader = false,
+                    includeActions = false,
+                    onCancel = { closeDialog() }
+                )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val fp = fingerprintState.value.trim()
-                    if (fp.isEmpty()) {
-                        dialogError.value = "Select a key file so fingerprint can be calculated."
-                        return@TextButton
-                    }
-                    val duplicate = items.any { it.fingerprint.equals(fp, true) && it.id != editingId.value }
-                    if (duplicate) {
-                        dialogError.value = "An identity with that fingerprint already exists."
-                        return@TextButton
-                    }
-                    if (!isValidFingerprint(fp)) {
-                        dialogError.value = "Fingerprint format looks invalid."
-                        return@TextButton
-                    }
-                    dialogError.value = null
-                    val privateKey = dialogPrivateKeyState.value.trim()
-                    val publicKeyInput = dialogPublicKeyState.value.trim()
-                    val keyPassphrase = dialogKeyPassphraseState.value.trim().takeIf { it.isNotBlank() }
-                    val identityId = if (isEdit) {
-                        editingId.value!!
-                    } else {
-                        UUID.randomUUID().toString()
-                    }
-                    if (isEdit) {
-                        onUpdate(
-                            identityId,
-                            labelState.value,
-                            fp,
-                            null,
-                            groupState.value.trim().ifBlank { null }
-                        )
-                        if (privateKey.isNotBlank()) {
-                            val imported = onImportIdentityKeyPlain(identityId, privateKey)
-                            onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
-                        }
-                    } else {
-                        onAdd(
-                            labelState.value.ifBlank { "Identity ${UUID.randomUUID()}" },
-                            fp,
-                            null,
-                            groupState.value.trim().ifBlank { null },
-                            identityId
-                        )
-                    }
-                    if (privateKey.isNotBlank()) {
-                        val imported = onImportIdentityKeyPlain(identityId, privateKey)
-                        onShowMessage(if (imported) "Private key imported" else "Failed to import private key")
-                    }
-                    val publicKey = when {
-                        publicKeyInput.isNotBlank() -> publicKeyInput
-                        privateKey.isNotBlank() -> SshKeyGenerator.derivePublicKeyFromPrivate(privateKey, labelState.value.trim()).orEmpty()
-                        else -> ""
-                    }.trim()
-                    if (publicKey.isNotBlank()) {
-                        onStoreIdentityPublicKey(identityId, publicKey)
-                    }
-                    onStoreIdentityKeyPassphrase(identityId, keyPassphrase)
-                    closeDialog()
-                }) { Text(if (editingId.value == null) "Add" else "Save") }
+                TextButton(onClick = { saveIdentity() }) { Text(if (editingId.value == null) "Add" else "Save") }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (editingId.value != null && editingIdentity?.hasPrivateKey == true) {
+                    if (editingId.value != null && items.firstOrNull { it.id == editingId.value }?.hasPrivateKey == true) {
                         TextButton(onClick = {
                             if (isLocked) {
                                 onShowMessage("Unlock the app before removing keys.")

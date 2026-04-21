@@ -58,6 +58,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -77,6 +78,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 @Composable
 fun SettingsScreen(
     currentTheme: ThemeMode,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     onThemeChange: (ThemeMode) -> Unit,
     currentAppIcon: AppIconOption,
     onAppIconChange: (AppIconOption) -> Unit,
@@ -242,7 +244,7 @@ fun SettingsScreen(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 980.dp)
+                .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1280.dp else 980.dp)
                 .fillMaxSize()
                 .align(Alignment.TopCenter)
                 .verticalScroll(rememberScrollState())

@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.CardDefaults.cardElevation
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
@@ -79,6 +80,9 @@ import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
 import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
+import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
+import com.majordaftapps.sshpeaches.app.ui.adaptive.secondaryClickToOpen
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.majordaftapps.sshpeaches.app.util.snippetReference
 
@@ -93,6 +97,7 @@ fun HostCard(
     canRunInfoCommands: Boolean = false,
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
+    onDetails: ((HostConnection) -> Unit)? = null,
     onEdit: ((HostConnection) -> Unit)? = null,
     onDelete: ((HostConnection) -> Unit)? = null
 ) {
@@ -112,6 +117,10 @@ fun HostCard(
     val showOverflow = rememberSaveable(host.id) { mutableStateOf(false) }
     val infoSnippetExpanded = rememberSaveable(host.id) { mutableStateOf(false) }
     val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
+    val hasDesktopActions = onDetails != null || onEdit != null || onDelete != null
+    val (cardInteractionSource, cardHovered) = rememberDesktopHoverState(
+        enabled = hasDesktopActions
+    )
     AutoHidePasswordReveal(passphraseRevealIndex)
     AutoHidePasswordReveal(confirmPassphraseRevealIndex)
 
@@ -138,8 +147,17 @@ fun HostCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        modifier = modifier
+            .fillMaxWidth()
+            .desktopHoverable(
+                enabled = hasDesktopActions,
+                interactionSource = cardInteractionSource
+            )
+            .secondaryClickToOpen(enabled = hasDesktopActions) {
+                showOverflow.value = true
+            },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = cardElevation(defaultElevation = if (cardHovered) 6.dp else 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -191,7 +209,7 @@ fun HostCard(
                             contentDescription = if (host.favorite) "Unfavorite" else "Favorite"
                         )
                     }
-                    if (onEdit != null || onDelete != null) {
+                    if (hasDesktopActions) {
                         Box {
                             IconButton(
                                 onClick = { showOverflow.value = true },
@@ -206,6 +224,15 @@ fun HostCard(
                                 expanded = showOverflow.value,
                                 onDismissRequest = { showOverflow.value = false }
                             ) {
+                                onDetails?.let {
+                                    DropdownMenuItem(
+                                        text = { Text("Details") },
+                                        onClick = {
+                                            showOverflow.value = false
+                                            it(host)
+                                        }
+                                    )
+                                }
                                 onEdit?.let {
                                     DropdownMenuItem(
                                         text = { Text("Edit") },

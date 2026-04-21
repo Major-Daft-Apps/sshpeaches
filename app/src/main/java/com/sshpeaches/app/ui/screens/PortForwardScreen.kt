@@ -19,11 +19,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -36,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +64,11 @@ import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
+import com.majordaftapps.sshpeaches.app.ui.adaptive.secondaryClickToOpen
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
@@ -82,6 +90,7 @@ fun PortForwardScreen(
     items: List<PortForward>,
     hosts: List<HostConnection> = emptyList(),
     allowBackgroundSessions: Boolean = true,
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     addRequestKey: Int = 0,
     editRequestKey: Int = 0,
     editRequestId: String? = null,
@@ -109,6 +118,7 @@ fun PortForwardScreen(
     val shareForward = remember { mutableStateOf<PortForward?>(null) }
     val pendingDeleteForward = remember { mutableStateOf<PortForward?>(null) }
     val overflowForwardId = remember { mutableStateOf<String?>(null) }
+    val detailForwardId = rememberSaveable { mutableStateOf<String?>(null) }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val handledAddRequestKey = rememberSaveable { mutableIntStateOf(0) }
@@ -117,6 +127,7 @@ fun PortForwardScreen(
     val context = LocalContext.current
 
     fun openDialog(forward: PortForward?, asEdit: Boolean = forward != null) {
+        detailForwardId.value = null
         editingId.value = if (asEdit) forward?.id else null
         labelState.value = forward?.label ?: ""
         groupState.value = forward?.group ?: ""
@@ -135,8 +146,77 @@ fun PortForwardScreen(
         showDialog.value = false
     }
 
+    fun openDetails(forward: PortForward) {
+        showDialog.value = false
+        detailForwardId.value = forward.id
+    }
+
     fun hostHasBackgroundSessionsDisabled(host: HostConnection): Boolean =
         host.backgroundBehavior == BackgroundBehavior.ALWAYS_STOP
+
+    fun saveForward(): Boolean {
+        val srcPort = parsePort(srcPortState.value) ?: run {
+            dialogError.value = "Enter a valid source port (1-65535)."
+            return false
+        }
+        val dstPort = parsePort(dstPortState.value) ?: run {
+            dialogError.value = "Enter a valid destination port."
+            return false
+        }
+        val chosenHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
+            dialogError.value = "Select a host."
+            return false
+        }
+        if (!allowBackgroundSessions) {
+            dialogError.value = "Enable background sessions in Settings before saving a port forward."
+            return false
+        }
+        if (hostHasBackgroundSessionsDisabled(chosenHost)) {
+            dialogError.value = "Selected host has background sessions disabled."
+            return false
+        }
+        if (!isValidHostAddress(chosenHost.host)) {
+            dialogError.value = "Selected host has an invalid address."
+            return false
+        }
+        val destinationHost = dstHostState.value.trim().ifBlank { "127.0.0.1" }
+        if (!isValidHostAddress(destinationHost)) {
+            dialogError.value = "Enter a valid destination host."
+            return false
+        }
+        dialogError.value = null
+        val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
+        val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
+        val associated = listOf(chosenHost.id)
+        if (editingId.value != null) {
+            onUpdate(
+                editingId.value!!,
+                label,
+                groupState.value.trim().ifBlank { null },
+                PortForwardType.LOCAL,
+                bind,
+                srcPort,
+                destinationHost,
+                dstPort,
+                enabledState.value,
+                associated
+            )
+        } else {
+            onAdd(
+                label,
+                groupState.value.trim().ifBlank { null },
+                PortForwardType.LOCAL,
+                bind,
+                srcPort,
+                destinationHost,
+                dstPort,
+                enabledState.value,
+                associated
+            )
+        }
+        closeDialog()
+        return true
+    }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@rememberLauncherForActivityResult
@@ -210,143 +290,351 @@ fun PortForwardScreen(
         onEmptyStateVisibleChanged(showEmptyState)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_FORWARDS)
+    @Composable
+    fun ForwardEditorContent(
+        modifier: Modifier = Modifier,
+        showHeader: Boolean,
+        includeActions: Boolean = true,
+        onCancel: () -> Unit
     ) {
+        val isEdit = editingId.value != null
+        val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
+        val selectedHostBackgroundError = selectedHost
+            ?.takeIf(::hostHasBackgroundSessionsDisabled)
+            ?.let { "Selected host has background sessions disabled." }
+
         Column(
-            modifier = Modifier
-                .widthIn(max = 980.dp)
-                .fillMaxSize()
-                .align(Alignment.TopCenter)
+            modifier = modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (showHeader) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (isEdit) "Edit port forward" else "Add port forward",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    OutlinedButton(onClick = onCancel) {
+                        Text("Close")
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = labelState.value,
+                onValueChange = { labelState.value = it },
+                label = { Text("Label") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text
+                )
+            )
+            OutlinedTextField(
+                value = groupState.value,
+                onValueChange = { groupState.value = it },
+                label = { Text("Group") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_GROUP_FIELD),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text
+                )
+            )
+            Text("Type: Local (SSH -L)", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(
+                value = bindState.value,
+                onValueChange = { bindState.value = it },
+                label = { Text("Local bind address") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii
+                )
+            )
+            OutlinedTextField(
+                value = srcPortState.value,
+                onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Local port") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Number
+                )
+            )
+            ExposedDropdownMenuBox(
+                expanded = hostPickerExpanded.value,
+                onExpandedChange = {
+                    if (hosts.isNotEmpty()) {
+                        hostPickerExpanded.value = !hostPickerExpanded.value
+                    }
+                }
             ) {
                 TextField(
+                    value = selectedHost?.name?.ifBlank { selectedHost.host } ?: "",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Associated host") },
+                    placeholder = { Text("Select host") },
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostPickerExpanded.value) },
                     modifier = Modifier
+                        .menuAnchor()
                         .fillMaxWidth()
-                        .testTag(UiTestTags.FORWARD_SEARCH_INPUT),
-                    value = search.value,
-                    onValueChange = { search.value = it },
-                    placeholder = { Text("Search port forwards") },
-                    trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                        .testTag(UiTestTags.FORWARD_DIALOG_HOST_FIELD)
+                )
+                ExposedDropdownMenu(
+                    expanded = hostPickerExpanded.value,
+                    onDismissRequest = { hostPickerExpanded.value = false }
+                ) {
+                    hosts.forEach { host ->
+                        DropdownMenuItem(
+                            text = { Text(host.name.ifBlank { host.host }) },
+                            modifier = Modifier.testTag(UiTestTags.forwardHostOption(host.id)),
+                            onClick = {
+                                selectedHostIdState.value = host.id
+                                hostPickerExpanded.value = false
+                            }
+                        )
+                    }
+                }
+            }
+            selectedHostBackgroundError?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag(UiTestTags.FORWARD_HOST_BACKGROUND_ERROR)
                 )
             }
-            HorizontalDivider()
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (items.isEmpty()) {
-                    item { EmptyState(itemLabel = "port forward") }
-                } else if (filteredItems.isEmpty()) {
-                    item { EmptyState(itemLabel = "result") }
+            Text(
+                text = if (selectedHost == null) {
+                    "Destination traffic is opened through the selected SSH host."
                 } else {
-                    groupedItems.forEach { section ->
-                        item(key = "forward_header_${section.key}") {
-                            GroupSectionHeader(
-                                vertical = "forwards",
-                                label = section.label,
-                                count = section.items.size,
-                                expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
-                                onToggle = {
-                                    val current = expandedSections[section.key] ?: true
-                                    expandedSections[section.key] = !current
-                                }
-                            )
-                        }
-                        if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
-                            items(section.items, key = { it.id }) { forward ->
-                                val selectedHost = hosts.firstOrNull { it.id == forward.selectedHostId() }
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(forward.label, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            text = localForwardSummary(forward),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        if (selectedHost != null) {
-                                            Text(
-                                                text = "Host: ${selectedHost.name.ifBlank { selectedHost.host }}",
-                                                style = MaterialTheme.typography.bodySmall
-                                            )
+                    "Use 127.0.0.1 to reach a service listening on the SSH host itself."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedTextField(
+                value = dstHostState.value,
+                onValueChange = { dstHostState.value = it },
+                label = { Text("Destination host") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Ascii
+                )
+            )
+            OutlinedTextField(
+                value = dstPortState.value,
+                onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Destination port") },
+                singleLine = true,
+                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT),
+                keyboardOptions = KeyboardOptions(
+                    autoCorrect = false,
+                    capitalization = KeyboardCapitalization.None,
+                    keyboardType = KeyboardType.Number
+                )
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
+                Text("Enable now")
+            }
+            if (hosts.isEmpty()) {
+                Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
+            }
+            dialogError.value?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            if (includeActions) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { saveForward() }) {
+                        Text(if (isEdit) "Save" else "Add")
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
+    }
+
+    AdaptivePaneScaffold(
+        shellLayoutMode = shellLayoutMode,
+        modifier = Modifier.testTag(UiTestTags.SCREEN_FORWARDS),
+        secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE &&
+            (showDialog.value || detailForwardId.value != null),
+        primaryPane = {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1200.dp else 980.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(UiTestTags.FORWARD_SEARCH_INPUT),
+                            value = search.value,
+                            onValueChange = { search.value = it },
+                            placeholder = { Text("Search port forwards") },
+                            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                        )
+                    }
+                    HorizontalDivider()
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (items.isEmpty()) {
+                            item { EmptyState(itemLabel = "port forward") }
+                        } else if (filteredItems.isEmpty()) {
+                            item { EmptyState(itemLabel = "result") }
+                        } else {
+                            groupedItems.forEach { section ->
+                                item(key = "forward_header_${section.key}") {
+                                    GroupSectionHeader(
+                                        vertical = "forwards",
+                                        label = section.label,
+                                        count = section.items.size,
+                                        expanded = if (search.value.isNotBlank()) true else expandedSections[section.key] ?: true,
+                                        onToggle = {
+                                            val current = expandedSections[section.key] ?: true
+                                            expandedSections[section.key] = !current
                                         }
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                    )
+                                }
+                                if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
+                                    items(section.items, key = { it.id }) { forward ->
+                                        val selectedHost = hosts.firstOrNull { it.id == forward.selectedHostId() }
+                                        val (cardInteractionSource, cardHovered) = rememberDesktopHoverState()
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .desktopHoverable(
+                                                    enabled = true,
+                                                    interactionSource = cardInteractionSource
+                                                )
+                                                .secondaryClickToOpen {
+                                                    overflowForwardId.value = forward.id
+                                                },
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                            elevation = CardDefaults.cardElevation(
+                                                defaultElevation = if (cardHovered) 6.dp else 0.dp
+                                            )
                                         ) {
-                                            Switch(
-                                                checked = forward.enabled,
-                                                onCheckedChange = {
-                                                    onUpdate(
-                                                        forward.id,
-                                                        forward.label,
-                                                        forward.group,
-                                                        PortForwardType.LOCAL,
-                                                        forward.sourceHost,
-                                                        forward.sourcePort,
-                                                        forward.destinationHost,
-                                                        forward.destinationPort,
-                                                        it,
-                                                        forward.associatedHosts
+                                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(forward.label, style = MaterialTheme.typography.titleMedium)
+                                                Text(
+                                                    text = localForwardSummary(forward),
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                                if (selectedHost != null) {
+                                                    Text(
+                                                        text = "Host: ${selectedHost.name.ifBlank { selectedHost.host }}",
+                                                        style = MaterialTheme.typography.bodySmall
                                                     )
                                                 }
-                                            )
-                                            IconButton(
-                                                onClick = { onToggleFavorite(forward.id) },
-                                                modifier = Modifier
-                                                    .testTag(UiTestTags.forwardFavorite(forward.id))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Star,
-                                                    contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
-                                                    tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = { shareForward.value = forward },
-                                                modifier = Modifier.testTag(UiTestTags.forwardShare(forward.id))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.QrCode,
-                                                    contentDescription = "Share"
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = { overflowForwardId.value = forward.id },
-                                                modifier = Modifier.testTag(UiTestTags.forwardOverflowButton(forward.id))
-                                            ) {
-                                                Icon(Icons.Default.MoreVert, contentDescription = "More actions")
-                                            }
-                                            DropdownMenu(
-                                                expanded = overflowForwardId.value == forward.id,
-                                                onDismissRequest = { overflowForwardId.value = null }
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Edit") },
-                                                    onClick = {
-                                                        overflowForwardId.value = null
-                                                        openDialog(forward)
-                                                    },
-                                                    modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "edit"))
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Delete") },
-                                                    onClick = {
-                                                        overflowForwardId.value = null
-                                                        pendingDeleteForward.value = forward
-                                                    },
-                                                    modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "delete"))
-                                                )
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Switch(
+                                                        checked = forward.enabled,
+                                                        onCheckedChange = {
+                                                            onUpdate(
+                                                                forward.id,
+                                                                forward.label,
+                                                                forward.group,
+                                                                PortForwardType.LOCAL,
+                                                                forward.sourceHost,
+                                                                forward.sourcePort,
+                                                                forward.destinationHost,
+                                                                forward.destinationPort,
+                                                                it,
+                                                                forward.associatedHosts
+                                                            )
+                                                        }
+                                                    )
+                                                    IconButton(
+                                                        onClick = { onToggleFavorite(forward.id) },
+                                                        modifier = Modifier
+                                                            .testTag(UiTestTags.forwardFavorite(forward.id))
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Star,
+                                                            contentDescription = if (forward.favorite) "Unfavorite" else "Favorite",
+                                                            tint = if (forward.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        onClick = { shareForward.value = forward },
+                                                        modifier = Modifier.testTag(UiTestTags.forwardShare(forward.id))
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.QrCode,
+                                                            contentDescription = "Share"
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        onClick = { overflowForwardId.value = forward.id },
+                                                        modifier = Modifier.testTag(UiTestTags.forwardOverflowButton(forward.id))
+                                                    ) {
+                                                        Icon(Icons.Default.MoreVert, contentDescription = "More actions")
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = overflowForwardId.value == forward.id,
+                                                        onDismissRequest = { overflowForwardId.value = null }
+                                                    ) {
+                                                        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                                                            DropdownMenuItem(
+                                                                text = { Text("Details") },
+                                                                onClick = {
+                                                                    overflowForwardId.value = null
+                                                                    openDetails(forward)
+                                                                }
+                                                            )
+                                                        }
+                                                        DropdownMenuItem(
+                                                            text = { Text("Edit") },
+                                                            onClick = {
+                                                                overflowForwardId.value = null
+                                                                openDialog(forward)
+                                                            },
+                                                            modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "edit"))
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Delete") },
+                                                            onClick = {
+                                                                overflowForwardId.value = null
+                                                                pendingDeleteForward.value = forward
+                                                            },
+                                                            modifier = Modifier.testTag(UiTestTags.forwardOverflowAction(forward.id, "delete"))
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -356,8 +644,63 @@ fun PortForwardScreen(
                     }
                 }
             }
+        },
+        secondaryPane = {
+            when {
+                showDialog.value -> {
+                    ForwardEditorContent(
+                        showHeader = true,
+                        onCancel = ::closeDialog
+                    )
+                }
+
+                detailForwardId.value != null -> {
+                    val detailForward = items.firstOrNull { it.id == detailForwardId.value }
+                    val selectedHost = hosts.firstOrNull { it.id == detailForward?.selectedHostId() }
+                    if (detailForward != null) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(detailForward.label, style = MaterialTheme.typography.titleLarge)
+                                OutlinedButton(onClick = { detailForwardId.value = null }) {
+                                    Text("Close")
+                                }
+                            }
+                            Text(localForwardSummary(detailForward), style = MaterialTheme.typography.bodyMedium)
+                            selectedHost?.let {
+                                Text(
+                                    text = "Host: ${it.name.ifBlank { it.host }}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Text(
+                                text = if (detailForward.enabled) "Forward is enabled." else "Forward is disabled.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    detailForwardId.value = null
+                                    openDialog(detailForward)
+                                }) {
+                                    Icon(Icons.Default.Info, contentDescription = null)
+                                    Text("Edit")
+                                }
+                                OutlinedButton(onClick = { pendingDeleteForward.value = detailForward }) {
+                                    Text("Delete")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-    }
+    )
 
     pendingDeleteForward.value?.let { forward ->
         DeleteConfirmationDialog(
@@ -371,224 +714,21 @@ fun PortForwardScreen(
         )
     }
 
-    if (showDialog.value) {
+    if (showDialog.value && shellLayoutMode != ShellLayoutMode.WIDE) {
         val isEdit = editingId.value != null
-        val selectedHost = hosts.firstOrNull { it.id == selectedHostIdState.value }
-        val selectedHostBackgroundError = selectedHost
-            ?.takeIf(::hostHasBackgroundSessionsDisabled)
-            ?.let { "Selected host has background sessions disabled." }
         AlertDialog(
             onDismissRequest = { closeDialog() },
             title = { Text(if (isEdit) "Edit port forward" else "Add port forward") },
             text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = dialogBodyMaxHeight)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = labelState.value,
-                        onValueChange = { labelState.value = it },
-                        label = { Text("Label") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        )
-                    )
-                    OutlinedTextField(
-                        value = groupState.value,
-                        onValueChange = { groupState.value = it },
-                        label = { Text("Group") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_GROUP_FIELD),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text
-                        )
-                    )
-                    Text("Type: Local (SSH -L)", style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(
-                        value = bindState.value,
-                        onValueChange = { bindState.value = it },
-                        label = { Text("Local bind address") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Ascii
-                        )
-                    )
-                    OutlinedTextField(
-                        value = srcPortState.value,
-                        onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("Local port") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Number
-                        )
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = hostPickerExpanded.value,
-                        onExpandedChange = {
-                            if (hosts.isNotEmpty()) {
-                                hostPickerExpanded.value = !hostPickerExpanded.value
-                            }
-                        }
-                    ) {
-                        TextField(
-                            value = selectedHost?.name?.ifBlank { selectedHost.host } ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Associated host") },
-                            placeholder = { Text("Select host") },
-                            singleLine = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostPickerExpanded.value) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                                .testTag(UiTestTags.FORWARD_DIALOG_HOST_FIELD)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = hostPickerExpanded.value,
-                            onDismissRequest = { hostPickerExpanded.value = false }
-                        ) {
-                            hosts.forEach { host ->
-                                DropdownMenuItem(
-                                    text = { Text(host.name.ifBlank { host.host }) },
-                                    modifier = Modifier.testTag(UiTestTags.forwardHostOption(host.id)),
-                                    onClick = {
-                                        selectedHostIdState.value = host.id
-                                        hostPickerExpanded.value = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    selectedHostBackgroundError?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.testTag(UiTestTags.FORWARD_HOST_BACKGROUND_ERROR)
-                        )
-                    }
-                    Text(
-                        text = if (selectedHost == null) {
-                            "Destination traffic is opened through the selected SSH host."
-                        } else {
-                            "Use 127.0.0.1 to reach a service listening on the SSH host itself."
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = dstHostState.value,
-                        onValueChange = { dstHostState.value = it },
-                        label = { Text("Destination host") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Ascii
-                        )
-                    )
-                    OutlinedTextField(
-                        value = dstPortState.value,
-                        onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
-                        label = { Text("Destination port") },
-                        singleLine = true,
-                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT),
-                        keyboardOptions = KeyboardOptions(
-                            autoCorrect = false,
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Number
-                        )
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
-                        Text("Enable now")
-                    }
-                    if (hosts.isEmpty()) {
-                        Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
-                    }
-                    dialogError.value?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                ForwardEditorContent(
+                    modifier = Modifier.heightIn(max = dialogBodyMaxHeight),
+                    showHeader = false,
+                    includeActions = false,
+                    onCancel = ::closeDialog
+                )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val srcPort = parsePort(srcPortState.value) ?: run {
-                        dialogError.value = "Enter a valid source port (1-65535)."
-                        return@TextButton
-                    }
-                    val dstPort = parsePort(dstPortState.value) ?: run {
-                        dialogError.value = "Enter a valid destination port."
-                        return@TextButton
-                    }
-                    val chosenHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
-                        dialogError.value = "Select a host."
-                        return@TextButton
-                    }
-                    if (!allowBackgroundSessions) {
-                        dialogError.value = "Enable background sessions in Settings before saving a port forward."
-                        return@TextButton
-                    }
-                    if (hostHasBackgroundSessionsDisabled(chosenHost)) {
-                        dialogError.value = "Selected host has background sessions disabled."
-                        return@TextButton
-                    }
-                    if (!isValidHostAddress(chosenHost.host)) {
-                        dialogError.value = "Selected host has an invalid address."
-                        return@TextButton
-                    }
-                    val destinationHost = dstHostState.value.trim().ifBlank { "127.0.0.1" }
-                    if (!isValidHostAddress(destinationHost)) {
-                        dialogError.value = "Enter a valid destination host."
-                        return@TextButton
-                    }
-                    dialogError.value = null
-                    val label = labelState.value.ifBlank { "Forward ${UUID.randomUUID()}" }
-                    val bind = bindState.value.ifBlank { "127.0.0.1" }.trim()
-                    val associated = listOf(chosenHost.id)
-                    if (isEdit) {
-                        onUpdate(
-                            editingId.value!!,
-                            label,
-                            groupState.value.trim().ifBlank { null },
-                            PortForwardType.LOCAL,
-                            bind,
-                            srcPort,
-                            destinationHost,
-                            dstPort,
-                            enabledState.value,
-                            associated
-                        )
-                    } else {
-                        onAdd(
-                            label,
-                            groupState.value.trim().ifBlank { null },
-                            PortForwardType.LOCAL,
-                            bind,
-                            srcPort,
-                            destinationHost,
-                            dstPort,
-                            enabledState.value,
-                            associated
-                        )
-                    }
-                    closeDialog()
-                }) { Text(if (isEdit) "Save" else "Add") }
+                TextButton(onClick = { saveForward() }) { Text(if (isEdit) "Save" else "Add") }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
