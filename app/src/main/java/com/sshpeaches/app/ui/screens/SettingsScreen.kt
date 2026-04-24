@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,6 +31,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -59,6 +62,7 @@ import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -72,7 +76,21 @@ import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransfor
 import com.majordaftapps.sshpeaches.app.ui.util.calculatePasswordRevealIndex
 import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+
+private enum class SettingsCategory(
+    val title: String,
+    val description: String
+) {
+    PERMISSIONS("Permissions", "App access and required OS permissions"),
+    APPEARANCE("Appearance", "Theme and launcher icon"),
+    BACKGROUND("Background", "Session lifetime while backgrounded"),
+    TERMINAL("Terminal", "Emulation, margins, bell, and Mosh"),
+    SECURITY("Security", "PIN, biometrics, and host key policy"),
+    AUTOMATION("Automation", "Snippets and port forward defaults"),
+    DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
+    TRANSFER("Transfer / QR", "Export and import app data"),
+    ADVANCED("Advanced", "Restore default settings")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -237,21 +255,21 @@ fun SettingsScreen(
     AutoHidePasswordReveal(exportPassphraseRevealIndex)
     AutoHidePasswordReveal(exportConfirmPassphraseRevealIndex)
     AutoHidePasswordReveal(importPassphraseRevealIndex)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_SETTINGS)
+    val selectedCategory = rememberSaveable { mutableStateOf(SettingsCategory.PERMISSIONS) }
+
+    @Composable
+    fun SettingsSections(
+        visibleCategories: Set<SettingsCategory>,
+        modifier: Modifier = Modifier
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1280.dp else 980.dp)
-                .fillMaxSize()
-                .align(Alignment.TopCenter)
+            modifier = modifier
                 .verticalScroll(rememberScrollState())
                 .testTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (SettingsCategory.PERMISSIONS in visibleCategories) {
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Permissions", style = MaterialTheme.typography.titleMedium)
@@ -284,6 +302,8 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
+            if (SettingsCategory.APPEARANCE in visibleCategories) {
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Theme", style = MaterialTheme.typography.titleMedium)
@@ -349,6 +369,8 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
+            if (SettingsCategory.BACKGROUND in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
@@ -417,6 +439,8 @@ fun SettingsScreen(
                 )
             }
         }
+            }
+            if (SettingsCategory.TERMINAL in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Terminal", style = MaterialTheme.typography.titleMedium)
@@ -591,6 +615,8 @@ fun SettingsScreen(
                 }
             }
         }
+            }
+            if (SettingsCategory.SECURITY in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Security", style = MaterialTheme.typography.titleMedium)
@@ -734,6 +760,8 @@ fun SettingsScreen(
                 }
             }
         }
+            }
+            if (SettingsCategory.AUTOMATION in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Snippets", style = MaterialTheme.typography.titleMedium)
@@ -773,6 +801,8 @@ fun SettingsScreen(
                 }
             }
         }
+            }
+            if (SettingsCategory.DIAGNOSTICS in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
@@ -803,6 +833,8 @@ fun SettingsScreen(
                 )
             }
         }
+            }
+            if (SettingsCategory.ADVANCED in visibleCategories) {
         Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Restore Defaults", style = MaterialTheme.typography.titleMedium)
@@ -820,6 +852,8 @@ fun SettingsScreen(
                 }
             }
         }
+            }
+            if (SettingsCategory.TRANSFER in visibleCategories) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
@@ -840,14 +874,9 @@ fun SettingsScreen(
                 }
                 Button(
                     onClick = {
-                        val options = ScanOptions().apply {
-                            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                            setPrompt("Scan SSHPeaches export QR")
-                            setBeepEnabled(false)
-                            setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                            setOrientationLocked(true)
-                        }
-                        scanLauncher.launch(options)
+                        scanLauncher.launch(
+                            buildQrScanOptions(shellLayoutMode, "Scan SSHPeaches export QR")
+                        )
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -856,7 +885,74 @@ fun SettingsScreen(
                 }
             }
         }
+            }
     }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(UiTestTags.SCREEN_SETTINGS)
+    ) {
+        if (shellLayoutMode == ShellLayoutMode.WIDE) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .width(280.dp)
+                        .fillMaxHeight(),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp,
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SettingsCategory.values().forEach { category ->
+                            val selected = selectedCategory.value == category
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(UiTestTags.settingsCategory(category.title))
+                                    .clickable { selectedCategory.value = category },
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(category.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(category.description, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+                SettingsSections(
+                    visibleCategories = setOf(selectedCategory.value),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                )
+            }
+        } else {
+            SettingsSections(
+                visibleCategories = SettingsCategory.values().toSet(),
+                modifier = Modifier
+                    .widthIn(max = 980.dp)
+                    .fillMaxSize()
+                    .align(Alignment.TopCenter)
+            )
+        }
     }
     if (showTransferDialog.value) {
         androidx.compose.material3.AlertDialog(

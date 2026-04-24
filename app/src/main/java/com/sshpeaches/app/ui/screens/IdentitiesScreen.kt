@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,12 +71,14 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.adaptive.AdaptivePaneScaffold
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
+import com.majordaftapps.sshpeaches.app.ui.adaptive.secondaryClickToOpen
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.GroupSectionHeader
@@ -84,6 +87,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.IdentityQrPayload
 import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
 import com.majordaftapps.sshpeaches.app.ui.components.processIdentityQrImport
+import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
@@ -530,14 +534,9 @@ fun IdentitiesScreen(
     LaunchedEffect(importRequestKey) {
         if (importRequestKey > handledImportRequestKey.intValue) {
             handledImportRequestKey.intValue = importRequestKey
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Scan SSH identity QR")
-                setBeepEnabled(false)
-                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                setOrientationLocked(true)
-            }
-            scanLauncher.launch(options)
+            scanLauncher.launch(
+                buildQrScanOptions(shellLayoutMode, "Scan SSH identity QR")
+            )
         }
     }
 
@@ -792,7 +791,6 @@ fun IdentitiesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .testTag(UiTestTags.SCREEN_IDENTITIES)
             ) {
                 Column(
                     modifier = Modifier
@@ -842,7 +840,23 @@ fun IdentitiesScreen(
                                 }
                                 if (search.value.isNotBlank() || (expandedSections[section.key] ?: true)) {
                                     items(section.items, key = { it.id }) { identity ->
-                                        Card(modifier = Modifier.fillMaxWidth()) {
+                                        val (cardInteractionSource, cardHovered) = rememberDesktopHoverState(
+                                            enabled = true
+                                        )
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .desktopHoverable(
+                                                    enabled = true,
+                                                    interactionSource = cardInteractionSource
+                                                )
+                                                .secondaryClickToOpen {
+                                                    overflowIdentityId.value = identity.id
+                                                },
+                                            elevation = CardDefaults.cardElevation(
+                                                defaultElevation = if (cardHovered) 6.dp else 0.dp
+                                            )
+                                        ) {
                                             Column(
                                                 modifier = Modifier.padding(16.dp),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp)

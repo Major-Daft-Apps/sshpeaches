@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -74,6 +75,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.HostCard
 import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.generateHostQr
 import com.majordaftapps.sshpeaches.app.ui.components.generateIdentityQr
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.state.FavoritesSection
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.HomeRecentItem
@@ -98,6 +100,7 @@ fun HomeScreen(
     openSessions: List<SessionService.SessionSnapshot> = emptyList(),
     transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
     activeSshSessionHostIds: Set<String> = emptySet(),
+    shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
     hasAnyResources: Boolean,
     suppressEmptyWelcome: Boolean = false,
     onSuppressEmptyWelcomeConsumed: () -> Unit = {},
@@ -201,7 +204,10 @@ fun HomeScreen(
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1200.dp else 980.dp)
+                    .fillMaxSize()
+                    .align(Alignment.TopCenter),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {

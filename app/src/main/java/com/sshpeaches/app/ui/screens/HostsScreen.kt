@@ -81,9 +81,9 @@ import com.majordaftapps.sshpeaches.app.util.parsePort
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
 import com.majordaftapps.sshpeaches.app.util.snippetReference
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
+import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 
 private enum class HostPaneMode {
     DETAILS,
@@ -459,14 +459,9 @@ fun HostsScreen(
     LaunchedEffect(importRequestKey) {
         if (importRequestKey > handledImportRequestKey.intValue) {
             handledImportRequestKey.intValue = importRequestKey
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Scan SSH host QR")
-                setBeepEnabled(false)
-                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                setOrientationLocked(true)
-            }
-            scanLauncher.launch(options)
+            scanLauncher.launch(
+                buildQrScanOptions(shellLayoutMode, "Scan SSH host QR")
+            )
         }
     }
     val filteredHosts = hosts.filter { host ->
@@ -1139,7 +1134,6 @@ fun HostsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .testTag(UiTestTags.SCREEN_HOSTS)
             ) {
                 Column(
                     modifier = Modifier
@@ -1247,14 +1241,9 @@ fun HostsScreen(
                     }
                     Button(
                         onClick = {
-                            val options = ScanOptions().apply {
-                                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                setPrompt("Scan SSH host QR")
-                                setBeepEnabled(false)
-                                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                                setOrientationLocked(true)
-                            }
-                            scanLauncher.launch(options)
+                            scanLauncher.launch(
+                                buildQrScanOptions(shellLayoutMode, "Scan SSH host QR")
+                            )
                         },
                         modifier = Modifier.weight(1f)
                     ) {

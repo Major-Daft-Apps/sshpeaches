@@ -5,18 +5,17 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
+import com.majordaftapps.sshpeaches.app.testutil.revealSettingsControl
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import org.junit.Rule
@@ -44,28 +43,25 @@ class SettingsRestoreDefaultsTest {
             diagnostics = true
         )
         composeRule.activityRule.scenario.recreate()
-        composeRule.onNodeWithContentDescription("Menu").performClick()
-        composeRule.onNodeWithTag(UiTestTags.drawerItem(Routes.SETTINGS), useUnmergedTree = true)
-            .performClick()
+        composeRule.navigateDrawer(Routes.SETTINGS)
 
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
         composeRule.waitUntil(20_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH).assertIsOn()
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH).assertIsOn()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.waitUntil(20_000) {
+            runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
                 true
             }.getOrDefault(false)
         }
 
-        repeat(8) {
-            val buttonVisible = runCatching {
-                composeRule.onNodeWithTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON).assertIsDisplayed()
-                true
-            }.getOrDefault(false)
-            if (buttonVisible) return@repeat
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
-                .performTouchInput { swipeUp() }
-        }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON).performClick()
         composeRule.waitUntil(20_000) {
@@ -77,10 +73,17 @@ class SettingsRestoreDefaultsTest {
             .performClick()
 
         val diagnosticsExpectedAfterReset = SettingsStore.defaultDiagnosticsEnabled
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
         composeRule.waitUntil(20_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH).assertIsOn()
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH).assertIsOff()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.waitUntil(20_000) {
+            runCatching {
                 if (diagnosticsExpectedAfterReset) {
                     composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
                 } else {
@@ -89,8 +92,10 @@ class SettingsRestoreDefaultsTest {
                 true
             }.getOrDefault(false)
         }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH).assertIsOn()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH).assertIsOff()
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         if (diagnosticsExpectedAfterReset) {
             composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
         } else {

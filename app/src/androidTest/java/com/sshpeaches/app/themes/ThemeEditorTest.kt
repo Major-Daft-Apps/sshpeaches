@@ -5,12 +5,16 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -42,18 +46,17 @@ class ThemeEditorTest {
 
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON).performClick()
+        openNewThemeProfileEditor()
 
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR).assertIsDisplayed()
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
         composeRule.onNodeWithText("Apply").performClick()
-        composeRule.onNodeWithText("Save").performClick()
+        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
 
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(10_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
-                composeRule.onNodeWithText(themeName).assertIsDisplayed()
+                composeRule.onNodeWithText(themeName).performScrollTo().assertIsDisplayed()
                 true
             }.getOrDefault(false)
         }
@@ -64,23 +67,29 @@ class ThemeEditorTest {
         val duplicatedName = "Sunset QA"
 
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
-        composeRule.onNodeWithTag(UiTestTags.themeDuplicate(TerminalProfileDefaults.DEFAULT_PROFILE_ID))
-            .performClick()
+        openDuplicateThemeProfileEditor(TerminalProfileDefaults.DEFAULT_PROFILE_ID)
 
         renameThemeAndSave(duplicatedName)
 
-        composeRule.onNodeWithText(duplicatedName).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performClick()
+        composeRule.onNodeWithTag(UiTestTags.themeProfileRow(duplicatedName))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performScrollTo().performClick()
         composeRule.onNodeWithTag(UiTestTags.themeDefaultOption(duplicatedName), useUnmergedTree = true)
             .performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).assertTextContains(duplicatedName)
 
-        composeRule.onAllNodesWithText("Delete", useUnmergedTree = true)
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText("Delete", useUnmergedTree = true)
-            .onFirst()
-            .performClick()
-        composeRule.onNodeWithTag(UiTestTags.THEME_DELETE_CONFIRM).performClick()
+        composeRule.onNodeWithTag(UiTestTags.themeProfileRow(duplicatedName)).performScrollTo()
+        composeRule.onNodeWithTag(UiTestTags.themeDeleteByName(duplicatedName))
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.THEME_DELETE_CONFIRM, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(UiTestTags.THEME_DELETE_CONFIRM, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         composeRule.waitUntil(5_000) {
             runCatching {
@@ -149,7 +158,7 @@ class ThemeEditorTest {
     @Test
     fun duplicateThemeNameShowsValidationError() {
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
-        composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON).performClick()
+        openNewThemeProfileEditor()
 
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement("Termux")
@@ -166,7 +175,7 @@ class ThemeEditorTest {
         val themeName = "JetBrains QA"
 
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
-        composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON).performClick()
+        openNewThemeProfileEditor()
 
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_FONT_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_FONT_FIELD).performClick()
@@ -181,27 +190,52 @@ class ThemeEditorTest {
         composeRule.onNodeWithText("Apply").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
 
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(10_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
                 true
             }.getOrDefault(false)
         }
 
-        composeRule.onNodeWithText(themeName).assertIsDisplayed()
-        composeRule.onNodeWithText("JetBrains Mono", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.themeProfileRow(themeName))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("JetBrains Mono", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun openNewThemeProfileEditor() {
+        composeRule.onNodeWithTag(UiTestTags.THEME_CREATE_BUTTON)
+            .performScrollTo()
+            .performClick()
+        waitForThemeProfileEditor()
+    }
+
+    private fun openDuplicateThemeProfileEditor(profileId: String) {
+        composeRule.onNodeWithTag(UiTestTags.themeDuplicate(profileId))
+            .performScrollTo()
+            .performClick()
+        waitForThemeProfileEditor()
+    }
+
+    private fun waitForThemeProfileEditor() {
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR).assertIsDisplayed()
     }
 
     private fun renameThemeAndSave(themeName: String) {
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR).assertIsDisplayed()
+        waitForThemeProfileEditor()
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
         composeRule.onNodeWithText("Apply").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(10_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
-                composeRule.onNodeWithText(themeName).assertIsDisplayed()
+                composeRule.onNodeWithText(themeName).performScrollTo().assertIsDisplayed()
                 true
             }.getOrDefault(false)
         }

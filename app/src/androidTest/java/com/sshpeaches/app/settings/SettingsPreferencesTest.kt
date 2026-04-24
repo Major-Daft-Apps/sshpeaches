@@ -26,6 +26,7 @@ import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
+import com.majordaftapps.sshpeaches.app.testutil.revealSettingsControl
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
@@ -51,29 +52,38 @@ class SettingsPreferencesTest {
     fun themeModeAndTogglesPersistAcrossRecreate() {
         AppStateSeeder.configureSettings(
             themeMode = ThemeMode.DARK,
-            appIcon = AppIconOption.PEACH_LIGHT
+            appIcon = AppIconOption.PEACH_LIGHT,
+            allowBackgroundSessions = true
         )
         composeRule.activityRule.scenario.recreate()
         openSettings()
 
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_THEME_MODE_FIELD)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
         composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("Orange Peach")).assertIsSelected()
         composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).performClick()
         composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).assertIsSelected()
 
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
-        scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).performTextInput("16")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
-        scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
             .performTextInput("mosh-server new -s -l LANG=C.UTF-8")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
             .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
 
-        scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         val diagnosticsInitiallyOn = SettingsStore.defaultDiagnosticsEnabled
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
         if (diagnosticsInitiallyOn) {
@@ -86,15 +96,17 @@ class SettingsPreferencesTest {
         composeRule.waitForIdle()
         openSettings()
 
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_THEME_MODE_FIELD)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
         composeRule.onNodeWithTag(UiTestTags.settingsAppIconOption("White Peach")).assertIsSelected()
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
-        scrollToTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT).assertTextContains("16")
-        scrollToTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
             .assertTextContains("mosh-server new -s -l LANG=C.UTF-8")
-        scrollToTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         if (diagnosticsInitiallyOn) {
             composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
         } else {
@@ -108,7 +120,7 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 
@@ -124,7 +136,7 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 
@@ -169,7 +181,7 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        scrollToTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 

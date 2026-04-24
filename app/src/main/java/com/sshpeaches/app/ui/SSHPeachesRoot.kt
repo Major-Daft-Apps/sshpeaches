@@ -1722,6 +1722,7 @@ fun SSHPeachesRoot(
                                 snippets = uiState.snippets,
                                 openSessions = openSessionSnapshots,
                                 transferProgresses = fileTransferProgresses,
+                                shellLayoutMode = shellLayoutMode,
                                 hasAnyResources = uiState.hosts.isNotEmpty() ||
                                     uiState.identities.isNotEmpty() ||
                                     uiState.portForwards.isNotEmpty() ||

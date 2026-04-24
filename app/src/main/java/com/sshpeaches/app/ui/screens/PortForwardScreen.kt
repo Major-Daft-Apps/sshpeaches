@@ -59,7 +59,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
@@ -76,6 +75,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.PortForwardQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.processPortForwardQrImport
+import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
 import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
@@ -256,14 +256,9 @@ fun PortForwardScreen(
     LaunchedEffect(importRequestKey) {
         if (importRequestKey > handledImportRequestKey.intValue) {
             handledImportRequestKey.intValue = importRequestKey
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Scan port forward QR")
-                setBeepEnabled(false)
-                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                setOrientationLocked(true)
-            }
-            scanLauncher.launch(options)
+            scanLauncher.launch(
+                buildQrScanOptions(shellLayoutMode, "Scan port forward QR")
+            )
         }
     }
 

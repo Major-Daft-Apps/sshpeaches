@@ -7,7 +7,8 @@ import java.nio.charset.StandardCharsets
 
 class TerminalInputRouter(
     private val emulatorProvider: () -> TerminalEmulator,
-    private val onWriteToRemote: (ByteArray) -> Unit
+    private val onWriteToRemote: (ByteArray) -> Unit,
+    private val onRequestPasteText: () -> String? = { null }
 ) {
 
     fun sendText(
@@ -36,6 +37,12 @@ class TerminalInputRouter(
 
     fun sendBackspace() {
         onWriteToRemote(byteArrayOf(0x7F))
+    }
+
+    fun pasteFromClipboard(): Boolean {
+        val text = onRequestPasteText()?.takeIf { it.isNotEmpty() } ?: return false
+        emulatorProvider().paste(text)
+        return true
     }
 
     fun sendVirtualKey(
@@ -80,14 +87,20 @@ class TerminalInputRouter(
         if (event.isSystem && event.keyCode != KeyEvent.KEYCODE_BACK) return false
         if (event.keyCode == KeyEvent.KEYCODE_BACK) return false
 
-        val controlDown = event.isCtrlPressed
-        val leftAltDown = (event.metaState and KeyEvent.META_ALT_LEFT_ON) != 0
-        val shiftDown = event.isShiftPressed
+        val metaState = event.metaState
+        val controlDown = (metaState and KeyEvent.META_CTRL_MASK) != 0
+        val altDown = (metaState and KeyEvent.META_ALT_MASK) != 0
+        val leftAltDown = (metaState and KeyEvent.META_ALT_LEFT_ON) != 0
+        val shiftDown = (metaState and KeyEvent.META_SHIFT_MASK) != 0
+
+        if (isPasteShortcut(event.keyCode, metaState)) {
+            return pasteFromClipboard()
+        }
 
         var keyMod = if (controlDown) KeyHandler.KEYMOD_CTRL else 0
-        if (event.isAltPressed || leftAltDown) keyMod = keyMod or KeyHandler.KEYMOD_ALT
+        if (altDown || leftAltDown) keyMod = keyMod or KeyHandler.KEYMOD_ALT
         if (shiftDown) keyMod = keyMod or KeyHandler.KEYMOD_SHIFT
-        if (event.isNumLockOn) keyMod = keyMod or KeyHandler.KEYMOD_NUM_LOCK
+        if ((metaState and KeyEvent.META_NUM_LOCK_ON) != 0) keyMod = keyMod or KeyHandler.KEYMOD_NUM_LOCK
         val keyCodeSequence = KeyHandler.getCode(
             event.keyCode,
             keyMod,
@@ -111,11 +124,23 @@ class TerminalInputRouter(
 
         val unicode = event.getUnicodeChar(effectiveMetaState)
         if (unicode != 0) {
-            sendCodePoint(unicode, controlDown, event.isAltPressed || leftAltDown)
+            sendCodePoint(unicode, controlDown, altDown || leftAltDown)
             return true
         }
 
         return false
+    }
+
+    internal fun isPasteShortcut(keyCode: Int, metaState: Int): Boolean {
+        val controlDown = (metaState and KeyEvent.META_CTRL_MASK) != 0
+        val shiftDown = (metaState and KeyEvent.META_SHIFT_MASK) != 0
+        val altDown = (metaState and KeyEvent.META_ALT_MASK) != 0
+        return when (keyCode) {
+            KeyEvent.KEYCODE_PASTE -> true
+            KeyEvent.KEYCODE_INSERT -> shiftDown && !controlDown && !altDown
+            KeyEvent.KEYCODE_V -> controlDown && shiftDown && !altDown
+            else -> false
+        }
     }
 
     private fun sendCodePoint(codePoint: Int, ctrlDown: Boolean, altDown: Boolean) {

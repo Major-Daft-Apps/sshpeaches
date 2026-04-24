@@ -301,13 +301,14 @@ fun ConnectingScreen(
             }
         )
     }
-    val terminalInput = remember(request?.sessionId) {
+    val terminalInput = remember(request?.sessionId, clipboardManager) {
         TerminalInputRouter(
             emulatorProvider = {
                 request?.let { resolveTerminalEmulator(it.sessionId) }
                     ?: terminalEngine.emulator()
             },
-            onWriteToRemote = onSendShellBytes
+            onWriteToRemote = onSendShellBytes,
+            onRequestPasteText = { clipboardManager.getText()?.text }
         )
     }
     var lastShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
@@ -1775,7 +1776,8 @@ private fun ConnectingTerminalContent(
             singleLine = false,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
-                keyboardType = KeyboardType.Password,
+                // Password fields suppress clipboard affordances on many IMEs.
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.None,
                 autoCorrect = false
             )

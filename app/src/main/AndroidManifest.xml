@@ -94,6 +94,11 @@
             tools:ignore="LockedOrientationActivity,DiscouragedApi"
             android:theme="@style/zxing_CaptureTheme" />
         <activity
+            android:name=".ui.qr.AdaptiveCaptureActivity"
+            android:exported="false"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme" />
+        <activity
             android:name=".ui.testing.ReleaseTestHostActivity"
             android:exported="false" />
         <service

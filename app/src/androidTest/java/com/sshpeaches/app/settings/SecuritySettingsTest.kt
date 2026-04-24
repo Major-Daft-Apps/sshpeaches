@@ -18,6 +18,7 @@ import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
+import com.majordaftapps.sshpeaches.app.testutil.revealSettingsControl
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import org.junit.Rule
@@ -120,7 +121,7 @@ class SecuritySettingsTest {
     }
 
     private fun revealSecurityControl(tag: String) {
-        composeRule.onNodeWithTag(tag).performScrollTo()
+        composeRule.revealSettingsControl(tag)
         composeRule.onNodeWithTag(tag).assertIsDisplayed()
     }
 }

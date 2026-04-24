@@ -29,8 +29,7 @@ class ExternalLinksNavigationTest {
             AppDrawer(
                 destinations = drawerDestinations,
                 currentRoute = Routes.HOME,
-                onDestinationSelected = { selectedRoute.set(it.route) },
-                onQuickConnect = {}
+                onDestinationSelected = { selectedRoute.set(it.route) }
             )
         }
 

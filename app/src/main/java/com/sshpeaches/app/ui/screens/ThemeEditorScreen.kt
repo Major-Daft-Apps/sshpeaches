@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.TextView
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,22 +67,27 @@ fun ThemeEditorScreen(
     val defaultTerminalProfileExpanded = remember { mutableStateOf(false) }
     val showDeleteProfileDialog = remember { mutableStateOf<String?>(null) }
     val builtInProfileIds = remember { TerminalProfileDefaults.builtInProfiles.map { it.id }.toSet() }
+    var paneCreateOpen by rememberSaveable { mutableStateOf(false) }
     var paneProfileId by rememberSaveable { mutableStateOf<String?>(null) }
     var paneDuplicateSourceId by rememberSaveable { mutableStateOf<String?>(null) }
     var paneDirty by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var pendingPaneCreateOpen by remember { mutableStateOf(false) }
     var pendingPaneProfileId by remember { mutableStateOf<String?>(null) }
     var pendingPaneDuplicateId by remember { mutableStateOf<String?>(null) }
     var pendingPaneClose by remember { mutableStateOf(false) }
 
     fun requestPaneNavigation(profileId: String?, duplicateSourceId: String?) {
+        val createOpen = profileId == null && duplicateSourceId == null
         if (paneDirty) {
+            pendingPaneCreateOpen = createOpen
             pendingPaneProfileId = profileId
             pendingPaneDuplicateId = duplicateSourceId
             pendingPaneClose = false
             showDiscardDialog = true
             return
         }
+        paneCreateOpen = createOpen
         paneProfileId = profileId
         paneDuplicateSourceId = duplicateSourceId
     }
@@ -89,11 +95,13 @@ fun ThemeEditorScreen(
     fun closePane() {
         if (paneDirty) {
             pendingPaneClose = true
+            pendingPaneCreateOpen = false
             pendingPaneProfileId = null
             pendingPaneDuplicateId = null
             showDiscardDialog = true
             return
         }
+        paneCreateOpen = false
         paneProfileId = null
         paneDuplicateSourceId = null
     }
@@ -101,7 +109,7 @@ fun ThemeEditorScreen(
     AdaptivePaneScaffold(
         shellLayoutMode = shellLayoutMode,
         secondaryPaneVisible = shellLayoutMode == ShellLayoutMode.WIDE &&
-            (paneProfileId != null || paneDuplicateSourceId != null),
+            (paneCreateOpen || paneProfileId != null || paneDuplicateSourceId != null),
         primaryPane = {
             Column(
                 modifier = Modifier
@@ -152,7 +160,9 @@ fun ThemeEditorScreen(
                         }
                         terminalProfiles.forEach { profile ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(UiTestTags.themeProfileRow(profile.name)),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -184,6 +194,9 @@ fun ThemeEditorScreen(
                                     }
                                 } else {
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        fun requestDelete() {
+                                            showDeleteProfileDialog.value = profile.id
+                                        }
                                         TextButton(
                                             onClick = {
                                                 if (shellLayoutMode == ShellLayoutMode.WIDE) {
@@ -196,11 +209,14 @@ fun ThemeEditorScreen(
                                         ) {
                                             Text("Edit")
                                         }
-                                        TextButton(
-                                            onClick = { showDeleteProfileDialog.value = profile.id },
-                                            modifier = Modifier.testTag(UiTestTags.themeDelete(profile.id))
+                                        Box(
+                                            modifier = Modifier
+                                                .clickable(onClick = ::requestDelete)
+                                                .testTag(UiTestTags.themeDeleteByName(profile.name))
                                         ) {
-                                            Text("Delete")
+                                            TextButton(onClick = ::requestDelete) {
+                                                Text("Delete")
+                                            }
                                         }
                                     }
                                 }
@@ -230,7 +246,7 @@ fun ThemeEditorScreen(
         },
         secondaryPane = {
             val selected = terminalProfiles.firstOrNull { it.id == paneProfileId }
-            val initialProfile = remember(paneProfileId, paneDuplicateSourceId, terminalProfiles) {
+            val initialProfile = remember(paneCreateOpen, paneProfileId, paneDuplicateSourceId, terminalProfiles) {
                 when {
                     paneDuplicateSourceId != null -> {
                         val source = terminalProfiles.firstOrNull { it.id == paneDuplicateSourceId }
@@ -245,6 +261,7 @@ fun ThemeEditorScreen(
                     }
 
                     selected != null -> selected
+                    paneCreateOpen -> TerminalProfileDefaults.customTemplate(name = "Custom Theme")
                     else -> TerminalProfileDefaults.customTemplate(name = "Custom Theme")
                 }
             }
@@ -274,15 +291,21 @@ fun ThemeEditorScreen(
                     onSaveTheme = {
                         onSaveTheme(it)
                         paneDirty = false
+                        paneCreateOpen = false
                         paneProfileId = null
                         paneDuplicateSourceId = null
                     },
                     onNavigateBack = {
                         paneDirty = false
+                        paneCreateOpen = false
                         paneProfileId = null
                         paneDuplicateSourceId = null
                     },
-                    onDirtyStateChange = { paneDirty = it },
+                    onDirtyStateChange = {
+                        if (paneCreateOpen || paneProfileId != null || paneDuplicateSourceId != null) {
+                            paneDirty = it
+                        }
+                    },
                     onShowMessage = onShowMessage
                 )
             }
@@ -291,19 +314,25 @@ fun ThemeEditorScreen(
 
     showDeleteProfileDialog.value?.let { profileId ->
         val profileName = terminalProfiles.firstOrNull { it.id == profileId }?.name ?: "this theme"
+        fun confirmDelete() {
+            onDeleteTerminalProfile(profileId)
+            showDeleteProfileDialog.value = null
+            onShowMessage("Terminal theme deleted.")
+        }
         AlertDialog(
             onDismissRequest = { showDeleteProfileDialog.value = null },
             title = { Text("Delete terminal theme?") },
             text = { Text("Delete $profileName? Hosts using it will fall back to app default.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteTerminalProfile(profileId)
-                        showDeleteProfileDialog.value = null
-                        onShowMessage("Terminal theme deleted.")
-                    },
-                    modifier = Modifier.testTag(UiTestTags.THEME_DELETE_CONFIRM)
-                ) { Text("Delete") }
+                Box(
+                    modifier = Modifier
+                        .clickable(onClick = ::confirmDelete)
+                        .testTag(UiTestTags.THEME_DELETE_CONFIRM)
+                ) {
+                    TextButton(onClick = ::confirmDelete) {
+                        Text("Delete")
+                    }
+                }
             },
             dismissButton = {
                 TextButton(
@@ -324,12 +353,15 @@ fun ThemeEditorScreen(
                     paneDirty = false
                     showDiscardDialog = false
                     if (pendingPaneClose) {
+                        paneCreateOpen = false
                         paneProfileId = null
                         paneDuplicateSourceId = null
                     } else {
+                        paneCreateOpen = pendingPaneCreateOpen
                         paneProfileId = pendingPaneProfileId
                         paneDuplicateSourceId = pendingPaneDuplicateId
                     }
+                    pendingPaneCreateOpen = false
                     pendingPaneProfileId = null
                     pendingPaneDuplicateId = null
                     pendingPaneClose = false
@@ -340,6 +372,7 @@ fun ThemeEditorScreen(
             dismissButton = {
                 TextButton(onClick = {
                     showDiscardDialog = false
+                    pendingPaneCreateOpen = false
                     pendingPaneProfileId = null
                     pendingPaneDuplicateId = null
                     pendingPaneClose = false

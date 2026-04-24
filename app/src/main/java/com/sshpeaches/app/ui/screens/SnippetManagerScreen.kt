@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.ui.components.DeleteConfirmationDialog
 import com.majordaftapps.sshpeaches.app.ui.components.EmptyState
@@ -57,6 +56,7 @@ import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
 import com.majordaftapps.sshpeaches.app.ui.adaptive.secondaryClickToOpen
+import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
@@ -151,14 +151,9 @@ fun SnippetManagerScreen(
 
     LaunchedEffect(importRequestKey) {
         if (importRequestKey > 0) {
-            val options = ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt("Scan snippet QR")
-                setBeepEnabled(false)
-                setCaptureActivity(com.majordaftapps.sshpeaches.app.ui.qr.PortraitCaptureActivity::class.java)
-                setOrientationLocked(true)
-            }
-            scanLauncher.launch(options)
+            scanLauncher.launch(
+                buildQrScanOptions(shellLayoutMode, "Scan snippet QR")
+            )
         }
     }
 
@@ -250,6 +245,7 @@ fun SnippetManagerScreen(
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .testTag(UiTestTags.snippetRow(snippet.title))
                                             .desktopHoverable(
                                                 enabled = true,
                                                 interactionSource = cardInteractionSource
@@ -357,7 +353,11 @@ fun SnippetManagerScreen(
                             paneEditorDirty = false
                             paneEditorSnippetId = null
                         },
-                        onDirtyStateChange = { paneEditorDirty = it },
+                        onDirtyStateChange = {
+                            if (paneEditorSnippetId != null) {
+                                paneEditorDirty = it
+                            }
+                        },
                         onShowMessage = {}
                     )
                 }

@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -158,19 +159,27 @@ fun SnippetEditorScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(
-                onClick = {
-                    if (command.isBlank()) {
-                        editorError = "Command is required."
-                        return@Button
-                    }
-                    onSave(title.ifBlank { "Snippet" }, group.ifBlank { null }, description, command)
-                    onShowMessage("Snippet saved.")
-                    onNavigateBack()
-                },
-                modifier = Modifier.weight(1f)
+            fun saveSnippet() {
+                if (command.isBlank()) {
+                    editorError = "Command is required."
+                    return
+                }
+                onSave(title.ifBlank { "Snippet" }, group.ifBlank { null }, description, command)
+                onShowMessage("Snippet saved.")
+                onNavigateBack()
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = ::saveSnippet)
+                    .testTag(UiTestTags.SNIPPET_EDITOR_SAVE_BUTTON)
             ) {
-                Text("Save")
+                Button(
+                    onClick = ::saveSnippet,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Save")
+                }
             }
             OutlinedButton(
                 onClick = ::requestClose,

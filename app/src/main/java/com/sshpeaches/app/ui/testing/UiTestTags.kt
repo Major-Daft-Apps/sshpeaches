@@ -129,6 +129,8 @@ object UiTestTags {
     const val SNIPPET_EDITOR_TITLE_INPUT = "snippet_editor_title_input"
     const val SNIPPET_EDITOR_DESCRIPTION_INPUT = "snippet_editor_description_input"
     const val SNIPPET_EDITOR_COMMAND_INPUT = "snippet_editor_command_input"
+    const val SNIPPET_EDITOR_SAVE_BUTTON = "snippet_editor_save_button"
+    fun snippetRow(title: String): String = "snippet_row_${sanitize(title)}"
     fun snippetRun(id: String): String = "snippet_${id}_run"
     fun snippetEdit(id: String): String = "snippet_${id}_edit"
     fun snippetDelete(id: String): String = "snippet_${id}_delete"
@@ -159,6 +161,9 @@ object UiTestTags {
     fun themeDuplicate(id: String): String = "theme_${id}_duplicate"
     fun themeEdit(id: String): String = "theme_${id}_edit"
     fun themeDelete(id: String): String = "theme_${id}_delete"
+    fun themeDeleteByName(name: String): String = "theme_${sanitize(name)}_delete"
+    fun themeProfileRow(name: String): String =
+        "theme_profile_row_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val THEME_DELETE_CONFIRM = "theme_delete_confirm"
     const val THEME_DELETE_CANCEL = "theme_delete_cancel"
     const val THEME_PROFILE_NAME_INPUT = "theme_profile_name_input"
@@ -179,6 +184,8 @@ object UiTestTags {
         "settings_terminal_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     fun settingsTerminalBellOption(name: String): String =
         "settings_terminal_bell_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsCategory(name: String): String =
+        "settings_category_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"
     const val SETTINGS_BACKGROUND_SWITCH = "settings_background_switch"
     const val SETTINGS_TERMINAL_EMULATION_FIELD = "settings_terminal_emulation_field"

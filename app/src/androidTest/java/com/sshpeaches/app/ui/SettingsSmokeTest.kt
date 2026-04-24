@@ -17,6 +17,7 @@ import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
+import com.majordaftapps.sshpeaches.app.testutil.revealSettingsControl
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import org.junit.Before
@@ -46,23 +47,27 @@ class SettingsSmokeTest {
 
     @Test
     fun toggleSettingsAndDropdowns_reflectsChanges() {
-        val backgroundInitiallyOn = runCatching {
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOn()
-            true
-        }.getOrDefault(false)
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
-        if (backgroundInitiallyOn) {
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
-        } else {
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOn()
-        }
+        AppStateSeeder.configureSettings(allowBackgroundSessions = true)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.navigateDrawer(Routes.SETTINGS)
 
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOn()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).performClick()
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH).assertIsOff()
+
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_THEME_MODE_FIELD)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).performClick()
         composeRule.onNodeWithText("Dark").performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_THEME_MODE_FIELD).assertTextContains("Dark")
 
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         val diagnosticsInitiallyOn = runCatching {
             composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
             true
@@ -92,8 +97,7 @@ class SettingsSmokeTest {
         composeRule.navigateDrawer(Routes.SETTINGS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
 
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).performTouchInput { swipeUp() }
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
         composeRule.onNodeWithText("Export via QR").performClick()
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH).assertIsOn()
