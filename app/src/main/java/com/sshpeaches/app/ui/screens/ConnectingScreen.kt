@@ -1776,8 +1776,8 @@ private fun ConnectingTerminalContent(
             singleLine = false,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,
-                // Password fields suppress clipboard affordances on many IMEs.
-                keyboardType = KeyboardType.Text,
+                // The hidden terminal IME bridge must not enable predictive text.
+                keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.None,
                 autoCorrect = false
             )

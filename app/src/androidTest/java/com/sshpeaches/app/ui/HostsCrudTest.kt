@@ -16,6 +16,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
+import com.majordaftapps.sshpeaches.app.testutil.clickNodeWithTag
+import com.majordaftapps.sshpeaches.app.testutil.dismissSoftKeyboard
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -54,9 +56,16 @@ class HostsCrudTest {
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_PORT_INPUT).performTextInput("22")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT).performTextInput("tester")
         selectPasswordAuth()
-        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON).performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
 
-        composeRule.onNodeWithText("QA Host").assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onAllNodesWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).assertCountEquals(0)
+                composeRule.onNodeWithText("QA Host").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
 
         composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0]
             .performClick()
@@ -66,10 +75,14 @@ class HostsCrudTest {
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("QA Host Updated")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.2.3")
-        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON).performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
 
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("QA Host Updated").fetchSemanticsNodes().isNotEmpty()
+            runCatching {
+                composeRule.onAllNodesWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).assertCountEquals(0)
+                composeRule.onAllNodesWithText("QA Host Updated").fetchSemanticsNodes().isNotEmpty()
+            }.getOrDefault(false)
         }
         composeRule.onNodeWithText("QA Host Updated").assertIsDisplayed()
         composeRule.onAllNodesWithText("QA Host").assertCountEquals(0)
@@ -94,17 +107,25 @@ class HostsCrudTest {
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_PORT_INPUT).performTextInput("70000")
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT).performTextInput("tester")
         selectPasswordAuth()
-        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON).performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
 
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.HOST_DIALOG_ERROR).fetchSemanticsNodes().size == 1
+        }
         composeRule.onAllNodesWithTag(UiTestTags.HOST_DIALOG_ERROR).assertCountEquals(1)
         composeRule.onAllNodesWithText("Enter a valid port between 1 and 65535.").assertCountEquals(1)
 
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_PORT_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_PORT_INPUT).performTextInput("22")
-        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON).performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
 
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("Enter a valid hostname or IP address.").fetchSemanticsNodes().size == 1
+        }
         composeRule.onAllNodesWithText("Enter a valid hostname or IP address.").assertCountEquals(1)
-        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON).performClick()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON)
     }
 
     private fun selectPasswordAuth() {

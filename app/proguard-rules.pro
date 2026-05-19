@@ -1,1 +1,1 @@
-# Placeholder for future rules
+# Production release shrinker rules.

@@ -1057,10 +1057,16 @@ fun HostsScreen(
             }
             if (includeActions) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { saveHost() }) {
+                    TextButton(
+                        onClick = { saveHost() },
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+                    ) {
                         Text(if (isEditingHost) "Save" else "Add")
                     }
-                    TextButton(onClick = onCancel) {
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON)
+                    ) {
                         Text("Cancel")
                     }
                 }

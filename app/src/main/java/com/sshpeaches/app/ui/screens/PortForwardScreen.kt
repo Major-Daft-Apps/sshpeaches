@@ -453,14 +453,24 @@ fun PortForwardScreen(
                 Text("No hosts available. Create a host first.", style = MaterialTheme.typography.bodySmall)
             }
             dialogError.value?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_ERROR)
+                )
             }
             if (includeActions) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { saveForward() }) {
+                    TextButton(
+                        onClick = { saveForward() },
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
+                    ) {
                         Text(if (isEdit) "Save" else "Add")
                     }
-                    TextButton(onClick = onCancel) {
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_CANCEL_BUTTON)
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -723,11 +733,17 @@ fun PortForwardScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { saveForward() }) { Text(if (isEdit) "Save" else "Add") }
+                TextButton(
+                    onClick = { saveForward() },
+                    modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
+                ) { Text(if (isEdit) "Save" else "Add") }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { closeDialog() }) { Text("Cancel") }
+                    TextButton(
+                        onClick = { closeDialog() },
+                        modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_CANCEL_BUTTON)
+                    ) { Text("Cancel") }
                 }
             }
         )

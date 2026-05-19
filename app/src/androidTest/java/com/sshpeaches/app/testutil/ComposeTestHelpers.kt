@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -19,6 +20,22 @@ typealias MainActivityComposeRule =
 fun MainActivityComposeRule.resetAppState() {
     AppStateResetter.reset(activity.applicationContext)
     activityRule.scenario.recreate()
+    waitForIdle()
+}
+
+fun MainActivityComposeRule.dismissSoftKeyboard() {
+    waitForIdle()
+    runCatching { Espresso.closeSoftKeyboard() }
+    waitForIdle()
+}
+
+fun MainActivityComposeRule.clickNodeWithTag(tag: String, useUnmergedTree: Boolean = false) {
+    val node = onNodeWithTag(tag, useUnmergedTree = useUnmergedTree)
+    runCatching {
+        node.performScrollTo()
+        waitForIdle()
+    }
+    node.performClick()
     waitForIdle()
 }
 

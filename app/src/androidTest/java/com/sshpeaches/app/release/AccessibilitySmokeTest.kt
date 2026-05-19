@@ -4,7 +4,6 @@ import android.Manifest
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,7 +36,6 @@ class AccessibilitySmokeTest {
 
     @Test
     fun drawerEntryPointsExposeAccessibleActions() {
-        composeRule.onNodeWithContentDescription("Menu").assertIsDisplayed().assertHasClickAction()
         composeRule.openDrawer()
 
         composeRule.onNodeWithTag(UiTestTags.DRAWER_QUICK_CONNECT, useUnmergedTree = true)

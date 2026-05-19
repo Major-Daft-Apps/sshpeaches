@@ -24,6 +24,8 @@ import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import com.majordaftapps.sshpeaches.app.testutil.clickNodeWithTag
+import com.majordaftapps.sshpeaches.app.testutil.dismissSoftKeyboard
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -63,11 +65,15 @@ class PortForwardCrudTest {
         composeRule.onNodeWithTag(UiTestTags.forwardHostOption(host.id)).performClick()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).performTextClearance()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).performTextInput("443")
-        composeRule.onNodeWithText("Add").performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
 
         composeRule.waitUntil(5_000) {
             runCatching {
+                composeRule.onAllNodesWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).assertCountEquals(0)
                 composeRule.onNodeWithText("QA Tunnel").assertIsDisplayed()
+                composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)
+                    .assertCountEquals(1)
                 true
             }.getOrDefault(false)
         }
@@ -104,10 +110,12 @@ class PortForwardCrudTest {
             .performTextReplacement("QA Tunnel Updated")
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT)
             .performTextReplacement("8443")
-        composeRule.onNodeWithText("Save").performClick()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
 
         composeRule.waitUntil(5_000) {
             runCatching {
+                composeRule.onAllNodesWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).assertCountEquals(0)
                 composeRule.onNodeWithText("QA Tunnel Updated").assertIsDisplayed()
                 true
             }.getOrDefault(false)
@@ -191,9 +199,13 @@ class PortForwardCrudTest {
 
         composeRule.onAllNodesWithText("Enable background sessions in Settings before saving a port forward.")
             .assertCountEquals(0)
-        composeRule.onNodeWithText("Add").performClick()
-        composeRule.onAllNodesWithText("Enable background sessions in Settings before saving a port forward.")
-            .assertCountEquals(1)
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.FORWARD_DIALOG_ERROR).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_ERROR)
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).assertIsDisplayed()
     }
 

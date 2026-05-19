@@ -78,8 +78,8 @@ android {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.9.18"
+        versionCode = 19
+        versionName = "0.9.19"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -149,6 +149,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (releaseInstrumentationRequested) {
+                proguardFile("proguard-release-androidtest-rules.pro")
+            }
             if (releaseSigning != null) {
                 signingConfig = releaseSigning
             } else {
@@ -265,6 +268,7 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation("androidx.tracing:tracing:1.0.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
@@ -510,7 +514,7 @@ tasks.register("connectedReleaseLaunchCheck") {
         }
 
         val launchOutput = captureCommandOutput(
-            adbCommand("shell", "am", "start", "-W", "-n", launcherComponent)
+            adbCommand("shell", "am", "start", "-n", launcherComponent)
         )
 
         Thread.sleep(8_000)

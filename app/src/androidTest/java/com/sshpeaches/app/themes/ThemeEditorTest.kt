@@ -20,6 +20,8 @@ import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
+import com.majordaftapps.sshpeaches.app.testutil.clickNodeWithTag
+import com.majordaftapps.sshpeaches.app.testutil.dismissSoftKeyboard
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -50,8 +52,9 @@ class ThemeEditorTest {
 
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
+        composeRule.dismissSoftKeyboard()
         composeRule.onNodeWithText("Apply").performClick()
-        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
+        saveThemeProfile()
 
         composeRule.waitUntil(10_000) {
             runCatching {
@@ -75,8 +78,7 @@ class ThemeEditorTest {
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performScrollTo().performClick()
-        composeRule.onNodeWithTag(UiTestTags.themeDefaultOption(duplicatedName), useUnmergedTree = true)
-            .performClick()
+        composeRule.clickNodeWithTag(UiTestTags.themeDefaultOption(duplicatedName), useUnmergedTree = true)
         composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).assertTextContains(duplicatedName)
 
         composeRule.onNodeWithTag(UiTestTags.themeProfileRow(duplicatedName)).performScrollTo()
@@ -109,50 +111,17 @@ class ThemeEditorTest {
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
         composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performClick()
 
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Dracula"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Tango"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("GitHub Light"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("GitHub Dark"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("One Dark"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Gruvbox"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Nord"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Monokai"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Solarized Dark"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("Solarized Light"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(
-            UiTestTags.themeDefaultOption("xterm"),
-            useUnmergedTree = true
-        ).assertIsDisplayed()
+        assertThemeDefaultOptionExists("Dracula")
+        assertThemeDefaultOptionExists("Tango")
+        assertThemeDefaultOptionExists("GitHub Light")
+        assertThemeDefaultOptionExists("GitHub Dark")
+        assertThemeDefaultOptionExists("One Dark")
+        assertThemeDefaultOptionExists("Gruvbox")
+        assertThemeDefaultOptionExists("Nord")
+        assertThemeDefaultOptionExists("Monokai")
+        assertThemeDefaultOptionExists("Solarized Dark")
+        assertThemeDefaultOptionExists("Solarized Light")
+        assertThemeDefaultOptionExists("xterm")
     }
 
     @Test
@@ -162,8 +131,9 @@ class ThemeEditorTest {
 
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement("Termux")
+        composeRule.dismissSoftKeyboard()
         composeRule.onNodeWithText("Apply").performClick()
-        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
+        saveThemeProfile()
 
         composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_PROFILE_EDITOR).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_ERROR)
@@ -187,8 +157,9 @@ class ThemeEditorTest {
 
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
+        composeRule.dismissSoftKeyboard()
         composeRule.onNodeWithText("Apply").performClick()
-        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
+        saveThemeProfile()
 
         composeRule.waitUntil(10_000) {
             runCatching {
@@ -230,8 +201,9 @@ class ThemeEditorTest {
         waitForThemeProfileEditor()
         composeRule.onNodeWithText("Rename").performClick()
         composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_NAME_INPUT).performTextReplacement(themeName)
+        composeRule.dismissSoftKeyboard()
         composeRule.onNodeWithText("Apply").performClick()
-        composeRule.onNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON).performClick()
+        saveThemeProfile()
         composeRule.waitUntil(10_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SCREEN_THEME_EDITOR).assertIsDisplayed()
@@ -239,5 +211,18 @@ class ThemeEditorTest {
                 true
             }.getOrDefault(false)
         }
+    }
+
+    private fun saveThemeProfile() {
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON)
+    }
+
+    private fun assertThemeDefaultOptionExists(name: String) {
+        val nodes = composeRule.onAllNodesWithTag(
+            UiTestTags.themeDefaultOption(name),
+            useUnmergedTree = true
+        ).fetchSemanticsNodes()
+        check(nodes.isNotEmpty()) { "Expected $name in the default theme picker." }
     }
 }
