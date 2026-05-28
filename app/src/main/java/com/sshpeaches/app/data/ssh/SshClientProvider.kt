@@ -55,15 +55,8 @@ object SshClientProvider {
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
-        // Android host-key decoding is currently reliable only for RSA in this stack.
-        // Prefer RSA host keys until SSHJ/provider handling is stabilized.
-        val compatibleHostKeys = config.keyAlgorithms.filterNot { factory ->
-            factory.name.contains("ed25519", ignoreCase = true) ||
-                factory.name.contains("ecdsa", ignoreCase = true)
-        }
-        if (compatibleHostKeys.isNotEmpty()) {
-            config.keyAlgorithms = compatibleHostKeys
-        }
+        // Preserve SSHJ default host-key algorithms so known_hosts pinning for Ed25519/ECDSA
+        // remains enforceable and host-key changes are classified correctly.
         val knownHostsFile = File(context.filesDir, "known_hosts")
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
