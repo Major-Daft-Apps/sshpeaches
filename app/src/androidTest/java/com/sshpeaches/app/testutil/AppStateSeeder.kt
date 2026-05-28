@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
 import com.majordaftapps.sshpeaches.app.data.local.asEntity
+import com.majordaftapps.sshpeaches.app.data.local.asModel
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.HostUptimeConfig
@@ -86,9 +87,15 @@ object AppStateSeeder {
         enabled: Boolean = true
     ) {
         runBlocking {
-            SshPeachesDatabase.get(context).hostUptimeConfigDao().upsert(
+            val database = SshPeachesDatabase.get(context)
+            val host = database.hostDao().getById(hostId)?.asModel()
+            database.hostUptimeConfigDao().upsert(
                 HostUptimeConfig(
                     hostId = hostId,
+                    hostName = host?.name.orEmpty(),
+                    hostAddress = host?.host.orEmpty(),
+                    hostPort = host?.port ?: 22,
+                    hostUsername = host?.username.orEmpty(),
                     method = method,
                     port = port,
                     intervalMinutes = intervalMinutes,

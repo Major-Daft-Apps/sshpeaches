@@ -70,6 +70,7 @@ fun UptimeScreen(
     val trackedHostIds = summaries.map { it.host.id }.toSet()
     val availableHosts = hosts.filterNot { trackedHostIds.contains(it.id) }.sortedBy { it.name.lowercase() }
     val editingSummary = remember { mutableStateOf<HostUptimeSummary?>(null) }
+    val pendingRemoveSummary = remember { mutableStateOf<HostUptimeSummary?>(null) }
     val addingHostId = remember { mutableStateOf<String?>(null) }
     val dialogHostId = rememberSaveable { mutableStateOf("") }
     val dialogMethod = rememberSaveable { mutableStateOf(UptimeCheckMethod.TCP) }
@@ -140,6 +141,26 @@ fun UptimeScreen(
             }
 
             when {
+                summaries.isNotEmpty() -> {
+                    SummaryRow(summaries = summaries)
+                    HorizontalDivider()
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(summaries, key = { it.host.id }) { summary ->
+                            UptimeCard(
+                                summary = summary,
+                                onRefresh = { onRefreshHost(summary.host.id) },
+                                onEdit = { openEditDialog(summary) },
+                                onRemove = { pendingRemoveSummary.value = summary },
+                                onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
+                            )
+                        }
+                    }
+                }
+
                 hosts.isEmpty() -> {
                     Box(
                         modifier = Modifier
@@ -162,26 +183,6 @@ fun UptimeScreen(
                             "No uptime monitors yet. Add a saved host to start tracking.",
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
-                    }
-                }
-
-                else -> {
-                    SummaryRow(summaries = summaries)
-                    HorizontalDivider()
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(summaries, key = { it.host.id }) { summary ->
-                            UptimeCard(
-                                summary = summary,
-                                onRefresh = { onRefreshHost(summary.host.id) },
-                                onEdit = { openEditDialog(summary) },
-                                onRemove = { onRemoveHost(summary.host.id) },
-                                onSetEnabled = { enabled -> onSetEnabled(summary.host.id, enabled) }
-                            )
-                        }
                     }
                 }
             }
@@ -341,6 +342,36 @@ fun UptimeScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    pendingRemoveSummary.value?.let { summary ->
+        AlertDialog(
+            onDismissRequest = { pendingRemoveSummary.value = null },
+            title = { Text("Remove uptime monitor?") },
+            text = {
+                Text("This only removes monitoring for ${summary.host.name}. The saved host stays unchanged.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRemoveHost(summary.host.id)
+                        pendingRemoveSummary.value = null
+                    },
+                    modifier = Modifier.testTag(UiTestTags.UPTIME_REMOVE_CONFIRM_BUTTON)
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingRemoveSummary.value = null },
+                    modifier = Modifier.testTag(UiTestTags.UPTIME_REMOVE_CANCEL_BUTTON)
+                ) {
+                    Text("Cancel")
+                }
+            },
+            modifier = Modifier.testTag(UiTestTags.UPTIME_REMOVE_CONFIRM_DIALOG)
         )
     }
 }

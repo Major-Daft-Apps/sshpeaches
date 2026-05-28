@@ -5,11 +5,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.majordaftapps.sshpeaches.app.ui.AboutDialog
 import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
+import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import org.junit.Rule
 import org.junit.Test
@@ -68,5 +70,20 @@ class ExternalLinksNavigationTest {
 
         composeRule.onNodeWithTag(UiTestTags.ABOUT_LICENSES_LINK).performClick()
         composeRule.runOnIdle { check(lastAction.get() == "licenses") }
+    }
+
+    @Test
+    fun helpScreen_moreHelpInvokesSupportCallback() {
+        val lastAction = AtomicReference<String?>(null)
+        composeRule.setContent {
+            HelpScreen(onOpenSupport = { lastAction.set("support") })
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.HELP_SCREEN).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.helpStep(0)).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.HELP_SCREEN).performScrollToIndex(6)
+        composeRule.onNodeWithTag(UiTestTags.HELP_MORE_HELP_BUTTON).performClick()
+
+        composeRule.runOnIdle { check(lastAction.get() == "support") }
     }
 }

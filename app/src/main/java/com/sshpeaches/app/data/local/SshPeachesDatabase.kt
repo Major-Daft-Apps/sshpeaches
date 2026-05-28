@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         HostUptimeConfigEntity::class,
         HostUptimeSampleEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -42,6 +42,7 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_5_6)
                     .addMigrations(MIGRATION_6_8)
                     .addMigrations(MIGRATION_7_8)
+                    .addMigrations(MIGRATION_8_9)
                     .build()
                     .also { instance = it }
             }
@@ -89,6 +90,108 @@ abstract class SshPeachesDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 createUptimeTables(db)
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `host_uptime_configs_persistent` (
+                        `hostId` TEXT NOT NULL,
+                        `hostName` TEXT NOT NULL,
+                        `hostAddress` TEXT NOT NULL,
+                        `hostPort` INTEGER NOT NULL,
+                        `hostUsername` TEXT NOT NULL,
+                        `method` TEXT NOT NULL,
+                        `port` INTEGER NOT NULL,
+                        `intervalMinutes` INTEGER NOT NULL,
+                        `enabled` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `lastCheckedAt` INTEGER,
+                        `lastStatus` TEXT,
+                        `lastReason` TEXT,
+                        `lastTransitionAt` INTEGER,
+                        PRIMARY KEY(`hostId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR REPLACE INTO `host_uptime_configs_persistent` (
+                        `hostId`,
+                        `hostName`,
+                        `hostAddress`,
+                        `hostPort`,
+                        `hostUsername`,
+                        `method`,
+                        `port`,
+                        `intervalMinutes`,
+                        `enabled`,
+                        `createdAt`,
+                        `lastCheckedAt`,
+                        `lastStatus`,
+                        `lastReason`,
+                        `lastTransitionAt`
+                    )
+                    SELECT
+                        configs.`hostId`,
+                        COALESCE(hosts.`name`, configs.`hostId`),
+                        COALESCE(hosts.`host`, ''),
+                        COALESCE(hosts.`port`, configs.`port`, 22),
+                        COALESCE(hosts.`username`, ''),
+                        configs.`method`,
+                        configs.`port`,
+                        configs.`intervalMinutes`,
+                        configs.`enabled`,
+                        configs.`createdAt`,
+                        configs.`lastCheckedAt`,
+                        configs.`lastStatus`,
+                        configs.`lastReason`,
+                        configs.`lastTransitionAt`
+                    FROM `host_uptime_configs` configs
+                    LEFT JOIN `hosts` hosts ON hosts.`id` = configs.`hostId`
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `host_uptime_samples_persistent` (
+                        `hostId` TEXT NOT NULL,
+                        `checkedAt` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `reason` TEXT,
+                        PRIMARY KEY(`hostId`, `checkedAt`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR REPLACE INTO `host_uptime_samples_persistent` (
+                        `hostId`,
+                        `checkedAt`,
+                        `status`,
+                        `reason`
+                    )
+                    SELECT `hostId`, `checkedAt`, `status`, `reason`
+                    FROM `host_uptime_samples`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `host_uptime_samples`")
+                db.execSQL("DROP TABLE `host_uptime_configs`")
+                db.execSQL("ALTER TABLE `host_uptime_configs_persistent` RENAME TO `host_uptime_configs`")
+                db.execSQL("ALTER TABLE `host_uptime_samples_persistent` RENAME TO `host_uptime_samples`")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_host_uptime_configs_hostId` ON `host_uptime_configs`(`hostId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_host_uptime_samples_hostId` ON `host_uptime_samples`(`hostId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_host_uptime_samples_checkedAt` ON `host_uptime_samples`(`checkedAt`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_host_uptime_samples_hostId_checkedAt` ON `host_uptime_samples`(`hostId`, `checkedAt`)"
+                )
             }
         }
 

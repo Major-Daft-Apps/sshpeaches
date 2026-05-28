@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+import com.majordaftapps.sshpeaches.app.data.local.asEntity
 import com.majordaftapps.sshpeaches.app.data.local.asModel
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
@@ -71,6 +72,8 @@ class UptimeScreenTest {
         waitForTag(UiTestTags.uptimeCard(host.id))
         composeRule.onNodeWithTag(UiTestTags.uptimeCard(host.id)).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.uptimeRemove(host.id)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.UPTIME_REMOVE_CONFIRM_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.UPTIME_REMOVE_CONFIRM_BUTTON).performClick()
 
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag(UiTestTags.uptimeCard(host.id))
@@ -164,6 +167,31 @@ class UptimeScreenTest {
         assertEquals(22, config?.port)
         assertEquals(45, config?.intervalMinutes)
         assertFalse(config?.enabled ?: true)
+    }
+
+    @Test
+    fun monitorSurvivesSavedHostDeletionFromSnapshot() {
+        val host = host(name = "Persistent Monitor", address = "10.0.2.64")
+        AppStateSeeder.seedHost(host)
+        AppStateSeeder.seedUptimeConfig(host.id)
+        composeRule.activityRule.scenario.recreate()
+
+        openUptimeScreen()
+        waitForTag(UiTestTags.uptimeCard(host.id))
+        composeRule.onNodeWithTag(UiTestTags.uptimeCard(host.id)).assertIsDisplayed()
+
+        runBlocking {
+            SshPeachesDatabase.get(composeRule.activity).hostDao().delete(host.asEntity())
+        }
+        composeRule.activityRule.scenario.recreate()
+
+        openUptimeScreen()
+        waitForTag(UiTestTags.uptimeCard(host.id))
+        composeRule.onNodeWithTag(UiTestTags.uptimeCard(host.id)).assertIsDisplayed()
+
+        val config = uptimeConfig(host.id)
+        assertEquals("Persistent Monitor", config?.hostName)
+        assertEquals("10.0.2.64", config?.hostAddress)
     }
 
     private fun waitForTag(tag: String) {

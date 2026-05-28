@@ -27,6 +27,10 @@ enum class UptimeBarBucketStatus {
 
 data class HostUptimeConfig(
     val hostId: String,
+    val hostName: String = "",
+    val hostAddress: String = "",
+    val hostPort: Int = 22,
+    val hostUsername: String = "",
     val method: UptimeCheckMethod = UptimeCheckMethod.TCP,
     val port: Int = 22,
     val intervalMinutes: Int = 15,

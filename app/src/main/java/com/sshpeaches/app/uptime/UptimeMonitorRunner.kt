@@ -6,7 +6,9 @@ import android.content.Context
 import com.majordaftapps.sshpeaches.app.data.local.HostUptimeSampleEntity
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
 import com.majordaftapps.sshpeaches.app.data.local.asModel
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.HostUptimeConfig
 import com.majordaftapps.sshpeaches.app.data.model.UnverifiedReason
 import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.model.UptimeStatus
@@ -38,7 +40,8 @@ class UptimeMonitorRunner(
         val hasActiveNetwork = hasActiveNetworkTransport()
 
         dueConfigs.forEach { config ->
-            val host = hostsById[config.hostId]?.asModel() ?: return@forEach
+            val modelConfig = config.asModel()
+            val host = modelConfig.monitorHost(hostsById[config.hostId]?.asModel()) ?: return@forEach
             val outcome = if (shouldSkipCheckForNoNetwork(host.host, hasActiveNetwork)) {
                 CheckOutcome(
                     status = UptimeStatus.UNVERIFIED,
@@ -123,6 +126,19 @@ class UptimeMonitorRunner(
         val status: UptimeStatus,
         val reason: UnverifiedReason?
     )
+
+    private fun HostUptimeConfig.monitorHost(savedHost: HostConnection?): HostConnection? {
+        if (savedHost != null) return savedHost
+        if (hostAddress.isBlank()) return null
+        return HostConnection(
+            id = hostId,
+            name = hostName.ifBlank { hostAddress },
+            host = hostAddress,
+            port = hostPort.coerceIn(1, 65_535),
+            username = hostUsername,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+    }
 }
 
 internal fun shouldSkipCheckForNoNetwork(host: String, hasActiveNetwork: Boolean): Boolean =

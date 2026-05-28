@@ -5,6 +5,10 @@ import com.majordaftapps.sshpeaches.app.data.model.HostUptimeSample
 
 fun HostUptimeConfigEntity.asModel(): HostUptimeConfig = HostUptimeConfig(
     hostId = hostId,
+    hostName = hostName,
+    hostAddress = hostAddress,
+    hostPort = hostPort,
+    hostUsername = hostUsername,
     method = method,
     port = port,
     intervalMinutes = intervalMinutes,
@@ -18,6 +22,10 @@ fun HostUptimeConfigEntity.asModel(): HostUptimeConfig = HostUptimeConfig(
 
 fun HostUptimeConfig.asEntity(): HostUptimeConfigEntity = HostUptimeConfigEntity(
     hostId = hostId,
+    hostName = hostName,
+    hostAddress = hostAddress,
+    hostPort = hostPort,
+    hostUsername = hostUsername,
     method = method,
     port = port,
     intervalMinutes = intervalMinutes,

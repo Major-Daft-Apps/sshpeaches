@@ -6,6 +6,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -110,7 +114,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -130,14 +133,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.widget.EditText
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
@@ -166,7 +170,6 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.WcWidth
 import android.app.SearchManager
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -312,8 +315,6 @@ fun ConnectingScreen(
         )
     }
     var lastShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
-    var imeBridgeValue by remember(request?.sessionId) { mutableStateOf(TextFieldValue("")) }
-    var imeSentText by remember(request?.sessionId) { mutableStateOf("") }
     var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalView?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
     var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(10f) }
@@ -628,8 +629,6 @@ fun ConnectingScreen(
         terminalEngine.reset()
         terminalEngine.applyProfile(terminalProfile)
         lastShellSnapshot = ""
-        imeBridgeValue = TextFieldValue("")
-        imeSentText = ""
         terminalFontSizeSp = terminalProfile.fontSizeSp.toFloat()
         lastResize = null
         sftpPath = "."
@@ -1455,37 +1454,17 @@ fun ConnectingScreen(
         }
     }
 
-    fun handleImeBridgeValueChange(next: TextFieldValue) {
-        if (next == imeBridgeValue) return
-        imeBridgeValue = next
-
-        // Send deltas immediately so IME composing text is echoed in-terminal.
-        sendImeDelta(
-            previous = imeSentText,
-            next = next.text,
-            sendBackspace = terminalInput::sendBackspace,
-            sendInserted = { inserted ->
-                val modifiers = pendingModifiers
-                terminalInput.sendText(
-                    text = inserted,
-                    ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
-                    altDown = modifiers.contains(KeyboardModifier.ALT),
-                    shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
-                )
-                if (modifiers.isNotEmpty()) {
-                    pendingModifiers = emptySet()
-                }
-            }
+    fun handleTerminalImeText(text: String) {
+        if (text.isEmpty()) return
+        val modifiers = pendingModifiers
+        terminalInput.sendText(
+            text = text,
+            ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+            altDown = modifiers.contains(KeyboardModifier.ALT),
+            shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
         )
-        imeSentText = next.text
-
-        if (imeSentText.length > IME_BUFFER_MAX_CHARS) {
-            val tail = imeSentText.takeLast(IME_BUFFER_KEEP_TAIL_CHARS)
-            imeSentText = tail
-            imeBridgeValue = TextFieldValue(
-                text = tail,
-                selection = TextRange(tail.length)
-            )
+        if (modifiers.isNotEmpty()) {
+            pendingModifiers = emptySet()
         }
     }
 
@@ -1515,8 +1494,7 @@ fun ConnectingScreen(
                 pendingModifiers = pendingModifiers,
                 activeAliasIcons = activeAliasIcons,
                 onSendCompactKey = ::handleCompactKeyPress,
-                imeBridgeValue = imeBridgeValue,
-                onImeBridgeValueChange = ::handleImeBridgeValueChange,
+                onImeTextInput = ::handleTerminalImeText,
                 keyboardFocusRequester = keyboardFocusRequester,
                 onKeyboardFocusChanged = { keyboardFocused = it },
                 handleVolumeKeyForFontSize = ::handleVolumeKeyForFontSize,
@@ -1682,8 +1660,7 @@ private fun ConnectingTerminalContent(
     pendingModifiers: Set<KeyboardModifier>,
     activeAliasIcons: Set<String>,
     onSendCompactKey: (CompactTerminalKey) -> Unit,
-    imeBridgeValue: TextFieldValue,
-    onImeBridgeValueChange: (TextFieldValue) -> Unit,
+    onImeTextInput: (String) -> Unit,
     keyboardFocusRequester: FocusRequester,
     onKeyboardFocusChanged: (Boolean) -> Unit,
     handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
@@ -1754,34 +1731,115 @@ private fun ConnectingTerminalContent(
             }
         }
 
-        BasicTextField(
-            value = imeBridgeValue,
-            onValueChange = onImeBridgeValueChange,
+        TerminalImeBridge(
+            onTextInput = onImeTextInput,
+            onBackspace = terminalInput::sendBackspace,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .size(1.dp)
                 .alpha(0f)
                 .focusRequester(keyboardFocusRequester)
-                .onFocusChanged { onKeyboardFocusChanged(it.isFocused) }
-                .onPreviewKeyEvent { keyEvent ->
-                    val nativeEvent = keyEvent.nativeKeyEvent
-                    if (handleVolumeKeyForFontSize(nativeEvent)) {
-                        return@onPreviewKeyEvent true
-                    }
-                    if (nativeEvent.action != KeyEvent.ACTION_DOWN) {
-                        return@onPreviewKeyEvent false
-                    }
-                    terminalInput.onAndroidKeyDown(nativeEvent)
-                },
-            singleLine = false,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.None,
-                // The hidden terminal IME bridge must not enable predictive text.
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.None,
-                autoCorrect = false
-            )
+                .onFocusChanged { onKeyboardFocusChanged(it.isFocused) },
+            handleVolumeKeyForFontSize = handleVolumeKeyForFontSize,
+            terminalInput = terminalInput
         )
+    }
+}
+
+@Composable
+private fun TerminalImeBridge(
+    onTextInput: (String) -> Unit,
+    onBackspace: () -> Unit,
+    handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
+    terminalInput: TerminalInputRouter,
+    modifier: Modifier = Modifier
+) {
+    val currentOnTextInput = rememberUpdatedState(onTextInput)
+    val currentOnBackspace = rememberUpdatedState(onBackspace)
+    val currentHandleVolumeKeyForFontSize = rememberUpdatedState(handleVolumeKeyForFontSize)
+    val currentTerminalInput = rememberUpdatedState(terminalInput)
+
+    AndroidView(
+        factory = { context ->
+            TerminalImeBridgeEditText(context).apply {
+                isFocusable = true
+                isFocusableInTouchMode = true
+                isCursorVisible = false
+                setTextColor(android.graphics.Color.TRANSPARENT)
+                setHintTextColor(android.graphics.Color.TRANSPARENT)
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                background = null
+                includeFontPadding = false
+                setPadding(0, 0, 0, 0)
+                isSaveEnabled = false
+                importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+                importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                setRawInputType(TERMINAL_IME_INPUT_TYPE)
+                imeOptions = TERMINAL_IME_OPTIONS
+                privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
+
+                var restoring = false
+
+                fun restoreSentinel() {
+                    restoring = true
+                    setText(TERMINAL_IME_SENTINEL)
+                    setSelection(TERMINAL_IME_SENTINEL.length)
+                    restoring = false
+                }
+
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+
+                    override fun afterTextChanged(s: Editable?) {
+                        if (restoring) return
+                        val raw = s?.toString().orEmpty()
+                        when {
+                            raw == TERMINAL_IME_SENTINEL -> setSelection(raw.length)
+                            raw.isEmpty() -> {
+                                currentOnBackspace.value()
+                                restoreSentinel()
+                            }
+                            raw.startsWith(TERMINAL_IME_SENTINEL) -> {
+                                raw.removePrefix(TERMINAL_IME_SENTINEL)
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { currentOnTextInput.value(normalizeImeChunk(it)) }
+                                restoreSentinel()
+                            }
+                            else -> {
+                                raw.replace(TERMINAL_IME_SENTINEL, "")
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { currentOnTextInput.value(normalizeImeChunk(it)) }
+                                restoreSentinel()
+                            }
+                        }
+                    }
+                })
+
+                setOnKeyListener { _, _, event ->
+                    if (currentHandleVolumeKeyForFontSize.value(event)) {
+                        true
+                    } else if (event.action == KeyEvent.ACTION_DOWN) {
+                        currentTerminalInput.value.onAndroidKeyDown(event)
+                    } else {
+                        false
+                    }
+                }
+
+                restoreSentinel()
+            }
+        },
+        modifier = modifier
+    )
+}
+
+private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val connection = super.onCreateInputConnection(outAttrs)
+        outAttrs.inputType = TERMINAL_IME_INPUT_TYPE
+        outAttrs.imeOptions = TERMINAL_IME_OPTIONS
+        outAttrs.privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
+        return connection
     }
 }
 
@@ -3807,47 +3865,18 @@ private fun normalizeImeChunk(chunk: String): String {
     return normalized.replace('\n', '\r')
 }
 
-private fun sendImeDelta(
-    previous: String,
-    next: String,
-    sendBackspace: () -> Unit,
-    sendInserted: (String) -> Unit
-) {
-    if (previous == next) return
-
-    val prefixLength = commonPrefixLength(previous, next)
-    val suffixLength = commonSuffixLength(previous, next, prefixLength)
-    val previousMiddleEnd = previous.length - suffixLength
-    val nextMiddleEnd = next.length - suffixLength
-
-    val removed = previous.substring(prefixLength, previousMiddleEnd)
-    if (removed.isNotEmpty()) {
-        val deleteCount = removed.codePointCount(0, removed.length)
-        repeat(deleteCount) { sendBackspace() }
-    }
-
-    val inserted = normalizeImeChunk(next.substring(prefixLength, nextMiddleEnd))
-    if (inserted.isNotEmpty()) {
-        sendInserted(inserted)
-    }
-}
-
-private fun commonPrefixLength(a: String, b: String): Int {
-    val max = minOf(a.length, b.length)
-    var i = 0
-    while (i < max && a[i] == b[i]) i++
-    return i
-}
-
-private fun commonSuffixLength(a: String, b: String, prefixLength: Int): Int {
-    val max = minOf(a.length, b.length) - prefixLength
-    var i = 0
-    while (i < max && a[a.length - 1 - i] == b[b.length - 1 - i]) i++
-    return i
-}
-
-private const val IME_BUFFER_MAX_CHARS = 512
-private const val IME_BUFFER_KEEP_TAIL_CHARS = 160
+private const val TERMINAL_IME_SENTINEL = "\u0001"
+private const val TERMINAL_PRIVATE_IME_OPTIONS =
+    "com.google.android.inputmethod.latin.noPersonalizedLearning=true;com.google.android.inputmethod.latin.noMicrophoneKey=true"
+private val TERMINAL_IME_INPUT_TYPE = InputType.TYPE_CLASS_TEXT or
+    InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+    InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+    InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE
+private val TERMINAL_IME_OPTIONS = EditorInfo.IME_ACTION_NONE or
+    EditorInfo.IME_FLAG_NO_EXTRACT_UI or
+    EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or
+    EditorInfo.IME_FLAG_FORCE_ASCII
 private const val SFTP_CANCEL_BUTTON_DELAY_MS = 220L
 private const val SFTP_TRANSFER_STATUS_AUTO_DISMISS_MS = 3_000L
 private const val SFTP_TRANSFER_SUCCESS_MESSAGE = "file transferred succesfully"

@@ -157,6 +157,7 @@ import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
@@ -615,6 +616,7 @@ fun SSHPeachesRoot(
         Routes.SESSION -> activeSessionRequest?.name?.ifBlank {
             activeSessionRequest.host
         } ?: "Connecting"
+        Routes.HELP -> "Help"
         Routes.HOSTS -> "Hosts"
         Routes.UPTIME -> "Uptime"
         Routes.IDENTITIES -> "Identities"
@@ -1426,23 +1428,23 @@ fun SSHPeachesRoot(
         )
     }
 
+    fun openSupportSite() {
+        val helpUri = helpUrl.toUri()
+        val customTab = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+        runCatching {
+            customTab.launchUrl(context, helpUri)
+        }.onFailure {
+            context.startActivity(Intent(Intent.ACTION_VIEW, helpUri))
+        }
+    }
+
     val onDrawerDestinationSelected: (com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination) -> Unit = { destination ->
         if (shellLayoutMode == ShellLayoutMode.COMPACT) {
             scope.launch { drawerState.close() }
         }
         when (destination.route) {
-            Routes.HELP -> {
-                val helpUri = helpUrl.toUri()
-                val customTab = CustomTabsIntent.Builder()
-                    .setShowTitle(true)
-                    .build()
-                runCatching {
-                    customTab.launchUrl(context, helpUri)
-                }.onFailure {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, helpUri))
-                }
-            }
-
             Routes.ABOUT -> showAbout.value = true
             else -> {
                 if (destination.route != currentRoute) {
@@ -1888,6 +1890,9 @@ fun SSHPeachesRoot(
                         composable(Routes.SESSION) {
                             SessionVerticalContent()
                         }
+                    composable(Routes.HELP) {
+                        HelpScreen(onOpenSupport = ::openSupportSite)
+                    }
                     composable(Routes.HOSTS) {
                         val activeSshSessionHostIds = sessions
                             .filter {

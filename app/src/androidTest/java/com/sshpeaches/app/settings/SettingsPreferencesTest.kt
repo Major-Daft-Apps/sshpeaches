@@ -86,10 +86,15 @@ class SettingsPreferencesTest {
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
         val diagnosticsInitiallyOn = SettingsStore.defaultDiagnosticsEnabled
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).performClick()
-        if (diagnosticsInitiallyOn) {
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
-        } else {
-            composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                if (diagnosticsInitiallyOn) {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOff()
+                } else {
+                    composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
+                }
+                true
+            }.getOrDefault(false)
         }
 
         composeRule.activityRule.scenario.recreate()
