@@ -804,6 +804,10 @@ class MainActivity : FragmentActivity() {
             }
 
             ACTION_WIDGET_CONNECT -> {
+                if (!HostWidgets.isTrustedWidgetActionIntent(this, intent)) {
+                    UiDebugLog.result("handleWidgetConnectIntent", false, "untrusted-intent")
+                    return
+                }
                 val hostId = intent.getStringExtra(EXTRA_WIDGET_HOST_ID).orEmpty()
                 val mode = runCatching {
                     ConnectionMode.valueOf(intent.getStringExtra(EXTRA_WIDGET_MODE).orEmpty())

@@ -251,6 +251,10 @@ internal object HostWidgets {
         )
     }
 
+    fun putActionToken(intent: Intent, context: Context) {
+        intent.putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
+    }
+
     fun isTrustedWidgetActionIntent(context: Context, intent: Intent): Boolean {
         val expected = actionToken(context)
         val actual = intent.getStringExtra(EXTRA_ACTION_TOKEN)
@@ -318,6 +322,7 @@ abstract class BaseHostWidgetProvider : AppWidgetProvider() {
                             MainActivity.EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE,
                             intent.getStringExtra(HostWidgets.EXTRA_FILE_TRANSFER_ENTRY_MODE)
                         )
+                        HostWidgets.putActionToken(this, context)
                     }
                     context.startActivity(launchIntent)
                 }
