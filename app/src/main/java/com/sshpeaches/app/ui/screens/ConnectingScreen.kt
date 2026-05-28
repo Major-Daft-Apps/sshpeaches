@@ -286,8 +286,8 @@ fun ConnectingScreen(
     val terminalEngine = remember(request?.sessionId, clipboardManager) {
         TermuxTerminalEngine(
             onWriteToRemote = onSendShellBytes,
-            onCopyToClipboard = { text -> clipboardManager.setText(AnnotatedString(text)) },
-            onRequestPasteText = { clipboardManager.getText()?.text },
+            onCopyToClipboard = { _ -> },
+            onRequestPasteText = { null },
             onTerminalDiagnostic = { message ->
                 val sessionId = request?.sessionId ?: return@TermuxTerminalEngine
                 if (!diagnosticsLoggingEnabled) return@TermuxTerminalEngine
