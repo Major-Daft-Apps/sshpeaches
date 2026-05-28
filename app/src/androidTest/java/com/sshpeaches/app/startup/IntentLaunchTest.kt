@@ -14,6 +14,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
 import java.util.UUID
 import org.junit.Rule
@@ -48,6 +49,25 @@ class IntentLaunchTest {
             waitForScenarioState(scenario, Lifecycle.State.RESUMED)
             check(scenario.state == Lifecycle.State.RESUMED) {
                 "Widget-connect launch did not keep MainActivity resumed"
+            }
+        }
+    }
+
+    @Test
+    fun forgedWidgetConnectIntentWithoutTokenDoesNotStartSessionLaunchPath() {
+        val host = seedWidgetHost("Forged Widget Host")
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        WidgetSessionStore.write(targetContext, emptyList())
+
+        ActivityScenario.launch<MainActivity>(
+            widgetConnectIntent(targetContext, host.id, trusted = false)
+        ).use { scenario ->
+            waitForScenarioState(scenario, Lifecycle.State.RESUMED)
+            SystemClock.sleep(1_000)
+
+            val sessions = WidgetSessionStore.read(targetContext)
+            check(sessions.none { it.title.contains(host.name) }) {
+                "Forged widget-connect intent should not publish an open-session entry for ${host.name}"
             }
         }
     }
@@ -114,7 +134,11 @@ class IntentLaunchTest {
         return host
     }
 
-    private fun widgetConnectIntent(targetContext: android.content.Context, hostId: String): Intent =
+    private fun widgetConnectIntent(
+        targetContext: android.content.Context,
+        hostId: String,
+        trusted: Boolean = true
+    ): Intent =
         Intent(targetContext, MainActivity::class.java).apply {
             action = MainActivity.ACTION_WIDGET_CONNECT
             addFlags(
@@ -124,6 +148,9 @@ class IntentLaunchTest {
             )
             putExtra(MainActivity.EXTRA_WIDGET_HOST_ID, hostId)
             putExtra(MainActivity.EXTRA_WIDGET_MODE, ConnectionMode.SSH.name)
+            if (trusted) {
+                HostWidgets.putActionToken(this, targetContext)
+            }
         }
 
     private fun waitForWidgetSession(targetContext: android.content.Context, hostName: String) {

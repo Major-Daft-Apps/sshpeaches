@@ -257,6 +257,10 @@ internal object HostWidgets {
         return !actual.isNullOrBlank() && actual == expected
     }
 
+    fun putActionToken(intent: Intent, context: Context) {
+        intent.putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
+    }
+
     private fun actionToken(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val existing = prefs.getString(KEY_ACTION_TOKEN, null)
@@ -318,6 +322,7 @@ abstract class BaseHostWidgetProvider : AppWidgetProvider() {
                             MainActivity.EXTRA_WIDGET_FILE_TRANSFER_ENTRY_MODE,
                             intent.getStringExtra(HostWidgets.EXTRA_FILE_TRANSFER_ENTRY_MODE)
                         )
+                        HostWidgets.putActionToken(this, context)
                     }
                     context.startActivity(launchIntent)
                 }

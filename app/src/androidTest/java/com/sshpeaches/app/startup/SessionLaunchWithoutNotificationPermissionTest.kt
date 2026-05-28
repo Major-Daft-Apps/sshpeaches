@@ -13,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import java.util.UUID
 import org.junit.Rule
 import org.junit.Test
@@ -54,6 +55,7 @@ class SessionLaunchWithoutNotificationPermissionTest {
                     )
                     putExtra(MainActivity.EXTRA_WIDGET_HOST_ID, host.id)
                     putExtra(MainActivity.EXTRA_WIDGET_MODE, ConnectionMode.SSH.name)
+                    HostWidgets.putActionToken(this, targetContext)
                 }
             ).use { scenario ->
                 waitForScenarioState(scenario, Lifecycle.State.RESUMED)

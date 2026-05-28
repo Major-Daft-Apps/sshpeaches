@@ -196,8 +196,6 @@ import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.BuildConfig
-import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
-import com.majordaftapps.sshpeaches.app.util.snippetReference
 import com.majordaftapps.sshpeaches.app.MainActivity
 import java.util.UUID
 import org.json.JSONArray
@@ -1021,7 +1019,7 @@ fun SSHPeachesRoot(
             for (index in 0 until forwards.length()) {
                 val item = forwards.optJSONObject(index) ?: continue
                 val label = item.optString("label").trim().ifBlank { "Imported Forward" }
-                val sourceHost = item.optString("sourceHost").trim().ifBlank { "127.0.0.1" }
+                val sourceHost = "127.0.0.1"
                 val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
                 val destinationHost = item.optString("destinationHost").trim()
                 val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
@@ -1057,9 +1055,9 @@ fun SSHPeachesRoot(
                         sourcePort = sourcePort,
                         destinationHost = destinationHost,
                         destinationPort = destinationPort,
-                        associatedHosts = jsonStringList(item.optJSONArray("associatedHosts")),
+                        associatedHosts = emptyList(),
                         favorite = item.optBoolean("favorite", false),
-                        enabled = item.optBoolean("enabled", true)
+                        enabled = false
                     )
                     onImportPortForward(importedForward)
                     existingForwardByKey[key] = importedForward
@@ -1086,10 +1084,6 @@ fun SSHPeachesRoot(
                 }.getOrDefault(ConnectionMode.SSH)
                 val targetId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
                 val encryptedPasswordPayload = item.optString("pwdPayload").trim().ifBlank { null }
-                val startupScript = item.optString("startupScript")
-                val remappedStartupScript = parseSnippetReference(startupScript)
-                    ?.let { snippetId -> snippetIdMap[snippetId]?.let(::snippetReference) ?: startupScript }
-                    ?: startupScript
                 onImportHost(
                     HostConnection(
                         id = targetId,
@@ -1123,7 +1117,7 @@ fun SSHPeachesRoot(
                             ?.let { identityIdMap[it] ?: it },
                         preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
                             ?.let { forwardIdMap[it] ?: it },
-                        startupScript = remappedStartupScript,
+                        startupScript = "",
                         backgroundBehavior = runCatching {
                             BackgroundBehavior.valueOf(
                                 item.optString("backgroundBehavior", BackgroundBehavior.INHERIT.name)
@@ -1180,17 +1174,11 @@ fun SSHPeachesRoot(
             onTerminalMarginPxChange(
                 settings.optInt("terminalMarginPx", uiState.terminalMarginPx).coerceIn(0, 128)
             )
-            onMoshServerCommandChange(
-                settings.optString("moshServerCommand", uiState.moshServerCommand)
-            )
             onCrashReportsToggle(settings.optBoolean("crashReportsEnabled", uiState.crashReportsEnabled))
             onAnalyticsToggle(settings.optBoolean("analyticsEnabled", uiState.analyticsEnabled))
             onDiagnosticsToggle(
                 settings.optBoolean("diagnosticsLoggingEnabled", uiState.diagnosticsLoggingEnabled)
             )
-            onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
-            onHostKeyPromptToggle(settings.optBoolean("hostKeyPromptEnabled", uiState.hostKeyPromptEnabled))
-            onAutoTrustHostKeyToggle(settings.optBoolean("autoTrustHostKey", uiState.autoTrustHostKey))
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
