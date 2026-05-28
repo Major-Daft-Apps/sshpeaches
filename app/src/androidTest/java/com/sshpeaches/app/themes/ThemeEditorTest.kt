@@ -77,9 +77,7 @@ class ThemeEditorTest {
         composeRule.onNodeWithTag(UiTestTags.themeProfileRow(duplicatedName))
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performScrollTo().performClick()
-        composeRule.clickNodeWithTag(UiTestTags.themeDefaultOption(duplicatedName), useUnmergedTree = true)
-        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).assertTextContains(duplicatedName)
+        selectDefaultTheme(duplicatedName)
 
         composeRule.onNodeWithTag(UiTestTags.themeProfileRow(duplicatedName)).performScrollTo()
         composeRule.onNodeWithTag(UiTestTags.themeDeleteByName(duplicatedName))
@@ -216,6 +214,24 @@ class ThemeEditorTest {
     private fun saveThemeProfile() {
         composeRule.dismissSoftKeyboard()
         composeRule.clickNodeWithTag(UiTestTags.THEME_PROFILE_SAVE_BUTTON)
+    }
+
+    private fun selectDefaultTheme(themeName: String) {
+        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).performScrollTo().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(
+                UiTestTags.themeDefaultOption(themeName),
+                useUnmergedTree = true
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.clickNodeWithTag(UiTestTags.themeDefaultOption(themeName), useUnmergedTree = true)
+        composeRule.waitUntil(10_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).assertTextContains(themeName)
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag(UiTestTags.THEME_DEFAULT_FIELD).assertTextContains(themeName)
     }
 
     private fun assertThemeDefaultOptionExists(name: String) {
