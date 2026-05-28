@@ -1178,9 +1178,6 @@ fun SSHPeachesRoot(
             onTerminalMarginPxChange(
                 settings.optInt("terminalMarginPx", uiState.terminalMarginPx).coerceIn(0, 128)
             )
-            onMoshServerCommandChange(
-                settings.optString("moshServerCommand", uiState.moshServerCommand)
-            )
             onCrashReportsToggle(settings.optBoolean("crashReportsEnabled", uiState.crashReportsEnabled))
             onAnalyticsToggle(settings.optBoolean("analyticsEnabled", uiState.analyticsEnabled))
             onDiagnosticsToggle(
