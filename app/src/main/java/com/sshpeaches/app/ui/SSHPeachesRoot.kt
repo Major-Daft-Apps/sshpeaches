@@ -1019,7 +1019,7 @@ fun SSHPeachesRoot(
             for (index in 0 until forwards.length()) {
                 val item = forwards.optJSONObject(index) ?: continue
                 val label = item.optString("label").trim().ifBlank { "Imported Forward" }
-                val sourceHost = item.optString("sourceHost").trim().ifBlank { "127.0.0.1" }
+                val sourceHost = "127.0.0.1"
                 val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
                 val destinationHost = item.optString("destinationHost").trim()
                 val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
@@ -1057,7 +1057,7 @@ fun SSHPeachesRoot(
                         destinationPort = destinationPort,
                         associatedHosts = jsonStringList(item.optJSONArray("associatedHosts")),
                         favorite = item.optBoolean("favorite", false),
-                        enabled = item.optBoolean("enabled", true)
+                        enabled = false
                     )
                     onImportPortForward(importedForward)
                     existingForwardByKey[key] = importedForward
@@ -1121,7 +1121,7 @@ fun SSHPeachesRoot(
                             ?.let { identityIdMap[it] ?: it },
                         preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
                             ?.let { forwardIdMap[it] ?: it },
-                        startupScript = remappedStartupScript,
+                        startupScript = "",
                         backgroundBehavior = runCatching {
                             BackgroundBehavior.valueOf(
                                 item.optString("backgroundBehavior", BackgroundBehavior.INHERIT.name)
@@ -1186,9 +1186,9 @@ fun SSHPeachesRoot(
             onDiagnosticsToggle(
                 settings.optBoolean("diagnosticsLoggingEnabled", uiState.diagnosticsLoggingEnabled)
             )
-            onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
-            onHostKeyPromptToggle(settings.optBoolean("hostKeyPromptEnabled", uiState.hostKeyPromptEnabled))
-            onAutoTrustHostKeyToggle(settings.optBoolean("autoTrustHostKey", uiState.autoTrustHostKey))
+            onAutoStartForwardsToggle(uiState.autoStartForwards)
+            onHostKeyPromptToggle(uiState.hostKeyPromptEnabled)
+            onAutoTrustHostKeyToggle(uiState.autoTrustHostKey)
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
