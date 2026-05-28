@@ -1447,12 +1447,10 @@ fun SSHPeachesRoot(
         when (destination.route) {
             Routes.ABOUT -> showAbout.value = true
             else -> {
-                if (destination.route != currentRoute) {
-                    navController.navigate(destination.route) {
-                        popUpTo(Routes.HOME) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                navController.navigate(destination.route) {
+                    popUpTo(Routes.HOME) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
                 }
             }
         }

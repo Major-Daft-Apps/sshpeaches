@@ -56,4 +56,15 @@ class SmokeNavigationTest {
         composeRule.navigateDrawer(Routes.SETTINGS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
     }
+
+    @Test
+    fun drawerNavigation_canReturnHomeFromHosts() {
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+
+        composeRule.navigateDrawer(Routes.HOSTS)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOSTS).assertIsDisplayed()
+
+        composeRule.navigateDrawer(Routes.HOME)
+        composeRule.onNodeWithTag(UiTestTags.SCREEN_HOME).assertIsDisplayed()
+    }
 }
