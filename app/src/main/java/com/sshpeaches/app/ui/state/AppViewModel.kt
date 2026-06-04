@@ -254,6 +254,7 @@ class AppViewModel(
         )
         val recents = buildHomeRecents(hosts, identities, forwards, snippets)
         AppUiState(
+            resourcesLoaded = true,
             home = HomeSection(favorites = favorites, recents = recents),
             hosts = hostList,
             identities = identities,
@@ -547,6 +548,7 @@ class AppViewModel(
     }
 
     private fun stateFingerprint(state: AppUiState): String = buildString {
+        append(state.resourcesLoaded).append('|')
         append(state.hosts.size).append('|')
         append(state.identities.size).append('|')
         append(state.portForwards.size).append('|')

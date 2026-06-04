@@ -27,6 +27,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.data.ssh.Ed25519IdentityKeyProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
@@ -1779,22 +1780,62 @@ class SessionService : Service() {
             )
             return false
         }
-        val tempKeyFile = writeIdentityKeyTempFile(host.id, privateKey)
+        val publicKey = runCatching {
+            SecurityManager.getIdentityPublicKey(identityId)
+        }.getOrNull()
+        var tempKeyFile: File? = null
         return try {
-            val keyProvider = if (keyPassphrase.isNullOrBlank()) {
-                client.loadKeys(tempKeyFile.absolutePath)
-            } else {
-                client.loadKeys(tempKeyFile.absolutePath, keyPassphrase.toCharArray())
+            UiDebugLog.action(
+                "SessionService.authenticateWithIdentity",
+                "sessionId=$sessionId, hostId=${host.id}, identityId=${identityId.take(8)}, " +
+                    "required=$required, hasPassphrase=${!keyPassphrase.isNullOrBlank()}, " +
+                    "hasPublicKey=${!publicKey.isNullOrBlank()}"
+            )
+            var providerSource = "sshj-file"
+            val keyProvider = Ed25519IdentityKeyProvider.load(
+                client = client,
+                privateKeyMaterial = privateKey,
+                publicKeyMaterial = publicKey,
+                passphrase = keyPassphrase
+            )?.also {
+                providerSource = "ed25519-pkcs8-direct"
+            } ?: run {
+                val file = writeIdentityKeyTempFile(host.id, privateKey)
+                tempKeyFile = file
+                if (keyPassphrase.isNullOrBlank()) {
+                    client.loadKeys(file.absolutePath)
+                } else {
+                    client.loadKeys(file.absolutePath, keyPassphrase.toCharArray())
+                }
             }
+            val keyType = runCatching { keyProvider.type.toString() }.getOrDefault("unknown")
+            UiDebugLog.result(
+                "SessionService.identityKeyProvider",
+                true,
+                "sessionId=$sessionId, hostId=${host.id}, identityId=${identityId.take(8)}, " +
+                    "source=$providerSource, type=$keyType"
+            )
             client.authPublickey(host.username, keyProvider)
+            UiDebugLog.result(
+                "SessionService.authenticateWithIdentity",
+                client.isAuthenticated,
+                "sessionId=$sessionId, hostId=${host.id}, identityId=${identityId.take(8)}, " +
+                    "source=$providerSource, type=$keyType"
+            )
             client.isAuthenticated
         } catch (authError: UserAuthException) {
+            UiDebugLog.result(
+                "SessionService.authenticateWithIdentity",
+                false,
+                "sessionId=$sessionId, hostId=${host.id}, identityId=${identityId.take(8)}, " +
+                    "error=${authError.safeIdentityAuthSummary(host)}"
+            )
             if (required) {
                 throw RuntimeException("Identity authentication failed.", authError)
             }
             false
         } finally {
-            tempKeyFile.delete()
+            tempKeyFile?.delete()
         }
     }
 
@@ -1811,6 +1852,28 @@ class SessionService : Service() {
         file.setReadable(true, true)
         file.setWritable(true, true)
         return file
+    }
+
+    private fun Throwable.safeIdentityAuthSummary(host: HostConnection): String {
+        return generateSequence(this) { it.cause }
+            .take(4)
+            .joinToString(" <- ") { error ->
+                val message = error.message
+                    ?.sanitizeIdentityAuthLog(host)
+                    ?.takeIf { it.isNotBlank() }
+                listOfNotNull(error.javaClass.name, message).joinToString(" | ")
+            }
+    }
+
+    private fun String.sanitizeIdentityAuthLog(host: HostConnection): String {
+        var sanitized = this
+        listOf(host.host to "<host>", host.username to "<user>", host.name to "<host-name>")
+            .filter { (value, _) -> value.isNotBlank() }
+            .forEach { (value, replacement) -> sanitized = sanitized.replace(value, replacement) }
+        return sanitized
+            .replace(Regex("(?i)(password|passphrase|secret)\\s*[:=]\\s*\\S+"), "\$1=<redacted>")
+            .replace(Regex("-----BEGIN [^-]+-----[\\s\\S]*?-----END [^-]+-----"), "<private-key>")
+            .replace(Regex("ssh-(rsa|ed25519|ecdsa-[^ ]+) [A-Za-z0-9+/=]+"), "ssh-$1 <public-key>")
     }
 
     private suspend fun startMoshServer(hostId: String, client: SSHClient): MoshConnect {

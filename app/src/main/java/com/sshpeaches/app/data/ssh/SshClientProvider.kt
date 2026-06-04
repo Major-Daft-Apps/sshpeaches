@@ -1,27 +1,51 @@
 package com.majordaftapps.sshpeaches.app.data.ssh
 
 import android.content.Context
+import android.util.Log
+import com.hierynomus.sshj.key.BaseKeyAlgorithm
+import com.hierynomus.sshj.key.KeyAlgorithm
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
+import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.MessageDigest
+import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.Security
+import java.security.Signature as JcaSignature
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import net.schmizz.sshj.DefaultConfig
+import net.schmizz.sshj.common.Buffer
+import net.schmizz.sshj.common.Factory
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.common.SSHRuntimeException
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.LoggerFactory
 import net.schmizz.sshj.common.SecurityUtils
+import net.schmizz.sshj.signature.Signature as SshjSignature
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
 
 /**
  * Minimal SSHJ provider. Callers are responsible for threading/coroutine dispatch.
  */
 object SshClientProvider {
 
+    private const val TAG = "SshClientProvider"
+    private const val BOUNCY_CASTLE_PROVIDER_NAME = "BC"
+    private const val ED25519_OID = "1.3.101.112"
+    private const val ED25519_KEY_SIZE = 32
     private val knownHostsWriteLock = Any()
+    private val providerInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
+    @Volatile
+    private var hostKeyProviderChecked = false
 
     data class HostKeyPrompt(
         val host: String,
@@ -46,6 +70,9 @@ object SshClientProvider {
         // Keep SSHJ on Android's default provider. bcprov is bundled for key generation,
         // but letting SSHJ auto-register BC breaks transport digests on Android.
         SecurityUtils.setRegisterBouncyCastle(false)
+        SecurityUtils.setSecurityProvider(null)
+        ensureBundledBouncyCastleProviderInstalled()
+        ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
         // Keep the Android-compatible KEX set from the last known-good release.
@@ -55,8 +82,20 @@ object SshClientProvider {
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
-        // Preserve SSHJ default host-key algorithms so known_hosts pinning for Ed25519/ECDSA
-        // remains enforceable and host-key changes are classified correctly.
+        // Android Conscrypt Ed25519 host keys can reach SSHJ as provider-specific keys that
+        // the transport layer cannot encode during key exchange. Keep Ed25519 configured so
+        // public-key user auth can advertise it, but prefer RSA/ECDSA for host keys.
+        val compatibleHostKeys = config.keyAlgorithms
+            .map { factory ->
+                androidCompatibleEcdsaHostKeyFactory(factory.name)
+                    ?: androidCompatibleEd25519KeyFactory(factory.name)
+                    ?: factory
+            }
+            .sortedBy { factory -> androidHostKeyPriority(factory.name) }
+        if (compatibleHostKeys.isNotEmpty()) {
+            config.keyAlgorithms = compatibleHostKeys
+        }
+        // Keep known_hosts pinning enforceable and host-key changes classified correctly.
         val knownHostsFile = File(context.filesDir, "known_hosts")
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
@@ -72,6 +111,360 @@ object SshClientProvider {
             connectTimeout = 10_000
             timeout = 20_000
             connection.keepAlive.keepAliveInterval = KEEPALIVE_INTERVAL_SECONDS
+        }
+    }
+
+    internal fun ensureCompatibleHostKeyAlgorithmsAvailableForTesting() {
+        ensureCompatibleHostKeyAlgorithmsAvailable()
+    }
+
+    internal fun ed25519SignatureForTesting(): SshjSignature {
+        return AndroidEd25519Signature(KeyType.ED25519.toString())
+    }
+
+    private fun ensureCompatibleHostKeyAlgorithmsAvailable() {
+        if (hostKeyProviderChecked && hostKeyAlgorithmsAvailable()) return
+        synchronized(providerInstallLock) {
+            if (hostKeyAlgorithmsAvailable()) {
+                hostKeyProviderChecked = true
+                return
+            }
+
+            hostKeyProviderChecked = true
+            if (!hostKeyAlgorithmsAvailable()) {
+                Log.w(
+                    TAG,
+                    "ECDSA/Ed25519 host-key algorithms are unavailable; SSH negotiation may fall back to RSA or fail."
+                )
+            }
+        }
+    }
+
+    private fun hostKeyAlgorithmsAvailable(): Boolean {
+        return canCreateKeyFactory("ECDSA") &&
+            canCreateKeyFactory("Ed25519") &&
+            canCreateSignature("Ed25519")
+    }
+
+    private fun canCreateKeyFactory(algorithm: String): Boolean {
+        return runCatching { KeyFactory.getInstance(algorithm) }.isSuccess
+    }
+
+    private fun canCreateSignature(algorithm: String): Boolean {
+        return runCatching { JcaSignature.getInstance(algorithm) }.isSuccess
+    }
+
+    private fun ensureBundledBouncyCastleProviderInstalled() {
+        synchronized(providerInstallLock) {
+            runCatching {
+                val existing = Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME)
+                if (existing?.javaClass?.name != BouncyCastleProvider::class.java.name) {
+                    if (existing != null) {
+                        Security.removeProvider(existing.name)
+                    }
+                    Security.addProvider(BouncyCastleProvider())
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "Unable to install bundled Bouncy Castle host-key provider", error)
+            }
+        }
+    }
+
+    private fun androidCompatibleEcdsaHostKeyFactory(name: String): Factory.Named<KeyAlgorithm>? {
+        return when (name) {
+            KeyType.ECDSA256.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA256withECDSA", KeyType.ECDSA256)
+            KeyType.ECDSA256_CERT.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA256withECDSA", KeyType.ECDSA256_CERT)
+            KeyType.ECDSA384.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA384withECDSA", KeyType.ECDSA384)
+            KeyType.ECDSA384_CERT.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA384withECDSA", KeyType.ECDSA384_CERT)
+            KeyType.ECDSA521.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA512withECDSA", KeyType.ECDSA521)
+            KeyType.ECDSA521_CERT.toString() -> AndroidEcdsaKeyAlgorithmFactory(name, "SHA512withECDSA", KeyType.ECDSA521_CERT)
+            else -> null
+        }
+    }
+
+    private fun androidCompatibleEd25519KeyFactory(name: String): Factory.Named<KeyAlgorithm>? {
+        return when (name) {
+            KeyType.ED25519.toString() -> AndroidEd25519KeyAlgorithmFactory(name, KeyType.ED25519)
+            else -> null
+        }
+    }
+
+    private fun androidHostKeyPriority(name: String): Int {
+        val lower = name.lowercase()
+        return when {
+            lower == "rsa-sha2-512" -> 0
+            lower == "rsa-sha2-256" -> 1
+            lower.contains("rsa") -> 2
+            lower.contains("ecdsa") -> 3
+            lower.contains("ed25519") || lower.contains("eddsa") -> 4
+            else -> 5
+        }
+    }
+
+    private class AndroidEcdsaKeyAlgorithmFactory(
+        private val name: String,
+        private val jcaAlgorithm: String,
+        private val keyType: KeyType
+    ) : Factory.Named<KeyAlgorithm> {
+        override fun getName(): String = name
+
+        override fun create(): KeyAlgorithm {
+            return BaseKeyAlgorithm(
+                name,
+                AndroidEcdsaSignatureFactory(name, jcaAlgorithm),
+                keyType
+            )
+        }
+    }
+
+    private class AndroidEd25519KeyAlgorithmFactory(
+        private val name: String,
+        private val keyType: KeyType
+    ) : Factory.Named<KeyAlgorithm> {
+        override fun getName(): String = name
+
+        override fun create(): KeyAlgorithm {
+            return BaseKeyAlgorithm(
+                name,
+                AndroidEd25519SignatureFactory(name),
+                keyType
+            )
+        }
+    }
+
+    private class AndroidEd25519SignatureFactory(
+        private val name: String
+    ) : Factory.Named<SshjSignature> {
+        override fun getName(): String = name
+
+        override fun create(): SshjSignature = AndroidEd25519Signature(name)
+    }
+
+    private class AndroidEd25519Signature(
+        private val signatureName: String
+    ) : SshjSignature {
+        private var signer: Ed25519Signer? = null
+
+        override fun getSignatureName(): String = signatureName
+
+        override fun initVerify(publicKey: PublicKey) {
+            val rawPublicKey = runCatching { extractEd25519PublicKey(publicKey) }
+                .getOrElse { throw SSHRuntimeException(it) }
+            signer = Ed25519Signer().apply {
+                init(false, Ed25519PublicKeyParameters(rawPublicKey, 0))
+            }
+        }
+
+        override fun initSign(privateKey: PrivateKey) {
+            val seed = runCatching { extractEd25519PrivateSeed(privateKey) }
+                .getOrElse { throw SSHRuntimeException(it) }
+            signer = Ed25519Signer().apply {
+                init(true, Ed25519PrivateKeyParameters(seed, 0))
+            }
+        }
+
+        override fun update(data: ByteArray) {
+            update(data, 0, data.size)
+        }
+
+        override fun update(data: ByteArray, offset: Int, length: Int) {
+            runCatching {
+                signer?.update(data, offset, length) ?: error("Ed25519 signature is not initialized.")
+            }.getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun sign(): ByteArray {
+            return runCatching {
+                signer?.generateSignature() ?: error("Ed25519 signature is not initialized.")
+            }.getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun encode(signature: ByteArray): ByteArray = signature
+
+        override fun verify(signature: ByteArray): Boolean {
+            val rawSignature = runCatching { extractEd25519Signature(signature, signatureName) }
+                .getOrElse { throw SSHRuntimeException(it) }
+            return runCatching {
+                signer?.verifySignature(rawSignature) ?: error("Ed25519 signature is not initialized.")
+            }.getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        private fun extractEd25519PrivateSeed(privateKey: PrivateKey): ByteArray {
+            if (privateKey is RawEd25519PrivateKey) return privateKey.rawSeed()
+            val info = PrivateKeyInfo.getInstance(privateKey.encoded)
+            check(info.privateKeyAlgorithm.algorithm.id == ED25519_OID) { "Private key is not Ed25519." }
+            val octets = ASN1OctetString.getInstance(info.parsePrivateKey()).octets
+            check(octets.size == ED25519_KEY_SIZE) { "Invalid Ed25519 private key length." }
+            return octets
+        }
+
+        private fun extractEd25519PublicKey(publicKey: PublicKey): ByteArray {
+            if (publicKey is RawEd25519PublicKey) return publicKey.rawPublicKey()
+            val encoded = publicKey.encoded
+            check(encoded.size >= ED25519_KEY_SIZE) { "Invalid Ed25519 public key length." }
+            return encoded.copyOfRange(encoded.size - ED25519_KEY_SIZE, encoded.size)
+        }
+
+        private fun extractEd25519Signature(signature: ByteArray, expectedName: String): ByteArray {
+            if (signature.size == 64) return signature
+            val buffer = Buffer.PlainBuffer(signature)
+            val actualName = buffer.readString()
+            if (actualName != expectedName) {
+                error("Expected '$expectedName' key algorithm, but got: $actualName")
+            }
+            val rawSignature = buffer.readBytes()
+            check(rawSignature.size == 64) { "Invalid Ed25519 signature length." }
+            return rawSignature
+        }
+    }
+
+    private class AndroidEcdsaSignatureFactory(
+        private val name: String,
+        private val jcaAlgorithm: String
+    ) : Factory.Named<SshjSignature> {
+        override fun getName(): String = name
+
+        override fun create(): SshjSignature = AndroidEcdsaSignature(name, jcaAlgorithm)
+    }
+
+    private class AndroidEcdsaSignature(
+        private val signatureName: String,
+        private val jcaAlgorithm: String
+    ) : SshjSignature {
+        private val signature = createSignature()
+
+        override fun getSignatureName(): String = signatureName
+
+        override fun initVerify(publicKey: PublicKey) {
+            runCatching { signature.initVerify(publicKey) }
+                .getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun initSign(privateKey: PrivateKey) {
+            runCatching { signature.initSign(privateKey) }
+                .getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun update(data: ByteArray) {
+            update(data, 0, data.size)
+        }
+
+        override fun update(data: ByteArray, offset: Int, length: Int) {
+            runCatching { signature.update(data, offset, length) }
+                .getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun sign(): ByteArray {
+            return runCatching { signature.sign() }
+                .getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        override fun encode(signature: ByteArray): ByteArray {
+            val (r, s) = runCatching { derDecodeEcdsaSignature(signature) }
+                .getOrElse { throw SSHRuntimeException(it) }
+            return Buffer.PlainBuffer()
+                .putMPInt(r)
+                .putMPInt(s)
+                .compactData
+        }
+
+        override fun verify(signature: ByteArray): Boolean {
+            val derSignature = runCatching { sshEcdsaSignatureToDer(signature, signatureName) }
+                .getOrElse { throw SSHRuntimeException(it) }
+            return runCatching { this.signature.verify(derSignature) }
+                .getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        private fun createSignature(): JcaSignature {
+            return runCatching {
+                val provider = Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME)
+                if (provider == null) {
+                    JcaSignature.getInstance(jcaAlgorithm)
+                } else {
+                    JcaSignature.getInstance(jcaAlgorithm, provider)
+                }
+            }.getOrElse { throw SSHRuntimeException(it) }
+        }
+
+        private fun sshEcdsaSignatureToDer(signature: ByteArray, expectedName: String): ByteArray {
+            val outer = Buffer.PlainBuffer(signature)
+            val actualName = outer.readString()
+            if (actualName != expectedName) {
+                error("Expected '$expectedName' key algorithm, but got: $actualName")
+            }
+            val inner = Buffer.PlainBuffer(outer.readBytes())
+            return derEncodeEcdsaSignature(
+                r = inner.readMPInt(),
+                s = inner.readMPInt()
+            )
+        }
+
+        private fun derEncodeEcdsaSignature(r: BigInteger, s: BigInteger): ByteArray {
+            val encodedR = derEncodeInteger(r)
+            val encodedS = derEncodeInteger(s)
+            val length = encodedR.size + encodedS.size
+            return byteArrayOf(0x30) + derEncodeLength(length) + encodedR + encodedS
+        }
+
+        private fun derEncodeInteger(value: BigInteger): ByteArray {
+            val bytes = value.toByteArray()
+            return byteArrayOf(0x02) + derEncodeLength(bytes.size) + bytes
+        }
+
+        private fun derDecodeEcdsaSignature(signature: ByteArray): Pair<BigInteger, BigInteger> {
+            val reader = DerReader(signature)
+            reader.expect(0x30)
+            val sequenceLength = reader.readLength()
+            val sequenceEnd = reader.position + sequenceLength
+            val r = reader.readInteger()
+            val s = reader.readInteger()
+            check(reader.position == sequenceEnd) { "Unexpected trailing ECDSA signature data." }
+            return r to s
+        }
+
+        private fun derEncodeLength(length: Int): ByteArray {
+            if (length < 0x80) return byteArrayOf(length.toByte())
+            val bytes = BigInteger.valueOf(length.toLong()).toByteArray().dropWhile { it == 0.toByte() }
+            return byteArrayOf((0x80 or bytes.size).toByte()) + bytes.toByteArray()
+        }
+
+        private class DerReader(private val data: ByteArray) {
+            var position: Int = 0
+                private set
+
+            fun expect(expected: Int) {
+                val actual = readByte()
+                check(actual == expected) {
+                    "Expected DER tag 0x${expected.toString(16)}, got 0x${actual.toString(16)}."
+                }
+            }
+
+            fun readLength(): Int {
+                val first = readByte()
+                if ((first and 0x80) == 0) return first
+                val byteCount = first and 0x7F
+                check(byteCount in 1..4) { "Unsupported DER length." }
+                var length = 0
+                repeat(byteCount) {
+                    length = (length shl 8) or readByte()
+                }
+                check(length >= 0 && position + length <= data.size) { "Invalid DER length." }
+                return length
+            }
+
+            fun readInteger(): BigInteger {
+                expect(0x02)
+                val length = readLength()
+                check(length > 0 && position + length <= data.size) { "Invalid DER integer length." }
+                val bytes = data.copyOfRange(position, position + length)
+                position += length
+                return BigInteger(bytes)
+            }
+
+            private fun readByte(): Int {
+                check(position < data.size) { "Unexpected end of DER data." }
+                return data[position++].toInt() and 0xFF
+            }
         }
     }
 
@@ -119,6 +512,10 @@ object SshClientProvider {
         private val autoTrustUnknownHostKey: Boolean,
         private val onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?
     ) : OpenSSHKnownHosts(file) {
+
+        override fun verify(hostname: String, port: Int, key: PublicKey): Boolean {
+            return super.verify(hostname, port, normalizeKnownHostKey(key))
+        }
 
         override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
             if (autoTrustUnknownHostKey) {
@@ -196,7 +593,6 @@ object SshClientProvider {
                 ?: return key
             val candidates = buildList {
                 val algorithm = key.algorithm.trim()
-                if (algorithm.isNotBlank()) add(algorithm)
                 val lower = algorithm.lowercase()
                 when {
                     lower.contains("eddsa") || lower.contains("ed25519") || lower.contains("ed") -> {
@@ -206,15 +602,14 @@ object SshClientProvider {
                     lower.contains("ecdsa") || lower.contains("ec") -> add("EC")
                     lower.contains("rsa") -> add("RSA")
                 }
+                if (algorithm.isNotBlank()) add(algorithm)
                 add("Ed25519")
                 add("EC")
                 add("RSA")
             }.distinct()
             candidates.forEach { algorithm ->
-                val normalized = runCatching {
-                    KeyFactory.getInstance(algorithm).generatePublic(X509EncodedKeySpec(encoded))
-                }.getOrNull()
-                if (normalized != null) {
+                val normalized = generateKnownHostPublicKey(algorithm, encoded)
+                if (normalized != null && resolveKnownHostKeyType(normalized) != KeyType.UNKNOWN) {
                     return normalized
                 }
             }
@@ -230,6 +625,24 @@ object SshClientProvider {
                 algorithm.contains("rsa") -> KeyType.RSA
                 algorithm.contains("dsa") -> KeyType.DSA
                 else -> KeyType.UNKNOWN
+            }
+        }
+
+        private fun generateKnownHostPublicKey(algorithm: String, encoded: ByteArray): PublicKey? {
+            val providers = if (algorithm.equals("Ed25519", ignoreCase = true) || algorithm.equals("EdDSA", ignoreCase = true)) {
+                listOf(Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME), null)
+            } else {
+                listOf(null)
+            }
+            return providers.firstNotNullOfOrNull { provider ->
+                runCatching {
+                    val factory = if (provider == null) {
+                        KeyFactory.getInstance(algorithm)
+                    } else {
+                        KeyFactory.getInstance(algorithm, provider)
+                    }
+                    factory.generatePublic(X509EncodedKeySpec(encoded))
+                }.getOrNull()
             }
         }
     }

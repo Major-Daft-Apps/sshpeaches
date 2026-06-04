@@ -15,6 +15,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
 data class AppUiState(
+    val resourcesLoaded: Boolean = false,
     val home: HomeSection = HomeSection(),
     val hosts: List<HostConnection> = emptyList(),
     val uptimeSummaries: List<HostUptimeSummary> = emptyList(),

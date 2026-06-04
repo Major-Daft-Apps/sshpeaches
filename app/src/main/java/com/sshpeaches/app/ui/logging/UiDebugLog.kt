@@ -21,7 +21,8 @@ object UiDebugLog {
     fun state(origin: String, state: AppUiState) {
         if (!BuildConfig.DEBUG) return
         val filledSlots = state.keyboardSlots.count { !it.isEmpty() }
-        val summary = "hosts=${state.hosts.size}, identities=${state.identities.size}, " +
+        val summary = "resourcesLoaded=${state.resourcesLoaded}, " +
+            "hosts=${state.hosts.size}, identities=${state.identities.size}, " +
             "forwards=${state.portForwards.size}, snippets=${state.snippets.size}, " +
             "sort=${state.sortMode}, theme=${state.themeMode}, locked=${state.isLocked}, " +
             "pinConfigured=${state.pinConfigured}, background=${state.allowBackgroundSessions}, " +

@@ -294,6 +294,7 @@ val liveServerMarkerFile = layout.buildDirectory.file("live-ssh-server/process.p
 val liveServerLogFile = layout.buildDirectory.file("live-ssh-server/server.log")
 val liveSshUseAdbReverse = (findProperty("liveSshUseAdbReverse") as? String)?.equals("true", ignoreCase = true) == true
 val liveSshDeviceSerial = (findProperty("liveSshDeviceSerial") as? String)?.takeIf { it.isNotBlank() }
+val liveSshHostKeyAlgorithm = (findProperty("liveSshHostKeyAlgorithm") as? String)?.takeIf { it.isNotBlank() } ?: "RSA"
 
 fun adbExecutablePath(): String {
     val adbName = if (OperatingSystem.current().isWindows) "adb.exe" else "adb"
@@ -362,7 +363,8 @@ tasks.register("startLiveSshServer") {
             "--port=$liveServerPort",
             "--httpPort=$liveForwardHttpPort",
             "--stateDir=${liveServerStateDir.get().asFile.absolutePath}",
-            "--keyProfile=primary"
+            "--keyProfile=primary",
+            "--hostKeyAlgorithm=$liveSshHostKeyAlgorithm"
         )
             .directory(rootProject.projectDir)
             .redirectErrorStream(true)

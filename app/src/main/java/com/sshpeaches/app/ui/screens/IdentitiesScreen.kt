@@ -205,6 +205,7 @@ fun IdentitiesScreen(
     val generationError = remember { mutableStateOf<String?>(null) }
     val copyKeyIdentity = remember { mutableStateOf<Identity?>(null) }
     val copyHostId = remember { mutableStateOf<String?>(null) }
+    val copyHostExpanded = remember { mutableStateOf(false) }
     val copyHostPassword = remember { mutableStateOf("") }
     val copyHostPasswordRevealIndex = remember { mutableIntStateOf(-1) }
     val copyIdentityPassphrase = remember { mutableStateOf("") }
@@ -511,6 +512,7 @@ fun IdentitiesScreen(
         }
         copyKeyIdentity.value = identity
         copyHostId.value = hosts.firstOrNull()?.id
+        copyHostExpanded.value = false
         copyHostPassword.value = ""
         copyIdentityPassphrase.value = ""
         copyError.value = null
@@ -1260,28 +1262,43 @@ fun IdentitiesScreen(
                     if (hosts.isEmpty()) {
                         Text("Add a host first, then try copying this key.")
                     } else {
-                        Text("Choose destination host")
-                        LazyColumn(
-                            modifier = Modifier.heightIn(max = 180.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        val selectedHost = hosts.firstOrNull { it.id == copyHostId.value } ?: hosts.first()
+                        ExposedDropdownMenuBox(
+                            expanded = copyHostExpanded.value,
+                            onExpandedChange = {
+                                if (!copyInProgress.value) {
+                                    copyHostExpanded.value = !copyHostExpanded.value
+                                }
+                            }
                         ) {
-                            items(hosts, key = { it.id }) { host ->
-                                val selected = copyHostId.value == host.id
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
-                                            shape = MaterialTheme.shapes.small
-                                        )
-                                        .clickable(enabled = !copyInProgress.value) { copyHostId.value = host.id }
-                                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(host.name.ifBlank { host.host })
-                                    if (selected) {
-                                        Text("Selected", style = MaterialTheme.typography.bodySmall)
-                                    }
+                            OutlinedTextField(
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                value = selectedHost.copyKeyDestinationLabel(),
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = !copyInProgress.value,
+                                label = { Text("Destination host") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = copyHostExpanded.value)
+                                },
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = copyHostExpanded.value,
+                                onDismissRequest = { copyHostExpanded.value = false }
+                            ) {
+                                hosts.forEach { host ->
+                                    DropdownMenuItem(
+                                        text = { Text(host.copyKeyDestinationLabel()) },
+                                        onClick = {
+                                            copyHostId.value = host.id
+                                            copyHostExpanded.value = false
+                                            copyError.value = null
+                                        },
+                                        enabled = !copyInProgress.value
+                                    )
                                 }
                             }
                         }
@@ -1607,6 +1624,11 @@ private fun applyGeneratedKeyPair(
     fingerprintState.value = generated.fingerprint
     passphraseState.value = passphrase
     keyStatusState.value = "Generated ${generated.publicKey.substringBefore(' ')} keypair."
+}
+
+private fun HostConnection.copyKeyDestinationLabel(): String {
+    val displayName = name.trim().ifBlank { host.trim() }
+    return "$displayName (${username.trim()}@${host.trim()})"
 }
 
 private fun computeFingerprintFromKeyMaterial(keyText: String): String {

@@ -64,7 +64,7 @@ fun main(args: Array<String>) {
         keyPairProvider = SimpleGeneratorHostKeyProvider(
             keyDir.resolve("${options.keyProfile}.ser")
         ).apply {
-            setAlgorithm("RSA")
+            setAlgorithm(options.hostKeyAlgorithm)
         }
         fileSystemFactory = VirtualFileSystemFactory(sandboxRoot)
         passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
@@ -93,7 +93,11 @@ fun main(args: Array<String>) {
 
     forwardHttpServer.start()
     server.start()
-    println("$READY_PREFIX port=${server.port} httpPort=${options.httpPort} sandbox=${sandboxRoot.absolutePathString()} keyProfile=${options.keyProfile}")
+    println(
+        "$READY_PREFIX port=${server.port} httpPort=${options.httpPort} " +
+            "sandbox=${sandboxRoot.absolutePathString()} keyProfile=${options.keyProfile} " +
+            "hostKeyAlgorithm=${options.hostKeyAlgorithm}"
+    )
     val latch = CountDownLatch(1)
     latch.await()
 }
@@ -144,7 +148,8 @@ private data class Options(
     val port: Int,
     val httpPort: Int,
     val stateDir: Path,
-    val keyProfile: String
+    val keyProfile: String,
+    val hostKeyAlgorithm: String
 ) {
     companion object {
         fun parse(args: Array<String>): Options {
@@ -158,7 +163,14 @@ private data class Options(
             val httpPort = parsed["httpPort"]?.toIntOrNull() ?: 56323
             val stateDir = Path.of(parsed["stateDir"] ?: Path.of("build", "live-ssh-server").toString())
             val keyProfile = parsed["keyProfile"]?.takeIf { it.isNotBlank() } ?: "primary"
-            return Options(port = port, httpPort = httpPort, stateDir = stateDir, keyProfile = keyProfile)
+            val hostKeyAlgorithm = parsed["hostKeyAlgorithm"]?.takeIf { it.isNotBlank() } ?: "RSA"
+            return Options(
+                port = port,
+                httpPort = httpPort,
+                stateDir = stateDir,
+                keyProfile = keyProfile,
+                hostKeyAlgorithm = hostKeyAlgorithm
+            )
         }
     }
 }

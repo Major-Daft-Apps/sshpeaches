@@ -101,6 +101,7 @@ fun HomeScreen(
     transferProgresses: Map<String, FileTransferProgress> = emptyMap(),
     activeSshSessionHostIds: Set<String> = emptySet(),
     shellLayoutMode: ShellLayoutMode = ShellLayoutMode.COMPACT,
+    resourcesLoaded: Boolean = true,
     hasAnyResources: Boolean,
     suppressEmptyWelcome: Boolean = false,
     onSuppressEmptyWelcomeConsumed: () -> Unit = {},
@@ -190,7 +191,9 @@ fun HomeScreen(
             .fillMaxSize()
             .testTag(UiTestTags.SCREEN_HOME)
     ) {
-        if (!hasAnyResources && !suppressEmptyWelcomeForCurrentVisit.value) {
+        if (!resourcesLoaded) {
+            // Hold the home surface blank until Room emits real resource state.
+        } else if (!hasAnyResources && !suppressEmptyWelcomeForCurrentVisit.value) {
             HomeWelcome(
                 onAddHost = onAddHost,
                 onAddIdentity = onAddIdentity,
