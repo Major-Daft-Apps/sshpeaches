@@ -18,6 +18,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import android.os.SystemClock
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
@@ -108,6 +110,53 @@ class ConnectingScreenTest {
                 "Snippet picker did not send the expected shell payload"
             }
         }
+    }
+
+    @Test
+    fun terminalKeyboardButtonAndDoubleTap_showSoftKeyboard() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
+        hideSoftKeyboardIfShown(device)
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        composeRule.waitUntil(5_000) { device.isSoftKeyboardShown() }
+
+        hideSoftKeyboardIfShown(device)
+
+        doubleTapTerminalPanelWithDevice(device)
+        composeRule.waitUntil(5_000) { device.isSoftKeyboardShown() }
     }
 
     @Test
@@ -754,4 +803,31 @@ class ConnectingScreenTest {
         auth = AuthMethod.PASSWORD,
         mode = mode
     )
+
+    private fun UiDevice.isSoftKeyboardShown(): Boolean {
+        val dump = executeShellCommand("dumpsys input_method")
+        return dump.lineSequence().any { line ->
+            line.contains("mInputShown=true")
+        }
+    }
+
+    private fun hideSoftKeyboardIfShown(device: UiDevice) {
+        if (device.isSoftKeyboardShown()) {
+            device.pressBack()
+            composeRule.waitUntil(5_000) { !device.isSoftKeyboardShown() }
+        }
+    }
+
+    private fun doubleTapTerminalPanelWithDevice(device: UiDevice) {
+        val bounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val rootOffset = IntArray(2)
+        composeRule.activity.window.decorView.getLocationOnScreen(rootOffset)
+        val x = rootOffset[0] + bounds.center.x.toInt()
+        val y = rootOffset[1] + bounds.center.y.toInt()
+        device.click(x, y)
+        SystemClock.sleep(80)
+        device.click(x, y)
+    }
 }
