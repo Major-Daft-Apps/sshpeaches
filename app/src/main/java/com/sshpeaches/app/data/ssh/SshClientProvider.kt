@@ -8,6 +8,7 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyFactory
+import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.PublicKey
@@ -15,6 +16,7 @@ import java.security.Security
 import java.security.Signature as JcaSignature
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
+import javax.crypto.KeyAgreement
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.Factory
@@ -25,6 +27,7 @@ import net.schmizz.sshj.common.LoggerFactory
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.signature.Signature as SshjSignature
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
+import net.schmizz.sshj.transport.kex.KeyExchange
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
@@ -67,6 +70,61 @@ object SshClientProvider {
         autoTrustUnknownHostKey: Boolean = true,
         onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
     ): SSHClient {
+        // Keep known_hosts pinning enforceable and host-key changes classified correctly.
+        val knownHostsFile = File(context.filesDir, "known_hosts")
+        return createConfiguredClient(
+            knownHostsFile = knownHostsFile,
+            host = host,
+            loggerFactory = loggerFactory,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt
+        )
+    }
+
+    internal fun ensureCompatibleHostKeyAlgorithmsAvailableForTesting() {
+        ensureCompatibleHostKeyAlgorithmsAvailable()
+    }
+
+    internal fun ed25519SignatureForTesting(): SshjSignature {
+        return AndroidEd25519Signature(KeyType.ED25519.toString())
+    }
+
+    internal fun compatibleKeyExchangeNamesForTesting(
+        unavailableAlgorithms: Set<String> = emptySet()
+    ): List<String> {
+        val unavailable = unavailableAlgorithms.map { it.lowercase() }.toSet()
+        val availability = object : JcaAlgorithmAvailability {
+            override fun hasKeyPairGenerator(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
+            override fun hasKeyAgreement(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
+            override fun hasKeyFactory(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
+        }
+        return androidCompatibleKeyExchangeFactories(DefaultConfig().keyExchangeFactories, availability)
+            .map { it.name }
+    }
+
+    internal fun createClientForTesting(
+        knownHostsFile: File,
+        host: HostConnection,
+        loggerFactory: LoggerFactory? = null,
+        autoTrustUnknownHostKey: Boolean = true,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
+    ): SSHClient {
+        return createConfiguredClient(
+            knownHostsFile = knownHostsFile,
+            host = host,
+            loggerFactory = loggerFactory,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt
+        )
+    }
+
+    private fun createConfiguredClient(
+        knownHostsFile: File,
+        host: HostConnection,
+        loggerFactory: LoggerFactory?,
+        autoTrustUnknownHostKey: Boolean,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?
+    ): SSHClient {
         // Keep SSHJ on Android's default provider. bcprov is bundled for key generation,
         // but letting SSHJ auto-register BC breaks transport digests on Android.
         SecurityUtils.setRegisterBouncyCastle(false)
@@ -75,16 +133,10 @@ object SshClientProvider {
         ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
-        // Keep the Android-compatible KEX set from the last known-good release.
-        val compatibleKex = config.keyExchangeFactories.filterNot { factory ->
-            factory.name.contains("curve25519", ignoreCase = true)
-        }
+        val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories)
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
-        // Android Conscrypt Ed25519 host keys can reach SSHJ as provider-specific keys that
-        // the transport layer cannot encode during key exchange. Keep Ed25519 configured so
-        // public-key user auth can advertise it, but prefer RSA/ECDSA for host keys.
         val compatibleHostKeys = config.keyAlgorithms
             .map { factory ->
                 androidCompatibleEcdsaHostKeyFactory(factory.name)
@@ -95,8 +147,7 @@ object SshClientProvider {
         if (compatibleHostKeys.isNotEmpty()) {
             config.keyAlgorithms = compatibleHostKeys
         }
-        // Keep known_hosts pinning enforceable and host-key changes classified correctly.
-        val knownHostsFile = File(context.filesDir, "known_hosts")
+        knownHostsFile.parentFile?.mkdirs()
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
             addHostKeyVerifier(
@@ -114,12 +165,86 @@ object SshClientProvider {
         }
     }
 
-    internal fun ensureCompatibleHostKeyAlgorithmsAvailableForTesting() {
-        ensureCompatibleHostKeyAlgorithmsAvailable()
+    private fun androidCompatibleKeyExchangeFactories(
+        factories: List<Factory.Named<KeyExchange>>,
+        availability: JcaAlgorithmAvailability = RealJcaAlgorithmAvailability
+    ): List<Factory.Named<KeyExchange>> {
+        val compatibleFactories = factories.filter { factory ->
+            keyExchangeFactoryAvailable(factory.name, availability)
+        }
+        return compatibleFactories.sortedWith(
+            compareBy<Factory.Named<KeyExchange>> { factory -> androidKeyExchangePriority(factory.name) }
+                .thenBy { factory -> compatibleFactories.indexOf(factory) }
+        )
     }
 
-    internal fun ed25519SignatureForTesting(): SshjSignature {
-        return AndroidEd25519Signature(KeyType.ED25519.toString())
+    private fun keyExchangeFactoryAvailable(
+        name: String,
+        availability: JcaAlgorithmAvailability
+    ): Boolean {
+        val lower = name.lowercase()
+        return when {
+            lower.startsWith("ext-info") -> true
+            lower.contains("curve25519") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "X25519",
+                keyAgreementAlgorithm = "X25519",
+                keyFactoryAlgorithm = "X25519"
+            )
+            lower.startsWith("ecdh-") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "EC",
+                keyAgreementAlgorithm = "ECDH",
+                keyFactoryAlgorithm = "EC"
+            )
+            lower.contains("diffie-hellman") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "DH",
+                keyAgreementAlgorithm = "DH",
+                keyFactoryAlgorithm = "DH"
+            )
+            else -> true
+        }
+    }
+
+    private fun androidKeyExchangePriority(name: String): Int {
+        val lower = name.lowercase()
+        return when {
+            lower.contains("curve25519") -> 0
+            lower == "ecdh-sha2-nistp256" -> 1
+            lower == "ecdh-sha2-nistp384" -> 2
+            lower == "ecdh-sha2-nistp521" -> 3
+            lower == "diffie-hellman-group14-sha256" -> 4
+            lower == "diffie-hellman-group16-sha512" -> 5
+            lower == "diffie-hellman-group18-sha512" -> 6
+            lower.contains("diffie-hellman") -> 7
+            lower.startsWith("ext-info") -> 99
+            else -> 8
+        }
+    }
+
+    private fun JcaAlgorithmAvailability.supportsKeyExchange(
+        keyPairAlgorithm: String,
+        keyAgreementAlgorithm: String,
+        keyFactoryAlgorithm: String
+    ): Boolean {
+        return hasKeyPairGenerator(keyPairAlgorithm) &&
+            hasKeyAgreement(keyAgreementAlgorithm) &&
+            hasKeyFactory(keyFactoryAlgorithm)
+    }
+
+    private interface JcaAlgorithmAvailability {
+        fun hasKeyPairGenerator(algorithm: String): Boolean
+        fun hasKeyAgreement(algorithm: String): Boolean
+        fun hasKeyFactory(algorithm: String): Boolean
+    }
+
+    private object RealJcaAlgorithmAvailability : JcaAlgorithmAvailability {
+        override fun hasKeyPairGenerator(algorithm: String): Boolean =
+            runCatching { KeyPairGenerator.getInstance(algorithm) }.isSuccess
+
+        override fun hasKeyAgreement(algorithm: String): Boolean =
+            runCatching { KeyAgreement.getInstance(algorithm) }.isSuccess
+
+        override fun hasKeyFactory(algorithm: String): Boolean =
+            canCreateKeyFactory(algorithm)
     }
 
     private fun ensureCompatibleHostKeyAlgorithmsAvailable() {

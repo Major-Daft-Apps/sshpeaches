@@ -235,6 +235,7 @@ object UiTestTags {
     const val CONNECTING_LOG_PANEL = "connecting_log_panel"
     const val CONNECTING_FIND_BUTTON = "connecting_find_button"
     const val CONNECTING_CLOSE_BUTTON = "connecting_close_button"
+    const val CONNECTING_KEYBOARD_STATE = "connecting_keyboard_state"
     const val CONNECTING_KEYBOARD_TOGGLE = "connecting_keyboard_toggle"
     const val CONNECTING_FIND_INPUT = "connecting_find_input"
     const val CONNECTING_FIND_STATUS = "connecting_find_status"

@@ -126,6 +126,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.core.graphics.toColorInt
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -141,6 +142,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -316,6 +318,7 @@ fun ConnectingScreen(
     }
     var lastShellSnapshot by remember(request?.sessionId) { mutableStateOf("") }
     var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalView?>(null) }
+    var terminalImeBridgeRef by remember(request?.sessionId) { mutableStateOf<TerminalImeBridgeEditText?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
     var terminalFontSizeSp by rememberSaveable(request?.sessionId) { mutableStateOf(10f) }
     var lastResize by remember(request?.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -544,17 +547,31 @@ fun ConnectingScreen(
     } else {
         findMatches[findMatchIndex.coerceIn(0, findMatches.lastIndex)]
     }
+    fun hideSystemKeyboard() {
+        terminalImeBridgeRef?.hideTerminalKeyboard()
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        keyboardFocused = false
+        keyboardVisibleRequested = false
+    }
+
+    fun showSystemKeyboard() {
+        runCatching { keyboardFocusRequester.requestFocus() }
+        terminalImeBridgeRef?.showTerminalKeyboard() ?: keyboardController?.show()
+        keyboardFocused = true
+        keyboardVisibleRequested = true
+    }
+
     val toggleSystemKeyboard = {
         if (keyboardVisibleRequested) {
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            keyboardFocused = false
-            keyboardVisibleRequested = false
+            hideSystemKeyboard()
         } else {
-            keyboardFocusRequester.requestFocus()
-            keyboardController?.show()
-            keyboardFocused = true
-            keyboardVisibleRequested = true
+            showSystemKeyboard()
+        }
+    }
+    LaunchedEffect(keyboardVisibleRequested, terminalImeBridgeRef) {
+        if (keyboardVisibleRequested) {
+            terminalImeBridgeRef?.showTerminalKeyboard()
         }
     }
     val terminalViewClient = remember(request?.sessionId) {
@@ -568,9 +585,7 @@ fun ConnectingScreen(
             override fun onSingleTapUp(e: MotionEvent) {
                 onToggleConnectedHostBar()
                 if (keyboardVisibleRequested) {
-                    keyboardFocusRequester.requestFocus()
-                    keyboardController?.show()
-                    keyboardFocused = true
+                    showSystemKeyboard()
                 }
             }
 
@@ -789,6 +804,7 @@ fun ConnectingScreen(
             swipeRepeatJob = null
             swipeRepeatKeyCode = null
             terminalViewRef = null
+            terminalImeBridgeRef = null
         }
     }
     DisposableEffect(activity, request?.sessionId) {
@@ -802,10 +818,7 @@ fun ConnectingScreen(
             when (event) {
                 Lifecycle.Event.ON_PAUSE,
                 Lifecycle.Event.ON_STOP -> {
-                    keyboardController?.hide()
-                    focusManager.clearFocus(force = true)
-                    keyboardFocused = false
-                    keyboardVisibleRequested = false
+                    hideSystemKeyboard()
                 }
 
                 else -> Unit
@@ -814,9 +827,7 @@ fun ConnectingScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            keyboardVisibleRequested = false
+            hideSystemKeyboard()
         }
     }
     LaunchedEffect(shellOutput, request?.sessionId, hasExternalTerminalEmulator) {
@@ -860,15 +871,9 @@ fun ConnectingScreen(
     }
     LaunchedEffect(state.phase, request?.sessionId) {
         if (showTerminalSession) {
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            keyboardFocused = false
-            keyboardVisibleRequested = false
+            hideSystemKeyboard()
         } else {
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            keyboardFocused = false
-            keyboardVisibleRequested = false
+            hideSystemKeyboard()
         }
     }
     LaunchedEffect(findRequestToken, showTerminalSession) {
@@ -1495,7 +1500,9 @@ fun ConnectingScreen(
                 activeAliasIcons = activeAliasIcons,
                 onSendCompactKey = ::handleCompactKeyPress,
                 onImeTextInput = ::handleTerminalImeText,
+                keyboardVisibleRequested = keyboardVisibleRequested,
                 keyboardFocusRequester = keyboardFocusRequester,
+                onImeBridgeReady = { terminalImeBridgeRef = it },
                 onKeyboardFocusChanged = { keyboardFocused = it },
                 handleVolumeKeyForFontSize = ::handleVolumeKeyForFontSize,
                 terminalInput = terminalInput,
@@ -1661,7 +1668,9 @@ private fun ConnectingTerminalContent(
     activeAliasIcons: Set<String>,
     onSendCompactKey: (CompactTerminalKey) -> Unit,
     onImeTextInput: (String) -> Unit,
+    keyboardVisibleRequested: Boolean,
     keyboardFocusRequester: FocusRequester,
+    onImeBridgeReady: (TerminalImeBridgeEditText?) -> Unit,
     onKeyboardFocusChanged: (Boolean) -> Unit,
     handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
     terminalInput: TerminalInputRouter,
@@ -1670,6 +1679,14 @@ private fun ConnectingTerminalContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .semantics {
+                stateDescription = if (keyboardVisibleRequested) {
+                    KEYBOARD_REQUESTED_STATE
+                } else {
+                    KEYBOARD_HIDDEN_STATE
+                }
+            }
+            .testTag(UiTestTags.CONNECTING_KEYBOARD_STATE)
     ) {
         Column(
             modifier = Modifier
@@ -1734,6 +1751,7 @@ private fun ConnectingTerminalContent(
         TerminalImeBridge(
             onTextInput = onImeTextInput,
             onBackspace = terminalInput::sendBackspace,
+            onBridgeReady = onImeBridgeReady,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .size(1.dp)
@@ -1752,18 +1770,27 @@ private fun TerminalImeBridge(
     onBackspace: () -> Unit,
     handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
     terminalInput: TerminalInputRouter,
+    onBridgeReady: (TerminalImeBridgeEditText?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentOnTextInput = rememberUpdatedState(onTextInput)
     val currentOnBackspace = rememberUpdatedState(onBackspace)
     val currentHandleVolumeKeyForFontSize = rememberUpdatedState(handleVolumeKeyForFontSize)
     val currentTerminalInput = rememberUpdatedState(terminalInput)
+    val currentOnBridgeReady = rememberUpdatedState(onBridgeReady)
+
+    DisposableEffect(Unit) {
+        onDispose {
+            currentOnBridgeReady.value(null)
+        }
+    }
 
     AndroidView(
         factory = { context ->
             TerminalImeBridgeEditText(context).apply {
                 isFocusable = true
                 isFocusableInTouchMode = true
+                showSoftInputOnFocus = true
                 isCursorVisible = false
                 setTextColor(android.graphics.Color.TRANSPARENT)
                 setHintTextColor(android.graphics.Color.TRANSPARENT)
@@ -1827,13 +1854,42 @@ private fun TerminalImeBridge(
                 }
 
                 restoreSentinel()
+                currentOnBridgeReady.value(this)
             }
+        },
+        update = { bridge ->
+            currentOnBridgeReady.value(bridge)
         },
         modifier = modifier
     )
 }
 
 private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
+    fun showTerminalKeyboard() {
+        fun showNow() {
+            showSoftInputOnFocus = true
+            requestFocus()
+            post {
+                if (isAttachedToWindow) {
+                    requestFocus()
+                    inputMethodManager()?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                }
+            }
+        }
+        if (isAttachedToWindow) {
+            showNow()
+        } else {
+            post {
+                if (isAttachedToWindow) showNow()
+            }
+        }
+    }
+
+    fun hideTerminalKeyboard() {
+        inputMethodManager()?.hideSoftInputFromWindow(windowToken, 0)
+        clearFocus()
+    }
+
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val connection = super.onCreateInputConnection(outAttrs)
         outAttrs.inputType = TERMINAL_IME_INPUT_TYPE
@@ -1841,6 +1897,9 @@ private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
         outAttrs.privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
         return connection
     }
+
+    private fun inputMethodManager(): InputMethodManager? =
+        context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
 }
 
 @Composable
@@ -3866,6 +3925,8 @@ private fun normalizeImeChunk(chunk: String): String {
 }
 
 private const val TERMINAL_IME_SENTINEL = "\u0001"
+private const val KEYBOARD_REQUESTED_STATE = "keyboard_requested"
+private const val KEYBOARD_HIDDEN_STATE = "keyboard_hidden"
 private const val TERMINAL_PRIVATE_IME_OPTIONS =
     "com.google.android.inputmethod.latin.noPersonalizedLearning=true;com.google.android.inputmethod.latin.noMicrophoneKey=true"
 private val TERMINAL_IME_INPUT_TYPE = InputType.TYPE_CLASS_TEXT or

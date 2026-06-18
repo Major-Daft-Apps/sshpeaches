@@ -1,5 +1,7 @@
 package com.majordaftapps.sshpeaches.app.data.ssh
 
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyGenerationSpec
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
@@ -12,14 +14,25 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
+import org.apache.sshd.common.kex.BuiltinDHFactories
+import org.apache.sshd.server.ServerBuilder
+import org.apache.sshd.server.SshServer
+import org.apache.sshd.server.auth.password.PasswordAuthenticator
+import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class SshClientProviderTest {
+
+    @get:Rule
+    val temp = TemporaryFolder()
 
     @Test
     fun compatibleHostKeyProviderKeepsSshjDefaultProviderUnset() {
@@ -45,6 +58,61 @@ class SshClientProviderTest {
                 Security.removeProvider("BC")
                 Security.addProvider(originalBcProvider)
             }
+        }
+    }
+
+    @Test
+    fun compatibleKexRemovesDiffieHellmanWhenDhKeyPairGeneratorIsUnavailable() {
+        val names = SshClientProvider.compatibleKeyExchangeNamesForTesting(
+            unavailableAlgorithms = setOf("DH")
+        )
+
+        assertFalse(names.any { it.contains("diffie-hellman", ignoreCase = true) })
+        assertTrue(names.any { it.startsWith("ecdh-", ignoreCase = true) })
+    }
+
+    @Test
+    fun compatibleKexPrefersEcdhBeforeDiffieHellmanForOpenSshOverlap() {
+        val names = SshClientProvider.compatibleKeyExchangeNamesForTesting(
+            unavailableAlgorithms = setOf("X25519")
+        )
+
+        val ecdhIndex = names.indexOf("ecdh-sha2-nistp256")
+        val dhIndex = names.indexOf("diffie-hellman-group-exchange-sha256")
+        assertTrue("Expected ecdh-sha2-nistp256 in KEX list: $names", ecdhIndex >= 0)
+        assertTrue("Expected diffie-hellman-group-exchange-sha256 in KEX list: $names", dhIndex >= 0)
+        assertTrue("Expected ECDH before DH KEX: $names", ecdhIndex < dhIndex)
+    }
+
+    @Test
+    fun connectsToOpenSshLikeEcdhServerWithEcdsaHostKey() {
+        val server = startLocalSshServer(
+            hostKeyAlgorithm = "EC",
+            keyExchanges = listOf(BuiltinDHFactories.dhgex256, BuiltinDHFactories.ecdhp256)
+        )
+        val host = HostConnection(
+            id = "openssh-like",
+            name = "OpenSSH-like local",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts"),
+            host = host,
+            autoTrustUnknownHostKey = true
+        )
+
+        try {
+            client.connect(host.host, host.port)
+            client.authPassword(TEST_USERNAME, TEST_PASSWORD)
+
+            assertTrue(client.isConnected)
+            assertTrue(client.isAuthenticated)
+        } finally {
+            runCatching { client.disconnect() }
+            runCatching { server.stop(true) }
         }
     }
 
@@ -106,5 +174,30 @@ class SshClientProviderTest {
 
         assertTrue(loaded.private is Key)
         assertTrue(loaded.public is Key)
+    }
+
+    private fun startLocalSshServer(
+        hostKeyAlgorithm: String,
+        keyExchanges: List<BuiltinDHFactories>
+    ): SshServer {
+        return SshServer.setUpDefaultServer().apply {
+            host = "127.0.0.1"
+            port = 0
+            keyPairProvider = SimpleGeneratorHostKeyProvider(
+                temp.newFile("host-key-$hostKeyAlgorithm.ser").toPath()
+            ).apply {
+                setAlgorithm(hostKeyAlgorithm)
+            }
+            keyExchangeFactories = keyExchanges.map { ServerBuilder.DH2KEX.apply(it) }
+            passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
+                username == TEST_USERNAME && password == TEST_PASSWORD
+            }
+            start()
+        }
+    }
+
+    private companion object {
+        const val TEST_USERNAME = "tester"
+        const val TEST_PASSWORD = "peaches-password"
     }
 }
