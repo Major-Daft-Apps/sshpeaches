@@ -7,6 +7,7 @@ import com.hierynomus.sshj.key.KeyAlgorithm
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
 import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
@@ -26,7 +27,7 @@ import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.LoggerFactory
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.signature.Signature as SshjSignature
-import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts
+import net.schmizz.sshj.transport.verification.HostKeyVerifier
 import net.schmizz.sshj.transport.kex.KeyExchange
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.asn1.ASN1OctetString
@@ -44,6 +45,7 @@ object SshClientProvider {
     private const val BOUNCY_CASTLE_PROVIDER_NAME = "BC"
     private const val ED25519_OID = "1.3.101.112"
     private const val ED25519_KEY_SIZE = 32
+    private val X509_ED25519_PUBLIC_KEY_HEADER = Base64.getDecoder().decode("MCowBQYDK2VwAyEA")
     private val knownHostsWriteLock = Any()
     private val providerInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
@@ -116,6 +118,25 @@ object SshClientProvider {
             autoTrustUnknownHostKey = autoTrustUnknownHostKey,
             onHostKeyPrompt = onHostKeyPrompt
         )
+    }
+
+    internal fun verifyHostKeyForTesting(
+        knownHostsFile: File,
+        host: String,
+        port: Int,
+        key: PublicKey,
+        autoTrustUnknownHostKey: Boolean = true,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
+    ): Boolean {
+        knownHostsFile.parentFile?.mkdirs()
+        if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
+        return InteractiveKnownHosts(
+            file = knownHostsFile,
+            host = host,
+            port = port,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt
+        ).verify(host, port, key)
     }
 
     private fun createConfiguredClient(
@@ -424,10 +445,8 @@ object SshClientProvider {
         }
 
         private fun extractEd25519PublicKey(publicKey: PublicKey): ByteArray {
-            if (publicKey is RawEd25519PublicKey) return publicKey.rawPublicKey()
-            val encoded = publicKey.encoded
-            check(encoded.size >= ED25519_KEY_SIZE) { "Invalid Ed25519 public key length." }
-            return encoded.copyOfRange(encoded.size - ED25519_KEY_SIZE, encoded.size)
+            return extractRawEd25519PublicKey(publicKey)
+                ?: error("Unable to extract Ed25519 public key material.")
         }
 
         private fun extractEd25519Signature(signature: ByteArray, expectedName: String): ByteArray {
@@ -608,41 +627,67 @@ object SshClientProvider {
         if (!knownHostsFile.exists()) return true
         return runCatching {
             synchronized(knownHostsWriteLock) {
-                val knownHosts = OpenSSHKnownHosts(knownHostsFile)
-                val hostCandidates = buildSet {
-                    add(normalizedHost)
-                    add("[$normalizedHost]:$port")
-                }
-                val keyTypes = KeyType.values().filterNot { it == KeyType.UNKNOWN }
-                val toRemove = knownHosts.entries().filter { entry ->
-                    hostCandidates.any { candidate ->
-                        keyTypes.any { keyType ->
-                            runCatching { entry.appliesTo(keyType, candidate) }.getOrDefault(false)
-                        }
+                val adjustedHost = adjustKnownHostName(normalizedHost, port)
+                val hostCandidates = setOf(normalizedHost, adjustedHost)
+                val filtered = knownHostsFile.readLines(StandardCharsets.UTF_8)
+                    .filterNot { line ->
+                        val entry = parseKnownHostEntry(line) ?: return@filterNot false
+                        hostCandidates.any(entry::appliesTo)
                     }
-                }
-                if (toRemove.isNotEmpty()) {
-                    knownHosts.entries().removeAll(toRemove.toSet())
-                    knownHosts.write()
-                }
+                knownHostsFile.writeText(
+                    filtered.joinToString(System.lineSeparator()).let { text ->
+                        if (text.isBlank()) "" else text + System.lineSeparator()
+                    },
+                    StandardCharsets.UTF_8
+                )
             }
             true
         }.getOrElse { false }
     }
 
     private class InteractiveKnownHosts(
-        file: File,
+        private val file: File,
         private val host: String,
         private val port: Int,
         private val autoTrustUnknownHostKey: Boolean,
         private val onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?
-    ) : OpenSSHKnownHosts(file) {
+    ) : HostKeyVerifier {
 
         override fun verify(hostname: String, port: Int, key: PublicKey): Boolean {
-            return super.verify(hostname, port, normalizeKnownHostKey(key))
+            val normalizedKey = normalizeKnownHostKey(key)
+            val keyType = resolveKnownHostKeyType(normalizedKey)
+            if (keyType == KeyType.UNKNOWN) {
+                logUnableToResolveKeyType(hostname, normalizedKey)
+                return false
+            }
+            val keyBlob = sshPublicKeyBlob(keyType, normalizedKey) ?: run {
+                logUnableToResolveKeyType(hostname, normalizedKey)
+                return false
+            }
+            val adjustedHost = adjustKnownHostName(hostname, port)
+            var matchingTypeSeen = false
+            readKnownHostEntries().forEach { entry ->
+                if (entry.keyType == keyType && entry.appliesTo(adjustedHost)) {
+                    matchingTypeSeen = true
+                    if (entry.keyBlob.contentEquals(keyBlob)) return true
+                }
+            }
+            return if (matchingTypeSeen) {
+                hostKeyChangedAction(adjustedHost, normalizedKey)
+            } else {
+                hostKeyUnverifiableAction(adjustedHost, normalizedKey)
+            }
         }
 
-        override fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
+        override fun findExistingAlgorithms(hostname: String, port: Int): List<String> {
+            val adjustedHost = adjustKnownHostName(hostname, port)
+            return readKnownHostEntries()
+                .filter { entry -> entry.appliesTo(adjustedHost) }
+                .map { entry -> entry.keyType.toString() }
+                .distinct()
+        }
+
+        private fun hostKeyUnverifiableAction(hostname: String, key: PublicKey): Boolean {
             if (autoTrustUnknownHostKey) {
                 return rememberAcceptedHostKey(hostname, key, replaceExisting = false)
             }
@@ -657,8 +702,7 @@ object SshClientProvider {
             return rememberAcceptedHostKey(hostname, key, replaceExisting = false)
         }
 
-        // Always ask for changed keys when callback exists; never silently trust changed keys.
-        override fun hostKeyChangedAction(hostname: String, key: PublicKey): Boolean {
+        private fun hostKeyChangedAction(hostname: String, key: PublicKey): Boolean {
             val prompt = HostKeyPrompt(
                 host = host,
                 port = port,
@@ -680,39 +724,33 @@ object SshClientProvider {
                     val normalizedKey = normalizeKnownHostKey(key)
                     val keyType = resolveKnownHostKeyType(normalizedKey)
                     if (keyType == KeyType.UNKNOWN) {
-                        log.warn(
-                            "Unable to resolve host key type for {} using algorithm {} ({})",
-                            hostname,
-                            normalizedKey.algorithm,
-                            normalizedKey.javaClass.name
-                        )
+                        logUnableToResolveKeyType(hostname, normalizedKey)
                         return false
                     }
-                    if (replaceExisting) {
-                        entries().removeAll { entry ->
-                            runCatching { entry.appliesTo(keyType, hostname) }.getOrDefault(false)
-                        }
+                    val keyBlob = sshPublicKeyBlob(keyType, normalizedKey) ?: run {
+                        logUnableToResolveKeyType(hostname, normalizedKey)
+                        return false
                     }
-                    entries().add(OpenSSHKnownHosts.HostEntry(null, hostname, keyType, normalizedKey))
+                    val line = knownHostLine(hostname, keyType, keyBlob)
                     if (replaceExisting) {
-                        write()
+                        replaceHostKeyLine(hostname, keyType, line)
                     } else {
-                        write(entries().last())
+                        appendHostKeyLine(line)
                     }
                 }
                 true
             }.getOrElse { error ->
-                log.warn("Failed to persist accepted host key for {}", hostname, error)
+                Log.w(TAG, "Failed to persist accepted host key for $hostname", error)
                 true
             }
         }
 
-        /**
-         * Conscrypt can surface provider-specific Ed25519 key classes that SSHJ later struggles to
-         * serialize into known_hosts. Re-wrapping from X.509 keeps the same key material while
-         * producing a standard JCA key implementation.
-         */
         private fun normalizeKnownHostKey(key: PublicKey): PublicKey {
+            if (isEd25519Key(key)) {
+                extractRawEd25519PublicKey(key)?.let { rawKey ->
+                    return StableEd25519PublicKey(rawKey)
+                }
+            }
             val encoded = runCatching { key.encoded }.getOrNull()
                 ?.takeIf { it.isNotEmpty() }
                 ?: return key
@@ -720,15 +758,10 @@ object SshClientProvider {
                 val algorithm = key.algorithm.trim()
                 val lower = algorithm.lowercase()
                 when {
-                    lower.contains("eddsa") || lower.contains("ed25519") || lower.contains("ed") -> {
-                        add("Ed25519")
-                        add("EdDSA")
-                    }
                     lower.contains("ecdsa") || lower.contains("ec") -> add("EC")
                     lower.contains("rsa") -> add("RSA")
                 }
                 if (algorithm.isNotBlank()) add(algorithm)
-                add("Ed25519")
                 add("EC")
                 add("RSA")
             }.distinct()
@@ -741,8 +774,40 @@ object SshClientProvider {
             return key
         }
 
+        private fun readKnownHostEntries(): List<KnownHostEntry> {
+            return runCatching {
+                if (!file.exists()) return emptyList()
+                file.readLines(StandardCharsets.UTF_8).mapNotNull(::parseKnownHostEntry)
+            }.getOrDefault(emptyList())
+        }
+
+        private fun appendHostKeyLine(line: String) {
+            file.parentFile?.mkdirs()
+            file.appendText(line + System.lineSeparator(), StandardCharsets.UTF_8)
+        }
+
+        private fun replaceHostKeyLine(hostname: String, keyType: KeyType, line: String) {
+            file.parentFile?.mkdirs()
+            val existing = if (file.exists()) file.readLines(StandardCharsets.UTF_8) else emptyList()
+            val filtered = existing.filterNot { existingLine ->
+                val entry = parseKnownHostEntry(existingLine) ?: return@filterNot false
+                entry.keyType == keyType && entry.appliesTo(hostname)
+            }
+            file.writeText(
+                (filtered + line).joinToString(System.lineSeparator()) + System.lineSeparator(),
+                StandardCharsets.UTF_8
+            )
+        }
+
+        private fun logUnableToResolveKeyType(hostname: String, key: PublicKey) {
+            Log.w(
+                TAG,
+                "Unable to resolve host key type for $hostname using algorithm ${key.algorithm} (${key.javaClass.name})"
+            )
+        }
+
         private fun resolveKnownHostKeyType(key: PublicKey): KeyType {
-            val direct = KeyType.fromKey(key)
+            val direct = runCatching { KeyType.fromKey(key) }.getOrDefault(KeyType.UNKNOWN)
             if (direct != KeyType.UNKNOWN) return direct
             val algorithm = key.algorithm.trim().lowercase()
             return when {
@@ -754,27 +819,144 @@ object SshClientProvider {
         }
 
         private fun generateKnownHostPublicKey(algorithm: String, encoded: ByteArray): PublicKey? {
-            val providers = if (algorithm.equals("Ed25519", ignoreCase = true) || algorithm.equals("EdDSA", ignoreCase = true)) {
-                listOf(Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME), null)
-            } else {
-                listOf(null)
-            }
-            return providers.firstNotNullOfOrNull { provider ->
-                runCatching {
-                    val factory = if (provider == null) {
-                        KeyFactory.getInstance(algorithm)
-                    } else {
-                        KeyFactory.getInstance(algorithm, provider)
-                    }
-                    factory.generatePublic(X509EncodedKeySpec(encoded))
-                }.getOrNull()
-            }
+            return runCatching {
+                KeyFactory.getInstance(algorithm).generatePublic(X509EncodedKeySpec(encoded))
+            }.getOrNull()
         }
     }
 
     private fun fingerprintSha256(key: PublicKey): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(key.encoded)
+        val normalizedKey = if (isEd25519Key(key)) {
+            extractRawEd25519PublicKey(key)?.let(::StableEd25519PublicKey) ?: key
+        } else {
+            key
+        }
+        val keyType = runCatching { KeyType.fromKey(normalizedKey) }.getOrDefault(KeyType.UNKNOWN)
+        val material = sshPublicKeyBlob(keyType, normalizedKey)
+            ?: runCatching { normalizedKey.encoded }.getOrNull()
+            ?: return "SHA256:unavailable"
+        val digest = MessageDigest.getInstance("SHA-256").digest(material)
         val value = Base64.getEncoder().withoutPadding().encodeToString(digest)
         return "SHA256:$value"
+    }
+
+    private data class KnownHostEntry(
+        val hostPart: String,
+        val keyType: KeyType,
+        val keyBlob: ByteArray
+    ) {
+        fun appliesTo(hostname: String): Boolean {
+            return hostPart.split(',').any { candidate ->
+                candidate.equals(hostname, ignoreCase = true)
+            }
+        }
+    }
+
+    private fun parseKnownHostEntry(line: String): KnownHostEntry? {
+        val trimmed = line.trim()
+        if (trimmed.isBlank() || trimmed.startsWith("#")) return null
+        val parts = trimmed.split(Regex("\\s+"))
+        val offset = if (parts.firstOrNull()?.startsWith("@") == true) 1 else 0
+        if (parts.size <= offset + 2) return null
+        val hostPart = parts[offset]
+        val keyType = KeyType.fromString(parts[offset + 1]).takeIf { it != KeyType.UNKNOWN } ?: return null
+        val keyBlob = runCatching { Base64.getDecoder().decode(parts[offset + 2]) }.getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return KnownHostEntry(hostPart, keyType, keyBlob)
+    }
+
+    private fun adjustKnownHostName(hostname: String, port: Int): String {
+        val normalized = hostname.trim().lowercase()
+        return if (port == 22) normalized else "[$normalized]:$port"
+    }
+
+    private fun knownHostLine(hostname: String, keyType: KeyType, keyBlob: ByteArray): String {
+        val encodedKey = Base64.getEncoder().encodeToString(keyBlob)
+        return "$hostname ${keyType} $encodedKey"
+    }
+
+    private fun sshPublicKeyBlob(keyType: KeyType, key: PublicKey): ByteArray? {
+        if (keyType == KeyType.ED25519) {
+            val rawKey = extractRawEd25519PublicKey(key) ?: return null
+            return Buffer.PlainBuffer()
+                .putString(KeyType.ED25519.toString())
+                .putBytes(rawKey)
+                .compactData
+        }
+        return runCatching {
+            Buffer.PlainBuffer()
+                .putPublicKey(key)
+                .compactData
+        }.getOrNull()
+    }
+
+    private fun isEd25519Key(key: PublicKey): Boolean {
+        val algorithm = key.algorithm.trim().lowercase()
+        return algorithm.contains("ed25519") || algorithm.contains("eddsa") || algorithm == ED25519_OID
+    }
+
+    private fun extractRawEd25519PublicKey(publicKey: PublicKey): ByteArray? {
+        if (publicKey is RawEd25519PublicKey) return publicKey.rawPublicKey()
+        encodedEd25519PublicKey(publicKey)?.let { return it }
+        return ed25519PublicKeyFromPoint(publicKey)
+    }
+
+    private fun encodedEd25519PublicKey(publicKey: PublicKey): ByteArray? {
+        val encoded = runCatching { publicKey.encoded }.getOrNull()
+            ?.takeIf { it.size >= ED25519_KEY_SIZE }
+            ?: return null
+        if (
+            encoded.size == X509_ED25519_PUBLIC_KEY_HEADER.size + ED25519_KEY_SIZE &&
+            encoded.copyOfRange(0, X509_ED25519_PUBLIC_KEY_HEADER.size)
+                .contentEquals(X509_ED25519_PUBLIC_KEY_HEADER)
+        ) {
+            return encoded.copyOfRange(X509_ED25519_PUBLIC_KEY_HEADER.size, encoded.size)
+        }
+        return encoded.copyOfRange(encoded.size - ED25519_KEY_SIZE, encoded.size)
+    }
+
+    private fun ed25519PublicKeyFromPoint(publicKey: PublicKey): ByteArray? {
+        return runCatching {
+            val edPublicKeyType = Class.forName("java.security.interfaces.EdECPublicKey")
+            if (!edPublicKeyType.isInstance(publicKey)) return null
+            val point = edPublicKeyType.getMethod("getPoint").invoke(publicKey) ?: return null
+            val y = point.javaClass.getMethod("getY").invoke(point) as BigInteger
+            val xOdd = point.javaClass.getMethod("isXOdd").invoke(point) as Boolean
+            encodeEd25519Point(y, xOdd)
+        }.getOrNull()
+    }
+
+    private fun encodeEd25519Point(y: BigInteger, xOdd: Boolean): ByteArray {
+        val raw = ByteArray(ED25519_KEY_SIZE)
+        val bigEndianY = y.toByteArray()
+            .let { bytes ->
+                if (bytes.size > ED25519_KEY_SIZE) {
+                    bytes.copyOfRange(bytes.size - ED25519_KEY_SIZE, bytes.size)
+                } else {
+                    bytes
+                }
+            }
+        bigEndianY.indices.forEach { index ->
+            raw[index] = bigEndianY[bigEndianY.lastIndex - index]
+        }
+        raw[ED25519_KEY_SIZE - 1] = if (xOdd) {
+            (raw[ED25519_KEY_SIZE - 1].toInt() or 0x80).toByte()
+        } else {
+            (raw[ED25519_KEY_SIZE - 1].toInt() and 0x7F).toByte()
+        }
+        return raw
+    }
+
+    private class StableEd25519PublicKey(
+        private val publicKey: ByteArray
+    ) : PublicKey, RawEd25519PublicKey {
+        override fun getAlgorithm(): String = "Ed25519"
+
+        override fun getFormat(): String = "X.509"
+
+        override fun getEncoded(): ByteArray = X509_ED25519_PUBLIC_KEY_HEADER + publicKey.copyOf()
+
+        override fun rawPublicKey(): ByteArray = publicKey.copyOf()
     }
 }

@@ -5,10 +5,20 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyGenerationSpec
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
+import java.io.File
+import java.math.BigInteger
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.security.Key
 import java.security.KeyFactory
+import java.security.PublicKey
 import java.security.Security
 import java.security.Signature
+import java.security.interfaces.EdECPublicKey
+import java.security.spec.EdECPoint
+import java.security.spec.NamedParameterSpec
+import java.util.concurrent.TimeUnit
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
@@ -25,6 +35,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -117,6 +128,35 @@ class SshClientProviderTest {
     }
 
     @Test
+    fun connectsToOpenSshServerWithEd25519HostKeyWhenAvailable() {
+        val server = startOpenSshEd25519Server()
+        val knownHostsFile = temp.newFile("known_hosts_openssh_ed25519")
+        val host = HostConnection(
+            id = "openssh-like-ed25519",
+            name = "OpenSSH Ed25519 local",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = knownHostsFile,
+            host = host,
+            autoTrustUnknownHostKey = true
+        )
+
+        try {
+            client.connect(host.host, host.port)
+
+            assertTrue(client.isConnected)
+            assertTrue(knownHostsFile.readText().contains("ssh-ed25519"))
+        } finally {
+            runCatching { client.disconnect() }
+            server.close()
+        }
+    }
+
+    @Test
     fun ed25519Pkcs8IdentityLoadsDirectKeyProvider() {
         SecurityUtils.setRegisterBouncyCastle(false)
         SecurityUtils.setSecurityProvider(null)
@@ -176,6 +216,86 @@ class SshClientProviderTest {
         assertTrue(loaded.public is Key)
     }
 
+    @Test
+    fun ed25519SignatureVerifiesPublicKeyWhenEncodedThrows() {
+        val loaded = generatedEd25519KeyProvider()
+        val rawPublicKey = (loaded.public as RawEd25519PublicKey).rawPublicKey()
+        val conscryptLikePublicKey = ThrowingEncodedEd25519PublicKey(rawPublicKey)
+        val payload = "sshpeaches-conscrypt-ed25519-host-key".encodeToByteArray()
+
+        val signer = SshClientProvider.ed25519SignatureForTesting()
+        signer.initSign(loaded.private)
+        signer.update(payload)
+        val signature = signer.sign()
+
+        val verifier = SshClientProvider.ed25519SignatureForTesting()
+        verifier.initVerify(conscryptLikePublicKey)
+        verifier.update(payload)
+
+        assertTrue(verifier.verify(signature))
+    }
+
+    @Test
+    fun knownHostsTrustsEd25519PublicKeyWhenEncodedThrows() {
+        val loaded = generatedEd25519KeyProvider()
+        val rawPublicKey = (loaded.public as RawEd25519PublicKey).rawPublicKey()
+        val conscryptLikePublicKey = ThrowingEncodedEd25519PublicKey(rawPublicKey)
+        val knownHostsFile = temp.newFile("known_hosts_conscrypt_ed25519")
+        val prompts = mutableListOf<SshClientProvider.HostKeyPrompt>()
+
+        val trusted = SshClientProvider.verifyHostKeyForTesting(
+            knownHostsFile = knownHostsFile,
+            host = "127.0.0.1",
+            port = 2222,
+            key = conscryptLikePublicKey,
+            autoTrustUnknownHostKey = false,
+            onHostKeyPrompt = { prompt ->
+                prompts += prompt
+                true
+            }
+        )
+
+        assertTrue(trusted)
+        assertEquals(1, prompts.size)
+        assertFalse(prompts.single().keyChanged)
+        assertTrue(prompts.single().fingerprint.startsWith("SHA256:"))
+        assertTrue(knownHostsFile.readText().contains("ssh-ed25519"))
+
+        assertTrue(
+            SshClientProvider.verifyHostKeyForTesting(
+                knownHostsFile = knownHostsFile,
+                host = "127.0.0.1",
+                port = 2222,
+                key = conscryptLikePublicKey,
+                autoTrustUnknownHostKey = false
+            )
+        )
+    }
+
+    private fun generatedEd25519KeyProvider(): net.schmizz.sshj.userauth.keyprovider.KeyProvider {
+        SecurityUtils.setRegisterBouncyCastle(false)
+        SecurityUtils.setSecurityProvider(null)
+        if (Security.getProvider("BC") == null) {
+            Security.addProvider(BouncyCastleProvider())
+        }
+
+        val generated = SshKeyGenerator.generate(
+            IdentityKeyGenerationSpec(
+                algorithm = IdentityKeyAlgorithm.ED25519,
+                comment = "test-ed25519"
+            )
+        )
+        val provider = Ed25519IdentityKeyProvider.load(
+            client = SSHClient(DefaultConfig()),
+            privateKeyMaterial = generated.privateKey,
+            publicKeyMaterial = generated.publicKey,
+            passphrase = null
+        )
+
+        assertNotNull(provider)
+        return provider!!
+    }
+
     private fun startLocalSshServer(
         hostKeyAlgorithm: String,
         keyExchanges: List<BuiltinDHFactories>
@@ -193,6 +313,162 @@ class SshClientProviderTest {
                 username == TEST_USERNAME && password == TEST_PASSWORD
             }
             start()
+        }
+    }
+
+    private fun startOpenSshEd25519Server(): OpenSshServer {
+        val sshd = findExecutable(
+            "/usr/sbin/sshd",
+            "/usr/local/sbin/sshd",
+            "/opt/homebrew/sbin/sshd"
+        ) ?: skipTest("OpenSSH sshd is unavailable")
+        val sshKeygen = findExecutable(
+            "/usr/bin/ssh-keygen",
+            "/usr/local/bin/ssh-keygen",
+            "/opt/homebrew/bin/ssh-keygen"
+        ) ?: skipTest("OpenSSH ssh-keygen is unavailable")
+        val serverDir = temp.newFolder("openssh-ed25519-server")
+        val hostKey = File(serverDir, "ssh_host_ed25519_key")
+        val logFile = File(serverDir, "sshd.log")
+        val port = reserveLocalPort()
+
+        val keygen = ProcessBuilder(
+            sshKeygen,
+            "-q",
+            "-t",
+            "ed25519",
+            "-N",
+            "",
+            "-f",
+            hostKey.absolutePath
+        )
+            .redirectErrorStream(true)
+            .start()
+        assumeTrue("ssh-keygen could not create an Ed25519 host key", keygen.waitForSuccess())
+
+        val configFile = File(serverDir, "sshd_config").apply {
+            writeText(
+                """
+                HostKey ${hostKey.absolutePath}
+                HostKeyAlgorithms ssh-ed25519
+                Port $port
+                ListenAddress 127.0.0.1
+                PidFile ${File(serverDir, "sshd.pid").absolutePath}
+                AuthorizedKeysFile none
+                PubkeyAuthentication no
+                PasswordAuthentication no
+                UsePAM no
+                PermitRootLogin no
+                PrintMotd no
+                LogLevel VERBOSE
+                Subsystem sftp internal-sftp
+                """.trimIndent()
+            )
+        }
+        val configCheck = ProcessBuilder(
+            sshd,
+            "-t",
+            "-f",
+            configFile.absolutePath,
+            "-E",
+            logFile.absolutePath
+        )
+            .redirectErrorStream(true)
+            .start()
+        assumeTrue(
+            "OpenSSH sshd rejected the temporary test config: ${logFile.readIfPresent()}",
+            configCheck.waitForSuccess()
+        )
+
+        val process = ProcessBuilder(
+            sshd,
+            "-D",
+            "-f",
+            configFile.absolutePath,
+            "-E",
+            logFile.absolutePath
+        ).start()
+        assumeTrue(
+            "OpenSSH sshd did not start on localhost: $port ${logFile.readIfPresent()}",
+            waitForPort("127.0.0.1", port, process)
+        )
+        return OpenSshServer(port, process)
+    }
+
+    private fun findExecutable(vararg candidates: String): String? {
+        return candidates.firstOrNull { candidate ->
+            File(candidate).canExecute()
+        }
+    }
+
+    private fun reserveLocalPort(): Int {
+        return ServerSocket(0).use { socket ->
+            socket.localPort
+        }
+    }
+
+    private fun waitForPort(host: String, port: Int, process: Process): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            if (!process.isAlive) return false
+            val connected = runCatching {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(host, port), 250)
+                }
+            }.isSuccess
+            if (connected) return true
+            Thread.sleep(100)
+        }
+        return false
+    }
+
+    private fun Process.waitForSuccess(timeoutSeconds: Long = 10): Boolean {
+        if (!waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+            destroyForcibly()
+            return false
+        }
+        return exitValue() == 0
+    }
+
+    private fun File.readIfPresent(): String {
+        return takeIf { it.exists() }?.readText().orEmpty()
+    }
+
+    private fun skipTest(reason: String): Nothing {
+        assumeTrue(reason, false)
+        error(reason)
+    }
+
+    private class OpenSshServer(
+        val port: Int,
+        private val process: Process
+    ) : AutoCloseable {
+        override fun close() {
+            process.destroy()
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+            }
+        }
+    }
+
+    private class ThrowingEncodedEd25519PublicKey(
+        private val rawPublicKey: ByteArray
+    ) : PublicKey, EdECPublicKey {
+        override fun getAlgorithm(): String = "EdDSA"
+
+        override fun getFormat(): String = "X.509"
+
+        override fun getEncoded(): ByteArray {
+            error("don't know how to encode keyL: com.android.org.conscrypt.OpenSSLEdDSAPublicKey@ad30ed04")
+        }
+
+        override fun getParams(): NamedParameterSpec = NamedParameterSpec.ED25519
+
+        override fun getPoint(): EdECPoint {
+            val yBytes = rawPublicKey.copyOf()
+            val xOdd = (yBytes[31].toInt() and 0x80) != 0
+            yBytes[31] = (yBytes[31].toInt() and 0x7F).toByte()
+            return EdECPoint(xOdd, BigInteger(1, yBytes.reversedArray()))
         }
     }
 
