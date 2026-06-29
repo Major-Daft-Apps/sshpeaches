@@ -568,6 +568,10 @@ public final class TerminalEmulator {
         return isDecsetInternalBitSet(DECSET_BIT_APPLICATION_CURSOR_KEYS);
     }
 
+    public boolean isBracketedPasteMode() {
+        return isDecsetInternalBitSet(DECSET_BIT_BRACKETED_PASTE_MODE);
+    }
+
     public boolean isVt52Mode() {
         return mInVt52Mode;
     }

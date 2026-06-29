@@ -154,6 +154,6 @@ Settings includes:
 
 ## About, Help, and licenses
 
-- **Help** opens official support documentation in browser/custom tab.
+- **Help** shows an in-app guide for connecting, identities, terminal input, file transfers, QR sharing, and common troubleshooting. The guide also links to the external support site for longer notes.
 - **About** shows version, website, privacy policy, support links, and license entry points.
 - Open source license notices are available from About.

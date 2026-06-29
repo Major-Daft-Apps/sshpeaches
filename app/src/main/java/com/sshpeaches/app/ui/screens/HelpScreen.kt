@@ -1,17 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,93 +15,53 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
-import kotlinx.coroutines.delay
+import com.majordaftapps.sshpeaches.app.ui.theme.PeachyOrange
 
 @Composable
 fun HelpScreen(
     onOpenSupport: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val steps = remember { helpSteps() }
-    val selectedStep = rememberSaveable { mutableIntStateOf(0) }
-
-    LaunchedEffect(steps.size) {
-        while (steps.isNotEmpty()) {
-            delay(4_500)
-            selectedStep.intValue = (selectedStep.intValue + 1) % steps.size
-        }
-    }
+    val topics = remember { helpTopics() }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .testTag(UiTestTags.HELP_SCREEN),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Help,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text("Guided help", style = MaterialTheme.typography.headlineSmall)
-                }
-                Text(
-                    "Walk through the core SSHPeaches workflows without leaving the app.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        item {
-            AnimatedGuidePreview(
-                step = steps[selectedStep.intValue],
-                modifier = Modifier.padding(horizontal = 16.dp)
+            HelpHeader(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
             )
         }
 
-        items(steps.size) { index ->
-            HelpStepRow(
-                step = steps[index],
-                selected = selectedStep.intValue == index,
-                onClick = { selectedStep.intValue = index },
+        items(topics.size) { index ->
+            HelpTopicCard(
+                topic = topics[index],
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .testTag(UiTestTags.helpStep(index))
@@ -122,301 +69,246 @@ fun HelpScreen(
         }
 
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text("Need more help?", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Open the support site for docs, troubleshooting notes, and release updates.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Button(
-                        onClick = onOpenSupport,
-                        modifier = Modifier.testTag(UiTestTags.HELP_MORE_HELP_BUTTON)
-                    ) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("More help")
-                    }
-                }
-            }
+            SupportCard(
+                onOpenSupport = onOpenSupport,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun AnimatedGuidePreview(
-    step: HelpStep,
+private fun HelpHeader(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.Help,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text("How to use SSHPeaches", style = MaterialTheme.typography.headlineSmall)
+        }
+        Text(
+            "Quick answers for the workflows people use most: connecting, keys, terminal input, file transfer, sharing, and common fixes.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun HelpTopicCard(
+    topic: HelpTopic,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "help-preview")
-    val progress = transition.animateFloat(
-        initialValue = 0.12f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2_100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        label = "help-progress"
-    )
-    val pulse = transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "help-pulse"
-    )
-    val colorScheme = MaterialTheme.colorScheme
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 230.dp),
-        color = colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Surface(
-                    color = colorScheme.primary.copy(alpha = 0.14f),
+                    color = topic.tint.copy(alpha = 0.16f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
-                        step.icon,
+                        topic.icon,
                         contentDescription = null,
-                        tint = colorScheme.primary,
+                        tint = topic.tint,
                         modifier = Modifier.padding(10.dp)
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(step.title, style = MaterialTheme.typography.titleMedium)
-                    Text(step.label, style = MaterialTheme.typography.labelMedium, color = colorScheme.onSurfaceVariant)
-                }
-            }
-
-            AnimatedContent(
-                targetState = step,
-                transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
-                label = "help-step-content"
-            ) { current ->
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MockTopBar(title = current.mockTitle)
-                    MockScreenBody(step = current, pulse = pulse.value)
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(colorScheme.outline.copy(alpha = 0.28f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progress.value)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(colorScheme.primary)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MockTopBar(title: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Spacer(Modifier.width(12.dp))
-        Text(title, style = MaterialTheme.typography.labelLarge)
-        Spacer(Modifier.weight(1f))
-        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(12.dp))
-        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(12.dp))
-    }
-}
-
-@Composable
-private fun MockScreenBody(step: HelpStep, pulse: Float) {
-    val colorScheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            repeat(3) { index ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = if (index == step.highlightIndex) {
-                        step.tint.copy(alpha = 0.22f + 0.08f * pulse)
-                    } else {
-                        colorScheme.surface
-                    },
-                    shape = RoundedCornerShape(8.dp)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(if (index == step.highlightIndex) step.tint else colorScheme.outline)
+                    Text(topic.title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        topic.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            topic.steps.forEachIndexed { index, step ->
+                HelpInstructionRow(number = index + 1, text = step)
+            }
+
+            if (topic.tips.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    topic.tips.forEach { tip ->
+                        Text(
+                            text = tip,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(if (index == 0) 0.82f else 0.64f)
-                                    .height(7.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(colorScheme.onSurfaceVariant.copy(alpha = 0.34f))
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(if (index == 2) 0.72f else 0.48f)
-                                    .height(5.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
-                            )
-                        }
                     }
                 }
             }
         }
-        Surface(
-            modifier = Modifier
-                .width(92.dp)
-                .height(136.dp),
-            color = Color.Black,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                repeat(5) { index ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(if (index == 4) pulse else 0.75f)
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(step.tint)
-                    )
-                }
-            }
-        }
     }
 }
 
 @Composable
-private fun HelpStepRow(
-    step: HelpStep,
-    selected: Boolean,
-    onClick: () -> Unit,
+private fun HelpInstructionRow(
+    number: Int,
+    text: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$number",
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            text = text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun SupportCard(
+    onOpenSupport: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = if (selected) colors.primaryContainer else colors.surface,
-        shape = RoundedCornerShape(8.dp),
-        tonalElevation = if (selected) 2.dp else 0.dp
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(step.icon, contentDescription = null, tint = if (selected) colors.primary else colors.onSurfaceVariant)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Text("Still stuck?", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Open the support site for longer troubleshooting notes, release updates, and ways to report a reproducible issue.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Button(
+                onClick = onOpenSupport,
+                modifier = Modifier.testTag(UiTestTags.HELP_MORE_HELP_BUTTON)
             ) {
-                Text(step.title, style = MaterialTheme.typography.titleSmall)
-                Text(step.description, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            }
-            OutlinedButton(onClick = onClick) {
-                Text(if (selected) "Viewing" else "View")
+                Icon(Icons.Default.OpenInBrowser, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("More help")
             }
         }
     }
 }
 
-private data class HelpStep(
+private data class HelpTopic(
     val title: String,
-    val label: String,
-    val description: String,
-    val mockTitle: String,
+    val summary: String,
     val icon: ImageVector,
     val tint: Color,
-    val highlightIndex: Int
+    val steps: List<String>,
+    val tips: List<String> = emptyList()
 )
 
-private fun helpSteps(): List<HelpStep> = listOf(
-    HelpStep(
-        title = "Start a session",
-        label = "Hosts",
-        description = "Pick a saved host, confirm credentials, and keep SSH, SFTP, or SCP in the same shell.",
-        mockTitle = "Hosts",
+private fun helpTopics(): List<HelpTopic> = listOf(
+    HelpTopic(
+        title = "Connect to a server",
+        summary = "Use Quick Connect for one-off access or Hosts for saved servers.",
         icon = Icons.Default.PlayArrow,
         tint = Color(0xFF2E7D32),
-        highlightIndex = 0
+        steps = listOf(
+            "Open the drawer and tap Quick Connect for a temporary session, or open Hosts and tap + to save a server.",
+            "Enter host name or IP address, port, username, and the authentication method your server accepts.",
+            "For a saved host, use SSH for the terminal, SFTP for browsing files, or SCP for a focused copy workflow.",
+            "If connection fails, open the session log and check the exact host, port, username, network reachability, and server-side SSH settings."
+        )
     ),
-    HelpStep(
-        title = "Move files",
-        label = "SFTP and SCP",
-        description = "Use the file tools beside an active session to browse, upload, download, rename, and delete.",
-        mockTitle = "File transfer",
-        icon = Icons.Default.Build,
+    HelpTopic(
+        title = "Set up keys and security",
+        summary = "Import or generate identities, then attach them to hosts.",
+        icon = Icons.Default.Security,
         tint = Color(0xFF1565C0),
-        highlightIndex = 1
+        steps = listOf(
+            "Open Identities and tap + to import an OpenSSH private key or create a new identity.",
+            "Open a host, set Auth to Identity or Password + Identity, and choose the identity to use.",
+            "When a host key prompt appears, compare the fingerprint with a trusted source before accepting it.",
+            "Use Settings > Security to enable PIN or biometric unlock before storing sensitive connection data."
+        ),
+        tips = listOf(
+            "Only clear a saved host key after you have verified the server really rotated its key."
+        )
     ),
-    HelpStep(
-        title = "Track uptime",
-        label = "Monitoring",
-        description = "Add monitors for saved hosts and review 24-hour and 7-day status history from Uptime.",
-        mockTitle = "Uptime",
-        icon = Icons.Default.Timeline,
-        tint = Color(0xFF6A1B9A),
-        highlightIndex = 2
+    HelpTopic(
+        title = "Use the terminal",
+        summary = "Control the shell, paste text, and customize the compact key row.",
+        icon = Icons.Default.Keyboard,
+        tint = PeachyOrange,
+        steps = listOf(
+            "Double-tap the terminal to show or hide the system keyboard.",
+            "Use the compact key row for Esc, Tab, Ctrl, arrow/navigation keys, snippets, and custom sequences.",
+            "Paste with the Android paste menu, Ctrl+Shift+V on hardware keyboards, or clipboard suggestions above supported keyboards.",
+            "Open Keyboard Editor to replace any compact key with a letter, function key, modifier combo, saved sequence, snippet picker, or password injection action."
+        )
     ),
-    HelpStep(
-        title = "Tune the app",
-        label = "Settings",
-        description = "Adjust keyboard rows, terminal themes, lock behavior, background sessions, and app icon.",
-        mockTitle = "Settings",
-        icon = Icons.Default.Settings,
+    HelpTopic(
+        title = "Move files and automate work",
+        summary = "Use SFTP/SCP for transfer, snippets for repeated commands, and QR for local sharing.",
+        icon = Icons.Default.FolderOpen,
         tint = Color(0xFFEF6C00),
-        highlightIndex = 1
+        steps = listOf(
+            "Tap SFTP on a host when you need to browse remote directories, create folders, rename, delete, upload, or download.",
+            "Tap SCP when you already know what you want to copy and need a direct upload/download workflow.",
+            "Open Snippets to save reusable commands, then run them against an active SSH session or expose them from the terminal key row.",
+            "Use QR export/import from Hosts, Identities, Port Forwards, Snippets, or Settings > Transfer data to move local configuration between devices."
+        ),
+        tips = listOf(
+            "Encrypted QR exports require the same passphrase during import. SSHPeaches does not upload these transfers to cloud storage."
+        )
+    ),
+    HelpTopic(
+        title = "Fix common problems",
+        summary = "Start with the symptom, then verify the smallest thing that could be wrong.",
+        icon = Icons.Default.Warning,
+        tint = Color(0xFFC62828),
+        steps = listOf(
+            "Connection refused or timed out: verify the server is reachable from this device, the port is correct, and a firewall is not blocking SSH.",
+            "Password keeps failing: confirm the username, password, server PasswordAuthentication setting, and whether the server requires a key instead.",
+            "Identity login fails: re-import the key, confirm its passphrase, and check that the matching public key is in authorized_keys on the server.",
+            "Transfers fail: confirm the remote path exists, your account has permission, and the local destination is writable.",
+            "Background sessions stop: enable Run shells in background, allow notifications, and relax Android battery restrictions for SSHPeaches."
+        ),
+        tips = listOf(
+            "For a useful bug report, include the action you took, Android version, connection mode, and the visible error text from the session log."
+        )
     )
 )

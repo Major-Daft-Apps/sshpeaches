@@ -105,4 +105,56 @@ final class ByteQueue {
         }
         return true;
     }
+
+    public boolean write(byte[] buffer, int offset, int lengthToWrite, long timeoutMillis) {
+        if (lengthToWrite + offset > buffer.length) {
+            throw new IllegalArgumentException("length + offset > buffer.length");
+        } else if (lengthToWrite <= 0) {
+            throw new IllegalArgumentException("length <= 0");
+        } else if (timeoutMillis < 0) {
+            throw new IllegalArgumentException("timeoutMillis < 0");
+        }
+
+        final int bufferLength = mBuffer.length;
+        final long deadlineNanos = System.nanoTime() + timeoutMillis * 1_000_000L;
+
+        synchronized (this) {
+            while (lengthToWrite > 0) {
+                final int bytesThisChunk = Math.min(lengthToWrite, bufferLength);
+                while (bufferLength - mStoredBytes < bytesThisChunk && mOpen) {
+                    long remainingNanos = deadlineNanos - System.nanoTime();
+                    if (remainingNanos <= 0) return false;
+                    try {
+                        long waitMillis = Math.max(1L, remainingNanos / 1_000_000L);
+                        wait(waitMillis);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                }
+                if (!mOpen) return false;
+                final boolean wasEmpty = mStoredBytes == 0;
+                int bytesToWrite = bytesThisChunk;
+
+                while (bytesToWrite > 0) {
+                    int tail = mHead + mStoredBytes;
+                    int oneRun;
+                    if (tail >= bufferLength) {
+                        tail = tail - bufferLength;
+                        oneRun = mHead - tail;
+                    } else {
+                        oneRun = bufferLength - tail;
+                    }
+                    int bytesToCopy = Math.min(oneRun, bytesToWrite);
+                    System.arraycopy(buffer, offset, mBuffer, tail, bytesToCopy);
+                    offset += bytesToCopy;
+                    bytesToWrite -= bytesToCopy;
+                    mStoredBytes += bytesToCopy;
+                }
+                lengthToWrite -= bytesThisChunk;
+                if (wasEmpty) notify();
+            }
+        }
+        return true;
+    }
 }

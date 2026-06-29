@@ -175,6 +175,10 @@ public final class TerminalSession extends TerminalOutput {
         if (mShellPid > 0) mTerminalToProcessIOQueue.write(data, offset, count);
     }
 
+    public boolean writeWithTimeout(byte[] data, int offset, int count, long timeoutMillis) {
+        return mShellPid > 0 && mTerminalToProcessIOQueue.write(data, offset, count, timeoutMillis);
+    }
+
     /** Write the Unicode code point to the terminal encoded in UTF-8. */
     public void writeCodePoint(boolean prependEscape, int codePoint) {
         if (codePoint > 1114111 || (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {

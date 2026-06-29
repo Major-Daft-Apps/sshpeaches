@@ -617,7 +617,7 @@ public final class TerminalView extends View {
                     ClipData.Item clipItem = clipData.getItemAt(0);
                     if (clipItem != null) {
                         CharSequence text = clipItem.coerceToText(getContext());
-                        if (!TextUtils.isEmpty(text)) mEmulator.paste(text.toString());
+                        if (!TextUtils.isEmpty(text)) pasteText(text.toString());
                     }
                 }
             } else if (mEmulator.isMouseTrackingActive()) { // BUTTON_PRIMARY.
@@ -989,6 +989,7 @@ public final class TerminalView extends View {
             mTopRow = 0;
             scrollTo(0, 0);
             invalidate();
+            notifyTerminalSizeChanged(newColumns, newRows);
         } else if (mTermSession == null && mEmulator != null && (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {
             int fontWidth = (int) mRenderer.getFontWidth();
             int fontHeight = mRenderer.getFontLineSpacing();
@@ -996,7 +997,12 @@ public final class TerminalView extends View {
             mTopRow = 0;
             scrollTo(0, 0);
             invalidate();
+            notifyTerminalSizeChanged(newColumns, newRows);
         }
+    }
+
+    private void notifyTerminalSizeChanged(int columns, int rows) {
+        if (mClient != null) mClient.onTerminalSizeChanged(columns, rows);
     }
 
     @Override
@@ -1284,8 +1290,14 @@ public final class TerminalView extends View {
         ClipData.Item clipItem = clipData.getItemAt(0);
         CharSequence text = clipItem != null ? clipItem.coerceToText(getContext()) : null;
         if (!TextUtils.isEmpty(text)) {
-            mEmulator.paste(text.toString());
+            pasteText(text.toString());
         }
+    }
+
+    void pasteText(String text) {
+        if (TextUtils.isEmpty(text) || mEmulator == null) return;
+        if (mClient != null && mClient.onPasteText(mEmulator, text)) return;
+        mEmulator.paste(text);
     }
 
     /**

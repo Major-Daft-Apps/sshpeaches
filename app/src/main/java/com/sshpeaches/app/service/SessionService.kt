@@ -58,10 +58,12 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel as CoroutineChannel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -422,6 +424,8 @@ class SessionService : Service() {
                     UiDebugLog.result("startSession", false, "sessionId=$sessionId, mode=$mode")
                 }
             }
+            runCatching { shellBinding?.inputQueue?.close() }
+            runCatching { shellBinding?.inputWriterJob?.cancel() }
             runCatching { shellBinding?.shell?.close() }
             runCatching { shellBinding?.session?.close() }
             runCatching { moshBinding?.session?.finishIfRunning() }
@@ -485,6 +489,8 @@ class SessionService : Service() {
 
     private fun closeConnectionResources(hostId: String, connection: ActiveConnection, trigger: String) {
         measureOperation("closeConnectionResources/$trigger", hostId, thresholdMs = 200L) {
+            runCatching { connection.shellBinding?.inputQueue?.close() }
+            runCatching { connection.shellBinding?.inputWriterJob?.cancel() }
             runCatching { connection.shellBinding?.shell?.close() }
             runCatching { connection.shellBinding?.session?.close() }
             runCatching { connection.moshBinding?.session?.finishIfRunning() }
@@ -632,7 +638,15 @@ class SessionService : Service() {
         connection.moshBinding?.let { mosh ->
             serviceScope.launch {
                 runCatching {
-                    mosh.session.write(bytes, 0, bytes.size)
+                    val wrote = mosh.session.writeWithTimeout(
+                        bytes,
+                        0,
+                        bytes.size,
+                        MOSH_INPUT_WRITE_TIMEOUT_MS
+                    )
+                    if (!wrote) {
+                        throw TimeoutException("Timed out writing to mosh input queue")
+                    }
                     emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
                 }.onFailure { err ->
                     SessionLogBus.emit(
@@ -646,25 +660,20 @@ class SessionService : Service() {
             }
             return
         }
-        val shell = connection.shellBinding?.shell
-        if (connection.mode != ConnectionMode.SSH || shell == null) {
+        val shellBinding = connection.shellBinding
+        if (connection.mode != ConnectionMode.SSH || shellBinding == null) {
             UiDebugLog.result("sendShellBytes", false, "shell-not-available hostId=$hostId")
             return
         }
-        serviceScope.launch {
-            runCatching {
-                shell.outputStream.write(bytes)
-                shell.outputStream.flush()
-                emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
-            }.onFailure { err ->
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "Failed to write to shell: ${err.message ?: "unknown error"}"
-                    )
+        if (!shellBinding.inputQueue.trySend(bytes.copyOf()).isSuccess) {
+            UiDebugLog.result("sendShellBytes", false, "input-queue-closed hostId=$hostId")
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "Shell input queue is closed; dropped ${bytes.size} byte(s)."
                 )
-            }
+            )
         }
     }
 
@@ -2334,7 +2343,61 @@ class SessionService : Service() {
                 closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
             }
         }
-        return ShellBinding(session = session, shell = shell, terminalEngine = terminalEngine)
+        val inputQueue = CoroutineChannel<ByteArray>(CoroutineChannel.UNLIMITED)
+        val inputWriterJob = startShellInputWriter(hostId, shell, inputQueue)
+        return ShellBinding(
+            session = session,
+            shell = shell,
+            terminalEngine = terminalEngine,
+            inputQueue = inputQueue,
+            inputWriterJob = inputWriterJob
+        )
+    }
+
+    private fun startShellInputWriter(
+        hostId: String,
+        shell: Session.Shell,
+        inputQueue: CoroutineChannel<ByteArray>
+    ): Job = serviceScope.launch(Dispatchers.IO) {
+        for (payload in inputQueue) {
+            runCatching {
+                writeShellInputPayload(hostId, shell, payload)
+                emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = payload, size = payload.size)
+            }.onFailure { err ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "Failed to write to shell: ${err.message ?: "unknown error"}"
+                    )
+                )
+            }
+        }
+    }
+
+    private suspend fun writeShellInputPayload(hostId: String, shell: Session.Shell, payload: ByteArray) {
+        val timedOut = AtomicBoolean(false)
+        val watchdog = serviceScope.launch(Dispatchers.IO) {
+            delay(SHELL_INPUT_WRITE_TIMEOUT_MS)
+            timedOut.set(true)
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = "Timed out writing ${payload.size} byte(s) to shell input; closing shell."
+                )
+            )
+            runCatching { shell.close() }
+        }
+        try {
+            shell.outputStream.write(payload)
+            shell.outputStream.flush()
+            if (timedOut.get()) {
+                throw TimeoutException("Timed out writing to shell input")
+            }
+        } finally {
+            watchdog.cancel()
+        }
     }
 
     private fun closeSessionAfterShellExit(hostId: String, reason: String) {
@@ -2779,7 +2842,9 @@ class SessionService : Service() {
         private const val TRANSFER_NOTIFICATION_UPDATE_INTERVAL_MS = 250L
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
+        private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
+        private const val MOSH_INPUT_WRITE_TIMEOUT_MS = 1_000L
         private const val MOSH_DEFAULT_COLUMNS = 120
         private const val MOSH_DEFAULT_ROWS = 40
         private const val MOSH_TRANSCRIPT_ROWS = 2000
@@ -2805,7 +2870,9 @@ class SessionService : Service() {
     private data class ShellBinding(
         val session: Session,
         val shell: Session.Shell,
-        val terminalEngine: TermuxTerminalEngine
+        val terminalEngine: TermuxTerminalEngine,
+        val inputQueue: CoroutineChannel<ByteArray>,
+        val inputWriterJob: Job
     )
 
     private data class MoshBinding(

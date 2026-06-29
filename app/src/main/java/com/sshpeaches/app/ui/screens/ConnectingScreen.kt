@@ -6,7 +6,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ClipDescription
 import android.content.Context
+import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -142,6 +144,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
+import android.view.inputmethod.InputContentInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import com.majordaftapps.sshpeaches.app.R
@@ -187,9 +191,11 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.inputmethod.EditorInfoCompat
 import com.majordaftapps.sshpeaches.app.MainActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.Serializable
 import java.nio.charset.StandardCharsets
@@ -569,6 +575,13 @@ fun ConnectingScreen(
             showSystemKeyboard()
         }
     }
+    fun recordTerminalResize(columns: Int, rows: Int) {
+        if (columns <= 0 || rows <= 0) return
+        val resize = columns to rows
+        if (lastResize == resize) return
+        lastResize = resize
+        onTerminalResize(columns, rows)
+    }
     LaunchedEffect(keyboardVisibleRequested, terminalImeBridgeRef) {
         if (keyboardVisibleRequested) {
             terminalImeBridgeRef?.showTerminalKeyboard()
@@ -628,6 +641,15 @@ fun ConnectingScreen(
                     shiftDown = pendingModifiers.contains(KeyboardModifier.SHIFT)
                 )
                 return true
+            }
+
+            override fun onPasteText(emulator: TerminalEmulator?, text: String?): Boolean {
+                if (emulator == null || text.isNullOrEmpty()) return false
+                return terminalInput.pasteText(text, emulator)
+            }
+
+            override fun onTerminalSizeChanged(columns: Int, rows: Int) {
+                recordTerminalResize(columns, rows)
             }
         }
     }
@@ -1304,11 +1326,7 @@ fun ConnectingScreen(
         val textSizePx = with(density) { terminalFontSizeSp.sp.toPx().toInt().coerceAtLeast(6) }
         view.setTextSize(textSizePx)
         view.updateSize()
-        val resize = emulator.mColumns to emulator.mRows
-        if (lastResize != resize) {
-            lastResize = resize
-            onTerminalResize(emulator.mColumns, emulator.mRows)
-        }
+        recordTerminalResize(emulator.mColumns, emulator.mRows)
         view.setOnTouchListener { touchedView, event ->
             if (!swipeNavigationEnabled) {
                 swipeStart = null
@@ -1804,6 +1822,8 @@ private fun TerminalImeBridge(
                 setRawInputType(TERMINAL_IME_INPUT_TYPE)
                 imeOptions = TERMINAL_IME_OPTIONS
                 privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
+                onPasteRequested = { currentTerminalInput.value.pasteFromClipboard() }
+                onInlinePasteText = { currentTerminalInput.value.pasteText(it) }
 
                 var restoring = false
 
@@ -1858,6 +1878,8 @@ private fun TerminalImeBridge(
             }
         },
         update = { bridge ->
+            bridge.onPasteRequested = { currentTerminalInput.value.pasteFromClipboard() }
+            bridge.onInlinePasteText = { currentTerminalInput.value.pasteText(it) }
             currentOnBridgeReady.value(bridge)
         },
         modifier = modifier
@@ -1865,6 +1887,9 @@ private fun TerminalImeBridge(
 }
 
 private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
+    var onPasteRequested: (() -> Boolean)? = null
+    var onInlinePasteText: ((String) -> Boolean)? = null
+
     fun showTerminalKeyboard() {
         fun showNow() {
             showSoftInputOnFocus = true
@@ -1891,15 +1916,72 @@ private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
     }
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
-        val connection = super.onCreateInputConnection(outAttrs)
+        val connection = super.onCreateInputConnection(outAttrs) ?: return null
         outAttrs.inputType = TERMINAL_IME_INPUT_TYPE
         outAttrs.imeOptions = TERMINAL_IME_OPTIONS
         outAttrs.privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
-        return connection
+        EditorInfoCompat.setContentMimeTypes(outAttrs, TERMINAL_IME_CONTENT_MIME_TYPES)
+        return object : InputConnectionWrapper(connection, true) {
+            override fun performContextMenuAction(id: Int): Boolean {
+                if (id == android.R.id.paste || id == android.R.id.pasteAsPlainText) {
+                    if (onPasteRequested?.invoke() == true) return true
+                }
+                return super.performContextMenuAction(id)
+            }
+
+            override fun commitContent(
+                inputContentInfo: InputContentInfo,
+                flags: Int,
+                opts: Bundle?
+            ): Boolean {
+                val text = inputContentInfo.readTerminalText(context, flags)
+                if (!text.isNullOrEmpty() && onInlinePasteText?.invoke(text) == true) {
+                    return true
+                }
+                return super.commitContent(inputContentInfo, flags, opts)
+            }
+        }
+    }
+
+    override fun onTextContextMenuItem(id: Int): Boolean {
+        if (id == android.R.id.paste || id == android.R.id.pasteAsPlainText) {
+            if (onPasteRequested?.invoke() == true) return true
+        }
+        return super.onTextContextMenuItem(id)
     }
 
     private fun inputMethodManager(): InputMethodManager? =
         context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+}
+
+private fun InputContentInfo.readTerminalText(context: Context, flags: Int): String? {
+    if (!description.hasMimeType("text/*")) return null
+    val permissionRequested =
+        flags and InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION != 0 &&
+            runCatching {
+                requestPermission()
+                true
+            }.getOrDefault(false)
+    return try {
+        context.contentResolver.openInputStream(contentUri)
+            ?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(TERMINAL_IME_CONTENT_READ_BUFFER_BYTES)
+                var remaining = TERMINAL_IME_INLINE_PASTE_MAX_BYTES
+                while (remaining > 0) {
+                    val read = input.read(buffer, 0, minOf(buffer.size, remaining))
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    remaining -= read
+                }
+                String(output.toByteArray(), StandardCharsets.UTF_8)
+            }
+            ?.takeIf { it.isNotEmpty() }
+    } finally {
+        if (permissionRequested) {
+            runCatching { releasePermission() }
+        }
+    }
 }
 
 @Composable
@@ -3929,6 +4011,10 @@ private const val KEYBOARD_REQUESTED_STATE = "keyboard_requested"
 private const val KEYBOARD_HIDDEN_STATE = "keyboard_hidden"
 private const val TERMINAL_PRIVATE_IME_OPTIONS =
     "com.google.android.inputmethod.latin.noPersonalizedLearning=true;com.google.android.inputmethod.latin.noMicrophoneKey=true"
+private val TERMINAL_IME_CONTENT_MIME_TYPES = arrayOf(
+    ClipDescription.MIMETYPE_TEXT_PLAIN,
+    ClipDescription.MIMETYPE_TEXT_HTML
+)
 private val TERMINAL_IME_INPUT_TYPE = InputType.TYPE_CLASS_TEXT or
     InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
     InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
@@ -3938,6 +4024,8 @@ private val TERMINAL_IME_OPTIONS = EditorInfo.IME_ACTION_NONE or
     EditorInfo.IME_FLAG_NO_EXTRACT_UI or
     EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or
     EditorInfo.IME_FLAG_FORCE_ASCII
+private const val TERMINAL_IME_INLINE_PASTE_MAX_BYTES = 1_048_576
+private const val TERMINAL_IME_CONTENT_READ_BUFFER_BYTES = 8_192
 private const val SFTP_CANCEL_BUTTON_DELAY_MS = 220L
 private const val SFTP_TRANSFER_STATUS_AUTO_DISMISS_MS = 3_000L
 private const val SFTP_TRANSFER_SUCCESS_MESSAGE = "file transferred succesfully"

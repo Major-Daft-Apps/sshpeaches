@@ -51,4 +51,34 @@ public class ByteQueueTest extends TestCase {
 		assertEquals(0, q.read(new byte[128], false));
 	}
 
+	public void testTimedWriteReturnsWhenQueueStaysFull() {
+		ByteQueue q = new ByteQueue(2);
+		assertTrue(q.write(new byte[]{1, 2}, 0, 2));
+
+		long start = System.nanoTime();
+		assertFalse(q.write(new byte[]{3}, 0, 1, 50));
+		long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
+
+		assertTrue("Timed write took too long: " + elapsedMillis + "ms", elapsedMillis < 500);
+	}
+
+	public void testTimedWriteSucceedsWhenConsumerDrainsQueue() throws Exception {
+		ByteQueue q = new ByteQueue(2);
+		assertTrue(q.write(new byte[]{1, 2}, 0, 2));
+
+		Thread consumer = new Thread(() -> {
+			try {
+				Thread.sleep(25);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			q.read(new byte[2], true);
+		});
+		consumer.start();
+
+		assertTrue(q.write(new byte[]{3}, 0, 1, 500));
+		consumer.join(500);
+		assertFalse("Consumer thread did not finish", consumer.isAlive());
+	}
+
 }

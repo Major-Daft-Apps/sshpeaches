@@ -41,7 +41,17 @@ class TerminalInputRouter(
 
     fun pasteFromClipboard(): Boolean {
         val text = onRequestPasteText()?.takeIf { it.isNotEmpty() } ?: return false
-        emulatorProvider().paste(text)
+        return pasteText(text)
+    }
+
+    fun pasteText(text: String, emulator: TerminalEmulator = emulatorProvider()): Boolean {
+        val normalizedText = normalizePasteText(text).takeIf { it.isNotEmpty() } ?: return false
+        val payload = if (emulator.isBracketedPasteMode) {
+            "\u001B[200~$normalizedText\u001B[201~"
+        } else {
+            normalizedText
+        }
+        onWriteToRemote(payload.toByteArray(StandardCharsets.UTF_8))
         return true
     }
 
@@ -156,6 +166,10 @@ class TerminalInputRouter(
         }
         onWriteToRemote(payload)
     }
+
+    private fun normalizePasteText(text: String): String =
+        text.replace(Regex("(\u001B|[\u0080-\u009F])"), "")
+            .replace(Regex("\r?\n"), "\r")
 
     private fun normalizeCodePoint(codePoint: Int, ctrlDown: Boolean): Int {
         if (!ctrlDown) return codePoint

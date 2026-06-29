@@ -5,6 +5,7 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 
+import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
 
 /**
@@ -55,5 +56,12 @@ public interface TerminalViewClient {
     boolean readFnKey();
 
     boolean onCodePoint(int codePoint, boolean ctrlDown, TerminalSession session);
+
+    default boolean onPasteText(TerminalEmulator emulator, String text) {
+        return false;
+    }
+
+    default void onTerminalSizeChanged(int columns, int rows) {
+    }
 
 }
