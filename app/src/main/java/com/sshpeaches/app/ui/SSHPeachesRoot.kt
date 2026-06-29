@@ -1607,7 +1607,7 @@ fun SSHPeachesRoot(
                                                 onClick = { hostImportRequestToken.intValue += 1 },
                                                 modifier = Modifier.testTag(UiTestTags.topBarImport(Routes.HOSTS))
                                             ) {
-                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import host QR")
+                                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import hosts")
                                             }
                                             IconButton(
                                                 onClick = { hostAddRequestToken.intValue += 1 },
@@ -1906,6 +1906,8 @@ fun SSHPeachesRoot(
                             onImportFromQr = { showMessage("Host imported from QR") },
                             onToggleFavorite = onToggleFavorite,
                             onAdd = onHostAdd,
+                            onImportHost = onImportHost,
+                            onImportPortForward = onImportPortForward,
                             onImportPasswordPayload = onImportHostPasswordPayload,
                             onUpdate = onHostUpdate,
                             onDeleteHost = onHostDelete,

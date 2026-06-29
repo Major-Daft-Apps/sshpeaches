@@ -62,12 +62,13 @@ Open **Settings** and configure:
 - Keep **Host key prompts** enabled
 - Disable **Automatically trust host key** if you want manual trust decisions
 
-## Transfer data with QR
+## Transfer data and SSH configs
 
 - **Hosts**: open host card -> QR icon
 - **Identities**: identity row -> QR icon
 - **Port Forwards**: forward row -> QR icon
-- **Import**: use the QR icon in the top app bar on each management screen
+- **Import**: use the import icon in the top app bar on each management screen
+- **OpenSSH config**: from **Hosts**, choose import -> **OpenSSH config** to import `~/.ssh/config` hosts and local forwards
 - **Export all (single QR payload)**: **Settings** -> **Transfer Data** -> **Export via QR**
 
 If a host password or private key is included, you will be prompted for an export passphrase.

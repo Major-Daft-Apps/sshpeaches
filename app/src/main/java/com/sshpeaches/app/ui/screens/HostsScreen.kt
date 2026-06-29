@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -50,6 +53,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImportResult
+import com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporter
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
@@ -84,6 +89,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
+import java.nio.charset.StandardCharsets
 
 private enum class HostPaneMode {
     DETAILS,
@@ -127,6 +133,8 @@ fun HostsScreen(
     importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
     onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onImportHost: (HostConnection) -> Unit = {},
+    onImportPortForward: (PortForward) -> Unit = {},
     onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
@@ -174,6 +182,8 @@ fun HostsScreen(
     val showClearHostKeyDialog = rememberSaveable { mutableStateOf(false) }
     val pendingEncryptedImport = remember { mutableStateOf<Pair<String, String>?>(null) }
     val pendingDeleteHost = remember { mutableStateOf<HostConnection?>(null) }
+    val showImportOptionsDialog = rememberSaveable { mutableStateOf(false) }
+    val pendingOpenSshImport = remember { mutableStateOf<OpenSshConfigImportResult?>(null) }
     val importPassphraseState = remember { mutableStateOf("") }
     val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val importPassphraseError = remember { mutableStateOf<String?>(null) }
@@ -233,6 +243,126 @@ fun HostsScreen(
                 Toast.makeText(context, "Host imported", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+    val openSshConfigLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val contents = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader(StandardCharsets.UTF_8).readText()
+            }.orEmpty()
+        }.getOrElse {
+            Toast.makeText(context, "Unable to read SSH config file.", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        val processed = OpenSshConfigImporter.parse(
+            contents = contents,
+            existingHosts = hosts,
+            existingPortForwards = portForwards
+        )
+        if (processed.hosts.isEmpty() && processed.localForwards.isEmpty()) {
+            val detail = processed.warnings.firstOrNull()?.let { " $it" }.orEmpty()
+            Toast.makeText(context, "No importable OpenSSH hosts found.$detail", Toast.LENGTH_LONG).show()
+        } else {
+            pendingOpenSshImport.value = processed
+        }
+    }
+
+    fun launchHostQrImport() {
+        scanLauncher.launch(
+            buildQrScanOptions(shellLayoutMode, "Scan SSH host QR")
+        )
+    }
+
+    fun launchOpenSshConfigImport() {
+        openSshConfigLauncher.launch(
+            arrayOf(
+                "text/plain",
+                "text/*",
+                "application/octet-stream",
+                "*/*"
+            )
+        )
+    }
+
+    if (showImportOptionsDialog.value) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showImportOptionsDialog.value = false },
+            title = { Text("Import Hosts") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose a source to import saved SSH hosts.")
+                    Text("OpenSSH config imports hosts and local forwards. Private keys are not imported from IdentityFile paths.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportOptionsDialog.value = false
+                    launchOpenSshConfigImport()
+                }) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Text("OpenSSH config")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImportOptionsDialog.value = false
+                    launchHostQrImport()
+                }) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Text("QR")
+                }
+            }
+        )
+    }
+
+    pendingOpenSshImport.value?.let { importResult ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingOpenSshImport.value = null },
+            title = { Text("Review OpenSSH Import") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = dialogBodyMaxHeight)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("${importResult.hosts.size} host(s) and ${importResult.localForwards.size} local forward(s) ready.")
+                    importResult.hosts.take(8).forEach { imported ->
+                        Text(
+                            text = "${imported.host.name}: ${imported.host.username}@${imported.host.host}:${imported.host.port}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    if (importResult.hosts.size > 8) {
+                        Text("+${importResult.hosts.size - 8} more host(s)")
+                    }
+                    if (importResult.warnings.isNotEmpty()) {
+                        Text("Notes", fontWeight = FontWeight.SemiBold)
+                        importResult.warnings.take(8).forEach { warning ->
+                            Text("- $warning", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (importResult.warnings.size > 8) {
+                            Text("+${importResult.warnings.size - 8} more note(s)")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    importResult.hosts.forEach { onImportHost(it.host) }
+                    importResult.localForwards.forEach { onImportPortForward(it.forward) }
+                    Toast.makeText(
+                        context,
+                        "Imported ${importResult.hosts.size} host(s) and ${importResult.localForwards.size} forward(s).",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    pendingOpenSshImport.value = null
+                }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingOpenSshImport.value = null }) { Text("Cancel") }
+            }
+        )
     }
 
     pendingEncryptedImport.value?.let { (payload, targetId) ->
@@ -459,9 +589,7 @@ fun HostsScreen(
     LaunchedEffect(importRequestKey) {
         if (importRequestKey > handledImportRequestKey.intValue) {
             handledImportRequestKey.intValue = importRequestKey
-            scanLauncher.launch(
-                buildQrScanOptions(shellLayoutMode, "Scan SSH host QR")
-            )
+            showImportOptionsDialog.value = true
         }
     }
     val filteredHosts = hosts.filter { host ->

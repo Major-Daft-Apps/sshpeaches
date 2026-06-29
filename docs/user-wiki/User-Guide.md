@@ -38,7 +38,7 @@ Use this screen to manage saved servers.
 - Search hosts by name.
 - Sort menu: `Last Used` or `Alphabetical`.
 - Hosts are organized into collapsible groups.
-- Use the top app bar icons to add a host or import one from QR.
+- Use the top app bar icons to add a host, scan a host QR, or import hosts from an OpenSSH config file.
 - Use the three-dot menu on a host card for `Edit` and `Delete`.
 
 ### Host card actions
