@@ -251,6 +251,10 @@ internal object HostWidgets {
         )
     }
 
+    fun putActionToken(intent: Intent, context: Context) {
+        intent.putExtra(EXTRA_ACTION_TOKEN, actionToken(context))
+    }
+
     fun isTrustedWidgetActionIntent(context: Context, intent: Intent): Boolean {
         val expected = actionToken(context)
         val actual = intent.getStringExtra(EXTRA_ACTION_TOKEN)
