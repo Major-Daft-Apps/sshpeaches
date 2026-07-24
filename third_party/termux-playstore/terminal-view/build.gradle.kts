@@ -9,7 +9,7 @@ android {
     defaultConfig {
         minSdk = 26
 
-        testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -33,4 +33,7 @@ dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
     api(project(":terminal-emulator"))
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

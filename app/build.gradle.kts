@@ -78,8 +78,10 @@ android {
         applicationId = "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
-        versionCode = 106
-        versionName = "0.10.6"
+        // Version-code convention for 0.x releases: MMpp.
+        // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
+        versionCode = 1011
+        versionName = "0.10.11"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -265,6 +267,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.apache.sshd:sshd-core:2.12.1")
+    testImplementation("org.robolectric:robolectric:4.11.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

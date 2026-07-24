@@ -24,6 +24,7 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
+import net.schmizz.sshj.userauth.UserAuthException
 import org.apache.sshd.common.kex.BuiltinDHFactories
 import org.apache.sshd.server.ServerBuilder
 import org.apache.sshd.server.SshServer
@@ -35,6 +36,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -83,6 +85,47 @@ class SshClientProviderTest {
     }
 
     @Test
+    fun regression_cannotConnectWhenDhOnlyServerIsUnavailableForCaseInsensitiveInput() {
+        val names = SshClientProvider.compatibleKeyExchangeNamesForTesting(
+            unavailableAlgorithms = setOf("dH")
+        )
+
+        assertFalse(names.any { it.contains("diffie-hellman", ignoreCase = true) })
+    }
+
+    @Test
+    fun regression_cannotConnectWhenDhOnlyServerIsUnavailableAndUnavailableToClient() {
+        val server = startLocalSshServer(
+            hostKeyAlgorithm = "EC",
+            keyExchanges = listOf(BuiltinDHFactories.dhgex256)
+        )
+        val host = HostConnection(
+            id = "localhost-dh-only-fallback-blocked",
+            name = "Local DH-only server with DH unavailable",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_dh_only"),
+            host = host,
+            autoTrustUnknownHostKey = true,
+            unavailableKeyExchangeAlgorithms = setOf("DH")
+        )
+
+        try {
+            client.connect(host.host, host.port)
+            fail("Expected DH-only key exchange negotiation to fail when DH is unavailable on client.")
+        } catch (_: Exception) {
+            assertFalse(client.isAuthenticated)
+        } finally {
+            runCatching { client.disconnect() }
+            runCatching { server.stop(true) }
+        }
+    }
+
+    @Test
     fun compatibleKexPrefersEcdhBeforeDiffieHellmanForOpenSshOverlap() {
         val names = SshClientProvider.compatibleKeyExchangeNamesForTesting(
             unavailableAlgorithms = setOf("X25519")
@@ -121,6 +164,79 @@ class SshClientProviderTest {
 
             assertTrue(client.isConnected)
             assertTrue(client.isAuthenticated)
+        } finally {
+            runCatching { client.disconnect() }
+            runCatching { server.stop(true) }
+        }
+    }
+
+    @Test
+    fun connectsToLocalEcdhServerWhenDhKeyPairGeneratorIsUnavailable() {
+        val server = startLocalSshServer(
+            hostKeyAlgorithm = "EC",
+            keyExchanges = listOf(BuiltinDHFactories.dhgex256, BuiltinDHFactories.ecdhp256)
+        )
+        val host = HostConnection(
+            id = "localhost-dh-fallback",
+            name = "Local DH filtered to ECDH",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_fallback"),
+            host = host,
+            autoTrustUnknownHostKey = true,
+            unavailableKeyExchangeAlgorithms = setOf("DH")
+        )
+
+        try {
+            client.connect(host.host, host.port)
+            client.authPassword(TEST_USERNAME, TEST_PASSWORD)
+
+            assertTrue(client.isConnected)
+            assertTrue(client.isAuthenticated)
+        } finally {
+            runCatching { client.disconnect() }
+            runCatching { server.stop(true) }
+        }
+    }
+
+    @Test
+    fun retriesPasswordAfterInitialFailureWhenDhKeyPairGeneratorIsUnavailable() {
+        val server = startLocalSshServer(
+            hostKeyAlgorithm = "EC",
+            keyExchanges = listOf(BuiltinDHFactories.dhgex256, BuiltinDHFactories.ecdhp256)
+        )
+        val host = HostConnection(
+            id = "localhost-dh-fallback-retry",
+            name = "Local DH filtered to ECDH retry",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_fallback_retry"),
+            host = host,
+            autoTrustUnknownHostKey = true,
+            unavailableKeyExchangeAlgorithms = setOf("DH")
+        )
+
+        try {
+            client.connect(host.host, host.port)
+
+            runCatching {
+                client.authPassword(TEST_USERNAME, "wrong-password")
+            }.onSuccess {
+                throw AssertionError("Authentication should fail with wrong password.")
+            }
+
+            client.authPassword(TEST_USERNAME, TEST_PASSWORD)
+            assertTrue(client.isAuthenticated)
+        } catch (ex: UserAuthException) {
+            throw AssertionError("Expected second authentication attempt with correct password to succeed.", ex)
         } finally {
             runCatching { client.disconnect() }
             runCatching { server.stop(true) }

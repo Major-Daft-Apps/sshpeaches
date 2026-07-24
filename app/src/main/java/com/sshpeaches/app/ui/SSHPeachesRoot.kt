@@ -69,6 +69,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -136,6 +137,7 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalAnsiPalette
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
@@ -145,6 +147,7 @@ import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.local.Converters
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -230,6 +233,7 @@ data class SSHPeachesRootActions(
     val onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
     val onTerminalMarginPxChange: (Int) -> Unit,
     val onMoshServerCommandChange: (String) -> Unit,
+    val onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
     val onCrashReportsToggle: (Boolean) -> Unit,
     val onAnalyticsToggle: (Boolean) -> Unit,
     val onDiagnosticsToggle: (Boolean) -> Unit,
@@ -300,7 +304,7 @@ data class SSHPeachesRootActions(
     val onManageRemotePath: (String, String, String, String?) -> Unit,
     val onScpDownloadFile: (String, String, String?) -> Unit,
     val onScpUploadFile: (String, String, String) -> Unit,
-    val onOpenSessionRequestHandled: () -> Unit,
+    val onOpenSessionRequestHandled: (String) -> Unit,
     val onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
     val onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
     val onRequestCorePermissions: () -> Unit,
@@ -311,6 +315,8 @@ data class SSHPeachesRootActions(
 data class SSHPeachesRootRuntime(
     val resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
     val resolveRuntimeSessionPassword: (String) -> String?,
+    val sessionServiceReady: Boolean = false,
+    val runtimeSessionIds: Set<String> = emptySet(),
     val sessions: List<SessionSnapshot>,
     val shellOutputs: Map<String, String>,
     val remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
@@ -346,6 +352,7 @@ fun SSHPeachesRoot(
     val onTerminalVolumeButtonsAdjustFontSizeChange = actions.onTerminalVolumeButtonsAdjustFontSizeChange
     val onTerminalMarginPxChange = actions.onTerminalMarginPxChange
     val onMoshServerCommandChange = actions.onMoshServerCommandChange
+    val onUseBuiltInKeyboardToggle = actions.onUseBuiltInKeyboardToggle
     val onCrashReportsToggle = actions.onCrashReportsToggle
     val onAnalyticsToggle = actions.onAnalyticsToggle
     val onDiagnosticsToggle = actions.onDiagnosticsToggle
@@ -423,6 +430,8 @@ fun SSHPeachesRoot(
     val onStartupRouteHandled = actions.onStartupRouteHandled
     val resolveTerminalEmulator = runtime.resolveTerminalEmulator
     val resolveRuntimeSessionPassword = runtime.resolveRuntimeSessionPassword
+    val sessionServiceReady = runtime.sessionServiceReady
+    val runtimeSessionIds = runtime.runtimeSessionIds
     val sessions = runtime.sessions
     val shellOutputs = runtime.shellOutputs
     val remoteDirectories = runtime.remoteDirectories
@@ -476,10 +485,14 @@ fun SSHPeachesRoot(
     val helpUrl = context.getString(R.string.support_url)
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
-    val shellLayoutMode = rememberShellLayoutMode(
-        sessionRoute = currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
-    )
     val missingCorePermissions = corePermissions.filterNot { it.granted }
+    val showFirstRunWelcome = remember {
+        mutableStateOf(FirstRunWelcomePreferences.shouldShow(context))
+    }
+    val completeFirstRunWelcome = {
+        FirstRunWelcomePreferences.markCompleted(context)
+        showFirstRunWelcome.value = false
+    }
     val activeSshSessions = sessions.filter {
         it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
             it.mode == ConnectionMode.SSH
@@ -569,12 +582,22 @@ fun SSHPeachesRoot(
         pendingConnectingNavigation.value = false
         val popped = navController.popBackStack()
         if (!popped) {
-            val destination = routeBeforeConnecting.value
-                .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-                ?: Routes.HOME
+            val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
             navController.navigate(destination) {
                 popUpTo(Routes.HOME)
             }
+        }
+    }
+
+    fun returnFromMissingSessionRoute(destination: String) {
+        val recoveryRoute = validatedSessionRecoveryRoute(destination)
+        pendingConnectingNavigation.value = false
+        quickConnectRequest.value = null
+        quickConnectState.value = QuickConnectUiState()
+        suppressHomeWelcomeOnReturn.value = recoveryRoute == Routes.HOME
+        navController.navigate(recoveryRoute) {
+            popUpTo(Routes.HOME)
+            launchSingleTop = true
         }
     }
 
@@ -591,8 +614,47 @@ fun SSHPeachesRoot(
     val effectiveQuickConnectState = currentQuickConnectSnapshot?.let { snapshot ->
         quickStateFromSnapshot(snapshot, snapshot.host)
     } ?: quickConnectState.value
-    val isSessionVerticalRoute =
+    val isActualSessionVerticalRoute =
         currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+    val routeReadinessSnapshots = sessions.map { snapshot ->
+        val requiresTerminalEmulator = snapshot.mode == ConnectionMode.SSH
+        SessionRouteSnapshot(
+            sessionId = snapshot.hostId,
+            status = when (snapshot.status) {
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING ->
+                    SessionRouteSnapshotStatus.CONNECTING
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE ->
+                    SessionRouteSnapshotStatus.ACTIVE
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR ->
+                    SessionRouteSnapshotStatus.ERROR
+            },
+            requiresTerminalEmulator = requiresTerminalEmulator,
+            terminalEmulatorAvailable = !requiresTerminalEmulator ||
+                snapshot.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE ||
+                resolveTerminalEmulator(snapshot.hostId) != null
+        )
+    }
+    val staleSessionRouteDecision = decideStaleSessionRoute(
+        sessionServiceReady = sessionServiceReady,
+        currentRoute = currentRoute,
+        requestedOpenSessionId = requestedOpenSessionId,
+        quickConnectRequestSessionId = rawQuickConnectRequest?.sessionId,
+        pendingConnectingNavigation = pendingConnectingNavigation.value,
+        sawSnapshotForCurrentRequest = sawSnapshotForCurrentRequest.value,
+        sessionSnapshots = routeReadinessSnapshots,
+        runtimeSessionIds = runtimeSessionIds,
+        routeBeforeConnecting = routeBeforeConnecting.value
+    )
+    val sessionRouteRendering = decideSessionRouteRendering(
+        currentRoute = currentRoute,
+        staleSessionRouteDecision = staleSessionRouteDecision
+    )
+    val chromeRoute = sessionRouteRendering.chromeRoute
+    val isSessionVerticalRoute =
+        chromeRoute == Routes.CONNECTING || chromeRoute == Routes.SESSION
+    val shellLayoutMode = rememberShellLayoutMode(
+        sessionRoute = isSessionVerticalRoute
+    )
 
     fun routeForSnapshot(snapshot: SessionSnapshot): String =
         if (snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE) {
@@ -608,7 +670,7 @@ fun SSHPeachesRoot(
         navigateBackFromConnecting()
     }
     val activeSessionRequest = effectiveQuickConnectRequest
-    val currentTitle = when (currentRoute) {
+    val currentTitle = when (chromeRoute) {
         Routes.HOME -> "Home"
         Routes.CONNECTING,
         Routes.SESSION -> activeSessionRequest?.name?.ifBlank {
@@ -637,14 +699,34 @@ fun SSHPeachesRoot(
     }
 
     LaunchedEffect(currentRoute) {
-        if (!isSessionVerticalRoute) {
+        if (!isActualSessionVerticalRoute) {
             routeBeforeConnecting.value = currentRoute
         }
     }
 
-    LaunchedEffect(requestedOpenSessionId, requestedOpenSessionFileTransferEntryMode, sessions, currentRoute) {
+    LaunchedEffect(
+        requestedOpenSessionId,
+        requestedOpenSessionFileTransferEntryMode,
+        sessions,
+        currentRoute,
+        staleSessionRouteDecision.consumeRequestedOpenSessionId
+    ) {
         val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
-        val snapshot = sessions.firstOrNull { it.hostId == targetHostId } ?: return@LaunchedEffect
+        UiDebugLog.action(
+            "openSessionRoute",
+            "target=$targetHostId, current=${quickConnectRequest.value?.sessionId ?: "none"}, " +
+                "route=$currentRoute, snapshots=${sessions.joinToString { it.hostId }}, " +
+                "consumeAsStale=${staleSessionRouteDecision.consumeRequestedOpenSessionId}"
+        )
+        if (staleSessionRouteDecision.consumeRequestedOpenSessionId) {
+            UiDebugLog.result("openSessionRoute", false, "target=$targetHostId, reason=stale")
+            return@LaunchedEffect
+        }
+        val snapshot = sessions.firstOrNull { it.hostId == targetHostId }
+        if (snapshot == null) {
+            UiDebugLog.result("openSessionRoute", false, "target=$targetHostId, reason=snapshot-missing")
+            return@LaunchedEffect
+        }
         val host = snapshot.host
         val targetRoute = routeForSnapshot(snapshot)
         quickConnectRequest.value = quickRequestFromSnapshot(
@@ -659,7 +741,12 @@ fun SSHPeachesRoot(
                 popUpTo(Routes.HOME)
             }
         }
-        onOpenSessionRequestHandled()
+        UiDebugLog.result(
+            "openSessionRoute",
+            true,
+            "target=$targetHostId, selected=${quickConnectRequest.value?.sessionId ?: "none"}, route=$targetRoute"
+        )
+        onOpenSessionRequestHandled(targetHostId)
     }
 
     LaunchedEffect(requestedStartupRoute, backStackEntry?.destination?.route) {
@@ -682,6 +769,14 @@ fun SSHPeachesRoot(
     LaunchedEffect(rawQuickConnectRequest, currentQuickConnectSnapshot) {
         val request = rawQuickConnectRequest ?: return@LaunchedEffect
         val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        if (quickConnectRequest.value != request) {
+            UiDebugLog.result(
+                "reconcileSessionSelection",
+                false,
+                "captured=${request.sessionId}, current=${quickConnectRequest.value?.sessionId ?: "none"}"
+            )
+            return@LaunchedEffect
+        }
         val reconciledRequest = reconcileQuickConnectRequest(request, snapshot)
         if (quickConnectRequest.value != reconciledRequest) {
             quickConnectRequest.value = reconciledRequest
@@ -692,8 +787,15 @@ fun SSHPeachesRoot(
         }
     }
 
-    LaunchedEffect(currentQuickConnectSnapshot?.status, currentRoute) {
+    LaunchedEffect(
+        currentQuickConnectSnapshot?.hostId,
+        currentQuickConnectSnapshot?.status,
+        currentRoute
+    ) {
         val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        if (quickConnectRequest.value?.sessionId != snapshot.hostId) {
+            return@LaunchedEffect
+        }
         when {
             snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
                 currentRoute == Routes.CONNECTING -> {
@@ -713,22 +815,19 @@ fun SSHPeachesRoot(
         }
     }
 
-    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute) {
+    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute, sessionServiceReady) {
         val request = quickConnectRequest.value ?: return@LaunchedEffect
         val snapshot = sessions.firstOrNull { it.hostId == request.sessionId }
         when (snapshot?.status) {
             null -> {
-                if (sawSnapshotForCurrentRequest.value) {
-                    pendingConnectingNavigation.value = false
-                    quickConnectRequest.value = null
-                    quickConnectState.value = QuickConnectUiState()
-                    if (isSessionVerticalRoute) {
-                        val destination = routeBeforeConnecting.value
-                            .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-                            ?: Routes.HOME
-                        navController.navigate(destination) {
-                            popUpTo(Routes.HOME)
-                        }
+                if (
+                    sessionServiceReady &&
+                    sawSnapshotForCurrentRequest.value &&
+                    !pendingConnectingNavigation.value
+                ) {
+                    if (!isActualSessionVerticalRoute) {
+                        quickConnectRequest.value = null
+                        quickConnectState.value = QuickConnectUiState()
                     }
                 } else {
                     quickConnectState.value = QuickConnectUiState(
@@ -763,8 +862,20 @@ fun SSHPeachesRoot(
             }
         }
     }
+    LaunchedEffect(
+        requestedOpenSessionId,
+        staleSessionRouteDecision.consumeRequestedOpenSessionId,
+        staleSessionRouteDecision.recoveryRoute
+    ) {
+        if (staleSessionRouteDecision.consumeRequestedOpenSessionId) {
+            requestedOpenSessionId?.let(onOpenSessionRequestHandled)
+        }
+        staleSessionRouteDecision.recoveryRoute?.let { recoveryRoute ->
+            returnFromMissingSessionRoute(recoveryRoute)
+        }
+    }
     LaunchedEffect(currentRoute, quickConnectRequest.value?.sessionId) {
-        if (isSessionVerticalRoute || quickConnectRequest.value == null) {
+        if (isActualSessionVerticalRoute || quickConnectRequest.value == null) {
             pendingConnectingNavigation.value = false
         }
     }
@@ -1179,6 +1290,9 @@ fun SSHPeachesRoot(
             onDiagnosticsToggle(
                 settings.optBoolean("diagnosticsLoggingEnabled", uiState.diagnosticsLoggingEnabled)
             )
+            onUseBuiltInKeyboardToggle(
+                settings.optBoolean("useBuiltInKeyboard", uiState.useBuiltInKeyboard)
+            )
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
@@ -1264,9 +1378,7 @@ fun SSHPeachesRoot(
             onStopSession(request.sessionId)
         }
         pendingConnectingNavigation.value = false
-        val destination = routeBeforeConnecting.value
-            .takeIf { it != Routes.CONNECTING && it != Routes.SESSION }
-            ?: Routes.HOME
+        val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
         suppressHomeWelcomeOnReturn.value = destination == Routes.HOME
         navController.navigate(destination) {
             popUpTo(Routes.HOME)
@@ -1277,6 +1389,14 @@ fun SSHPeachesRoot(
 
     @Composable
     fun SessionVerticalContent() {
+        if (!sessionRouteRendering.renderTerminalContent) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            )
+            return
+        }
         val showConnectingTopBar =
             quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
                 !connectedHostBarCollapsed.value
@@ -1316,104 +1436,107 @@ fun SSHPeachesRoot(
             it.id == uiState.defaultTerminalProfileId
         } ?: uiState.terminalProfiles.firstOrNull()
             ?: TerminalProfileDefaults.builtInProfiles.first()
-        ConnectingScreen(
-            request = request,
-            state = screenState,
-            logs = logs,
-            shellOutput = shellOutput,
-            remoteDirectory = remoteDirectory,
-            activeFileTransfer = activeFileTransfer,
-            terminalProfile = activeTerminalProfile,
-            terminalSelectionMode = uiState.terminalSelectionMode,
-            terminalBellMode = uiState.terminalBellMode,
-            diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
-            useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
-            terminalMarginPx = uiState.terminalMarginPx,
-            keyboardSlots = uiState.keyboardSlots,
-            snippets = uiState.snippets,
-            onSendShellBytes = { payload ->
-                request?.let { current ->
-                    onSendShellBytes(current.sessionId, payload)
-                }
-            },
-            onTerminalResize = { cols, rows ->
-                request?.let { current ->
-                    onResizeShell(current.sessionId, cols, rows)
-                }
-            },
-            onSftpListDirectory = { path ->
-                request?.let { current ->
-                    onListSftpDirectory(current.sessionId, path)
-                }
-            },
-            onSftpDownload = { remotePath, localPath ->
-                request?.let { current ->
-                    onSftpDownloadFile(current.sessionId, remotePath, localPath)
-                }
-            },
-            onSftpUpload = { localPath, remotePath ->
-                request?.let { current ->
-                    onSftpUploadFile(current.sessionId, localPath, remotePath)
-                }
-            },
-            onScpDownload = { remotePath, localPath ->
-                request?.let { current ->
-                    onScpDownloadFile(current.sessionId, remotePath, localPath)
-                }
-            },
-            onScpUpload = { localPath, remotePath ->
-                request?.let { current ->
-                    onScpUploadFile(current.sessionId, localPath, remotePath)
-                }
-            },
-            onManageRemotePath = { operation, sourcePath, destinationPath ->
-                request?.let { current ->
-                    onManageRemotePath(current.sessionId, operation, sourcePath, destinationPath)
-                }
-            },
-            resolveTerminalEmulator = resolveTerminalEmulator,
-            resolveRuntimeSessionPassword = resolveRuntimeSessionPassword,
-            onRetry = {
-                quickConnectRequest.value?.let { current ->
-                    val next = if (current.savedHostId == null) {
-                        current.copy(
-                            sessionId = sessionIdFor("quick-${UUID.randomUUID()}", current.mode)
+        key(request?.sessionId) {
+            ConnectingScreen(
+                request = request,
+                state = screenState,
+                logs = logs,
+                shellOutput = shellOutput,
+                remoteDirectory = remoteDirectory,
+                activeFileTransfer = activeFileTransfer,
+                terminalProfile = activeTerminalProfile,
+                terminalSelectionMode = uiState.terminalSelectionMode,
+                terminalBellMode = uiState.terminalBellMode,
+                diagnosticsLoggingEnabled = uiState.diagnosticsLoggingEnabled,
+                useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
+                terminalMarginPx = uiState.terminalMarginPx,
+                useBuiltInKeyboard = uiState.useBuiltInKeyboard,
+                keyboardSlots = uiState.keyboardSlots,
+                snippets = uiState.snippets,
+                onSendShellBytes = { payload ->
+                    request?.let { current ->
+                        onSendShellBytes(current.sessionId, payload)
+                    }
+                },
+                onTerminalResize = { cols, rows ->
+                    request?.let { current ->
+                        onResizeShell(current.sessionId, cols, rows)
+                    }
+                },
+                onSftpListDirectory = { path ->
+                    request?.let { current ->
+                        onListSftpDirectory(current.sessionId, path)
+                    }
+                },
+                onSftpDownload = { remotePath, localPath ->
+                    request?.let { current ->
+                        onSftpDownloadFile(current.sessionId, remotePath, localPath)
+                    }
+                },
+                onSftpUpload = { localPath, remotePath ->
+                    request?.let { current ->
+                        onSftpUploadFile(current.sessionId, localPath, remotePath)
+                    }
+                },
+                onScpDownload = { remotePath, localPath ->
+                    request?.let { current ->
+                        onScpDownloadFile(current.sessionId, remotePath, localPath)
+                    }
+                },
+                onScpUpload = { localPath, remotePath ->
+                    request?.let { current ->
+                        onScpUploadFile(current.sessionId, localPath, remotePath)
+                    }
+                },
+                onManageRemotePath = { operation, sourcePath, destinationPath ->
+                    request?.let { current ->
+                        onManageRemotePath(current.sessionId, operation, sourcePath, destinationPath)
+                    }
+                },
+                resolveTerminalEmulator = resolveTerminalEmulator,
+                resolveRuntimeSessionPassword = resolveRuntimeSessionPassword,
+                onRetry = {
+                    quickConnectRequest.value?.let { current ->
+                        val next = if (current.savedHostId == null) {
+                            current.copy(
+                                sessionId = sessionIdFor("quick-${UUID.randomUUID()}", current.mode)
+                            )
+                        } else {
+                            current.copy(
+                                sessionId = sessionIdFor(current.savedHostId, current.mode)
+                            )
+                        }
+                        if (current.savedHostId == null) {
+                            onMoveRuntimeSessionPassword(current.sessionId, next.sessionId)
+                        }
+                        onStopSession(current.sessionId)
+                        resetSessionLogs(next.sessionId)
+                        quickConnectRequest.value = next
+                        quickConnectState.value = QuickConnectUiState(
+                            phase = QuickConnectPhase.CONNECTING,
+                            message = "Connecting to ${next.host}:${next.port}..."
                         )
-                    } else {
-                        current.copy(
-                            sessionId = sessionIdFor(current.savedHostId, current.mode)
+                        markRequestUsage(next)
+                        onStartSession(
+                            next.sessionId,
+                            quickConnectHost(next),
+                            next.mode,
+                            null,
+                            current.savedHostId != null
                         )
                     }
-                    if (current.savedHostId == null) {
-                        onMoveRuntimeSessionPassword(current.sessionId, next.sessionId)
-                    }
-                    onStopSession(current.sessionId)
-                    resetSessionLogs(next.sessionId)
-                    quickConnectRequest.value = next
-                    quickConnectState.value = QuickConnectUiState(
-                        phase = QuickConnectPhase.CONNECTING,
-                        message = "Connecting to ${next.host}:${next.port}..."
-                    )
-                    markRequestUsage(next)
-                    onStartSession(
-                        next.sessionId,
-                        quickConnectHost(next),
-                        next.mode,
-                        null,
-                        current.savedHostId != null
-                    )
-                }
-            },
-            onToggleConnectedHostBar = {
-                connectedHostBarCollapsed.value = !connectedHostBarCollapsed.value
-            },
-            onOpenSettings = {
-                navController.navigate(Routes.SETTINGS)
-            },
-            onShowMessage = showSuccessMessage,
-            findRequestToken = connectingFindRequestToken.intValue,
-            applyStatusBarsPadding = !showTopBarForCurrentSessionRoute
-        )
+                },
+                onToggleConnectedHostBar = {
+                    connectedHostBarCollapsed.value = !connectedHostBarCollapsed.value
+                },
+                onOpenSettings = {
+                    navController.navigate(Routes.SETTINGS)
+                },
+                onShowMessage = showSuccessMessage,
+                findRequestToken = connectingFindRequestToken.intValue,
+                applyStatusBarsPadding = !showTopBarForCurrentSessionRoute
+            )
+        }
     }
 
     fun openSupportSite() {
@@ -1509,7 +1632,7 @@ fun SSHPeachesRoot(
                     quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
                         !connectedHostBarCollapsed.value
                 val showSessionTopBar =
-                    currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
+                    chromeRoute != Routes.SESSION || !connectedHostBarCollapsed.value
                 Scaffold(
                     snackbarHost = {
                         SnackbarHost(snackbarHostState) { data ->
@@ -1525,7 +1648,7 @@ fun SSHPeachesRoot(
                     topBar = {
                         val showTopBar =
                             showSessionTopBar &&
-                                (currentRoute != Routes.CONNECTING || showConnectingTopBar)
+                                (chromeRoute != Routes.CONNECTING || showConnectingTopBar)
                         if (showTopBar) {
                             TopAppBar(
                                 title = { Text(currentTitle) },
@@ -1601,7 +1724,7 @@ fun SSHPeachesRoot(
                                             )
                                         }
                                     }
-                                    when (currentRoute) {
+                                    when (chromeRoute) {
                                         Routes.HOSTS -> {
                                             IconButton(
                                                 onClick = { hostImportRequestToken.intValue += 1 },
@@ -2151,6 +2274,8 @@ fun SSHPeachesRoot(
                                 onTerminalBellModeChange = onTerminalBellModeChange,
                                 useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
                                 onUseVolumeButtonsToAdjustFontSizeChange = onTerminalVolumeButtonsAdjustFontSizeChange,
+                                useBuiltInKeyboard = uiState.useBuiltInKeyboard,
+                                onUseBuiltInKeyboardToggle = onUseBuiltInKeyboardToggle,
                                 terminalMarginPx = uiState.terminalMarginPx,
                                 onTerminalMarginPxChange = onTerminalMarginPxChange,
                                 moshServerCommand = uiState.moshServerCommand,
@@ -2206,7 +2331,7 @@ fun SSHPeachesRoot(
                         ) {
                             AppDrawer(
                                 destinations = drawerDestinations,
-                                currentRoute = currentRoute,
+                                currentRoute = chromeRoute,
                                 onDestinationSelected = onDrawerDestinationSelected
                             )
                         }
@@ -2222,7 +2347,7 @@ fun SSHPeachesRoot(
                     sidebar = {
                         AppDrawer(
                             destinations = drawerDestinations,
-                            currentRoute = currentRoute,
+                            currentRoute = chromeRoute,
                             onDestinationSelected = onDrawerDestinationSelected
                         )
                     }
@@ -2246,12 +2371,34 @@ fun SSHPeachesRoot(
         }
     }
 
-    if (missingCorePermissions.isNotEmpty()) {
-        PermissionRequiredDialog(
-            missingCorePermissions = missingCorePermissions,
-            onManagePermissions = onOpenAppPermissionSettings,
-            onRequestNow = onRequestCorePermissions
+    when (
+        startupOverlay(
+            showFirstRunWelcome = showFirstRunWelcome.value,
+            hasMissingCorePermissions = missingCorePermissions.isNotEmpty()
         )
+    ) {
+        StartupOverlay.FIRST_RUN_WELCOME -> {
+            FirstRunWelcomeDialog(
+                onContinue = completeFirstRunWelcome,
+                onFollowOnX = {
+                    completeFirstRunWelcome()
+                    val profileUri = CREATOR_X_PROFILE_URL.toUri()
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, profileUri))
+                    }
+                }
+            )
+        }
+
+        StartupOverlay.PERMISSIONS -> {
+            PermissionRequiredDialog(
+                missingCorePermissions = missingCorePermissions,
+                onManagePermissions = onOpenAppPermissionSettings,
+                onRequestNow = onRequestCorePermissions
+            )
+        }
+
+        StartupOverlay.NONE -> Unit
     }
 
     if (showShortcutHelp.value && !uiState.isLocked) {
@@ -2382,8 +2529,24 @@ fun SSHPeachesRoot(
         )
     }
 
-    val hostKeyPrompt = hostKeyPrompts.firstOrNull()
-    val passwordPrompt = if (hostKeyPrompt == null) passwordPrompts.firstOrNull() else null
+    // Keep connection prompts aligned with the session the user explicitly opened. Without
+    // this filtering, the oldest prompt from another connecting session can remain on top and
+    // make a notification tap appear to have reopened the previously visible session.
+    val promptSessionId = activeSessionRequest?.sessionId
+    val hostKeyPrompt = if (promptSessionId == null) {
+        hostKeyPrompts.firstOrNull()
+    } else {
+        hostKeyPrompts.firstOrNull { it.hostId == promptSessionId }
+    }
+    val passwordPrompt = if (hostKeyPrompt == null) {
+        if (promptSessionId == null) {
+            passwordPrompts.firstOrNull()
+        } else {
+            passwordPrompts.firstOrNull { it.hostId == promptSessionId }
+        }
+    } else {
+        null
+    }
     hostKeyPrompt?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
@@ -3419,6 +3582,9 @@ private fun terminalProfileToJson(profile: TerminalProfile): JSONObject = JSONOb
     put("cursorHex", profile.cursorHex)
     put("cursorStyle", profile.cursorStyle.name)
     put("cursorBlink", profile.cursorBlink)
+    if (TerminalProfileDefaults.profileById(profile.id) == null) {
+        put("ansiColors", JSONArray(profile.ansiColors))
+    }
 }
 
 private fun terminalProfilesToJson(profiles: List<TerminalProfile>): JSONArray = JSONArray().apply {
@@ -3445,10 +3611,20 @@ private fun terminalProfilesFromJson(array: JSONArray?): List<TerminalProfile> {
                     item.optString("cursorStyle", TerminalCursorStyle.BLOCK.name)
                 )
             }.getOrDefault(TerminalCursorStyle.BLOCK),
-            cursorBlink = item.optBoolean("cursorBlink", true)
+            cursorBlink = item.optBoolean("cursorBlink", true),
+            ansiColors = terminalAnsiColorsFromJson(item.optJSONArray("ansiColors"))
         )
     }
     return out
+}
+
+private fun terminalAnsiColorsFromJson(array: JSONArray?): List<String> {
+    if (array == null || array.length() != TerminalAnsiPalette.TERMUX.size) {
+        return TerminalAnsiPalette.TERMUX
+    }
+    return List(array.length()) { index ->
+        array.optString(index).takeIf { it.isNotBlank() } ?: TerminalAnsiPalette.TERMUX[index]
+    }
 }
 
 private fun buildExportPayload(state: AppUiState, passphrase: String?): String? {
@@ -3546,6 +3722,7 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             put("moshServerCommand", state.moshServerCommand)
             put("terminalProfiles", terminalProfilesToJson(state.terminalProfiles))
             put("defaultTerminalProfileId", state.defaultTerminalProfileId)
+            put("useBuiltInKeyboard", state.useBuiltInKeyboard)
             put("crashReportsEnabled", state.crashReportsEnabled)
             put("analyticsEnabled", state.analyticsEnabled)
             put("diagnosticsLoggingEnabled", state.diagnosticsLoggingEnabled)

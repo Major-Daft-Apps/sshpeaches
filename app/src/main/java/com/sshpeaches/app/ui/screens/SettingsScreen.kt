@@ -84,7 +84,7 @@ private enum class SettingsCategory(
     PERMISSIONS("Permissions", "App access and required OS permissions"),
     APPEARANCE("Appearance", "Theme and launcher icon"),
     BACKGROUND("Background", "Session lifetime while backgrounded"),
-    TERMINAL("Terminal", "Emulation, margins, bell, and Mosh"),
+    TERMINAL("Terminal", "Emulation, custom keyboard, margins, bell, and Mosh"),
     SECURITY("Security", "PIN, biometrics, and host key policy"),
     AUTOMATION("Automation", "Snippets and port forward defaults"),
     DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
@@ -120,6 +120,8 @@ fun SettingsScreen(
     onTerminalBellModeChange: (TerminalBellMode) -> Unit,
     useVolumeButtonsToAdjustFontSize: Boolean,
     onUseVolumeButtonsToAdjustFontSizeChange: (Boolean) -> Unit,
+    useBuiltInKeyboard: Boolean,
+    onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
     terminalMarginPx: Int,
     onTerminalMarginPxChange: (Int) -> Unit,
     moshServerCommand: String,
@@ -566,6 +568,13 @@ fun SettingsScreen(
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH)
                     )
                 }
+                SettingsToggleRow(
+                    title = "Use built-in keyboard",
+                    description = "Use SSHPeaches' built-in keyboard layout and Fn access instead of the Android soft keyboard.",
+                    checked = useBuiltInKeyboard,
+                    onCheckedChange = onUseBuiltInKeyboardToggle,
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH)
+                )
                 OutlinedTextField(
                     value = moshServerCommandState.value,
                     onValueChange = { next ->

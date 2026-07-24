@@ -2,20 +2,24 @@ package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.graphics.Color
 import androidx.core.graphics.toColorInt
+import com.majordaftapps.sshpeaches.app.data.model.TerminalAnsiPalette
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalOutput
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
-import com.termux.terminal.TextStyle
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class TermuxTerminalEngine(
     private val onWriteToRemote: (ByteArray) -> Unit,
     private val onCopyToClipboard: (String) -> Unit = {},
     private val onRequestPasteText: () -> String? = { null },
     private var onBellAction: () -> Unit = {},
-    private val onTerminalDiagnostic: (String) -> Unit = {}
+    private val onTerminalDiagnostic: (String) -> Unit = {},
+    private val emulatorDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
 ) : TerminalOutput(), TerminalSessionClient {
 
     private val emulator = TerminalEmulator(
@@ -31,10 +35,12 @@ class TermuxTerminalEngine(
     private var incomingSequenceNumber = 0
     private var outgoingSequenceNumber = 0
 
-    fun appendIncoming(bytes: ByteArray) {
+    suspend fun appendIncoming(bytes: ByteArray) {
         if (bytes.isEmpty()) return
-        emitByteDiagnostic(direction = "RX", data = bytes, offset = 0, count = bytes.size)
-        emulator.append(bytes, bytes.size)
+        withContext(emulatorDispatcher) {
+            emitByteDiagnostic(direction = "RX", data = bytes, offset = 0, count = bytes.size)
+            emulator.append(bytes, bytes.size)
+        }
     }
 
     fun resize(columns: Int, rows: Int, cellWidthPx: Int, cellHeightPx: Int) {
@@ -134,10 +140,16 @@ class TermuxTerminalEngine(
             val foreground = parseColorValue(profile.foregroundHex, DEFAULT_FOREGROUND_COLOR)
             val background = parseColorValue(profile.backgroundHex, Color.BLACK)
             val cursor = parseColorValue(profile.cursorHex, DEFAULT_CURSOR_COLOR)
-            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground
-            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = background
-            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = cursor
-            emulator.setCursorStyle(profile.cursorStyle.toTerminalCursorStyle())
+            val profileAnsiColors = profile.ansiColors.takeIf { it.size == ANSI_COLOR_COUNT }
+                ?: TerminalAnsiPalette.TERMUX
+            val ansiColors = IntArray(ANSI_COLOR_COUNT) { index ->
+                parseColorValue(
+                    profileAnsiColors[index],
+                    parseColorValue(TerminalAnsiPalette.TERMUX[index], DEFAULT_FOREGROUND_COLOR)
+                )
+            }
+            emulator.mColors.setColorScheme(ansiColors, foreground, background, cursor)
+            emulator.setDefaultCursorStyle(profile.cursorStyle.toTerminalCursorStyle())
             return background
         }
 
@@ -149,6 +161,8 @@ class TermuxTerminalEngine(
             TerminalCursorStyle.UNDERLINE -> TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE
             TerminalCursorStyle.BAR -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
         }
+
+        private const val ANSI_COLOR_COUNT = 16
     }
 
     private fun emitByteDiagnostic(direction: String, data: ByteArray, offset: Int, count: Int) {

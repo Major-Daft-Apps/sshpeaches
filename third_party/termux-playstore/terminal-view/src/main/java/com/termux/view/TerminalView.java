@@ -365,7 +365,7 @@ public final class TerminalView extends View {
             }
 
             void sendTextToTerminal(CharSequence text) {
-                stopTextSelectionMode();
+                stopTextSelectionMode(true);
                 final int textLengthInChars = text.length();
                 for (int i = 0; i < textLengthInChars; i++) {
                     char firstChar = text.charAt(i);
@@ -742,7 +742,7 @@ public final class TerminalView extends View {
             return true;
         }
         if (isSelectingText()) {
-            stopTextSelectionMode();
+            stopTextSelectionMode(true);
         }
 
         if (mClient.onKeyDown(keyCode, event, mTermSession)) {
@@ -820,12 +820,13 @@ public final class TerminalView extends View {
                 + leftAltDownFromEvent + ")");
         }
 
+        final TerminalViewClient client = mClient;
+        final boolean controlDown = controlDownFromEvent || (client != null && client.readControlKey());
+        final boolean altDown = leftAltDownFromEvent || (client != null && client.readAltKey());
+
+        if (client != null && client.onCodePoint(codePoint, controlDown, mTermSession)) return;
+
         if (mTermSession == null) return;
-
-        final boolean controlDown = controlDownFromEvent || mClient.readControlKey();
-        final boolean altDown = leftAltDownFromEvent || mClient.readAltKey();
-
-        if (mClient.onCodePoint(codePoint, controlDown, mTermSession)) return;
 
         if (controlDown) {
             if (codePoint >= 'a' && codePoint <= 'z') {
@@ -1181,7 +1182,11 @@ public final class TerminalView extends View {
     }
 
     private boolean hideTextSelectionCursors() {
-        return getTextSelectionCursorController().hide();
+        return hideTextSelectionCursors(false);
+    }
+
+    private boolean hideTextSelectionCursors(boolean force) {
+        return getTextSelectionCursorController().hide(force);
     }
 
     public boolean isSelectingText() {
@@ -1328,10 +1333,26 @@ public final class TerminalView extends View {
     }
 
     public void stopTextSelectionMode() {
-        if (hideTextSelectionCursors()) {
+        stopTextSelectionMode(false);
+    }
+
+    public void stopTextSelectionMode(boolean force) {
+        if (hideTextSelectionCursors(force)) {
             mClient.copyModeChanged(isSelectingText());
             invalidate();
         }
+    }
+
+    void onTextSelectionModeStoppedByController() {
+        if (mClient != null) {
+            mClient.copyModeChanged(isSelectingText());
+        }
+        invalidate();
+    }
+
+    public boolean performTextSelectionActionForTest(boolean copy) {
+        if (mTextSelectionCursorController == null) return false;
+        return mTextSelectionCursorController.performActionForTesting(copy);
     }
 
     private void decrementYTextSelectionCursors(int decrement) {

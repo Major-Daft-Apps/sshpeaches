@@ -25,7 +25,11 @@ class TerminalInputRouter(
         var index = 0
         while (index < text.length) {
             val codePoint = text.codePointAt(index)
-            sendCodePoint(codePoint, ctrlDown, altDown)
+            sendCodePoint(
+                codePoint = if (shiftDown) shiftCodePoint(codePoint) else codePoint,
+                ctrlDown = ctrlDown,
+                altDown = altDown
+            )
             index += Character.charCount(codePoint)
         }
     }
@@ -62,6 +66,17 @@ class TerminalInputRouter(
         shiftDown: Boolean = false,
         fallbackSequence: String? = null
     ): Boolean {
+        val numpadLiteral = numpadLiteralForKeyCode(keyCode)
+        if (numpadLiteral != null) {
+            sendText(
+                text = numpadLiteral,
+                ctrlDown = ctrlDown,
+                altDown = altDown,
+                // App-rendered numpad buttons are literal even when Shift is latched.
+                shiftDown = false
+            )
+            return true
+        }
         var keyMod = 0
         if (ctrlDown) keyMod = keyMod or KeyHandler.KEYMOD_CTRL
         if (altDown) keyMod = keyMod or KeyHandler.KEYMOD_ALT
@@ -81,29 +96,63 @@ class TerminalInputRouter(
             onWriteToRemote(fallbackSequence.toByteArray(StandardCharsets.UTF_8))
             return true
         }
+        val printableText = printableTextForKeyCode(keyCode, shiftDown)
+        if (printableText != null) {
+            sendText(
+                text = printableText,
+                ctrlDown = ctrlDown,
+                altDown = altDown
+            )
+            return true
+        }
         return false
     }
 
     @Suppress("DEPRECATION")
-    fun onAndroidKeyDown(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_MULTIPLE && event.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
-            val chars = event.characters ?: return true
-            if (chars.isNotEmpty()) {
+    fun onAndroidKeyDown(
+        event: KeyEvent,
+        ctrlDown: Boolean = false,
+        altDown: Boolean = false,
+        shiftDown: Boolean = false
+    ): Boolean {
+        if (event.action == KeyEvent.ACTION_MULTIPLE) {
+            if (event.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                val chars = event.characters.orEmpty()
+                if (chars.isEmpty()) return false
                 onWriteToRemote(chars.toByteArray(StandardCharsets.UTF_8))
+                return true
             }
-            return true
+            var handled = false
+            repeat(event.repeatCount.coerceAtLeast(1)) {
+                handled = routeAndroidKeyEvent(event, ctrlDown, altDown, shiftDown) || handled
+            }
+            return handled
         }
 
+        return routeAndroidKeyEvent(event, ctrlDown, altDown, shiftDown)
+    }
+
+    private fun routeAndroidKeyEvent(
+        event: KeyEvent,
+        externalCtrlDown: Boolean,
+        externalAltDown: Boolean,
+        externalShiftDown: Boolean
+    ): Boolean {
         if (event.isSystem && event.keyCode != KeyEvent.KEYCODE_BACK) return false
         if (event.keyCode == KeyEvent.KEYCODE_BACK) return false
 
         val metaState = event.metaState
-        val controlDown = (metaState and KeyEvent.META_CTRL_MASK) != 0
-        val altDown = (metaState and KeyEvent.META_ALT_MASK) != 0
+        val controlDown = externalCtrlDown || (metaState and KeyEvent.META_CTRL_MASK) != 0
+        val altDown = externalAltDown || (metaState and KeyEvent.META_ALT_MASK) != 0
         val leftAltDown = (metaState and KeyEvent.META_ALT_LEFT_ON) != 0
-        val shiftDown = (metaState and KeyEvent.META_SHIFT_MASK) != 0
+        val shiftDown = externalShiftDown || (metaState and KeyEvent.META_SHIFT_MASK) != 0
 
-        if (isPasteShortcut(event.keyCode, metaState)) {
+        var effectiveShortcutMetaState = metaState
+        if (externalCtrlDown) effectiveShortcutMetaState = effectiveShortcutMetaState or KeyEvent.META_CTRL_ON
+        if (externalAltDown) effectiveShortcutMetaState = effectiveShortcutMetaState or KeyEvent.META_ALT_ON
+        if (externalShiftDown) effectiveShortcutMetaState = effectiveShortcutMetaState or KeyEvent.META_SHIFT_ON
+
+        if (isPasteShortcut(event.keyCode, effectiveShortcutMetaState)) {
             return pasteFromClipboard()
         }
 
@@ -162,9 +211,10 @@ class TerminalInputRouter(
             String(Character.toChars(normalized)).toByteArray(StandardCharsets.UTF_8)
         }
         if (altDown) {
-            onWriteToRemote(byteArrayOf(0x1B))
+            onWriteToRemote(byteArrayOf(0x1B) + payload)
+        } else {
+            onWriteToRemote(payload)
         }
-        onWriteToRemote(payload)
     }
 
     private fun normalizePasteText(text: String): String =
@@ -185,5 +235,85 @@ class TerminalInputRouter(
             codePoint == '8'.code -> 127
             else -> codePoint
         }
+    }
+
+    private fun shiftCodePoint(codePoint: Int): Int = when (codePoint) {
+        in 'a'.code..'z'.code -> codePoint - 'a'.code + 'A'.code
+        '0'.code -> ')'.code
+        '1'.code -> '!'.code
+        '2'.code -> '@'.code
+        '3'.code -> '#'.code
+        '4'.code -> '$'.code
+        '5'.code -> '%'.code
+        '6'.code -> '^'.code
+        '7'.code -> '&'.code
+        '8'.code -> '*'.code
+        '9'.code -> '('.code
+        '`'.code -> '~'.code
+        '-'.code -> '_'.code
+        '='.code -> '+'.code
+        '['.code -> '{'.code
+        ']'.code -> '}'.code
+        '\\'.code -> '|'.code
+        ';'.code -> ':'.code
+        '\''.code -> '"'.code
+        ','.code -> '<'.code
+        '.'.code -> '>'.code
+        '/'.code -> '?'.code
+        else -> codePoint
+    }
+
+    private fun numpadLiteralForKeyCode(keyCode: Int): String? {
+        if (keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) {
+            return ('0'.code + keyCode - KeyEvent.KEYCODE_NUMPAD_0).toChar().toString()
+        }
+        return when (keyCode) {
+            KeyEvent.KEYCODE_NUMPAD_ADD -> "+"
+            KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> "-"
+            KeyEvent.KEYCODE_NUMPAD_MULTIPLY -> "*"
+            KeyEvent.KEYCODE_NUMPAD_DIVIDE -> "/"
+            KeyEvent.KEYCODE_NUMPAD_DOT -> "."
+            KeyEvent.KEYCODE_NUMPAD_COMMA -> ","
+            KeyEvent.KEYCODE_NUMPAD_EQUALS -> "="
+            KeyEvent.KEYCODE_NUMPAD_LEFT_PAREN -> "("
+            KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN -> ")"
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> "\r"
+            else -> null
+        }
+    }
+
+    private fun printableTextForKeyCode(keyCode: Int, shiftDown: Boolean): String? {
+        if (keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z) {
+            val offset = keyCode - KeyEvent.KEYCODE_A
+            val base = if (shiftDown) 'A' else 'a'
+            return (base.code + offset).toChar().toString()
+        }
+        if (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+            val offset = keyCode - KeyEvent.KEYCODE_0
+            return if (shiftDown) {
+                SHIFTED_DIGITS[offset].toString()
+            } else {
+                ('0'.code + offset).toChar().toString()
+            }
+        }
+        return when (keyCode) {
+            KeyEvent.KEYCODE_SPACE -> " "
+            KeyEvent.KEYCODE_GRAVE -> if (shiftDown) "~" else "`"
+            KeyEvent.KEYCODE_MINUS -> if (shiftDown) "_" else "-"
+            KeyEvent.KEYCODE_EQUALS -> if (shiftDown) "+" else "="
+            KeyEvent.KEYCODE_LEFT_BRACKET -> if (shiftDown) "{" else "["
+            KeyEvent.KEYCODE_RIGHT_BRACKET -> if (shiftDown) "}" else "]"
+            KeyEvent.KEYCODE_BACKSLASH -> if (shiftDown) "|" else "\\"
+            KeyEvent.KEYCODE_SEMICOLON -> if (shiftDown) ":" else ";"
+            KeyEvent.KEYCODE_APOSTROPHE -> if (shiftDown) "\"" else "'"
+            KeyEvent.KEYCODE_COMMA -> if (shiftDown) "<" else ","
+            KeyEvent.KEYCODE_PERIOD -> if (shiftDown) ">" else "."
+            KeyEvent.KEYCODE_SLASH -> if (shiftDown) "?" else "/"
+            else -> null
+        }
+    }
+
+    private companion object {
+        const val SHIFTED_DIGITS = ")!@#$%^&*("
     }
 }

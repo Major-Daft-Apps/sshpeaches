@@ -20,13 +20,14 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.State
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
@@ -195,11 +196,11 @@ class MainActivity : FragmentActivity() {
         }
 
         val foregroundServiceTypeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val dataSyncGranted = ContextCompat.checkSelfPermission(
+            val connectedDeviceGranted = ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC
+                Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
             ) == PackageManager.PERMISSION_GRANTED
-            dataSyncGranted
+            connectedDeviceGranted
         } else {
             true
         }
@@ -311,12 +312,40 @@ class MainActivity : FragmentActivity() {
             }
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionService = sessionServiceState.value
-            val sessionSnapshots by sessionService?.sessionsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-            val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-            val passwordPrompts by sessionService?.passwordPromptsFlow()?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-            val shellOutputs by sessionService?.shellOutputFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
-            val remoteDirectories by sessionService?.remoteDirectoryFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
-            val fileTransferProgress by sessionService?.fileTransferProgressFlow()?.collectAsState(initial = emptyMap()) ?: remember { mutableStateOf(emptyMap()) }
+            val emptySessionSnapshotsState: State<List<SessionService.SessionSnapshot>> =
+                remember { mutableStateOf(emptyList()) }
+            val emptyHostKeyPromptsState: State<List<SessionService.HostKeyPrompt>> =
+                remember { mutableStateOf(emptyList()) }
+            val emptyPasswordPromptsState: State<List<SessionService.PasswordPrompt>> =
+                remember { mutableStateOf(emptyList()) }
+            val emptyShellOutputsState: State<Map<String, String>> =
+                remember { mutableStateOf(emptyMap()) }
+            val emptyRemoteDirectoriesState:
+                State<Map<String, SessionService.RemoteDirectorySnapshot>> =
+                remember { mutableStateOf(emptyMap()) }
+            val emptyFileTransferProgressState:
+                State<Map<String, com.majordaftapps.sshpeaches.app.service.FileTransferProgress>> =
+                remember { mutableStateOf(emptyMap()) }
+            val sessionSnapshotsFlow = sessionService?.sessionsFlow()
+            val observedSessionSnapshots by sessionSnapshotsFlow
+                ?.collectAsStateWithLifecycle(minActiveState = Lifecycle.State.CREATED)
+                ?: emptySessionSnapshotsState
+            val collectedSessionSnapshots = observedSessionSnapshots
+            // Notification intents can arrive before the STARTED collector resumes. Read the
+            // bound service's current StateFlow value so routing never validates against a
+            // lifecycle-cached list from the previously visible session. Reading the collected
+            // value above also keeps foreground compositions subscribed to later flow emissions.
+            val sessionSnapshots = sessionSnapshotsFlow?.value ?: collectedSessionSnapshots
+            val hostKeyPrompts by sessionService?.hostKeyPromptsFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyHostKeyPromptsState
+            val passwordPrompts by sessionService?.passwordPromptsFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyPasswordPromptsState
+            val shellOutputs by sessionService?.shellOutputFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyShellOutputsState
+            val remoteDirectories by sessionService?.remoteDirectoryFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyRemoteDirectoriesState
+            val fileTransferProgress by sessionService?.fileTransferProgressFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyFileTransferProgressState
             LaunchedEffect(uiState.hosts) {
                 HostWidgets.updateAll(this@MainActivity)
             }
@@ -517,6 +546,7 @@ class MainActivity : FragmentActivity() {
                         onTerminalVolumeButtonsAdjustFontSizeChange = viewModel::setTerminalVolumeButtonsAdjustFontSize,
                         onTerminalMarginPxChange = viewModel::setTerminalMarginPx,
                         onMoshServerCommandChange = viewModel::setMoshServerCommand,
+                        onUseBuiltInKeyboardToggle = viewModel::setUseBuiltInKeyboard,
                         onCrashReportsToggle = viewModel::setCrashReports,
                         onAnalyticsToggle = viewModel::setAnalytics,
                         onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -649,9 +679,18 @@ class MainActivity : FragmentActivity() {
                         onManageRemotePath = manageRemotePath,
                         onScpDownloadFile = scpDownloadFile,
                         onScpUploadFile = scpUploadFile,
-                        onOpenSessionRequestHandled = {
-                        requestedOpenSessionHostId.value = null
-                        requestedOpenSessionFileTransferEntryMode.value = null
+                        onOpenSessionRequestHandled = { handledSessionId ->
+                            val pendingSessionId = requestedOpenSessionHostId.value
+                            val matchesPendingRequest = pendingSessionId == handledSessionId
+                            UiDebugLog.result(
+                                "openSessionRequestHandled",
+                                matchesPendingRequest,
+                                "handled=$handledSessionId, pending=${pendingSessionId ?: "none"}"
+                            )
+                            if (matchesPendingRequest) {
+                                requestedOpenSessionHostId.value = null
+                                requestedOpenSessionFileTransferEntryMode.value = null
+                            }
                         },
                         onRespondToHostKeyPrompt = { promptId, trust ->
                         sessionService?.respondToHostKeyPrompt(promptId, trust)
@@ -673,6 +712,8 @@ class MainActivity : FragmentActivity() {
                     runtime = SSHPeachesRootRuntime(
                         resolveTerminalEmulator = resolveTerminalEmulator,
                         resolveRuntimeSessionPassword = resolveRuntimeSessionPassword,
+                        sessionServiceReady = sessionService != null,
+                        runtimeSessionIds = sessionService?.activeSessionIdsForRouting().orEmpty(),
                         sessions = sessionSnapshots,
                         shellOutputs = shellOutputs,
                         remoteDirectories = remoteDirectories,
@@ -801,6 +842,13 @@ class MainActivity : FragmentActivity() {
                 requestedOpenSessionHostId.value = hostId
                 requestedOpenSessionFileTransferEntryMode.value = null
                 UiDebugLog.result("handleSessionOpenIntent", true, "hostId=$hostId")
+            }
+
+            SessionService.ACTION_OPEN_SESSIONS -> {
+                requestedOpenSessionHostId.value = null
+                requestedOpenSessionFileTransferEntryMode.value = null
+                requestedStartupRoute.value = Routes.HOME
+                UiDebugLog.result("handleSessionsOpenIntent", true, "route=${Routes.HOME}")
             }
 
             ACTION_WIDGET_CONNECT -> {

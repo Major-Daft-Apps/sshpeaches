@@ -51,25 +51,37 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
     }
 
     public boolean hide() {
+        return hide(false);
+    }
+
+    public boolean hide(boolean force) {
         if (!isActive()) return false;
 
         // prevent hide calls right after a show call, like long pressing the down key
         // 300ms seems long enough that it wouldn't cause hide problems if action button
         // is quickly clicked after the show, otherwise decrease it
-        if (System.currentTimeMillis() - mShowStartTime < 300) {
+        if (!force && System.currentTimeMillis() - mShowStartTime < 300) {
             return false;
         }
+
+        return closeSelection(true);
+    }
+
+    private boolean closeSelection(boolean finishActionMode) {
+        if (!mIsSelectingText) return false;
 
         mStartHandle.hide();
         mEndHandle.hide();
 
-        if (mActionMode != null) {
-            // This will hide the TextSelectionCursorController
-            mActionMode.finish();
-        }
-
+        ActionMode actionMode = mActionMode;
+        mActionMode = null;
         mSelX1 = mSelY1 = mSelX2 = mSelY2 = -1;
         mIsSelectingText = false;
+
+        if (finishActionMode && actionMode != null) {
+            // This will hide the TextSelectionCursorController
+            actionMode.finish();
+        }
 
         return true;
     }
@@ -129,10 +141,10 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
                     case ACTION_COPY:
                         String selectedText = getSelectedText();
                         terminalView.copyTextToClipboard(selectedText);
-                        terminalView.stopTextSelectionMode();
+                        terminalView.stopTextSelectionMode(true);
                         break;
                     case ACTION_PASTE:
-                        terminalView.stopTextSelectionMode();
+                        terminalView.stopTextSelectionMode(true);
                         terminalView.pasteTextFromClipboard();
                         break;
                     case ACTION_MORE:
@@ -142,7 +154,7 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
                         mStoredSelectedText = getSelectedText();
                         // The text selection needs to be stopped before showing context menu,
                         // otherwise handles will show above popup
-                        terminalView.stopTextSelectionMode();
+                        terminalView.stopTextSelectionMode(true);
                         terminalView.showContextMenu();
                         break;
                 }
@@ -152,6 +164,11 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
             @Override
             public void onDestroyActionMode(ActionMode mode) {
+                if (mActionMode == mode) {
+                    if (closeSelection(false)) {
+                        terminalView.onTextSelectionModeStoppedByController();
+                    }
+                }
             }
 
         };
@@ -174,7 +191,7 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
             @Override
             public void onDestroyActionMode(ActionMode mode) {
-                // Ignore.
+                callback.onDestroyActionMode(mode);
             }
 
             @Override
@@ -385,6 +402,12 @@ public class TextSelectionCursorController implements ViewTreeObserver.OnTouchMo
 
     public ActionMode getActionMode() {
         return mActionMode;
+    }
+
+    boolean performActionForTesting(boolean copy) {
+        ActionMode actionMode = mActionMode;
+        if (actionMode == null) return false;
+        return actionMode.getMenu().performIdentifierAction(copy ? ACTION_COPY : ACTION_PASTE, 0);
     }
 
     /**

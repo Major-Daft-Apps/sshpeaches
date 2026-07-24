@@ -8,6 +8,9 @@ public final class TerminalColors {
     /** Static data - a bit ugly but ok for now. */
     public static final TerminalColorScheme COLOR_SCHEME = new TerminalColorScheme();
 
+    /** Per-emulator defaults. Unlike {@link #COLOR_SCHEME}, these may safely differ between sessions. */
+    private final int[] mDefaultColors = new int[TextStyle.NUM_INDEXED_COLORS];
+
     /**
      * The current terminal colors, which are normally set from the color theme, but may be set dynamically with the OSC
      * 4 control sequence.
@@ -16,17 +19,34 @@ public final class TerminalColors {
 
     /** Create a new instance with default colors from the theme. */
     public TerminalColors() {
+        System.arraycopy(COLOR_SCHEME.mDefaultColors, 0, mDefaultColors, 0, TextStyle.NUM_INDEXED_COLORS);
+        reset();
+    }
+
+    /**
+     * Set this emulator's 16 ANSI colors plus default foreground, background, and cursor colors.
+     * Keeping these defaults on the emulator instance prevents one session's theme from leaking into another and
+     * lets terminal reset/OSC reset sequences restore the selected theme instead of the process-wide fallback.
+     */
+    public void setColorScheme(int[] ansiColors, int foreground, int background, int cursor) {
+        if (ansiColors == null || ansiColors.length != 16) {
+            throw new IllegalArgumentException("A terminal color scheme must contain exactly 16 ANSI colors");
+        }
+        System.arraycopy(ansiColors, 0, mDefaultColors, 0, ansiColors.length);
+        mDefaultColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground;
+        mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND] = background;
+        mDefaultColors[TextStyle.COLOR_INDEX_CURSOR] = cursor;
         reset();
     }
 
     /** Reset a particular indexed color with the default color from the color theme. */
     public void reset(int index) {
-        mCurrentColors[index] = COLOR_SCHEME.mDefaultColors[index];
+        mCurrentColors[index] = mDefaultColors[index];
     }
 
     /** Reset all indexed colors with the default color from the color theme. */
     public void reset() {
-        System.arraycopy(COLOR_SCHEME.mDefaultColors, 0, mCurrentColors, 0, TextStyle.NUM_INDEXED_COLORS);
+        System.arraycopy(mDefaultColors, 0, mCurrentColors, 0, TextStyle.NUM_INDEXED_COLORS);
     }
 
     /**

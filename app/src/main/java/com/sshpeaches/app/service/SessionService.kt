@@ -7,10 +7,15 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
@@ -60,6 +65,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,6 +76,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,7 +96,6 @@ import net.schmizz.sshj.xfer.LocalFileFilter
 import net.schmizz.sshj.xfer.LocalSourceFile
 import net.schmizz.sshj.xfer.TransferListener
 import net.schmizz.sshj.xfer.scp.SCPFileTransfer
-import kotlin.math.absoluteValue
 import kotlin.math.min
 
 /**
@@ -110,6 +117,12 @@ class SessionService : Service() {
     private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
     private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
     private val fileTransferProgress = MutableStateFlow<Map<String, FileTransferProgress>>(emptyMap())
+    private val sessionSnapshotsState = sessionSnapshots.asStateFlow()
+    private val hostKeyPromptsState = hostKeyPrompts.asStateFlow()
+    private val passwordPromptsState = passwordPrompts.asStateFlow()
+    private val shellOutputState = shellOutput.asStateFlow()
+    private val remoteDirectoriesState = remoteDirectories.asStateFlow()
+    private val fileTransferProgressState = fileTransferProgress.asStateFlow()
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
     private val shellReadSequence = ConcurrentHashMap<String, Int>()
     private val shellWriteSequence = ConcurrentHashMap<String, Int>()
@@ -119,14 +132,24 @@ class SessionService : Service() {
     private val moshTranscriptPublishJobs = ConcurrentHashMap<String, Job>()
     private val moshReconnectJobs = ConcurrentHashMap<String, Job>()
     private val transferNotificationRefreshJobs = ConcurrentHashMap<String, Job>()
+    private val networkTransitionTracker = DefaultNetworkTransitionTracker<Network>()
+    private val networkHandler = Handler(Looper.getMainLooper())
+    private val sessionStateLock = Any()
     private val notificationStateLock = Any()
-    private var foregroundNotificationId: Int? = null
-    private val sessionNotificationIds = mutableSetOf<Int>()
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallbackRegistered = false
+    @Volatile
+    private var serviceDestroyed = false
+    private var foregroundNotificationStarted = false
+    private val sessionNotificationIdentities = mutableMapOf<String, SessionNotificationIdentity>()
+    private var nextSessionNotificationId = FIRST_SESSION_NOTIFICATION_ID
+    private var nextSessionDisplayNumber = 1
     @Volatile
     private var diagnosticsEnabled: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
+        serviceDestroyed = false
         UiDebugLog.action("SessionService.onCreate")
         serviceScope.launch {
             SettingsStore.diagnosticsEnabled.collect { enabled ->
@@ -134,6 +157,7 @@ class SessionService : Service() {
             }
         }
         createChannel()
+        registerDefaultNetworkMonitor()
         UiDebugLog.result("SessionService.onCreate", true)
     }
 
@@ -155,6 +179,9 @@ class SessionService : Service() {
 
     override fun onDestroy() {
         UiDebugLog.action("SessionService.onDestroy", "activeSessions=${activeJobs.size}")
+        serviceDestroyed = true
+        unregisterDefaultNetworkMonitor()
+        networkHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
         stopAllSessions()
         clearAllHostKeyPrompts()
@@ -177,6 +204,121 @@ class SessionService : Service() {
         shellReadSequence.clear()
         shellWriteSequence.clear()
         UiDebugLog.result("SessionService.onDestroy", true)
+    }
+
+    private val defaultNetworkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            networkTransitionTracker.onAvailable(
+                network = network,
+                isVpn = networkIsVpn(network)
+            )?.let(::disconnectForNetworkTransition)
+        }
+
+        override fun onCapabilitiesChanged(
+            network: Network,
+            networkCapabilities: NetworkCapabilities
+        ) {
+            networkTransitionTracker.onCapabilitiesChanged(
+                network = network,
+                isVpn = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            )?.let(::disconnectForNetworkTransition)
+        }
+
+        override fun onLosing(network: Network, maxMsToLive: Int) {
+            networkTransitionTracker.onLost(network)
+                ?.let(::disconnectForNetworkTransition)
+        }
+
+        override fun onLost(network: Network) {
+            networkTransitionTracker.onLost(network)
+                ?.let(::disconnectForNetworkTransition)
+        }
+    }
+
+    private fun registerDefaultNetworkMonitor() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        connectivityManager = manager
+        val initialNetwork = manager.activeNetwork
+        networkTransitionTracker.seed(
+            network = initialNetwork,
+            isVpn = initialNetwork?.let(::networkIsVpn)
+        )
+        runCatching {
+            manager.registerDefaultNetworkCallback(defaultNetworkCallback)
+        }.onSuccess {
+            networkCallbackRegistered = true
+        }.onFailure { error ->
+            UiDebugLog.error("SessionService.networkMonitor", error, "register-failed")
+        }
+    }
+
+    private fun unregisterDefaultNetworkMonitor() {
+        val manager = connectivityManager
+        if (manager != null && networkCallbackRegistered) {
+            runCatching {
+                manager.unregisterNetworkCallback(defaultNetworkCallback)
+            }.onFailure { error ->
+                UiDebugLog.error("SessionService.networkMonitor", error, "unregister-failed")
+            }
+        }
+        networkCallbackRegistered = false
+        connectivityManager = null
+        networkTransitionTracker.seed(network = null, isVpn = null)
+    }
+
+    private fun networkIsVpn(network: Network): Boolean? =
+        connectivityManager
+            ?.getNetworkCapabilities(network)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+
+    private fun disconnectForNetworkTransition(transition: DefaultNetworkTransition) {
+        networkHandler.post {
+            if (serviceDestroyed) return@post
+            val sessionIds = activeJobs.keys.toList()
+            if (sessionIds.isEmpty()) {
+                UiDebugLog.result(
+                    "SessionService.networkTransition",
+                    true,
+                    "transition=$transition, activeSessions=0"
+                )
+                return@post
+            }
+            val message = when (transition) {
+                DefaultNetworkTransition.LOST ->
+                    "Network connection lost. Session disconnected."
+                DefaultNetworkTransition.CHANGED ->
+                    "Network route changed. Session disconnected."
+                DefaultNetworkTransition.VPN_STATE_CHANGED ->
+                    "VPN state changed. Session disconnected."
+            }
+            sessionIds.forEach { sessionId ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = message
+                    )
+                )
+            }
+            stopAllSessions()
+            UiDebugLog.result(
+                "SessionService.networkTransition",
+                true,
+                "transition=$transition, disconnectedSessions=${sessionIds.size}"
+            )
+        }
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        UiDebugLog.action(
+            "SessionService.onTimeout",
+            "startId=$startId, fgsType=$fgsType, activeSessions=${activeJobs.size}"
+        )
+        stopAllSessions()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        foregroundNotificationStarted = false
+        stopSelf(startId)
+        UiDebugLog.result("SessionService.onTimeout", true, "sessionsStopped=true")
     }
 
     fun startSession(
@@ -220,7 +362,7 @@ class SessionService : Service() {
         } else {
             null
         }
-        val job = serviceScope.launch {
+        val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             var client: SSHClient? = null
             var shellBinding: ShellBinding? = null
             var moshBinding: MoshBinding? = null
@@ -234,7 +376,10 @@ class SessionService : Service() {
                 client = SshClientProvider.createClient(
                     this@SessionService,
                     sessionHost,
-                    SessionLoggerFactory(sessionId),
+                    SessionLoggerFactory(
+                        hostId = sessionId,
+                        diagnosticsEnabled = { diagnosticsEnabled }
+                    ),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
                     onHostKeyPrompt = if (hostKeyPromptEnabled) {
                         { prompt ->
@@ -424,10 +569,15 @@ class SessionService : Service() {
                     UiDebugLog.result("startSession", false, "sessionId=$sessionId, mode=$mode")
                 }
             }
+            runCatching { shellBinding?.resizeQueue?.close() }
             runCatching { shellBinding?.inputQueue?.close() }
+            runCatching { shellBinding?.resizeWriterJob?.cancel() }
             runCatching { shellBinding?.inputWriterJob?.cancel() }
+            runCatching { shellBinding?.outputReaderJob?.cancel() }
             runCatching { shellBinding?.shell?.close() }
             runCatching { shellBinding?.session?.close() }
+            runCatching { moshBinding?.inputQueue?.close() }
+            runCatching { moshBinding?.inputWriterJob?.cancel() }
             runCatching { moshBinding?.session?.finishIfRunning() }
             runCatching { sftpBinding?.client?.close() }
             runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
@@ -440,17 +590,24 @@ class SessionService : Service() {
             clearRemoteDirectoryForHost(sessionId)
             clearFileTransferProgress(sessionId)
         }
-        job.invokeOnCompletion {
-            activeJobs.remove(sessionId)
-            activeConnections.remove(sessionId)
-            clearRuntimeSessionPassword(sessionId)
-            clearFileTransferProgress(sessionId)
-            updateSessionNotifications()
-            if (it is CancellationException) {
-                removeSessionSnapshot(sessionId)
+        val existingJob = activeJobs.putIfAbsent(sessionId, job)
+        if (existingJob != null) {
+            job.cancel()
+            UiDebugLog.result("startSession", false, "already-active sessionId=$sessionId")
+            return
+        }
+        job.invokeOnCompletion { completionError ->
+            if (activeJobs.remove(sessionId, job)) {
+                activeConnections.remove(sessionId)
+                clearRuntimeSessionPassword(sessionId)
+                clearFileTransferProgress(sessionId)
+                updateSessionNotifications()
+                if (completionError is CancellationException) {
+                    removeSessionSnapshot(sessionId)
+                }
             }
         }
-        activeJobs[sessionId] = job
+        job.start()
         updateSessionNotifications()
     }
 
@@ -489,10 +646,15 @@ class SessionService : Service() {
 
     private fun closeConnectionResources(hostId: String, connection: ActiveConnection, trigger: String) {
         measureOperation("closeConnectionResources/$trigger", hostId, thresholdMs = 200L) {
+            runCatching { connection.shellBinding?.resizeQueue?.close() }
             runCatching { connection.shellBinding?.inputQueue?.close() }
+            runCatching { connection.shellBinding?.resizeWriterJob?.cancel() }
             runCatching { connection.shellBinding?.inputWriterJob?.cancel() }
+            runCatching { connection.shellBinding?.outputReaderJob?.cancel() }
             runCatching { connection.shellBinding?.shell?.close() }
             runCatching { connection.shellBinding?.session?.close() }
+            runCatching { connection.moshBinding?.inputQueue?.close() }
+            runCatching { connection.moshBinding?.inputWriterJob?.cancel() }
             runCatching { connection.moshBinding?.session?.finishIfRunning() }
             runCatching { connection.sftpBinding?.client?.close() }
             runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
@@ -572,12 +734,13 @@ class SessionService : Service() {
         return if (trimmed.contains('\n') || trimmed.contains('\r')) this else "$trimmed\r"
     }
 
-    fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshots.asStateFlow()
-    fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPrompts.asStateFlow()
-    fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPrompts.asStateFlow()
-    fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutput.asStateFlow()
-    fun remoteDirectoryFlow(): StateFlow<Map<String, RemoteDirectorySnapshot>> = remoteDirectories.asStateFlow()
-    fun fileTransferProgressFlow(): StateFlow<Map<String, FileTransferProgress>> = fileTransferProgress.asStateFlow()
+    fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshotsState
+    fun activeSessionIdsForRouting(): Set<String> = activeJobs.keys.toSet()
+    fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPromptsState
+    fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPromptsState
+    fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutputState
+    fun remoteDirectoryFlow(): StateFlow<Map<String, RemoteDirectorySnapshot>> = remoteDirectoriesState
+    fun fileTransferProgressFlow(): StateFlow<Map<String, FileTransferProgress>> = fileTransferProgressState
     fun resolveTerminalEmulator(hostId: String): TerminalEmulator? {
         val connection = activeConnections[hostId] ?: return null
         return connection.shellBinding?.terminalEngine?.emulator()
@@ -590,7 +753,7 @@ class SessionService : Service() {
 
     fun respondToHostKeyPrompt(promptId: String, trust: Boolean) {
         hostKeyPromptWaiters.remove(promptId)?.complete(trust)
-        hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
+        hostKeyPrompts.update { prompts -> prompts.filterNot { it.id == promptId } }
     }
 
     fun respondToPasswordPrompt(promptId: String, password: String?, savePassword: Boolean) {
@@ -604,7 +767,7 @@ class SessionService : Service() {
                 savePassword = savePassword
             )
         )
-        passwordPrompts.value = passwordPrompts.value.filterNot { it.id == promptId }
+        passwordPrompts.update { prompts -> prompts.filterNot { it.id == promptId } }
     }
 
     fun getRuntimeSessionPassword(sessionId: String): String? = runtimeSessionPasswords[sessionId]
@@ -636,27 +799,21 @@ class SessionService : Service() {
             return
         }
         connection.moshBinding?.let { mosh ->
-            serviceScope.launch {
-                runCatching {
-                    val wrote = mosh.session.writeWithTimeout(
-                        bytes,
-                        0,
-                        bytes.size,
-                        MOSH_INPUT_WRITE_TIMEOUT_MS
+            val reservedCapacity = if (bytes.size > MOSH_INTERACTIVE_INPUT_MAX_BYTES) {
+                MOSH_INTERACTIVE_INPUT_RESERVE_BYTES
+            } else {
+                0
+            }
+            if (!mosh.inputQueue.tryEnqueue(bytes, reservedCapacity)) {
+                UiDebugLog.result("sendShellBytes", false, "mosh-input-queue-full-or-closed hostId=$hostId")
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Mosh input buffer is full or closed; rejected ${bytes.size} byte(s). " +
+                            "Retry after the session reconnects."
                     )
-                    if (!wrote) {
-                        throw TimeoutException("Timed out writing to mosh input queue")
-                    }
-                    emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = bytes, size = bytes.size)
-                }.onFailure { err ->
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = hostId,
-                            level = SessionLogBus.LogLevel.ERROR,
-                            message = "Failed to write to mosh client: ${err.message ?: "unknown error"}"
-                        )
-                    )
-                }
+                )
             }
             return
         }
@@ -693,12 +850,8 @@ class SessionService : Service() {
             return
         }
         val shellBinding = connection.shellBinding ?: return
-        shellBinding.terminalEngine.resize(columns, rows, 0, 0)
-        val shell = shellBinding.shell
-        serviceScope.launch {
-            runCatching {
-                shell.changeWindowDimensions(columns, rows, 0, 0)
-            }
+        if (!shellBinding.resizeQueue.trySend(next).isSuccess) {
+            UiDebugLog.result("resizeShell", false, "resize-queue-closed hostId=$hostId")
         }
     }
 
@@ -1580,7 +1733,7 @@ class SessionService : Service() {
             keyChanged = prompt.keyChanged
         )
         hostKeyPromptWaiters[promptId] = waiter
-        hostKeyPrompts.value = hostKeyPrompts.value + uiPrompt
+        hostKeyPrompts.update { prompts -> prompts + uiPrompt }
         val warning = if (prompt.keyChanged) {
             "WARNING: Host key changed for ${prompt.host}:${prompt.port} (${prompt.fingerprint})"
         } else {
@@ -1607,7 +1760,7 @@ class SessionService : Service() {
             false
         } finally {
             hostKeyPromptWaiters.remove(promptId)
-            hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.id == promptId }
+            hostKeyPrompts.update { prompts -> prompts.filterNot { it.id == promptId } }
         }
     }
 
@@ -1631,7 +1784,7 @@ class SessionService : Service() {
             allowSave = allowSave
         )
         passwordPromptWaiters[promptId] = waiter
-        passwordPrompts.value = passwordPrompts.value + prompt
+        passwordPrompts.update { prompts -> prompts + prompt }
         updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, reason)
         val remainingMillis = millisUntilDeadline(deadlineMillis)
         if (remainingMillis <= 0L) {
@@ -1647,7 +1800,7 @@ class SessionService : Service() {
             null
         } finally {
             passwordPromptWaiters.remove(promptId)
-            passwordPrompts.value = passwordPrompts.value.filterNot { it.id == promptId }
+            passwordPrompts.update { prompts -> prompts.filterNot { it.id == promptId } }
         }
     }
 
@@ -1657,7 +1810,7 @@ class SessionService : Service() {
             hostKeyPromptWaiters.remove(prompt.id)?.complete(trust)
         }
         if (promptsForHost.isNotEmpty()) {
-            hostKeyPrompts.value = hostKeyPrompts.value.filterNot { it.hostId == hostId }
+            hostKeyPrompts.update { prompts -> prompts.filterNot { it.hostId == hostId } }
         }
     }
 
@@ -1678,7 +1831,7 @@ class SessionService : Service() {
             )
         }
         if (promptsForHost.isNotEmpty()) {
-            passwordPrompts.value = passwordPrompts.value.filterNot { it.hostId == hostId }
+            passwordPrompts.update { prompts -> prompts.filterNot { it.hostId == hostId } }
         }
     }
 
@@ -1933,7 +2086,9 @@ class SessionService : Service() {
         hostId: String,
         host: HostConnection,
         moshConnect: MoshConnect,
-        terminalEmulation: TerminalEmulation
+        terminalEmulation: TerminalEmulation,
+        existingInputQueue: BoundedMoshInputQueue? = null,
+        existingInputWriterJob: Job? = null
     ): MoshBinding {
         val runtime = MoshRuntime.prepare(this)
         val initialSize = shellSizes[hostId] ?: (MOSH_DEFAULT_COLUMNS to MOSH_DEFAULT_ROWS)
@@ -2005,11 +2160,50 @@ class SessionService : Service() {
                 term.updateSize(initialSize.first, initialSize.second, 0, 0)
             }
         }
+        val inputQueue = existingInputQueue ?: BoundedMoshInputQueue(
+            capacityBytes = MOSH_INPUT_BUFFER_BYTES,
+            chunkBytes = MOSH_INPUT_CHUNK_BYTES
+        )
+        val inputWriterJob = existingInputWriterJob ?: startMoshInputWriter(hostId, inputQueue)
         return MoshBinding(
             session = session,
             moshConnect = moshConnect,
-            terminalEmulation = terminalEmulation
+            terminalEmulation = terminalEmulation,
+            inputQueue = inputQueue,
+            inputWriterJob = inputWriterJob
         )
+    }
+
+    private fun startMoshInputWriter(
+        hostId: String,
+        inputQueue: BoundedMoshInputQueue
+    ): Job = serviceScope.launch(Dispatchers.IO) {
+        while (isActive) {
+            val payload = inputQueue.take() ?: break
+            var offset = 0
+            while (offset < payload.size && isActive) {
+                val session = activeConnections[hostId]?.moshBinding?.session
+                if (session == null || !session.isRunning) {
+                    delay(MOSH_INPUT_RETRY_DELAY_MS)
+                    continue
+                }
+                val chunkSize = min(MOSH_INPUT_CHUNK_BYTES, payload.size - offset)
+                val wrote = session.writeWithTimeout(
+                    payload,
+                    offset,
+                    chunkSize,
+                    MOSH_INPUT_WRITE_TIMEOUT_MS
+                )
+                if (wrote) {
+                    offset += chunkSize
+                } else {
+                    delay(MOSH_INPUT_RETRY_DELAY_MS)
+                }
+            }
+            if (offset == payload.size) {
+                emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = payload, size = payload.size)
+            }
+        }
     }
 
     private fun handleMoshClientFinished(hostId: String, finishedSession: TerminalSession) {
@@ -2074,7 +2268,9 @@ class SessionService : Service() {
                             hostId = hostId,
                             host = connection.host,
                             moshConnect = moshBinding.moshConnect,
-                            terminalEmulation = moshBinding.terminalEmulation
+                            terminalEmulation = moshBinding.terminalEmulation,
+                            existingInputQueue = moshBinding.inputQueue,
+                            existingInputWriterJob = moshBinding.inputWriterJob
                         )
                     }.onFailure { error ->
                         SessionLogBus.emit(
@@ -2085,7 +2281,15 @@ class SessionService : Service() {
                             )
                         )
                     }.getOrNull() ?: continue
-                    activeConnections[hostId] = connection.copy(moshBinding = newBinding)
+                    val replaced = activeConnections.replace(
+                        hostId,
+                        connection,
+                        connection.copy(moshBinding = newBinding)
+                    )
+                    if (!replaced) {
+                        newBinding.session.finishIfRunning()
+                        return@launch
+                    }
                     updateSessionSnapshot(
                         sessionId = hostId,
                         host = connection.host,
@@ -2304,54 +2508,104 @@ class SessionService : Service() {
                 )
             }
         )
-        serviceScope.launch {
-            var reachedEof = false
-            runCatching {
-                val buffer = ByteArray(2048)
-                while (true) {
-                    val read = shell.inputStream.read(buffer)
-                    if (read < 0) {
-                        reachedEof = true
-                        emitShellLifecycleDiagnostic(hostId, "RX EOF")
-                        break
-                    }
-                    if (read > 0) {
-                        terminalEngine.appendIncoming(buffer.copyOf(read))
-                        val text = String(buffer, 0, read, StandardCharsets.UTF_8)
-                        appendShellOutput(hostId, text)
-                        emitShellStreamDiagnostic(hostId = hostId, direction = "RX", payload = buffer, size = read)
-                    }
-                }
-            }.onFailure { err ->
+        val outputReaderJob = startShellOutputReader(hostId, shell, terminalEngine)
+        val inputQueue = CoroutineChannel<ByteArray>(CoroutineChannel.UNLIMITED)
+        val inputWriterJob = startShellInputWriter(hostId, shell, inputQueue)
+        val resizeQueue = CoroutineChannel<Pair<Int, Int>>(CoroutineChannel.CONFLATED)
+        val resizeWriterJob = startShellResizeWriter(hostId, shell, resizeQueue)
+        return ShellBinding(
+            session = session,
+            shell = shell,
+            terminalEngine = terminalEngine,
+            outputReaderJob = outputReaderJob,
+            inputQueue = inputQueue,
+            inputWriterJob = inputWriterJob,
+            resizeQueue = resizeQueue,
+            resizeWriterJob = resizeWriterJob
+        )
+    }
+
+    private fun startShellOutputReader(
+        hostId: String,
+        shell: Session.Shell,
+        terminalEngine: TermuxTerminalEngine
+    ): Job = serviceScope.launch(Dispatchers.IO) {
+        val buffer = ByteArray(2048)
+        val outputProcessor = TerminalOutputProcessor(
+            appendToTerminal = terminalEngine::appendIncoming,
+            onParserFailure = { error ->
                 emitShellLifecycleDiagnostic(
                     hostId,
-                    "RX stream error: ${err::class.java.simpleName}: ${err.message ?: "unknown error"}"
+                    "Terminal parser error: ${error::class.java.simpleName}: ${error.message ?: "unknown error"}"
                 )
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = hostId,
                         level = SessionLogBus.LogLevel.WARN,
-                        message = "Shell stream ended: ${err.message ?: "unknown error"}"
+                        message = "Terminal output could not be rendered; keeping the SSH connection open."
+                    )
+                )
+            }
+        )
+        while (isActive) {
+            val read = try {
+                shell.inputStream.read(buffer)
+            } catch (error: Exception) {
+                if (!isActive) return@launch
+                emitShellLifecycleDiagnostic(
+                    hostId,
+                    "RX stream error: ${error::class.java.simpleName}: ${error.message ?: "unknown error"}"
+                )
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Shell stream ended: ${error.message ?: "unknown error"}"
                     )
                 )
                 closeSessionAfterShellExit(
                     hostId,
-                    "Shell stream ended: ${err.message ?: "unknown error"}"
+                    "Shell stream ended: ${error.message ?: "unknown error"}"
+                )
+                return@launch
+            }
+
+            if (read < 0) {
+                emitShellLifecycleDiagnostic(hostId, "RX EOF")
+                closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
+                return@launch
+            }
+            if (read == 0) continue
+
+            val payload = buffer.copyOf(read)
+            outputProcessor.process(payload)
+
+            appendShellOutput(hostId, String(payload, StandardCharsets.UTF_8))
+            emitShellStreamDiagnostic(hostId = hostId, direction = "RX", payload = payload, size = payload.size)
+        }
+    }
+
+    private fun startShellResizeWriter(
+        hostId: String,
+        shell: Session.Shell,
+        resizeQueue: CoroutineChannel<Pair<Int, Int>>
+    ): Job = serviceScope.launch(Dispatchers.IO) {
+        for ((columns, rows) in resizeQueue) {
+            try {
+                shell.changeWindowDimensions(columns, rows, 0, 0)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (!isActive) return@launch
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Failed to resize remote terminal: ${error.message ?: "unknown error"}"
+                    )
                 )
             }
-            if (reachedEof) {
-                closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
-            }
         }
-        val inputQueue = CoroutineChannel<ByteArray>(CoroutineChannel.UNLIMITED)
-        val inputWriterJob = startShellInputWriter(hostId, shell, inputQueue)
-        return ShellBinding(
-            session = session,
-            shell = shell,
-            terminalEngine = terminalEngine,
-            inputQueue = inputQueue,
-            inputWriterJob = inputWriterJob
-        )
     }
 
     private fun startShellInputWriter(
@@ -2435,11 +2689,7 @@ class SessionService : Service() {
         moshTranscriptPublishJobs.remove(hostId)?.cancel()
         pendingShellSnapshots.remove(hostId)
         pendingShellOutputChunks.remove(hostId)
-        if (shellOutput.value.containsKey(hostId)) {
-            val updated = shellOutput.value.toMutableMap()
-            updated.remove(hostId)
-            shellOutput.value = updated
-        }
+        shellOutput.update { current -> current - hostId }
         shellSizes.remove(hostId)
         shellReadSequence.remove(hostId)
         shellWriteSequence.remove(hostId)
@@ -2470,35 +2720,31 @@ class SessionService : Service() {
             else -> current
         }
         if (next == current) return
-        val updated = shellOutput.value.toMutableMap()
-        updated[hostId] = next
-        shellOutput.value = updated
+        shellOutput.update { outputByHost -> outputByHost + (hostId to next) }
     }
 
     private fun setRemoteDirectorySnapshot(hostId: String, snapshot: RemoteDirectorySnapshot) {
         if (remoteDirectories.value[hostId] == snapshot) return
-        val updated = remoteDirectories.value.toMutableMap()
-        updated[hostId] = snapshot
-        remoteDirectories.value = updated
+        remoteDirectories.update { current -> current + (hostId to snapshot) }
     }
 
     private fun clearRemoteDirectoryForHost(hostId: String) {
         if (!remoteDirectories.value.containsKey(hostId)) return
-        val updated = remoteDirectories.value.toMutableMap()
-        updated.remove(hostId)
-        remoteDirectories.value = updated
+        remoteDirectories.update { current -> current - hostId }
     }
 
     private fun setFileTransferProgress(hostId: String, progress: FileTransferProgress?) {
-        val current = fileTransferProgress.value[hostId]
-        if (current == progress) return
-        val updated = fileTransferProgress.value.toMutableMap()
-        if (progress == null) {
-            updated.remove(hostId)
-        } else {
-            updated[hostId] = progress
+        val previous = fileTransferProgress.getAndUpdate { current ->
+            if (current[hostId] == progress) {
+                current
+            } else if (progress == null) {
+                current - hostId
+            } else {
+                current + (hostId to progress)
+            }
         }
-        fileTransferProgress.value = updated
+        val current = previous[hostId]
+        if (current == progress) return
         if (progress == null || current == null || !progress.hasStarted) {
             transferNotificationRefreshJobs.remove(hostId)?.cancel()
             updateSessionNotifications()
@@ -2513,9 +2759,7 @@ class SessionService : Service() {
             updateSessionNotifications()
             return
         }
-        val updated = fileTransferProgress.value.toMutableMap()
-        updated.remove(hostId)
-        fileTransferProgress.value = updated
+        fileTransferProgress.update { current -> current - hostId }
         updateSessionNotifications()
     }
 
@@ -2655,18 +2899,19 @@ class SessionService : Service() {
             status = status,
             statusMessage = message
         )
-        val existingIndex = sessionSnapshots.value.indexOfFirst { it.hostId == sessionId }
-        sessionSnapshots.value = if (existingIndex >= 0) {
-            sessionSnapshots.value.toMutableList().apply {
-                this[existingIndex] = snapshot
+        synchronized(sessionStateLock) {
+            if (!activeJobs.containsKey(sessionId)) {
+                UiDebugLog.result(
+                    "sessionSnapshot",
+                    false,
+                    "ignored-inactive sessionId=$sessionId, mode=$mode, status=$status"
+                )
+                return
             }
-        } else {
-            sessionSnapshots.value + snapshot
-        }
-        if (activeJobs.containsKey(sessionId)) {
+            sessionSnapshots.upsertSessionSnapshot(snapshot)
             updateSessionNotifications()
+            publishWidgetSessionState()
         }
-        publishWidgetSessionState()
         UiDebugLog.result(
             "sessionSnapshot",
             true,
@@ -2678,9 +2923,11 @@ class SessionService : Service() {
         "$hostId|${mode.name}|${UUID.randomUUID()}"
 
     private fun removeSessionSnapshot(hostId: String) {
-        sessionSnapshots.value = sessionSnapshots.value.filterNot { it.hostId == hostId }
-        updateSessionNotifications()
-        publishWidgetSessionState()
+        synchronized(sessionStateLock) {
+            sessionSnapshots.removeSessionSnapshot(hostId)
+            updateSessionNotifications()
+            publishWidgetSessionState()
+        }
     }
 
     private fun publishWidgetSessionState() {
@@ -2689,42 +2936,58 @@ class SessionService : Service() {
     }
 
     private fun updateSessionNotifications() {
+        val activeSessionIds = activeJobs.keys.toSet()
+        val snapshots = sessionSnapshots.value
+            .filter { it.hostId in activeSessionIds }
+            .sortedWith(
+                compareBy<SessionSnapshot> { it.host.name.lowercase() }
+                    .thenBy { it.hostId }
+            )
+        publishSessionNotifications(snapshots)
+    }
+
+    internal fun publishSessionNotifications(snapshots: List<SessionSnapshot>) {
         synchronized(notificationStateLock) {
             runCatching {
                 val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val activeHostIds = activeJobs.keys.toSet()
-                val snapshots = sessionSnapshots.value
-                    .filter { activeHostIds.contains(it.hostId) }
-                    .sortedBy { it.host.name.lowercase() }
 
                 if (snapshots.isEmpty()) {
-                    val existingNotificationIds = sessionNotificationIds.toSet()
-                    existingNotificationIds.forEach { id -> nm.cancel(id) }
-                    sessionNotificationIds.clear()
-                    if (foregroundNotificationId != null) {
+                    sessionNotificationIdentities.values.forEach { identity ->
+                        nm.cancel(SESSION_NOTIFICATION_TAG, identity.notificationId)
+                    }
+                    sessionNotificationIdentities.clear()
+                    nextSessionNotificationId = FIRST_SESSION_NOTIFICATION_ID
+                    nextSessionDisplayNumber = 1
+                    if (foregroundNotificationStarted) {
                         stopForeground(STOP_FOREGROUND_REMOVE)
-                        foregroundNotificationId = null
+                        foregroundNotificationStarted = false
                     }
                     return
                 }
 
-                val existingNotificationIds = sessionNotificationIds.toSet()
-                val desiredIds = snapshots.map { notificationIdForHost(it.hostId) }.toSet()
-                val staleIds = existingNotificationIds - desiredIds
-                staleIds.forEach { id -> nm.cancel(id) }
-
-                snapshots.forEachIndexed { index, snapshot ->
-                    val notificationId = notificationIdForHost(snapshot.hostId)
-                    val notification = buildSessionNotification(snapshot, snapshots.size)
-                    if (index == 0) {
-                        startForeground(notificationId, notification)
-                        foregroundNotificationId = notificationId
-                    } else {
-                        nm.notify(notificationId, notification)
+                val desiredSessionIds = snapshots.mapTo(mutableSetOf()) { it.hostId }
+                val staleSessionIds = sessionNotificationIdentities.keys - desiredSessionIds
+                staleSessionIds.forEach { sessionId ->
+                    sessionNotificationIdentities.remove(sessionId)?.let { identity ->
+                        nm.cancel(SESSION_NOTIFICATION_TAG, identity.notificationId)
                     }
                 }
-                sessionNotificationIds.clear()
-                sessionNotificationIds.addAll(desiredIds)
+
+                val entries = snapshots.map { snapshot ->
+                    snapshot to notificationIdentityFor(snapshot.hostId)
+                }
+                startForeground(
+                    SUMMARY_NOTIFICATION_ID,
+                    buildSessionSummaryNotification(entries)
+                )
+                foregroundNotificationStarted = true
+                entries.forEach { (snapshot, identity) ->
+                    nm.notify(
+                        SESSION_NOTIFICATION_TAG,
+                        identity.notificationId,
+                        buildSessionNotification(snapshot, identity)
+                    )
+                }
             }.onFailure { error ->
                 UiDebugLog.error(
                     "updateSessionNotifications",
@@ -2735,47 +2998,110 @@ class SessionService : Service() {
         }
     }
 
+    private fun buildSessionSummaryNotification(
+        entries: List<Pair<SessionSnapshot, SessionNotificationIdentity>>
+    ): Notification {
+        val count = entries.size
+        val singleSessionId = entries.singleOrNull()?.first?.hostId
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (singleSessionId != null) {
+                action = ACTION_OPEN_SESSION
+                data = sessionActionUri("open", singleSessionId)
+                putExtra(EXTRA_HOST_ID, singleSessionId)
+            } else {
+                action = ACTION_OPEN_SESSIONS
+                data = Uri.parse("sshpeaches://sessions/open")
+            }
+        }
+        val pendingOpen = PendingIntent.getActivity(
+            this,
+            SUMMARY_OPEN_REQUEST_CODE,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val stopAllIntent = Intent(this, SessionService::class.java).apply {
+            action = ACTION_STOP_ALL
+            data = Uri.parse("sshpeaches://sessions/disconnect-all")
+        }
+        val pendingStopAll = PendingIntent.getService(
+            this,
+            SUMMARY_STOP_REQUEST_CODE,
+            stopAllIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val title = if (count == 1) "1 active SSH session" else "$count active SSH sessions"
+        val openActionTitle = if (singleSessionId != null) "Open" else "Open sessions"
+        val style = NotificationCompat.InboxStyle().setBigContentTitle(title)
+        entries.take(MAX_SUMMARY_SESSION_LINES).forEach { (snapshot, identity) ->
+            style.addLine(
+                "${sessionNotificationTitle(snapshot, identity)} — ${sessionNotificationText(snapshot)}"
+            )
+        }
+        if (count > MAX_SUMMARY_SESSION_LINES) {
+            style.addLine("+${count - MAX_SUMMARY_SESSION_LINES} more")
+        }
+        val notificationIcon = resolveNotificationIcon()
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText("Tap to manage active connections")
+            .setStyle(style)
+            .setSmallIcon(notificationIcon)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setGroup(SESSION_NOTIFICATION_GROUP)
+            .setGroupSummary(true)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            .setContentIntent(pendingOpen)
+            .addAction(notificationIcon, openActionTitle, pendingOpen)
+            .addAction(notificationIcon, "Disconnect all", pendingStopAll)
+            .build()
+    }
+
     private fun buildSessionNotification(
         snapshot: SessionSnapshot,
-        totalSessions: Int
+        identity: SessionNotificationIdentity
     ): Notification {
         val activeTransfer = fileTransferProgress.value[snapshot.hostId]
-        val text = activeTransfer?.statusMessage() ?: when (snapshot.status) {
-            SessionStatus.ACTIVE -> snapshot.statusMessage ?: "Connected"
-            SessionStatus.CONNECTING -> snapshot.statusMessage ?: "Connecting"
-            SessionStatus.ERROR -> snapshot.statusMessage ?: "Connection error"
-        }
+        val text = sessionNotificationText(snapshot)
         val openIntent = Intent(this, MainActivity::class.java).apply {
             action = ACTION_OPEN_SESSION
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = sessionActionUri("open", snapshot.hostId)
             putExtra(EXTRA_HOST_ID, snapshot.hostId)
         }
         val pendingOpen = PendingIntent.getActivity(
             this,
-            OPEN_APP_REQUEST_CODE + snapshot.hostId.hashCode(),
+            identity.notificationId,
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val stopIntent = Intent(this, SessionService::class.java).apply {
             action = ACTION_STOP_SESSION
+            data = sessionActionUri("disconnect", snapshot.hostId)
             putExtra(EXTRA_HOST_ID, snapshot.hostId)
         }
         val pendingStop = PendingIntent.getService(
             this,
-            STOP_SESSION_REQUEST_CODE + snapshot.hostId.hashCode(),
+            identity.notificationId,
             stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notificationIcon = resolveNotificationIcon()
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}")
+            .setContentTitle(sessionNotificationTitle(snapshot, identity))
             .setContentText(text)
             .setSmallIcon(notificationIcon)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setSubText(if (totalSessions == 1) "1 active session" else "$totalSessions active sessions")
+            .setSubText("${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}")
+            .setGroup(SESSION_NOTIFICATION_GROUP)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            .setSortKey(identity.displayNumber.toString().padStart(8, '0'))
             .setContentIntent(pendingOpen)
             .addAction(notificationIcon, "Open", pendingOpen)
             .addAction(notificationIcon, "Disconnect", pendingStop)
@@ -2789,7 +3115,46 @@ class SessionService : Service() {
         return builder.build()
     }
 
-    private fun notificationIdForHost(hostId: String): Int = NOTIFICATION_ID_BASE + hostId.hashCode().absoluteValue
+    private fun sessionNotificationText(snapshot: SessionSnapshot): String =
+        fileTransferProgress.value[snapshot.hostId]?.statusMessage() ?: when (snapshot.status) {
+            SessionStatus.ACTIVE -> snapshot.statusMessage ?: "Connected"
+            SessionStatus.CONNECTING -> snapshot.statusMessage ?: "Connecting"
+            SessionStatus.ERROR -> snapshot.statusMessage ?: "Connection error"
+        }
+
+    private fun sessionNotificationTitle(
+        snapshot: SessionSnapshot,
+        identity: SessionNotificationIdentity
+    ): String {
+        val hostLabel = snapshot.host.name.ifBlank {
+            "${snapshot.host.username}@${snapshot.host.host}"
+        }
+        val modeLabel = when (snapshot.mode) {
+            ConnectionMode.SSH -> if (snapshot.host.useMosh) "Mosh" else "SSH"
+            ConnectionMode.SFTP -> "SFTP"
+            ConnectionMode.SCP -> "SCP"
+        }
+        return "$hostLabel • $modeLabel • Session ${identity.displayNumber}"
+    }
+
+    private fun sessionActionUri(action: String, sessionId: String): Uri =
+        Uri.Builder()
+            .scheme("sshpeaches")
+            .authority("session")
+            .appendPath(action)
+            .appendPath(sessionId)
+            .build()
+
+    private fun notificationIdentityFor(sessionId: String): SessionNotificationIdentity =
+        sessionNotificationIdentities.getOrPut(sessionId) {
+            check(nextSessionNotificationId < Int.MAX_VALUE) {
+                "Session notification ID space exhausted"
+            }
+            SessionNotificationIdentity(
+                notificationId = nextSessionNotificationId++,
+                displayNumber = nextSessionDisplayNumber++
+            )
+        }
 
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -2825,12 +3190,17 @@ class SessionService : Service() {
     companion object {
         private const val PERF_TAG = "SSHPeachesPerf"
         private const val CHANNEL_ID = "sessions"
-        private const val OPEN_APP_REQUEST_CODE = 19_241
-        private const val STOP_SESSION_REQUEST_CODE = 19_243
-        private const val NOTIFICATION_ID_BASE = 42_000
+        private const val SUMMARY_NOTIFICATION_ID = 42_000
+        private const val FIRST_SESSION_NOTIFICATION_ID = 43_000
+        private const val SUMMARY_OPEN_REQUEST_CODE = 19_241
+        private const val SUMMARY_STOP_REQUEST_CODE = 19_242
+        private const val SESSION_NOTIFICATION_TAG = "sshpeaches_session"
+        private const val SESSION_NOTIFICATION_GROUP = "sshpeaches_active_sessions"
+        private const val MAX_SUMMARY_SESSION_LINES = 5
         private const val ACTION_STOP_ALL = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_ALL"
         const val ACTION_STOP_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_STOP_SESSION"
         const val ACTION_OPEN_SESSION = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSION"
+        const val ACTION_OPEN_SESSIONS = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSIONS"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
@@ -2845,6 +3215,11 @@ class SessionService : Service() {
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
         private const val MOSH_INPUT_WRITE_TIMEOUT_MS = 1_000L
+        private const val MOSH_INPUT_RETRY_DELAY_MS = 50L
+        private const val MOSH_INPUT_CHUNK_BYTES = 2 * 1024
+        private const val MOSH_INPUT_BUFFER_BYTES = 2 * 1024 * 1024
+        private const val MOSH_INTERACTIVE_INPUT_RESERVE_BYTES = 64 * 1024
+        private const val MOSH_INTERACTIVE_INPUT_MAX_BYTES = 64
         private const val MOSH_DEFAULT_COLUMNS = 120
         private const val MOSH_DEFAULT_ROWS = 40
         private const val MOSH_TRANSCRIPT_ROWS = 2000
@@ -2855,6 +3230,11 @@ class SessionService : Service() {
     }
 
     private class ConnectionTimeoutException(message: String) : RuntimeException(message)
+
+    private data class SessionNotificationIdentity(
+        val notificationId: Int,
+        val displayNumber: Int
+    )
 
     private data class ActiveConnection(
         val host: HostConnection,
@@ -2871,14 +3251,19 @@ class SessionService : Service() {
         val session: Session,
         val shell: Session.Shell,
         val terminalEngine: TermuxTerminalEngine,
+        val outputReaderJob: Job,
         val inputQueue: CoroutineChannel<ByteArray>,
-        val inputWriterJob: Job
+        val inputWriterJob: Job,
+        val resizeQueue: CoroutineChannel<Pair<Int, Int>>,
+        val resizeWriterJob: Job
     )
 
     private data class MoshBinding(
         val session: TerminalSession,
         val moshConnect: MoshConnect,
-        val terminalEmulation: TerminalEmulation
+        val terminalEmulation: TerminalEmulation,
+        val inputQueue: BoundedMoshInputQueue,
+        val inputWriterJob: Job
     )
 
     private data class SftpBinding(

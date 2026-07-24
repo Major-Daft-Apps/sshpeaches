@@ -11,6 +11,8 @@ import android.content.Context
 import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
+import android.text.Selection
+import android.text.SpannableStringBuilder
 import android.text.TextWatcher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,6 +61,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DriveFileMove
@@ -142,9 +146,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedText
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputContentInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
@@ -262,6 +268,7 @@ fun ConnectingScreen(
     terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
     diagnosticsLoggingEnabled: Boolean = false,
     useVolumeButtonsToAdjustFontSize: Boolean = false,
+    useBuiltInKeyboard: Boolean = false,
     terminalMarginPx: Int = 0,
     keyboardSlots: List<KeyboardSlotAction>,
     snippets: List<Snippet>,
@@ -287,6 +294,10 @@ fun ConnectingScreen(
     val context = LocalContext.current
     val activity = context as? MainActivity
     val clipboardManager = LocalClipboardManager.current
+    val currentOnSendShellBytes = rememberUpdatedState(onSendShellBytes)
+    val currentResolveTerminalEmulator = rememberUpdatedState(resolveTerminalEmulator)
+    val currentRequest = rememberUpdatedState(request)
+    val currentDiagnosticsLoggingEnabled = rememberUpdatedState(diagnosticsLoggingEnabled)
     val lifecycleOwner = LocalLifecycleOwner.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -296,12 +307,12 @@ fun ConnectingScreen(
     val keyboardFocusRequester = remember(request?.sessionId) { FocusRequester() }
     val terminalEngine = remember(request?.sessionId, clipboardManager) {
         TermuxTerminalEngine(
-            onWriteToRemote = onSendShellBytes,
+            onWriteToRemote = { payload -> currentOnSendShellBytes.value(payload) },
             onCopyToClipboard = { _ -> },
             onRequestPasteText = { null },
             onTerminalDiagnostic = { message ->
-                val sessionId = request?.sessionId ?: return@TermuxTerminalEngine
-                if (!diagnosticsLoggingEnabled) return@TermuxTerminalEngine
+                val sessionId = currentRequest.value?.sessionId ?: return@TermuxTerminalEngine
+                if (!currentDiagnosticsLoggingEnabled.value) return@TermuxTerminalEngine
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = sessionId,
@@ -315,10 +326,10 @@ fun ConnectingScreen(
     val terminalInput = remember(request?.sessionId, clipboardManager) {
         TerminalInputRouter(
             emulatorProvider = {
-                request?.let { resolveTerminalEmulator(it.sessionId) }
+                currentRequest.value?.let { currentResolveTerminalEmulator.value(it.sessionId) }
                     ?: terminalEngine.emulator()
             },
-            onWriteToRemote = onSendShellBytes,
+            onWriteToRemote = { payload -> currentOnSendShellBytes.value(payload) },
             onRequestPasteText = { clipboardManager.getText()?.text }
         )
     }
@@ -384,13 +395,33 @@ fun ConnectingScreen(
     var swipeIntercepting by remember(request?.sessionId) { mutableStateOf(false) }
     var swipeRepeatJob by remember(request?.sessionId) { mutableStateOf<Job?>(null) }
     var swipeRepeatKeyCode by remember(request?.sessionId) { mutableStateOf<Int?>(null) }
+    var isFnRowVisible by rememberSaveable(request?.sessionId, useBuiltInKeyboard) {
+        mutableStateOf(false)
+    }
+    val supportsSystemKeyboard = !useBuiltInKeyboard
     var showFindDialog by remember(request?.sessionId) { mutableStateOf(false) }
     var findQuery by remember(request?.sessionId) { mutableStateOf("") }
     var findCaseSensitive by remember(request?.sessionId) { mutableStateOf(false) }
     var findMatchIndex by remember(request?.sessionId) { mutableStateOf(0) }
 
-    val compactKeys = remember(keyboardSlots) {
-        KeyboardLayoutDefaults.normalizeSlots(keyboardSlots).map { action ->
+    LaunchedEffect(useBuiltInKeyboard) {
+        if (useBuiltInKeyboard) {
+            terminalImeBridgeRef?.hideTerminalKeyboard()
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+            keyboardFocused = false
+            keyboardVisibleRequested = false
+        }
+    }
+
+    val compactKeys = remember(keyboardSlots, useBuiltInKeyboard, isFnRowVisible) {
+        val source = when {
+            isFnRowVisible && useBuiltInKeyboard -> KeyboardLayoutDefaults.builtInFnLayout(keyboardSlots)
+            isFnRowVisible -> KeyboardLayoutDefaults.customFnLayout(keyboardSlots)
+            useBuiltInKeyboard -> KeyboardLayoutDefaults.builtInCompactLayout(keyboardSlots)
+            else -> KeyboardLayoutDefaults.normalizeSlots(keyboardSlots)
+        }
+        source.map { action ->
             CompactTerminalKey(
                 label = KeyboardLayoutDefaults.compactLabel(action, fallback = "+"),
                 action = action,
@@ -399,8 +430,15 @@ fun ConnectingScreen(
             )
         }
     }
-    val activeAliasIcons = remember(swipeNavigationEnabled) {
-        if (swipeNavigationEnabled) setOf("swipe_nav") else emptySet()
+    val activeAliasIcons = remember(swipeNavigationEnabled, isFnRowVisible, useBuiltInKeyboard) {
+        buildSet {
+            if (swipeNavigationEnabled) {
+                add("swipe_nav")
+            }
+            if (isFnRowVisible) {
+                add("fn_active")
+            }
+        }
     }
     val swipeNavMinDistancePx = with(density) { SWIPE_NAV_MIN_DISTANCE_DP.dp.toPx() }
 
@@ -554,6 +592,10 @@ fun ConnectingScreen(
         findMatches[findMatchIndex.coerceIn(0, findMatches.lastIndex)]
     }
     fun hideSystemKeyboard() {
+        if (!supportsSystemKeyboard) {
+            keyboardVisibleRequested = false
+            return
+        }
         terminalImeBridgeRef?.hideTerminalKeyboard()
         keyboardController?.hide()
         focusManager.clearFocus(force = true)
@@ -562,13 +604,21 @@ fun ConnectingScreen(
     }
 
     fun showSystemKeyboard() {
+        if (!supportsSystemKeyboard) {
+            keyboardVisibleRequested = false
+            return
+        }
         runCatching { keyboardFocusRequester.requestFocus() }
         terminalImeBridgeRef?.showTerminalKeyboard() ?: keyboardController?.show()
         keyboardFocused = true
         keyboardVisibleRequested = true
     }
 
-    val toggleSystemKeyboard = {
+    fun toggleSystemKeyboard() {
+        if (!supportsSystemKeyboard) {
+            keyboardVisibleRequested = false
+            return
+        }
         if (keyboardVisibleRequested) {
             hideSystemKeyboard()
         } else {
@@ -582,12 +632,28 @@ fun ConnectingScreen(
         lastResize = resize
         onTerminalResize(columns, rows)
     }
-    LaunchedEffect(keyboardVisibleRequested, terminalImeBridgeRef) {
-        if (keyboardVisibleRequested) {
+    LaunchedEffect(keyboardVisibleRequested, terminalImeBridgeRef, supportsSystemKeyboard) {
+        if (keyboardVisibleRequested && supportsSystemKeyboard) {
             terminalImeBridgeRef?.showTerminalKeyboard()
+        } else if (!supportsSystemKeyboard) {
+            keyboardVisibleRequested = false
         }
     }
-    val terminalViewClient = remember(request?.sessionId) {
+    fun handleTerminalAndroidKeyEvent(event: KeyEvent): Boolean {
+        val modifiers = pendingModifiers
+        val handled = terminalInput.onAndroidKeyDown(
+            event = event,
+            ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+            altDown = modifiers.contains(KeyboardModifier.ALT),
+            shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+        )
+        if (handled && modifiers.isNotEmpty()) {
+            pendingModifiers = emptySet()
+        }
+        return handled
+    }
+
+    val terminalViewClient = remember(request?.sessionId, supportsSystemKeyboard) {
         object : TerminalViewClient {
             override fun onScale(scale: Float): Float {
                 terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(6f, 28f)
@@ -597,13 +663,15 @@ fun ConnectingScreen(
 
             override fun onSingleTapUp(e: MotionEvent) {
                 onToggleConnectedHostBar()
-                if (keyboardVisibleRequested) {
+                if (supportsSystemKeyboard && keyboardVisibleRequested) {
                     showSystemKeyboard()
                 }
             }
 
             override fun onDoubleTap(e: MotionEvent) {
-                toggleSystemKeyboard()
+                if (supportsSystemKeyboard) {
+                    toggleSystemKeyboard()
+                }
             }
 
             override fun shouldBackButtonBeMappedToEscape(): Boolean = false
@@ -612,11 +680,24 @@ fun ConnectingScreen(
 
             override fun isTerminalViewSelected(): Boolean = keyboardFocused
 
-            override fun copyModeChanged(copyMode: Boolean) = Unit
+            override fun copyModeChanged(copyMode: Boolean) {
+                if (copyMode || !supportsSystemKeyboard || !keyboardVisibleRequested) return
+                val bridge = terminalImeBridgeRef ?: return
+                bridge.post {
+                    if (
+                        terminalImeBridgeRef === bridge &&
+                        bridge.isAttachedToWindow &&
+                        keyboardVisibleRequested &&
+                        supportsSystemKeyboard
+                    ) {
+                        bridge.showTerminalKeyboard()
+                    }
+                }
+            }
 
             override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession?): Boolean {
                 if (handleVolumeKeyForFontSize(e)) return true
-                return terminalInput.onAndroidKeyDown(e)
+                return handleTerminalAndroidKeyEvent(e)
             }
 
             override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = handleVolumeKeyForFontSize(e)
@@ -640,6 +721,9 @@ fun ConnectingScreen(
                     altDown = pendingModifiers.contains(KeyboardModifier.ALT),
                     shiftDown = pendingModifiers.contains(KeyboardModifier.SHIFT)
                 )
+                if (pendingModifiers.isNotEmpty()) {
+                    pendingModifiers = emptySet()
+                }
                 return true
             }
 
@@ -659,7 +743,8 @@ fun ConnectingScreen(
 
     LaunchedEffect(renderedLogs.size) {
         if (renderedLogs.isNotEmpty()) {
-            listState.animateScrollToItem(renderedLogs.size - 1)
+            delay(SESSION_LOG_SCROLL_DEBOUNCE_MS)
+            listState.scrollToItem(renderedLogs.size - 1)
         }
     }
     LaunchedEffect(request?.sessionId) {
@@ -808,7 +893,7 @@ fun ConnectingScreen(
             sftpTransferStatus = null
         }
     }
-    LaunchedEffect(terminalProfile.id, terminalProfile.font) {
+    LaunchedEffect(terminalProfile) {
         terminalEngine.applyProfile(terminalProfile)
         externalTerminalEmulator?.let { emulator ->
             TermuxTerminalEngine.applyProfileToEmulator(emulator, terminalProfile)
@@ -1243,22 +1328,6 @@ fun ConnectingScreen(
                 showSnippetPicker = true
                 true
             }
-            "up" -> {
-                sendArrowKey(KeyEvent.KEYCODE_DPAD_UP)
-                true
-            }
-            "down" -> {
-                sendArrowKey(KeyEvent.KEYCODE_DPAD_DOWN)
-                true
-            }
-            "left" -> {
-                sendArrowKey(KeyEvent.KEYCODE_DPAD_LEFT)
-                true
-            }
-            "right" -> {
-                sendArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
-                true
-            }
             "key" -> {
                 val password = resolveInjectPassword()
                 if (password.isNotEmpty()) {
@@ -1293,7 +1362,9 @@ fun ConnectingScreen(
                 true
             }
             "keyboard" -> {
-                toggleSystemKeyboard()
+                if (supportsSystemKeyboard) {
+                    toggleSystemKeyboard()
+                }
                 true
             }
             "terminal" -> {
@@ -1306,6 +1377,10 @@ fun ConnectingScreen(
             }
             "search" -> {
                 showFindDialog = true
+                true
+            }
+            "fn", "fn_active" -> {
+                isFnRowVisible = !isFnRowVisible
                 true
             }
             else -> false
@@ -1410,9 +1485,14 @@ fun ConnectingScreen(
 
     fun handleCompactKeyPress(key: CompactTerminalKey) {
         if (!key.enabled) return
+        if (terminalViewRef?.isSelectingText == true) {
+            terminalViewRef?.stopTextSelectionMode()
+        }
         val action = key.action
         if (handleIconAlias(action)) {
-            pendingModifiers = emptySet()
+            if (action.iconId != "fn" && action.iconId != "fn_active") {
+                pendingModifiers = emptySet()
+            }
             return
         }
         when (action.type) {
@@ -1519,11 +1599,13 @@ fun ConnectingScreen(
                 onSendCompactKey = ::handleCompactKeyPress,
                 onImeTextInput = ::handleTerminalImeText,
                 keyboardVisibleRequested = keyboardVisibleRequested,
+                supportsSystemKeyboard = supportsSystemKeyboard,
                 keyboardFocusRequester = keyboardFocusRequester,
                 onImeBridgeReady = { terminalImeBridgeRef = it },
                 onKeyboardFocusChanged = { keyboardFocused = it },
                 handleVolumeKeyForFontSize = ::handleVolumeKeyForFontSize,
                 terminalInput = terminalInput,
+                onAndroidKeyEvent = ::handleTerminalAndroidKeyEvent,
                 updateTerminalView = ::updateTerminalView
             )
         } else if (showScpTransferSession && request != null) {
@@ -1687,11 +1769,13 @@ private fun ConnectingTerminalContent(
     onSendCompactKey: (CompactTerminalKey) -> Unit,
     onImeTextInput: (String) -> Unit,
     keyboardVisibleRequested: Boolean,
+    supportsSystemKeyboard: Boolean,
     keyboardFocusRequester: FocusRequester,
     onImeBridgeReady: (TerminalImeBridgeEditText?) -> Unit,
     onKeyboardFocusChanged: (Boolean) -> Unit,
     handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
     terminalInput: TerminalInputRouter,
+    onAndroidKeyEvent: (KeyEvent) -> Boolean,
     updateTerminalView: (TerminalView) -> Unit
 ) {
     Box(
@@ -1769,6 +1853,7 @@ private fun ConnectingTerminalContent(
         TerminalImeBridge(
             onTextInput = onImeTextInput,
             onBackspace = terminalInput::sendBackspace,
+            supportsSystemKeyboard = supportsSystemKeyboard,
             onBridgeReady = onImeBridgeReady,
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -1777,7 +1862,8 @@ private fun ConnectingTerminalContent(
                 .focusRequester(keyboardFocusRequester)
                 .onFocusChanged { onKeyboardFocusChanged(it.isFocused) },
             handleVolumeKeyForFontSize = handleVolumeKeyForFontSize,
-            terminalInput = terminalInput
+            terminalInput = terminalInput,
+            onAndroidKeyEvent = onAndroidKeyEvent
         )
     }
 }
@@ -1788,6 +1874,8 @@ private fun TerminalImeBridge(
     onBackspace: () -> Unit,
     handleVolumeKeyForFontSize: (KeyEvent) -> Boolean,
     terminalInput: TerminalInputRouter,
+    onAndroidKeyEvent: (KeyEvent) -> Boolean,
+    supportsSystemKeyboard: Boolean,
     onBridgeReady: (TerminalImeBridgeEditText?) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1795,6 +1883,7 @@ private fun TerminalImeBridge(
     val currentOnBackspace = rememberUpdatedState(onBackspace)
     val currentHandleVolumeKeyForFontSize = rememberUpdatedState(handleVolumeKeyForFontSize)
     val currentTerminalInput = rememberUpdatedState(terminalInput)
+    val currentOnAndroidKeyEvent = rememberUpdatedState(onAndroidKeyEvent)
     val currentOnBridgeReady = rememberUpdatedState(onBridgeReady)
 
     DisposableEffect(Unit) {
@@ -1806,9 +1895,9 @@ private fun TerminalImeBridge(
     AndroidView(
         factory = { context ->
             TerminalImeBridgeEditText(context).apply {
-                isFocusable = true
-                isFocusableInTouchMode = true
-                showSoftInputOnFocus = true
+                isFocusable = supportsSystemKeyboard
+                isFocusableInTouchMode = supportsSystemKeyboard
+                showSoftInputOnFocus = supportsSystemKeyboard
                 isCursorVisible = false
                 setTextColor(android.graphics.Color.TRANSPARENT)
                 setHintTextColor(android.graphics.Color.TRANSPARENT)
@@ -1824,6 +1913,11 @@ private fun TerminalImeBridge(
                 privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
                 onPasteRequested = { currentTerminalInput.value.pasteFromClipboard() }
                 onInlinePasteText = { currentTerminalInput.value.pasteText(it) }
+                onCommittedText = { currentOnTextInput.value(normalizeImeChunk(it)) }
+                onImeBackspace = { currentOnBackspace.value() }
+                onImeForwardDelete = {
+                    currentTerminalInput.value.sendVirtualKey(KeyEvent.KEYCODE_FORWARD_DEL)
+                }
 
                 var restoring = false
 
@@ -1866,8 +1960,8 @@ private fun TerminalImeBridge(
                 setOnKeyListener { _, _, event ->
                     if (currentHandleVolumeKeyForFontSize.value(event)) {
                         true
-                    } else if (event.action == KeyEvent.ACTION_DOWN) {
-                        currentTerminalInput.value.onAndroidKeyDown(event)
+                    } else if (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_MULTIPLE) {
+                        currentOnAndroidKeyEvent.value(event)
                     } else {
                         false
                     }
@@ -1878,8 +1972,16 @@ private fun TerminalImeBridge(
             }
         },
         update = { bridge ->
+            bridge.isFocusable = supportsSystemKeyboard
+            bridge.isFocusableInTouchMode = supportsSystemKeyboard
+            bridge.showSoftInputOnFocus = supportsSystemKeyboard
             bridge.onPasteRequested = { currentTerminalInput.value.pasteFromClipboard() }
             bridge.onInlinePasteText = { currentTerminalInput.value.pasteText(it) }
+            bridge.onCommittedText = { currentOnTextInput.value(normalizeImeChunk(it)) }
+            bridge.onImeBackspace = { currentOnBackspace.value() }
+            bridge.onImeForwardDelete = {
+                currentTerminalInput.value.sendVirtualKey(KeyEvent.KEYCODE_FORWARD_DEL)
+            }
             currentOnBridgeReady.value(bridge)
         },
         modifier = modifier
@@ -1889,6 +1991,9 @@ private fun TerminalImeBridge(
 private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
     var onPasteRequested: (() -> Boolean)? = null
     var onInlinePasteText: ((String) -> Boolean)? = null
+    var onCommittedText: ((String) -> Unit)? = null
+    var onImeBackspace: (() -> Unit)? = null
+    var onImeForwardDelete: (() -> Unit)? = null
 
     fun showTerminalKeyboard() {
         fun showNow() {
@@ -1916,12 +2021,71 @@ private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
     }
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
-        val connection = super.onCreateInputConnection(outAttrs) ?: return null
         outAttrs.inputType = TERMINAL_IME_INPUT_TYPE
         outAttrs.imeOptions = TERMINAL_IME_OPTIONS
         outAttrs.privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
         EditorInfoCompat.setContentMimeTypes(outAttrs, TERMINAL_IME_CONTENT_MIME_TYPES)
-        return object : InputConnectionWrapper(connection, true) {
+        val shadow = SpannableStringBuilder()
+        Selection.setSelection(shadow, 0)
+        return object : BaseInputConnection(this@TerminalImeBridgeEditText, true) {
+            override fun getEditable(): Editable = shadow
+
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                return super.setComposingText(text, newCursorPosition).also { reportSelection() }
+            }
+
+            override fun setComposingRegion(start: Int, end: Int): Boolean {
+                return super.setComposingRegion(start, end).also { reportSelection() }
+            }
+
+            override fun setSelection(start: Int, end: Int): Boolean {
+                return super.setSelection(start, end).also { reportSelection() }
+            }
+
+            override fun finishComposingText(): Boolean {
+                val finished = super.finishComposingText()
+                flushPendingText()
+                return finished
+            }
+
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                val committed = super.commitText(text, newCursorPosition)
+                flushPendingText()
+                return committed
+            }
+
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                val protected = protectedRange()
+                val localBefore = protected.first
+                val localAfter = shadow.length - protected.last
+                val deleted = super.deleteSurroundingText(beforeLength, afterLength)
+                repeat((beforeLength - localBefore).coerceAtLeast(0)) { onImeBackspace?.invoke() }
+                repeat((afterLength - localAfter).coerceAtLeast(0)) { onImeForwardDelete?.invoke() }
+                reportSelection()
+                return deleted
+            }
+
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
+                val protected = protectedRange()
+                val localBefore = Character.codePointCount(shadow, 0, protected.first)
+                val localAfter = Character.codePointCount(shadow, protected.last, shadow.length)
+                val deleted = super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+                repeat((beforeLength - localBefore).coerceAtLeast(0)) { onImeBackspace?.invoke() }
+                repeat((afterLength - localAfter).coerceAtLeast(0)) { onImeForwardDelete?.invoke() }
+                reportSelection()
+                return deleted
+            }
+
+            override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText =
+                ExtractedText().apply {
+                    text = shadow.toString()
+                    startOffset = 0
+                    partialStartOffset = -1
+                    partialEndOffset = -1
+                    selectionStart = Selection.getSelectionStart(shadow).coerceAtLeast(0)
+                    selectionEnd = Selection.getSelectionEnd(shadow).coerceAtLeast(0)
+                }
+
             override fun performContextMenuAction(id: Int): Boolean {
                 if (id == android.R.id.paste || id == android.R.id.pasteAsPlainText) {
                     if (onPasteRequested?.invoke() == true) return true
@@ -1939,6 +2103,43 @@ private class TerminalImeBridgeEditText(context: Context) : EditText(context) {
                     return true
                 }
                 return super.commitContent(inputContentInfo, flags, opts)
+            }
+
+            private fun protectedRange(): IntRange {
+                val selectionStart = Selection.getSelectionStart(shadow).coerceIn(0, shadow.length)
+                val selectionEnd = Selection.getSelectionEnd(shadow).coerceIn(0, shadow.length)
+                var start = minOf(selectionStart, selectionEnd)
+                var end = maxOf(selectionStart, selectionEnd)
+                val composingStart = getComposingSpanStart(shadow)
+                val composingEnd = getComposingSpanEnd(shadow)
+                if (composingStart >= 0 && composingEnd >= 0) {
+                    start = minOf(start, composingStart, composingEnd)
+                    end = maxOf(end, composingStart, composingEnd)
+                }
+                return start..end
+            }
+
+            private fun flushPendingText() {
+                val pending = shadow.toString()
+                removeComposingSpans(shadow)
+                shadow.clear()
+                Selection.setSelection(shadow, 0)
+                reportSelection()
+                if (pending.isNotEmpty()) {
+                    onCommittedText?.invoke(pending)
+                }
+            }
+
+            private fun reportSelection() {
+                val selectionStart = Selection.getSelectionStart(shadow).coerceAtLeast(0)
+                val selectionEnd = Selection.getSelectionEnd(shadow).coerceAtLeast(0)
+                inputMethodManager()?.updateSelection(
+                    this@TerminalImeBridgeEditText,
+                    selectionStart,
+                    selectionEnd,
+                    getComposingSpanStart(shadow),
+                    getComposingSpanEnd(shadow)
+                )
             }
         }
     }
@@ -2222,11 +2423,18 @@ private fun ConnectingScpContent(
         )
     val canMoveSelection = canMutateSelection && !deleteProtectedSelection
     val canDeleteSelection = canMutateSelection && !deleteProtectedSelection
-    val canChooseUploadSource = showScpUploadVertical && !scpTransferActive
+    val canChooseUploadSource = showScpUploadVertical &&
+        !scpTransferActive &&
+        !scpListingInProgress
     val canUploadHere = showScpUploadVertical &&
         !scpTransferActive &&
         !scpListingInProgress &&
         !scpUploadSourceUri.isNullOrBlank()
+    val canUseUploadAction = if (scpUploadSourceUri.isNullOrBlank()) {
+        canChooseUploadSource
+    } else {
+        canUploadHere
+    }
     val scpDownloadDocumentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
             val selectedRemote = pendingScpDownloadRemotePath
@@ -2264,6 +2472,29 @@ private fun ConnectingScpContent(
         browseScpPath(targetPath, true, true, true)
     }
 
+    fun launchScpDownloadPicker() {
+        val selectedRemotePath = scpSelectedPath ?: return
+        onPendingScpDownloadRemotePathChange(selectedRemotePath)
+        scpDownloadDocumentPicker.launch(
+            selectedRemotePath.substringAfterLast('/').ifBlank { "download.bin" }
+        )
+    }
+
+    fun handleScpUploadAction() {
+        val sourceUri = scpUploadSourceUri
+        if (sourceUri.isNullOrBlank()) {
+            if (!canChooseUploadSource) return
+            scpUploadDocumentPicker.launch(arrayOf("*/*"))
+            return
+        }
+        if (!canUploadHere) return
+        onScpTransferStatusChange(null)
+        onScpUpload(
+            sourceUri,
+            inferRemoteDestination(uploadLocalPath.ifBlank { "upload.bin" }, effectiveRemotePath)
+        )
+    }
+
     LaunchedEffect(remoteItems, effectiveRemotePath, scpSelectedPath) {
         val selectedRemotePath = scpSelectedPath ?: return@LaunchedEffect
         if (remoteItems.none { entryPathFor(it) == selectedRemotePath }) {
@@ -2278,146 +2509,166 @@ private fun ConnectingScpContent(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                enabled = canGoBack,
-                onClick = {
-                    if (!canGoBack) return@IconButton
-                    val nextIndex = scpPathHistoryIndex - 1
-                    onScpPathHistoryIndexChange(nextIndex)
-                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
-                }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val showForwardNavigation = maxWidth >= 372.dp
+            val showHomeNavigation = maxWidth >= 318.dp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant)
-            }
-            IconButton(
-                enabled = canGoForward,
-                onClick = {
-                    if (!canGoForward) return@IconButton
-                    val nextIndex = scpPathHistoryIndex + 1
-                    onScpPathHistoryIndexChange(nextIndex)
-                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
-                }
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant)
-            }
-            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) }) {
-                Icon(Icons.Default.ArrowUpward, "Up", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-            }
-            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(effectiveRemotePath, false, true, true) }) {
-                Icon(Icons.Default.Refresh, "Refresh", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-            }
-            IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) }) {
-                Icon(Icons.Default.Home, "Home", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Box {
                 IconButton(
-                    onClick = { onScpActionsExpandedChange(true) },
-                    enabled = !scpTransferActive,
-                    modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
+                    enabled = canGoBack,
+                    onClick = {
+                        if (!canGoBack) return@IconButton
+                        val nextIndex = scpPathHistoryIndex - 1
+                        onScpPathHistoryIndexChange(nextIndex)
+                        browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                    }
                 ) {
-                    Icon(Icons.Default.MoreVert, "Actions")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant)
                 }
-                DropdownMenu(
-                    expanded = scpActionsExpanded,
-                    onDismissRequest = { onScpActionsExpandedChange(false) }
-                ) {
-                    if (showScpUploadVertical) {
-                        DropdownMenuItem(
-                            text = { Text("Choose local file") },
-                            enabled = canChooseUploadSource,
-                            onClick = {
-                                onScpActionsExpandedChange(false)
-                                scpUploadDocumentPicker.launch(arrayOf("*/*"))
-                            },
-                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("choose_local_file"))
+                if (showForwardNavigation) {
+                    IconButton(
+                        enabled = canGoForward,
+                        onClick = {
+                            if (!canGoForward) return@IconButton
+                            val nextIndex = scpPathHistoryIndex + 1
+                            onScpPathHistoryIndexChange(nextIndex)
+                            browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                        }
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant)
+                    }
+                }
+                IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) }) {
+                    Icon(Icons.Default.ArrowUpward, "Up", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+                }
+                IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(effectiveRemotePath, false, true, true) }) {
+                    Icon(Icons.Default.Refresh, "Refresh", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+                }
+                if (showHomeNavigation) {
+                    IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) }) {
+                        Icon(Icons.Default.Home, "Home", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (showScpUploadVertical) {
+                    IconButton(
+                        onClick = ::handleScpUploadAction,
+                        enabled = canUseUploadAction,
+                        modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
+                    ) {
+                        Icon(
+                            Icons.Default.CloudUpload,
+                            if (scpUploadSourceUri.isNullOrBlank()) "Choose local file" else "Upload here",
+                            tint = if (canUseUploadAction) colorScheme.onSurface else colorScheme.onSurfaceVariant
                         )
-                        DropdownMenuItem(
-                            text = { Text("Upload here") },
-                            enabled = canUploadHere,
-                            onClick = {
-                                val sourceUri = scpUploadSourceUri ?: return@DropdownMenuItem
-                                onScpActionsExpandedChange(false)
-                                onScpTransferStatusChange(null)
-                                onScpUpload(
-                                    sourceUri,
-                                    inferRemoteDestination(uploadLocalPath.ifBlank { "upload.bin" }, effectiveRemotePath)
-                                )
-                            },
-                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("upload_here"))
+                    }
+                } else {
+                    IconButton(
+                        onClick = ::launchScpDownloadPicker,
+                        enabled = canDownloadSelected,
+                        modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
+                    ) {
+                        Icon(
+                            Icons.Default.CloudDownload,
+                            "Download",
+                            tint = if (canDownloadSelected) colorScheme.onSurface else colorScheme.onSurfaceVariant
                         )
-                    } else {
+                    }
+                }
+                Box {
+                    IconButton(
+                        onClick = { onScpActionsExpandedChange(true) },
+                        enabled = !scpTransferActive || (!showForwardNavigation && canGoForward),
+                        modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
+                    ) {
+                        Icon(Icons.Default.MoreVert, "Actions")
+                    }
+                    DropdownMenu(
+                        expanded = scpActionsExpanded,
+                        onDismissRequest = { onScpActionsExpandedChange(false) }
+                    ) {
+                        if (!showForwardNavigation) {
+                            DropdownMenuItem(
+                                text = { Text("Forward") },
+                                enabled = canGoForward,
+                                onClick = {
+                                    if (!canGoForward) return@DropdownMenuItem
+                                    val nextIndex = scpPathHistoryIndex + 1
+                                    onScpActionsExpandedChange(false)
+                                    onScpPathHistoryIndexChange(nextIndex)
+                                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("forward"))
+                            )
+                        }
+                        if (!showHomeNavigation) {
+                            DropdownMenuItem(
+                                text = { Text("Home") },
+                                enabled = !scpListingInProgress,
+                                onClick = {
+                                    if (scpListingInProgress) return@DropdownMenuItem
+                                    onScpActionsExpandedChange(false)
+                                    browseScpPath(scpHomePath ?: ".", true, true, true)
+                                },
+                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("home"))
+                            )
+                        }
                         DropdownMenuItem(
-                            text = { Text("Download") },
-                            enabled = canDownloadSelected,
+                            text = { Text("Rename") },
+                            enabled = canMutateSelection,
                             onClick = {
                                 val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
                                 onScpActionsExpandedChange(false)
-                                onPendingScpDownloadRemotePathChange(selectedRemotePath)
-                                scpDownloadDocumentPicker.launch(
-                                    selectedRemotePath.substringAfterLast('/').ifBlank { "download.bin" }
-                                )
+                                onScpRenameValueChange(selectedRemotePath.substringAfterLast('/').ifBlank { selectedEntry?.name.orEmpty() })
+                                onShowScpRenameDialogChange(true)
                             },
-                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("download"))
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("rename"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Move") },
+                            enabled = canMoveSelection,
+                            onClick = {
+                                val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                onScpActionsExpandedChange(false)
+                                onScpMoveDestinationChange(selectedRemotePath)
+                                onShowScpMoveDialogChange(true)
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy path") },
+                            enabled = canMutateSelection,
+                            onClick = {
+                                val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
+                                onScpActionsExpandedChange(false)
+                                onCopyRemotePath(selectedRemotePath)
+                                onScpTransferStatusChange("Remote path copied.")
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("copy_path"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            enabled = canDeleteSelection,
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                if (canDeleteSelection) onShowScpDeleteDialogChange(true)
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("delete"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("New folder") },
+                            enabled = !scpTransferActive && !scpListingInProgress,
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                onScpNewFolderValueChange("")
+                                onShowScpNewFolderDialogChange(true)
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("new_folder"))
                         )
                     }
-                    DropdownMenuItem(
-                        text = { Text("Rename") },
-                        enabled = canMutateSelection,
-                        onClick = {
-                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                            onScpActionsExpandedChange(false)
-                            onScpRenameValueChange(selectedRemotePath.substringAfterLast('/').ifBlank { selectedEntry?.name.orEmpty() })
-                            onShowScpRenameDialogChange(true)
-                        },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("rename"))
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Move") },
-                        enabled = canMoveSelection,
-                        onClick = {
-                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                            onScpActionsExpandedChange(false)
-                            onScpMoveDestinationChange(selectedRemotePath)
-                            onShowScpMoveDialogChange(true)
-                        },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Copy path") },
-                        enabled = canMutateSelection,
-                        onClick = {
-                            val selectedRemotePath = scpSelectedPath ?: return@DropdownMenuItem
-                            onScpActionsExpandedChange(false)
-                            onCopyRemotePath(selectedRemotePath)
-                            onScpTransferStatusChange("Remote path copied.")
-                        },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("copy_path"))
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        enabled = canDeleteSelection,
-                        onClick = {
-                            onScpActionsExpandedChange(false)
-                            if (canDeleteSelection) onShowScpDeleteDialogChange(true)
-                        },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("delete"))
-                    )
-                    DropdownMenuItem(
-                        text = { Text("New folder") },
-                        enabled = !scpTransferActive && !scpListingInProgress,
-                        onClick = {
-                            onScpActionsExpandedChange(false)
-                            onScpNewFolderValueChange("")
-                            onShowScpNewFolderDialogChange(true)
-                        },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("new_folder"))
-                    )
                 }
             }
         }
@@ -2447,7 +2698,7 @@ private fun ConnectingScpContent(
         Text(
             text = if (showScpUploadVertical) {
                 if (uploadLocalPath.isBlank()) {
-                    "Choose a local file from the actions menu, then upload it into the current folder."
+                    "Choose a local file, then upload it into the current folder."
                 } else {
                     "Local file: $uploadLocalPath"
                 }
@@ -3280,7 +3531,8 @@ private fun CompactKeyRow(
     }
     BoxWithConstraints(modifier = modifier) {
         val useWideLayout = maxWidth >= COMPACT_KEY_WIDE_LAYOUT_MIN_WIDTH
-        if (useWideLayout) {
+        val shouldSplitColumns = useWideLayout && rows.size > 2
+        if (shouldSplitColumns) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4022,10 +4274,10 @@ private val TERMINAL_IME_INPUT_TYPE = InputType.TYPE_CLASS_TEXT or
     InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE
 private val TERMINAL_IME_OPTIONS = EditorInfo.IME_ACTION_NONE or
     EditorInfo.IME_FLAG_NO_EXTRACT_UI or
-    EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or
-    EditorInfo.IME_FLAG_FORCE_ASCII
+    EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
 private const val TERMINAL_IME_INLINE_PASTE_MAX_BYTES = 1_048_576
 private const val TERMINAL_IME_CONTENT_READ_BUFFER_BYTES = 8_192
+private const val SESSION_LOG_SCROLL_DEBOUNCE_MS = 120L
 private const val SFTP_CANCEL_BUTTON_DELAY_MS = 220L
 private const val SFTP_TRANSFER_STATUS_AUTO_DISMISS_MS = 3_000L
 private const val SFTP_TRANSFER_SUCCESS_MESSAGE = "file transferred succesfully"

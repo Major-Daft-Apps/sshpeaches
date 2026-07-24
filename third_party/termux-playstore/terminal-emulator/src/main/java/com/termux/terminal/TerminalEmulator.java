@@ -250,6 +250,7 @@ public final class TerminalEmulator {
     /**
      * The terminal cursor styles.
      */
+    private int mDefaultCursorStyle = DEFAULT_TERMINAL_CURSOR_STYLE;
     private int mCursorStyle = DEFAULT_TERMINAL_CURSOR_STYLE;
 
 
@@ -541,13 +542,19 @@ public final class TerminalEmulator {
      * Set the terminal cursor style.
      */
     public void setCursorStyle() {
-        mCursorStyle = DEFAULT_TERMINAL_CURSOR_STYLE;
+        mCursorStyle = mDefaultCursorStyle;
     }
 
     /**
      * Set the terminal cursor style to a specific value.
      */
     public void setCursorStyle(int style) {
+        mCursorStyle = style;
+    }
+
+    /** Set the cursor style restored by terminal reset sequences and apply it immediately. */
+    public void setDefaultCursorStyle(int style) {
+        mDefaultCursorStyle = style;
         mCursorStyle = style;
     }
 

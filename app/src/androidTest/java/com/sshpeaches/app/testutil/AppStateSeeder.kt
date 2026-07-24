@@ -117,7 +117,8 @@ object AppStateSeeder {
         terminalSelectionMode: TerminalSelectionMode? = null,
         terminalBellMode: TerminalBellMode? = null,
         terminalMarginPx: Int? = null,
-        moshServerCommand: String? = null
+        moshServerCommand: String? = null,
+        useBuiltInKeyboard: Boolean? = null
     ) {
         val appContext = context
         runBlocking {
@@ -134,6 +135,7 @@ object AppStateSeeder {
             terminalBellMode?.let { SettingsStore.setTerminalBellMode(it) }
             terminalMarginPx?.let { SettingsStore.setTerminalMarginPx(it) }
             moshServerCommand?.let { SettingsStore.setMoshServerCommand(it) }
+            useBuiltInKeyboard?.let { SettingsStore.setUseBuiltInKeyboard(it) }
         }
     }
 

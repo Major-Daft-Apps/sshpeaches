@@ -193,6 +193,7 @@ object UiTestTags {
         "settings_terminal_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     fun settingsTerminalBellOption(name: String): String =
         "settings_terminal_bell_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    const val SETTINGS_BUILTIN_KEYBOARD_SWITCH = "settings_built_in_keyboard_switch"
     fun settingsCategory(name: String): String =
         "settings_category_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"
@@ -227,6 +228,9 @@ object UiTestTags {
     const val PERMISSION_REQUIRED_DIALOG = "permission_required_dialog"
     const val PERMISSION_REQUIRED_MANAGE_BUTTON = "permission_required_manage_button"
     const val PERMISSION_REQUIRED_REQUEST_BUTTON = "permission_required_request_button"
+    const val FIRST_RUN_WELCOME_DIALOG = "first_run_welcome_dialog"
+    const val FIRST_RUN_FOLLOW_X_BUTTON = "first_run_follow_x_button"
+    const val FIRST_RUN_CONTINUE_BUTTON = "first_run_continue_button"
 
     const val CONNECTING_RETRY_BUTTON = "connecting_retry_button"
     const val CONNECTING_TERMINAL_PANEL = "connecting_terminal_panel"

@@ -240,6 +240,11 @@ public final class TerminalRenderer {
                 foreColor = 0xFF000000 + (red << 16) + (green << 8) + blue;
             }
 
+            // Hosts may emit an indexed or true-color foreground that is identical (or extremely close) to the
+            // active background. Preserve its hue while moving it only as far toward black/white as necessary to
+            // keep SSH output readable. SGR "invisible" text remains intentionally hidden above.
+            foreColor = ensureReadableForeground(foreColor, backColor);
+
             mTextPaint.setFakeBoldText(bold);
             mTextPaint.setUnderlineText(underline);
             mTextPaint.setTextSkewX(italic ? -0.35f : 0.f);
@@ -260,4 +265,54 @@ public final class TerminalRenderer {
     public int getFontLineSpacing() {
         return mFontLineSpacing;
     }
+
+    static int ensureReadableForeground(int foreground, int background) {
+        if (contrastRatio(foreground, background) >= MINIMUM_TEXT_CONTRAST) return foreground;
+
+        final int black = 0xFF000000;
+        final int white = 0xFFFFFFFF;
+        final int target = contrastRatio(white, background) >= contrastRatio(black, background) ? white : black;
+        double low = 0.0;
+        double high = 1.0;
+        for (int iteration = 0; iteration < 12; iteration++) {
+            double amount = (low + high) / 2.0;
+            int candidate = blend(foreground, target, amount);
+            if (contrastRatio(candidate, background) >= MINIMUM_TEXT_CONTRAST) {
+                high = amount;
+            } else {
+                low = amount;
+            }
+        }
+        return blend(foreground, target, high);
+    }
+
+    private static int blend(int from, int to, double amount) {
+        int red = (int) Math.round(channel(from, 16) + (channel(to, 16) - channel(from, 16)) * amount);
+        int green = (int) Math.round(channel(from, 8) + (channel(to, 8) - channel(from, 8)) * amount);
+        int blue = (int) Math.round(channel(from, 0) + (channel(to, 0) - channel(from, 0)) * amount);
+        return 0xFF000000 | red << 16 | green << 8 | blue;
+    }
+
+    private static double contrastRatio(int first, int second) {
+        double lighter = Math.max(relativeLuminance(first), relativeLuminance(second));
+        double darker = Math.min(relativeLuminance(first), relativeLuminance(second));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double relativeLuminance(int color) {
+        return 0.2126 * linearChannel(channel(color, 16))
+            + 0.7152 * linearChannel(channel(color, 8))
+            + 0.0722 * linearChannel(channel(color, 0));
+    }
+
+    private static double linearChannel(int channel) {
+        double value = channel / 255.0;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+    }
+
+    private static int channel(int color, int shift) {
+        return color >> shift & 0xFF;
+    }
+
+    private static final double MINIMUM_TEXT_CONTRAST = 4.5;
 }

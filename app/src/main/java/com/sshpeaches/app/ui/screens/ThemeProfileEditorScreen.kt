@@ -238,7 +238,8 @@ fun ThemeProfileEditorScreen(
                         backgroundHex = backgroundHex.trim().uppercase(Locale.US),
                         cursorHex = cursorHex.trim().uppercase(Locale.US),
                         cursorStyle = cursorStyle,
-                        cursorBlink = cursorBlink
+                        cursorBlink = cursorBlink,
+                        ansiColors = initialProfile.ansiColors
                     )
                     onSaveTheme(profile)
                     onShowMessage("Terminal theme saved.")

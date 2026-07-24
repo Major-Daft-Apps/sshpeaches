@@ -1,10 +1,15 @@
 package com.majordaftapps.sshpeaches.app.session_ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,8 +26,17 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
-import android.os.SystemClock
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.widget.EditText
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
@@ -39,12 +53,24 @@ import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectPhase
 import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectRequest
 import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectUiState
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.termux.view.TerminalView
 import java.nio.charset.StandardCharsets
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+
+private fun View.findEditTextDescendant(): EditText? {
+    if (this is EditText) return this
+    if (this !is ViewGroup) return null
+    for (index in 0 until childCount) {
+        val match = getChildAt(index).findEditTextDescendant()
+        if (match != null) return match
+    }
+    return null
+}
 
 @RunWith(AndroidJUnit4::class)
 class ConnectingScreenTest {
@@ -54,6 +80,215 @@ class ConnectingScreenTest {
 
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val chunks = List(128) { index ->
+            when (index % 4) {
+                0 -> "cmd-$index "
+                1 -> "café "
+                2 -> "中文 "
+                else -> "line-$index\n"
+            }
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            val root = composeRule.activity.findViewById<View>(android.R.id.content)
+            val imeBridge = root.findEditTextDescendant()
+                ?: error("Terminal IME bridge was not attached")
+            val inputConnection = imeBridge.onCreateInputConnection(EditorInfo())
+                ?: error("Terminal IME bridge did not create an InputConnection")
+
+            chunks.forEach { chunk ->
+                check(inputConnection.commitText(chunk, 1)) {
+                    "IME rejected committed chunk: $chunk"
+                }
+            }
+            check(inputConnection.deleteSurroundingText(3, 0)) {
+                "IME rejected repeated backspace"
+            }
+        }
+
+        composeRule.runOnIdle {
+            val expected = chunks.joinToString(separator = "")
+                .replace('\n', '\r') + "\u007F\u007F\u007F"
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload ->
+                combined + payload
+            }.toString(StandardCharsets.UTF_8)
+            check(actual == expected) {
+                "Terminal input lost or reordered bytes: expected ${expected.length} chars, " +
+                    "received ${actual.length}"
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun terminalInput_actionMultipleRepeatsKnownHardwareKeys() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        composeRule.runOnIdle {
+            val root = composeRule.activity.findViewById<View>(android.R.id.content)
+            val imeBridge = root.findEditTextDescendant()
+                ?: error("Terminal IME bridge was not attached")
+            val event = KeyEvent(
+                0L,
+                0L,
+                KeyEvent.ACTION_MULTIPLE,
+                KeyEvent.KEYCODE_A,
+                4,
+                0
+            )
+            check(imeBridge.dispatchKeyEvent(event))
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "aaaa") { "ACTION_MULTIPLE dropped repeats: $actual" }
+        }
+    }
+
+    @Test
+    fun terminalIme_composingTextIsSentOnceOnlyWhenCommitted() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        composeRule.runOnIdle {
+            val inputConnection = terminalInputConnection()
+            check(inputConnection.setComposingText("e", 1))
+            check(inputConnection.setComposingText("é", 1))
+            check(inputConnection.commitText("é", 1))
+
+            check(inputConnection.setComposingText("discard", 1))
+            check(inputConnection.setComposingText("", 1))
+            check(inputConnection.finishComposingText())
+
+            check(inputConnection.setComposingText("中文", 1))
+            check(inputConnection.finishComposingText())
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "é中文") {
+                "IME composition leaked pre-edit or duplicate text: $actual"
+            }
+        }
+    }
+
+    @Test
+    fun terminalIme_composingRegionReplacementHonorsCursorEdits() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        composeRule.runOnIdle {
+            val inputConnection = terminalInputConnection()
+            check(inputConnection.setComposingText("abcd", 1))
+            check(inputConnection.setComposingRegion(1, 3))
+            check(inputConnection.setComposingText("X", 1))
+            check(inputConnection.finishComposingText())
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "aXd") { "IME composing-region replacement produced: $actual" }
+        }
+    }
+
+    @Test
+    fun terminalIme_reportsShadowSelectionAndSupportsForwardDelete() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        composeRule.runOnIdle {
+            val inputConnection = terminalInputConnection()
+            check(inputConnection.setComposingText("ab😀cd", 1))
+            check(inputConnection.setSelection(2, 4))
+            check(inputConnection.getSelectedText(0).toString() == "😀")
+            check(inputConnection.setComposingRegion(2, 4))
+            check(inputConnection.setComposingText("X", 1))
+            check(inputConnection.finishComposingText())
+            check(inputConnection.deleteSurroundingText(0, 2))
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "abXcd\u001B[3~\u001B[3~") {
+                "IME selection/forward-delete path produced: ${actual.toByteArray().contentToString()}"
+            }
+        }
+    }
+
+    @Test
+    fun terminalInput_usesLatestSendCallbackAfterSameSessionRecomposition() {
+        val firstSink = mutableListOf<ByteArray>()
+        val secondSink = mutableListOf<ByteArray>()
+        var useSecondSink by mutableStateOf(false)
+
+        composeRule.setContent {
+            MaterialTheme {
+                SshTerminalForInputTest(
+                    onSendShellBytes = if (useSecondSink) {
+                        { payload -> secondSink += payload.copyOf() }
+                    } else {
+                        { payload -> firstSink += payload.copyOf() }
+                    }
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            check(terminalInputConnection().commitText("before", 1))
+            useSecondSink = true
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            check(terminalInputConnection().commitText("after", 1))
+        }
+
+        composeRule.runOnIdle {
+            check(firstSink.single().toString(StandardCharsets.UTF_8) == "before")
+            check(secondSink.single().toString(StandardCharsets.UTF_8) == "after") {
+                "Remembered terminal input kept an obsolete send callback"
+            }
+        }
+    }
 
     @Test
     fun terminalSession_supportsFindDialogAndSnippetPicker() {
@@ -231,6 +466,498 @@ class ConnectingScreenTest {
                 "Settings alias custom key did not invoke the settings callback"
             }
         }
+    }
+
+    @Test
+    fun terminalSelectionCopy_virtualImeKeyConsumesLatchedCtrlOnce() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[0] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.CTRL, "Ctrl")
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "copy-paste-selection-target",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = customSlots,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        lateinit var terminalView: TerminalView
+        composeRule.runOnIdle {
+            terminalView = composeRule.activity.findViewById<View>(android.R.id.content)
+                .findTerminalViewDescendant()
+                ?: error("Terminal view was not attached")
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            terminalView.performSelectionAction(copy = true)
+            sentPayloads.clear()
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.runOnIdle {
+            terminalView.dispatchUnmodifiedVirtualA()
+            terminalView.dispatchUnmodifiedVirtualA()
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            check(actual.contentEquals(byteArrayOf(0x01, 0x61))) {
+                "Ctrl latch after terminal Copy produced ${actual.contentToString()}"
+            }
+        }
+    }
+
+    @Test
+    fun terminalSelectionPaste_virtualImeKeyConsumesLatchedCtrlOnce() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[0] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.CTRL, "Ctrl")
+        }
+
+        seedClipboardForTerminalPaste("seeded-paste")
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "copy-paste-selection-target",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = customSlots,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.runOnIdle {
+            val terminalView = composeRule.activity.findViewById<View>(android.R.id.content)
+                .findTerminalViewDescendant()
+                ?: error("Terminal view was not attached")
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            terminalView.performSelectionAction(copy = false)
+            sentPayloads.clear()
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.runOnIdle {
+            val terminalView = composeRule.activity.findViewById<View>(android.R.id.content)
+                .findTerminalViewDescendant()
+                ?: error("Terminal view was not attached")
+            terminalView.dispatchUnmodifiedVirtualA()
+            terminalView.dispatchUnmodifiedVirtualA()
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            check(actual.contentEquals(byteArrayOf(0x01, 0x61))) {
+                "Ctrl latch after terminal Paste produced ${actual.contentToString()}"
+            }
+        }
+    }
+
+    @Test
+    fun terminalImeBridgeKeyListener_virtualImeKeyConsumesLatchedCtrlOnce() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey { sentPayloads += it.copyOf() }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.runOnIdle {
+            val imeBridge = imeBridgeForTest()
+            check(imeBridge.dispatchKeyEvent(keyDownEvent(KeyEvent.KEYCODE_A))) {
+                "TerminalImeBridgeEditText did not consume latched Ctrl-A"
+            }
+            check(imeBridge.dispatchKeyEvent(keyDownEvent(KeyEvent.KEYCODE_A))) {
+                "TerminalImeBridgeEditText did not consume plain A after Ctrl latch"
+            }
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            check(actual.contentEquals(byteArrayOf(0x01, 0x61))) {
+                "IME bridge key listener produced ${actual.contentToString()}"
+            }
+        }
+    }
+
+    @Test
+    fun terminalAndroidDispatcher_backAndSystemKeysDoNotClearLatchedCtrl() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey { sentPayloads += it.copyOf() }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.runOnIdle {
+            val imeBridge = imeBridgeForTest()
+            imeBridge.dispatchKeyEvent(keyDownEvent(KeyEvent.KEYCODE_BACK))
+            imeBridge.dispatchKeyEvent(keyDownEvent(KeyEvent.KEYCODE_MENU))
+            imeBridge.dispatchKeyEvent(
+                KeyEvent(
+                    0L,
+                    0L,
+                    KeyEvent.ACTION_MULTIPLE,
+                    KeyEvent.KEYCODE_UNKNOWN,
+                    1,
+                    0
+                )
+            )
+            check(sentPayloads.isEmpty()) {
+                "Ignored Back/system/unknown keys wrote terminal bytes: ${sentPayloads.size}"
+            }
+            check(imeBridge.dispatchKeyEvent(keyDownEvent(KeyEvent.KEYCODE_A))) {
+                "Latched Ctrl-A was not consumed after ignored Back/system/unknown keys"
+            }
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            check(actual.contentEquals(byteArrayOf(0x01))) {
+                "Ignored Back/system/unknown keys cleared Ctrl latch or wrote bytes: ${actual.contentToString()}"
+            }
+        }
+    }
+
+    @Test
+    fun terminalActionModeCopy_restoresImeFocusAndCommittedCtrlA() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "copy-focus-selection-target",
+            onSendShellBytes = { sentPayloads += it.copyOf() }
+        )
+
+        showTerminalKeyboardAndAssertBridgeFocus()
+        val keyboardRequestedBefore = isTerminalKeyboardRequested()
+
+        lateinit var terminalView: TerminalView
+        composeRule.runOnIdle {
+            terminalView = terminalViewForTest()
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            check(terminalView.hasFocus()) {
+                "TerminalView should own focus while terminal selection is active"
+            }
+            terminalView.performSelectionAction(copy = true)
+            sentPayloads.clear()
+        }
+
+        waitForSelectionInactive(terminalView)
+        waitForImeBridgeFocus()
+        check(isTerminalKeyboardRequested() == keyboardRequestedBefore) {
+            "Terminal Copy changed keyboardVisibleRequested semantics"
+        }
+        assertCommittedCtrlAThenPlainA(sentPayloads)
+    }
+
+    @Test
+    fun terminalActionModePaste_restoresImeFocusAndCommittedCtrlA() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        seedClipboardForTerminalPaste("seeded-paste")
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "paste-focus-selection-target",
+            onSendShellBytes = { sentPayloads += it.copyOf() }
+        )
+
+        showTerminalKeyboardAndAssertBridgeFocus()
+        val keyboardRequestedBefore = isTerminalKeyboardRequested()
+
+        lateinit var terminalView: TerminalView
+        composeRule.runOnIdle {
+            terminalView = terminalViewForTest()
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            check(terminalView.hasFocus()) {
+                "TerminalView should own focus while terminal selection is active"
+            }
+            terminalView.performSelectionAction(copy = false)
+            sentPayloads.clear()
+        }
+
+        waitForSelectionInactive(terminalView)
+        waitForImeBridgeFocus()
+        check(isTerminalKeyboardRequested() == keyboardRequestedBefore) {
+            "Terminal Paste changed keyboardVisibleRequested semantics"
+        }
+        assertCommittedCtrlAThenPlainA(sentPayloads)
+    }
+
+    @Test
+    fun terminalActionModeCopy_doesNotFocusImeBridgeWhenSystemKeyboardHidden() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "copy-hidden-keyboard-selection-target",
+            onSendShellBytes = { sentPayloads += it.copyOf() }
+        )
+
+        check(!isTerminalKeyboardRequested()) {
+            "Terminal keyboard should start hidden for this focus-restoration negative test"
+        }
+
+        lateinit var terminalView: TerminalView
+        composeRule.runOnIdle {
+            terminalView = terminalViewForTest()
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            check(terminalView.hasFocus()) {
+                "TerminalView should own focus while terminal selection is active"
+            }
+            terminalView.performSelectionAction(copy = true)
+        }
+
+        waitForSelectionInactive(terminalView)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            check(!isTerminalKeyboardRequested()) {
+                "Terminal Copy should not mark the system keyboard requested when it was hidden"
+            }
+            check(!imeBridgeForTest().hasFocus()) {
+                "Terminal IME bridge should not regain focus when the system keyboard was hidden"
+            }
+        }
+    }
+
+    @Test
+    fun terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "copy-built-in-keyboard-selection-target",
+            useBuiltInKeyboard = true,
+            onSendShellBytes = { sentPayloads += it.copyOf() }
+        )
+
+        lateinit var terminalView: TerminalView
+        composeRule.runOnIdle {
+            terminalView = terminalViewForTest()
+            terminalView.startTextSelectionAtViewportCenter()
+            terminalView.selectAllText()
+            check(terminalView.hasFocus()) {
+                "TerminalView should own focus while terminal selection is active"
+            }
+            terminalView.performSelectionAction(copy = true)
+        }
+
+        waitForSelectionInactive(terminalView)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            check(!isTerminalKeyboardRequested()) {
+                "Built-in keyboard mode should not mark the system keyboard requested"
+            }
+            check(!imeBridgeForTest().hasFocus()) {
+                "Terminal IME bridge should not regain focus in built-in keyboard mode"
+            }
+        }
+    }
+
+    @Test
+    fun terminalImeContextPaste_keepsCommittedCtrlAAfterPaste() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        seedClipboardForTerminalPaste("ime-paste")
+        setSshTerminalContentWithCtrlKey { sentPayloads += it.copyOf() }
+
+        val inputConnection = focusedTerminalInputConnection()
+        val handled = performImeContextMenuActionAndAssertKeyboardRequestUnchanged(
+            inputConnection = inputConnection,
+            actionId = android.R.id.paste,
+            label = "paste"
+        ) {
+            sentPayloads.clear()
+        }
+        check(handled) { "IME paste context action was not handled" }
+
+        assertCommittedCtrlAThenPlainA(sentPayloads)
+    }
+
+    @Test
+    fun terminalImeContextPasteAsPlainText_keepsCommittedCtrlAAfterPaste() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        seedClipboardForTerminalPaste("ime-plain-paste")
+        setSshTerminalContentWithCtrlKey { sentPayloads += it.copyOf() }
+
+        val inputConnection = focusedTerminalInputConnection()
+        val handled = performImeContextMenuActionAndAssertKeyboardRequestUnchanged(
+            inputConnection = inputConnection,
+            actionId = android.R.id.pasteAsPlainText,
+            label = "paste-as-plain-text"
+        ) {
+            sentPayloads.clear()
+        }
+        if (!handled) {
+            composeRule.runOnIdle {
+                check(sentPayloads.isEmpty()) {
+                    "Unsupported IME paste-as-plain-text action should not send terminal bytes"
+                }
+            }
+            return
+        }
+
+        assertCommittedCtrlAThenPlainA(sentPayloads)
+    }
+
+    @Test
+    fun terminalImeContextCopy_keepsCommittedCtrlAAfterSelectedShadowTextCopy() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey { sentPayloads += it.copyOf() }
+
+        val inputConnection = focusedTerminalInputConnection()
+        composeRule.runOnIdle {
+            check(inputConnection.setComposingText("shadow-copy", 1))
+            check(inputConnection.setSelection(0, "shadow-copy".length))
+        }
+        val handled = performImeContextMenuActionAndAssertKeyboardRequestUnchanged(
+            inputConnection = inputConnection,
+            actionId = android.R.id.copy,
+            label = "copy"
+        ) {
+            sentPayloads.clear()
+        }
+        check(handled) { "IME copy context action was not handled" }
+
+        assertCommittedCtrlAThenPlainA(sentPayloads)
+    }
+
+    @Test
+    fun builtInKeyboard_keepsModifiersWorkingAcrossFnLayer() {
+        val sentPayloads = mutableListOf<ByteArray>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    useBuiltInKeyboard = true,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(15)).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(22)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(27)).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(13)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "\u001B[1;5P") {
+                "Ctrl was lost while switching to the built-in Fn layer: $actual"
+            }
+        }
+    }
+
+    @Test
+    fun customKeyboard_fnLayerIsNotASilentNoOp() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[0] = KeyboardLayoutDefaults.fnKeyAction()
+            this[20] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = customSlots,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithText("F1").assertIsDisplayed()
+        composeRule.onNodeWithText("Custom").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "\u001BOP") { "Custom Fn layer did not emit F1: $actual" }
+        }
+        composeRule.onNodeWithText("F1").assertDoesNotExist()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).assertIsDisplayed()
     }
 
     @Test
@@ -604,8 +1331,10 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PANEL).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
-        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("download")).assertIsNotEnabled()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("new_folder")).assertIsEnabled()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("new_folder")).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG).assertIsDisplayed()
@@ -624,8 +1353,7 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/existing.txt")).performClick()
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
-        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("download")).assertIsEnabled()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).assertIsEnabled()
         composeRule.runOnIdle {
             check(downloadRequest == null) {
                 "SCP download callback should remain idle until a document picker result is delivered"
@@ -636,6 +1364,184 @@ class ConnectingScreenTest {
         composeRule.runOnIdle {
             check(listedPath == "/uploads/subdir") {
                 "SCP browser did not request directory listing from the folder open affordance."
+            }
+        }
+    }
+
+    @Test
+    fun scpUploadPanel_promotesUploadActionToToolbar() {
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP).copy(
+                        initialFileTransferEntryMode = FileTransferEntryMode.UPLOAD
+                    ),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SCP transfer ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/uploads",
+                        entries = emptyList()
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithText("Choose a local file, then upload it into the current folder.")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("choose_local_file")).assertDoesNotExist()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("upload_here")).assertDoesNotExist()
+    }
+
+    @Test
+    fun scpUploadAction_isDisabledWhileDirectoryListingIsPending() {
+        val listedPaths = mutableListOf<String>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP).copy(
+                        initialFileTransferEntryMode = FileTransferEntryMode.UPLOAD
+                    ),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SCP transfer ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/uploads",
+                        entries = emptyList(),
+                        refreshToken = 1L
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = { listedPaths += it },
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON).assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Refresh").performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON).assertIsNotEnabled()
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/uploads")
+        }
+    }
+
+    @Test
+    fun scpForwardNavigation_isReachableFromOverflowOnNarrowScreens() {
+        val listedPaths = mutableListOf<String>()
+        var remoteDirectory by mutableStateOf<SessionService.RemoteDirectorySnapshot?>(null)
+
+        composeRule.setContent {
+            MaterialTheme {
+                Box(Modifier.width(320.dp).fillMaxHeight()) {
+                    ConnectingScreen(
+                        request = requestFor(ConnectionMode.SCP),
+                        state = QuickConnectUiState(
+                            phase = QuickConnectPhase.SUCCESS,
+                            message = "SCP transfer ready"
+                        ),
+                        logs = emptyList(),
+                        shellOutput = "",
+                        remoteDirectory = remoteDirectory,
+                        terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                        terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                        keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                        snippets = emptyList(),
+                        onSendShellBytes = {},
+                        onTerminalResize = { _, _ -> },
+                        onSftpListDirectory = { listedPaths += it },
+                        onSftpDownload = { _, _ -> },
+                        onSftpUpload = { _, _ -> },
+                        onScpDownload = { _, _ -> },
+                        onScpUpload = { _, _ -> },
+                        onManageRemotePath = { _, _, _ -> },
+                        onRetry = {},
+                        onToggleConnectedHostBar = {},
+                        onOpenSettings = {},
+                        findRequestToken = 0
+                    )
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                path = "/home/tester",
+                entries = listOf(
+                    SessionService.RemoteDirectoryEntry(
+                        name = "docs",
+                        isDirectory = true,
+                        sizeBytes = 0
+                    )
+                ),
+                refreshToken = 1L
+            )
+        }
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/home/tester/docs")).performClick()
+        composeRule.runOnIdle {
+            remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                path = "/home/tester/docs",
+                entries = emptyList(),
+                refreshToken = 2L
+            )
+        }
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.runOnIdle {
+            remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                path = "/home/tester",
+                entries = emptyList(),
+                refreshToken = 3L
+            )
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("forward"))
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/home/tester/docs") {
+                "Narrow SCP Forward did not revisit the next history entry: $listedPaths"
             }
         }
     }
@@ -797,6 +1703,246 @@ class ConnectingScreenTest {
         }
     }
 
+    private fun setSshTerminalContent(onSendShellBytes: (ByteArray) -> Unit) {
+        composeRule.setContent {
+            MaterialTheme {
+                SshTerminalForInputTest(onSendShellBytes)
+            }
+        }
+    }
+
+    private fun setSshTerminalContentWithCtrlKey(
+        shellOutput: String = "",
+        useBuiltInKeyboard: Boolean = false,
+        onSendShellBytes: (ByteArray) -> Unit
+    ) {
+        val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[0] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.CTRL, "Ctrl")
+        }
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = shellOutput,
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    useBuiltInKeyboard = useBuiltInKeyboard,
+                    keyboardSlots = customSlots,
+                    snippets = emptyList(),
+                    onSendShellBytes = onSendShellBytes,
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun SshTerminalForInputTest(onSendShellBytes: (ByteArray) -> Unit) {
+        ConnectingScreen(
+            request = requestFor(ConnectionMode.SSH),
+            state = QuickConnectUiState(
+                phase = QuickConnectPhase.SUCCESS,
+                message = "Interactive shell session ready"
+            ),
+            logs = emptyList(),
+            shellOutput = "",
+            remoteDirectory = null,
+            terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+            terminalSelectionMode = TerminalSelectionMode.NATURAL,
+            keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+            snippets = emptyList(),
+            onSendShellBytes = onSendShellBytes,
+            onTerminalResize = { _, _ -> },
+            onSftpListDirectory = {},
+            onSftpDownload = { _, _ -> },
+            onSftpUpload = { _, _ -> },
+            onScpDownload = { _, _ -> },
+            onScpUpload = { _, _ -> },
+            onManageRemotePath = { _, _, _ -> },
+            onRetry = {},
+            onToggleConnectedHostBar = {},
+            onOpenSettings = {},
+            findRequestToken = 0
+        )
+    }
+
+    private fun terminalInputConnection(): InputConnection {
+        val imeBridge = imeBridgeForTest()
+        return imeBridge.onCreateInputConnection(EditorInfo())
+            ?: error("Terminal IME bridge did not create an InputConnection")
+    }
+
+    private fun focusedTerminalInputConnection(): InputConnection {
+        showTerminalKeyboardAndAssertBridgeFocus()
+        return terminalInputConnection()
+    }
+
+    private fun imeBridgeForTest(): EditText {
+        val root = composeRule.activity.findViewById<View>(android.R.id.content)
+        return root.findEditTextDescendant()
+            ?: error("Terminal IME bridge was not attached")
+    }
+
+    private fun terminalViewForTest(): TerminalView {
+        return composeRule.activity.findViewById<View>(android.R.id.content)
+            .findTerminalViewDescendant()
+            ?: error("Terminal view was not attached")
+    }
+
+    private fun View.findTerminalViewDescendant(): TerminalView? {
+        if (this is TerminalView) return this
+        if (this !is ViewGroup) return null
+        for (index in 0 until childCount) {
+            val match = getChildAt(index).findTerminalViewDescendant()
+            if (match != null) return match
+        }
+        return null
+    }
+
+    private fun TerminalView.performSelectionAction(copy: Boolean) {
+        check(performTextSelectionActionForTest(copy)) {
+            "Terminal ${if (copy) "Copy" else "Paste"} action was not handled"
+        }
+    }
+
+    private fun TerminalView.dispatchUnmodifiedVirtualA() {
+        val event = keyDownEvent(KeyEvent.KEYCODE_A)
+        check(dispatchKeyEvent(event)) {
+            "TerminalView did not consume unmodified virtual KEYCODE_A"
+        }
+    }
+
+    private fun keyDownEvent(keyCode: Int): KeyEvent =
+        KeyEvent(
+            0L,
+            0L,
+            KeyEvent.ACTION_DOWN,
+            keyCode,
+            0,
+            0
+        )
+
+    private fun TerminalView.isTextSelectionActiveForTest(): Boolean {
+        return isSelectingText
+    }
+
+    private fun waitForSelectionInactive(terminalView: TerminalView) {
+        waitUntilOrFail(
+            timeoutMillis = 5_000,
+            failureMessage = "Timed out waiting for terminal selection to become inactive"
+        ) {
+            !terminalView.isTextSelectionActiveForTest()
+        }
+        check(!terminalView.isTextSelectionActiveForTest()) {
+            "Terminal selection is still active after explicit Copy/Paste action"
+        }
+    }
+
+    private fun waitForImeBridgeFocus() {
+        waitUntilOrFail(
+            timeoutMillis = 5_000,
+            failureMessage = "Timed out waiting for TerminalImeBridgeEditText to regain focus"
+        ) {
+            imeBridgeForTest().hasFocus()
+        }
+        check(imeBridgeForTest().hasFocus()) {
+            "TerminalImeBridgeEditText did not regain focus after terminal selection ended"
+        }
+    }
+
+    private fun showTerminalKeyboardAndAssertBridgeFocus() {
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        waitUntilOrFail(
+            timeoutMillis = 5_000,
+            failureMessage = "Timed out waiting for TerminalImeBridgeEditText focus after keyboard request"
+        ) {
+            imeBridgeForTest().hasFocus()
+        }
+        check(imeBridgeForTest().hasFocus()) {
+            "TerminalImeBridgeEditText should own focus after showing the system keyboard"
+        }
+        check(isTerminalKeyboardRequested()) {
+            "Terminal keyboard should be marked requested after showing the system keyboard"
+        }
+    }
+
+    private fun waitUntilOrFail(
+        timeoutMillis: Long,
+        failureMessage: String,
+        condition: () -> Boolean
+    ) {
+        runCatching {
+            composeRule.waitUntil(timeoutMillis, condition)
+        }.getOrElse { cause ->
+            throw AssertionError(failureMessage, cause)
+        }
+    }
+
+    private fun assertCommittedCtrlAThenPlainA(sentPayloads: MutableList<ByteArray>) {
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.runOnIdle {
+            check(terminalInputConnection().commitText("a", 1)) {
+                "IME rejected committed Ctrl-A input"
+            }
+            check(terminalInputConnection().commitText("a", 1)) {
+                "IME rejected committed plain A input"
+            }
+        }
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            check(actual.contentEquals(byteArrayOf(0x01, 0x61))) {
+                "Committed Ctrl-A/plain-A produced ${actual.contentToString()}"
+            }
+        }
+    }
+
+    private fun performImeContextMenuActionAndAssertKeyboardRequestUnchanged(
+        inputConnection: InputConnection,
+        actionId: Int,
+        label: String,
+        afterAction: () -> Unit
+    ): Boolean {
+        var handled = false
+        composeRule.runOnIdle {
+            check(imeBridgeForTest().hasFocus()) {
+                "TerminalImeBridgeEditText should own focus before IME $label context action"
+            }
+            val keyboardRequestedBefore = isTerminalKeyboardRequested()
+            handled = inputConnection.performContextMenuAction(actionId)
+            check(imeBridgeForTest().hasFocus()) {
+                "TerminalImeBridgeEditText lost focus after IME $label context action"
+            }
+            check(isTerminalKeyboardRequested() == keyboardRequestedBefore) {
+                "IME $label context action changed keyboardVisibleRequested semantics"
+            }
+            afterAction()
+        }
+        return handled
+    }
+
+    private fun seedClipboardForTerminalPaste(text: String) {
+        val clipboard = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("terminal-selection", text))
+    }
+
     private fun requestFor(mode: ConnectionMode) = QuickConnectRequest(
         sessionId = "session-${mode.name.lowercase()}",
         name = "Sandbox ${mode.name}",
@@ -856,7 +2002,6 @@ class ConnectingScreenTest {
         val x = rootOffset[0] + bounds.center.x.toInt()
         val y = rootOffset[1] + bounds.center.y.toInt()
         device.click(x, y)
-        SystemClock.sleep(80)
         device.click(x, y)
     }
 

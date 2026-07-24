@@ -13,7 +13,9 @@ import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.Provider
 import java.security.Security
+import java.security.Signature
 import java.security.Signature as JcaSignature
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
@@ -50,6 +52,8 @@ object SshClientProvider {
     private val providerInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
     @Volatile
+    private var testingUnavailableKeyExchangeAlgorithms: Set<String> = emptySet()
+    @Volatile
     private var hostKeyProviderChecked = false
 
     data class HostKeyPrompt(
@@ -79,8 +83,34 @@ object SshClientProvider {
             host = host,
             loggerFactory = loggerFactory,
             autoTrustUnknownHostKey = autoTrustUnknownHostKey,
-            onHostKeyPrompt = onHostKeyPrompt
+            onHostKeyPrompt = onHostKeyPrompt,
+            keyExchangeAvailability = testJcaAlgorithmAvailability(testingUnavailableKeyExchangeAlgorithms)
         )
+    }
+
+    internal fun setTestingUnavailableKeyExchangeAlgorithms(
+        algorithms: Set<String>
+    ) {
+        testingUnavailableKeyExchangeAlgorithms = algorithms
+            .map { it.lowercase() }
+            .toSet()
+    }
+
+    internal fun clearTestingUnavailableKeyExchangeAlgorithms() {
+        testingUnavailableKeyExchangeAlgorithms = emptySet()
+    }
+
+    internal fun withTestingUnavailableKeyExchangeAlgorithms(
+        algorithms: Set<String>,
+        action: () -> Unit
+    ) {
+        val previous = testingUnavailableKeyExchangeAlgorithms
+        setTestingUnavailableKeyExchangeAlgorithms(algorithms)
+        try {
+            action()
+        } finally {
+            testingUnavailableKeyExchangeAlgorithms = previous
+        }
     }
 
     internal fun ensureCompatibleHostKeyAlgorithmsAvailableForTesting() {
@@ -94,12 +124,7 @@ object SshClientProvider {
     internal fun compatibleKeyExchangeNamesForTesting(
         unavailableAlgorithms: Set<String> = emptySet()
     ): List<String> {
-        val unavailable = unavailableAlgorithms.map { it.lowercase() }.toSet()
-        val availability = object : JcaAlgorithmAvailability {
-            override fun hasKeyPairGenerator(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
-            override fun hasKeyAgreement(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
-            override fun hasKeyFactory(algorithm: String): Boolean = algorithm.lowercase() !in unavailable
-        }
+        val availability = testJcaAlgorithmAvailability(unavailableAlgorithms)
         return androidCompatibleKeyExchangeFactories(DefaultConfig().keyExchangeFactories, availability)
             .map { it.name }
     }
@@ -109,14 +134,16 @@ object SshClientProvider {
         host: HostConnection,
         loggerFactory: LoggerFactory? = null,
         autoTrustUnknownHostKey: Boolean = true,
-        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null,
+        unavailableKeyExchangeAlgorithms: Set<String> = emptySet()
     ): SSHClient {
         return createConfiguredClient(
             knownHostsFile = knownHostsFile,
             host = host,
             loggerFactory = loggerFactory,
             autoTrustUnknownHostKey = autoTrustUnknownHostKey,
-            onHostKeyPrompt = onHostKeyPrompt
+            onHostKeyPrompt = onHostKeyPrompt,
+            keyExchangeAvailability = testJcaAlgorithmAvailability(unavailableKeyExchangeAlgorithms)
         )
     }
 
@@ -144,7 +171,8 @@ object SshClientProvider {
         host: HostConnection,
         loggerFactory: LoggerFactory?,
         autoTrustUnknownHostKey: Boolean,
-        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?,
+        keyExchangeAvailability: JcaAlgorithmAvailability = RealJcaAlgorithmAvailability
     ): SSHClient {
         // Keep SSHJ on Android's default provider. bcprov is bundled for key generation,
         // but letting SSHJ auto-register BC breaks transport digests on Android.
@@ -154,7 +182,7 @@ object SshClientProvider {
         ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
-        val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories)
+        val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories, keyExchangeAvailability)
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
@@ -259,13 +287,33 @@ object SshClientProvider {
 
     private object RealJcaAlgorithmAvailability : JcaAlgorithmAvailability {
         override fun hasKeyPairGenerator(algorithm: String): Boolean =
-            runCatching { KeyPairGenerator.getInstance(algorithm) }.isSuccess
+            canCreateKeyPairGenerator(algorithm)
 
         override fun hasKeyAgreement(algorithm: String): Boolean =
-            runCatching { KeyAgreement.getInstance(algorithm) }.isSuccess
+            canCreateKeyAgreement(algorithm)
 
         override fun hasKeyFactory(algorithm: String): Boolean =
             canCreateKeyFactory(algorithm)
+    }
+
+    private fun testJcaAlgorithmAvailability(unavailableAlgorithms: Set<String>): JcaAlgorithmAvailability {
+        val unavailable = unavailableAlgorithms.map { it.lowercase() }.toSet()
+        return object : JcaAlgorithmAvailability {
+            override fun hasKeyPairGenerator(algorithm: String): Boolean {
+                val normalized = algorithm.lowercase()
+                return normalized !in unavailable && RealJcaAlgorithmAvailability.hasKeyPairGenerator(algorithm)
+            }
+
+            override fun hasKeyAgreement(algorithm: String): Boolean {
+                val normalized = algorithm.lowercase()
+                return normalized !in unavailable && RealJcaAlgorithmAvailability.hasKeyAgreement(algorithm)
+            }
+
+            override fun hasKeyFactory(algorithm: String): Boolean {
+                val normalized = algorithm.lowercase()
+                return normalized !in unavailable && RealJcaAlgorithmAvailability.hasKeyFactory(algorithm)
+            }
+        }
     }
 
     private fun ensureCompatibleHostKeyAlgorithmsAvailable() {
@@ -293,11 +341,37 @@ object SshClientProvider {
     }
 
     private fun canCreateKeyFactory(algorithm: String): Boolean {
-        return runCatching { KeyFactory.getInstance(algorithm) }.isSuccess
+        return canCreateWithAnyProvider { provider ->
+            KeyFactory.getInstance(algorithm, provider)
+        }
     }
 
     private fun canCreateSignature(algorithm: String): Boolean {
-        return runCatching { JcaSignature.getInstance(algorithm) }.isSuccess
+        return canCreateWithAnyProvider { provider ->
+            Signature.getInstance(algorithm, provider)
+        }
+    }
+
+    private fun canCreateKeyPairGenerator(algorithm: String): Boolean {
+        return canCreateWithAnyProvider { provider ->
+            KeyPairGenerator.getInstance(algorithm, provider)
+        }
+    }
+
+    private fun canCreateKeyAgreement(algorithm: String): Boolean {
+        return canCreateWithAnyProvider { provider ->
+            KeyAgreement.getInstance(algorithm, provider)
+        }
+    }
+
+    private fun canCreateWithAnyProvider(factory: (Provider) -> Any): Boolean {
+        val providers = Security.getProviders() ?: return false
+        if (providers.isEmpty()) {
+            return false
+        }
+        return providers.any { provider ->
+            runCatching { factory(provider) }.isSuccess
+        }
     }
 
     private fun ensureBundledBouncyCastleProviderInstalled() {

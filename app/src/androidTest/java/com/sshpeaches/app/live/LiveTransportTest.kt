@@ -221,6 +221,34 @@ class LiveTransportSuiteTest {
     }
 
     @Test
+    fun wrongPasswordShowsPasswordPromptForRetryWhenDhKeyPairGeneratorUnavailable() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true
+        )
+        SshClientProvider.withTestingUnavailableKeyExchangeAlgorithms(setOf("DH")) {
+            val host = HostConnection(
+                id = "live-wrong-password-dh-${UUID.randomUUID()}",
+                name = "Live Wrong Password with DH fallback",
+                host = LiveBackendConfig.host,
+                port = LiveBackendConfig.port,
+                username = LiveBackendConfig.username,
+                preferredAuth = AuthMethod.PASSWORD,
+                hasPassword = true
+            )
+            AppStateSeeder.seedHost(host, "wrong-password")
+
+            composeRule.navigateDrawer(Routes.HOSTS)
+            composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "ssh")).performClick()
+
+            waitForTag(UiTestTags.PASSWORD_PROMPT_DIALOG)
+            composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_DIALOG).assertIsDisplayed()
+            composeRule.onAllNodesWithText("Authentication failed. Enter password and try again.")[0].assertIsDisplayed()
+            composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_INPUT).assertIsDisplayed()
+        }
+    }
+
+    @Test
     fun rejectingHostKeyShowsRetryState() {
         AppStateSeeder.configureSettings(
             hostKeyPrompt = true,
@@ -350,6 +378,36 @@ class LiveTransportSuiteTest {
         waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_CONNECTING).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
+    }
+
+    @Test
+    fun foregroundAfterBackgroundClosesTerminalSession_returnsHomeWithoutStaleTerminal() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            allowBackgroundSessions = false,
+            terminalSelectionMode = TerminalSelectionMode.NATURAL
+        )
+        val host = seedPasswordHost("Live Closed In Background Host")
+
+        composeRule.navigateDrawer(Routes.HOSTS)
+        composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "ssh")).performClick()
+
+        waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+
+        waitForTag(UiTestTags.SCREEN_HOME)
+        check(
+            composeRule.onAllNodesWithTag(UiTestTags.SCREEN_CONNECTING, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        ) { "Stale connecting screen was still composed after the backing session closed." }
+        check(
+            composeRule.onAllNodesWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        ) { "Stale terminal panel was still composed after the backing session closed." }
     }
 
     @Test

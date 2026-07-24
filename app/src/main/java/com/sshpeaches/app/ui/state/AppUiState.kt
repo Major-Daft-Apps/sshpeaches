@@ -46,6 +46,7 @@ data class AppUiState(
     val hostKeyPromptEnabled: Boolean = true,
     val autoTrustHostKey: Boolean = false,
     val usageReportsEnabled: Boolean = SettingsStore.defaultUsageReportsEnabled,
+    val useBuiltInKeyboard: Boolean = false,
     val snippetRunTimeoutSeconds: Int = 10,
     val pinConfigured: Boolean = false,
     val isLocked: Boolean = false,

@@ -37,10 +37,11 @@ object SessionLogBus {
 
 class SessionLoggerFactory(
     private val hostId: String,
+    private val diagnosticsEnabled: () -> Boolean = { false },
     private val delegate: LoggerFactory = LoggerFactory.DEFAULT
 ) : LoggerFactory {
     override fun getLogger(name: String): Logger =
-        SessionLogger(hostId, delegate.getLogger(name))
+        SessionLogger(hostId, diagnosticsEnabled, delegate.getLogger(name))
 
     override fun getLogger(clazz: Class<*>?): Logger =
         getLogger(clazz?.name ?: "unknown")
@@ -48,6 +49,7 @@ class SessionLoggerFactory(
 
 private class SessionLogger(
     private val hostId: String,
+    private val diagnosticsEnabled: () -> Boolean,
     private val delegate: Logger
 ) : MarkerIgnoringBase() {
     companion object {
@@ -192,6 +194,7 @@ private class SessionLogger(
         args: Array<out Any?>? = null,
         throwable: Throwable? = null
     ) {
+        if (!shouldPublishSshLog(level, message, diagnosticsEnabled())) return
         val text = when {
             message == null -> throwable?.message ?: return
             args == null -> message
@@ -210,3 +213,21 @@ private class SessionLogger(
         SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text))
     }
 }
+
+internal fun shouldPublishSshLog(
+    level: LogLevel,
+    messageFormat: String?,
+    diagnosticsEnabled: Boolean
+): Boolean {
+    if (level != LogLevel.DEBUG) return true
+    if (!diagnosticsEnabled) return false
+    if (messageFormat == null) return true
+    return NOISY_SSH_LOG_MARKERS.none(messageFormat::contains)
+}
+
+private val NOISY_SSH_LOG_MARKERS = listOf(
+    "Received packet",
+    "Consuming by",
+    "Increasing by",
+    "Sending after interval"
+)

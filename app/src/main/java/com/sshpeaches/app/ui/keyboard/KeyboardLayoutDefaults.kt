@@ -38,6 +38,8 @@ object KeyboardLayoutDefaults {
     const val SLOT_COLUMNS = 7
     const val SLOT_ROWS = 4
     const val SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
+    const val BUILTIN_SLOT_ROWS = SLOT_ROWS
+    const val BUILTIN_SLOT_COUNT = SLOT_COLUMNS * BUILTIN_SLOT_ROWS
     private const val LEGACY_SLOT_ROWS = 2
     private const val LEGACY_SLOT_COUNT = SLOT_COLUMNS * LEGACY_SLOT_ROWS
     private const val EXTENDED_SLOT_COUNT = SLOT_COUNT - LEGACY_SLOT_COUNT
@@ -269,9 +271,61 @@ object KeyboardLayoutDefaults {
         }
         return List(SLOT_COUNT) { index ->
             val action = upgraded.getOrNull(index) ?: DEFAULT_SLOTS.getOrNull(index) ?: emptyAction()
-            applyDirectionalIconAlias(action)
+            applyLegacyIconAlias(action)
         }
     }
+
+    fun builtInCompactLayout(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> {
+        val normalized = normalizeSlots(slots)
+        return normalized.toMutableList().apply {
+            for (index in 0 until 12) {
+                if (index >= size) continue
+                this[index] = numpadPresets.getOrNull(index) ?: this[index]
+            }
+            if (size > 13) {
+                this[13] = fnKeyAction()
+            }
+            if (size > 27) {
+                // The Android-keyboard toggle is intentionally unavailable in built-in mode.
+                // Reuse that slot so Ctrl, Alt, and Shift all remain reachable.
+                this[27] = modifierAction(KeyboardModifier.SHIFT, "Shift")
+            }
+        }
+    }
+
+    fun builtInFnLayout(slots: List<KeyboardSlotAction> = DEFAULT_SLOTS): List<KeyboardSlotAction> = fnLayout(
+        slots = slots,
+        useBuiltInKeyboard = true
+    )
+
+    fun customFnLayout(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> = fnLayout(
+        slots = slots,
+        useBuiltInKeyboard = false
+    )
+
+    private fun fnLayout(
+        slots: List<KeyboardSlotAction>,
+        useBuiltInKeyboard: Boolean
+    ): List<KeyboardSlotAction> {
+        val base = if (useBuiltInKeyboard) {
+            builtInCompactLayout(slots)
+        } else {
+            normalizeSlots(slots)
+        }
+        return base.mapIndexed { index, action ->
+            when (index) {
+                0 -> fnKeyAction(active = true)
+                in 1..12 -> functionKeyAction(index)
+                13 -> modifierAction(KeyboardModifier.SHIFT, "Shift")
+                else -> action
+            }
+        }
+    }
+
+    fun fnKeyAction(active: Boolean = false): KeyboardSlotAction = textAction(
+        text = "",
+        label = if (active) "Fn*" else "Fn"
+    ).copy(iconId = if (active) "fn_active" else "fn")
 
     fun textAction(text: String, label: String = text): KeyboardSlotAction = KeyboardSlotAction(
         type = KeyboardActionType.TEXT,
@@ -384,6 +438,7 @@ object KeyboardLayoutDefaults {
             "password", "pwd", "pass" -> passwordInjectAction()
             "swipe", "swipenav", "swipe-nav" -> textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav")
             "keyboard" -> textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+            "fn" -> fnKeyAction()
             "reset", "clr", "clear" -> textAction(label = "reset+Enter", text = "").copy(iconId = "reset")
             "settings", "wrench", "tools", "tool" -> textAction(label = "Settings", text = "").copy(iconId = "build")
             else -> {
@@ -544,6 +599,11 @@ object KeyboardLayoutDefaults {
         else -> ""
     }
 
+    private fun applyLegacyIconAlias(action: KeyboardSlotAction): KeyboardSlotAction {
+        val withDirectionAlias = applyDirectionalIconAlias(action)
+        return applyFnIconAlias(withDirectionAlias)
+    }
+
     private fun applyDirectionalIconAlias(action: KeyboardSlotAction): KeyboardSlotAction {
         if (action.type != KeyboardActionType.KEY) return action
         if (action.iconId.isNotBlank()) return action
@@ -557,6 +617,17 @@ object KeyboardLayoutDefaults {
             else -> return action
         }
         return action.copy(iconId = iconId)
+    }
+
+    private fun applyFnIconAlias(action: KeyboardSlotAction): KeyboardSlotAction {
+        if (action.iconId.isNotBlank()) return action
+        if (action.type != KeyboardActionType.TEXT) return action
+        if (action.text.isNotBlank()) return action
+        return when (action.label.trim().lowercase()) {
+            "fn" -> action.copy(iconId = "fn")
+            "fn*" -> action.copy(iconId = "fn_active")
+            else -> action
+        }
     }
 
     private data class CombinationKeySpec(

@@ -83,6 +83,7 @@ class AppViewModel(
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+    private val useBuiltInKeyboardFlow = MutableStateFlow(false)
     private var uptimeTickerJob: Job? = null
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
@@ -230,6 +231,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.keyboardLayout.collect { slots ->
                 keyboardSlotsFlow.value = slots
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.useBuiltInKeyboard.collect { enabled ->
+                useBuiltInKeyboardFlow.value = enabled
             }
         }
     }
@@ -501,9 +507,11 @@ class AppViewModel(
 
     val uiState: StateFlow<AppUiState> = combine(
         uptimeUiState,
-        keyboardSlotsFlow
-    ) { state, slots ->
+        keyboardSlotsFlow,
+        useBuiltInKeyboardFlow
+    ) { state, slots, useBuiltInKeyboard ->
         state.copy(keyboardSlots = slots)
+            .copy(useBuiltInKeyboard = useBuiltInKeyboard)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -576,6 +584,7 @@ class AppViewModel(
         append(state.hostKeyPromptEnabled).append('|')
         append(state.autoTrustHostKey).append('|')
         append(state.usageReportsEnabled).append('|')
+        append(state.useBuiltInKeyboard).append('|')
         append(state.pinConfigured).append('|')
         append(state.isLocked).append('|')
         append(state.keyboardSlots.size).append('|')
@@ -1678,6 +1687,12 @@ class AppViewModel(
         keyboardSlotsFlow.value = KeyboardLayoutDefaults.DEFAULT_SLOTS
         launchLogged("resetKeyboardLayout") {
             SettingsStore.setKeyboardLayout(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+        }
+    }
+
+    fun setUseBuiltInKeyboard(enabled: Boolean) {
+        launchLogged("setUseBuiltInKeyboard", "enabled=$enabled") {
+            SettingsStore.setUseBuiltInKeyboard(enabled)
         }
     }
 

@@ -9,6 +9,7 @@ import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.FirstRunWelcomePreferences
 import kotlinx.coroutines.runBlocking
 
 object AppStateResetter {
@@ -36,6 +37,7 @@ object AppStateResetter {
         securePrefsNames.forEach { name ->
             appContext.deleteSharedPreferences(name)
         }
+        FirstRunWelcomePreferences.markCompleted(appContext)
         appContext.deleteFile("known_hosts")
         appContext.stopService(Intent(appContext, SessionService::class.java))
         SecurityManager.resetForTesting()

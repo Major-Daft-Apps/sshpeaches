@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.data.model.TerminalAnsiPalette
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
@@ -49,6 +50,7 @@ object SettingsStore {
     private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
     private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
+    private val useBuiltInKeyboardKey = booleanPreferencesKey("use_built_in_terminal_keyboard")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val appIconKey = stringPreferencesKey("app_icon")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
@@ -131,6 +133,10 @@ object SettingsStore {
         dataStore.data.map { prefs ->
             prefs[keyboardLayoutKey]?.let { decodeKeyboardSlots(it) } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
         }
+    }
+
+    val useBuiltInKeyboard: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[useBuiltInKeyboardKey] ?: false }
     }
 
     val backgroundSessionTimeout: Flow<BackgroundSessionTimeout> by lazy {
@@ -312,6 +318,12 @@ object SettingsStore {
         }
         dataStore.edit { prefs ->
             prefs[keyboardLayoutKey] = array.toString()
+        }
+    }
+
+    suspend fun setUseBuiltInKeyboard(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[useBuiltInKeyboardKey] = enabled
         }
     }
 
@@ -565,6 +577,7 @@ object SettingsStore {
                     put("cursorHex", profile.cursorHex)
                     put("cursorStyle", profile.cursorStyle.name)
                     put("cursorBlink", profile.cursorBlink)
+                    put("ansiColors", JSONArray(profile.ansiColors))
                 }
             )
         }
@@ -591,9 +604,19 @@ object SettingsStore {
                     cursorStyle = runCatching {
                         TerminalCursorStyle.valueOf(item.optString("cursorStyle", TerminalCursorStyle.BLOCK.name))
                     }.getOrDefault(TerminalCursorStyle.BLOCK),
-                    cursorBlink = item.optBoolean("cursorBlink", true)
+                    cursorBlink = item.optBoolean("cursorBlink", true),
+                    ansiColors = item.optJSONArray("ansiColors")
+                        ?.let(::decodeAnsiColors)
+                        ?: TerminalAnsiPalette.TERMUX
                 )
             }
             out.distinctBy { it.id }
         }.getOrDefault(emptyList())
+
+    private fun decodeAnsiColors(array: JSONArray): List<String> {
+        if (array.length() != TerminalAnsiPalette.TERMUX.size) return TerminalAnsiPalette.TERMUX
+        return List(array.length()) { index ->
+            array.optString(index).takeIf { it.isNotBlank() } ?: TerminalAnsiPalette.TERMUX[index]
+        }
+    }
 }
