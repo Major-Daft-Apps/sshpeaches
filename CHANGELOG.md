@@ -4,6 +4,10 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.10.12 (1012)
+
+Release date: 2026-07-24
+
 - Fixed notification Open actions while another SSHPeaches terminal is already visible, so the selected active session replaces the on-screen terminal.
 - Fixed SSH connections that could remain on the Connecting screen after the interactive shell was ready until the user left and reopened the session.
 - Reduced connection-screen stalls by filtering high-frequency SSH packet diagnostics and coalescing session-log scrolling.

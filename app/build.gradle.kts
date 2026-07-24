@@ -80,8 +80,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1011
-        versionName = "0.10.11"
+        versionCode = 1012
+        versionName = "0.10.12"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
