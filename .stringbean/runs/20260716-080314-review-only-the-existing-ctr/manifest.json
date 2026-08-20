@@ -1,6 +1,0 @@
-{
-  "run_id": "20260716-080314-review-only-the-existing-ctr",
-  "task": "Review only the existing Ctrl/IME changes using Opus 4.8; do not modify files.",
-  "status": "RECEIVED",
-  "execution_profile": "ro"
-}

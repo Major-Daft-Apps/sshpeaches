@@ -1,6 +1,0 @@
-{
-  "run_id": "20260726-202918-add-the-newly-released-claud",
-  "task": "Add the newly released Claude Opus 5 as a selectable model in Stringbean. Determine and use the canonical model identifier supported by Claude Code, update every relevant model-selection surface, validation path, documentation, and test. Then bump Stringbean to version 0.3.0, run proportionate verification, and publish the 0.3.0 release using the repository's established release workflow, including the appropriate commit, tag, push, package publication, and GitHub release if those are part of that workflow. Preserve unrelated user changes and report exactly what was changed, verified, and published.",
-  "status": "RECEIVED",
-  "execution_profile": "rw"
-}

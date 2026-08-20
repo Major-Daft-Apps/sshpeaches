@@ -23,6 +23,7 @@ app/google-services.json
 .DS_Store
 Thumbs.db
 *#)
+.stringbean/
 docs/user-wiki/developer/Google-Play-Publish-Checklist.md
 
 # Root-only local diagnostics captures (adb/logcat/ui dumps)
