@@ -1,11 +1,10 @@
 package com.majordaftapps.sshpeaches.app.navigation
 
-import android.Manifest
 import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -24,8 +23,7 @@ class AppInfoNavigationTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @Test
     fun startupRoute_canOpenLicenseNoticesScreen() {

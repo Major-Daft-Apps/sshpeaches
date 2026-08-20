@@ -12,5 +12,6 @@
     <color name="color_widget_action_secondary">#2B2B2B</color>
     <color name="color_widget_divider">#26F6F1EB</color>
     <color name="color_widget_disconnect">#A73D27</color>
+    <color name="color_widget_on_accent_secondary">#99191919</color>
     <color name="ic_launcher_background">#ffe9cc</color>
 </resources>

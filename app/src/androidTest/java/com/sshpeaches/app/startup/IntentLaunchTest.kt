@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.startup
 
-import android.Manifest
 import android.content.Intent
 import android.os.SystemClock
 import androidx.compose.runtime.MutableState
@@ -15,7 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
@@ -40,8 +39,7 @@ class IntentLaunchTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @get:Rule(order = 2)
     val composeRule = createEmptyComposeRule()

@@ -1,0 +1,18 @@
+{
+  "verdict": "revise",
+  "severity": "medium",
+  "summary": "The plan is technically sound for task-7, but the stated allowed file scope is inconsistent with the objective. Task-7 necessarily requires changes to TerminalView.java and a terminal-view test, while the allowed scope says only task-6. Clarify or correct that scope before implementation.",
+  "blockers": [
+    "Allowed file scope is listed as \"task-6\", but the objective is task-7 and requires editing task-7 implementation/test artifacts."
+  ],
+  "concerns": [
+    "The regression-first requirement is good, but the plan should explicitly allow a direct inputCodePoint test if IME commitText instrumentation is too costly or unavailable.",
+    "The required connectedDebugAndroidTest command may be environment-dependent; failure due to no attached emulator/device should be reported as a limitation, not treated as implementation failure."
+  ],
+  "recommendations": [
+    "Revise allowed file scope to include third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java and the focused terminal-view test location.",
+    "Keep the implementation narrowly limited to moving effective Ctrl/Alt computation and client onCodePoint routing before the TerminalSession fallback.",
+    "Do not touch selection dismissal, focus restoration, keyboard visibility, or hidden-editor sentinel cleanup for this task unless compilation requires it.",
+    "Report exact commands, results, modified files, task count, review rounds, and any emulator/device availability limitation."
+  ]
+}

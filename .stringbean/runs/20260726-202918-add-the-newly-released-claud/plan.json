@@ -1,0 +1,159 @@
+{
+  "summary": "Plan to add Claude Opus 5 to Stringbean model selection, verify the canonical Claude Code model identifier, update all model surfaces and validations, bump to 0.3.0, verify, and publish through the repository's existing release workflow while preserving unrelated worktree changes.",
+  "assumptions": [
+    "This orchestrator call is read-only, so implementation, release commits, tags, pushes, package publication, and GitHub release must be performed by read_write execution roles.",
+    "The repository may have unrelated dirty worktree changes; implementers must inspect status and avoid modifying or reverting unrelated files.",
+    "The canonical model identifier must be verified against Claude Code or official Anthropic/Claude Code sources at implementation time, not guessed from the task wording.",
+    "Release workflow details should be inferred from repository files such as package metadata, changelog, CI config, release scripts, and prior git tags/releases."
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Inventory Model Selection Surfaces",
+      "description": "Inspect the repository for Stringbean model definitions, CLI flags, config schemas, validation logic, defaults, documentation tables, examples, tests, and any generated metadata that enumerate supported Claude models. Record exact files and symbols to update. Do not inspect excluded paths.",
+      "dependencies": [],
+      "recommended_role": "investigator",
+      "permissions": "read_only",
+      "verification": [
+        "Run `git status --short` and record dirty paths without changing them.",
+        "Use `rg` for existing Claude model identifiers, model enum names, validation messages, and docs references.",
+        "Deliver a concise file-by-file inventory with required changes and any unrelated dirty files to preserve."
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Determine Canonical Claude Code Identifier",
+      "description": "Verify the canonical Claude Opus 5 model identifier supported by Claude Code using the most authoritative available source: local Claude Code model list/help if available, official Claude Code documentation, or official Anthropic model documentation. Record the exact source and evidence.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "investigator",
+      "permissions": "read_only",
+      "verification": [
+        "Run read-only Claude Code help/list commands if available.",
+        "If local tooling is insufficient, consult official documentation only.",
+        "Report the canonical identifier, aliases if any, and source URL or command output evidence."
+      ]
+    },
+    {
+      "id": "task-3",
+      "title": "Implement Claude Opus 5 Model Support",
+      "description": "Add Claude Opus 5 using the verified canonical identifier across every model-selection surface found in task-1. Update validation paths, CLI/config parsing, UI or prompt-selection lists, default-safe descriptions, error/help text, and any tests or snapshots that enumerate supported models. Keep edits scoped and preserve existing behavior for all current models.",
+      "dependencies": [
+        "task-1",
+        "task-2"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_write",
+      "verification": [
+        "Run targeted unit tests for model parsing, validation, CLI/config behavior, and any affected snapshots.",
+        "Run formatter/linter if the touched language ecosystem has an established command.",
+        "Confirm `rg` no longer shows stale supported-model lists missing Claude Opus 5."
+      ]
+    },
+    {
+      "id": "task-4",
+      "title": "Update Documentation And Changelog",
+      "description": "Update README, command help docs, configuration examples, model reference docs, and CHANGELOG entries to mention Claude Opus 5 and the exact canonical identifier. Ensure examples remain accurate and avoid touching unrelated docs.",
+      "dependencies": [
+        "task-3"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_write",
+      "verification": [
+        "Review docs diff for consistency with implemented identifiers.",
+        "Run documentation-related tests or link checks if the repository provides them."
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "Bump Version To 0.3.0",
+      "description": "Find all authoritative version declarations and bump Stringbean to 0.3.0. Update lockfiles or generated metadata only if the repository workflow requires it. Do not modify unrelated package metadata.",
+      "dependencies": [
+        "task-3",
+        "task-4"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_write",
+      "verification": [
+        "Search for old version declarations after edits.",
+        "Run package metadata validation or build command if available.",
+        "Confirm changelog contains a 0.3.0 entry."
+      ]
+    },
+    {
+      "id": "task-6",
+      "title": "Run Release Verification",
+      "description": "Run the repository's proportionate verification suite before publishing. Prefer established commands from package scripts, Gradle tasks, Makefile targets, CI config, or release docs. Capture exact commands and results.",
+      "dependencies": [
+        "task-5"
+      ],
+      "recommended_role": "verifier",
+      "permissions": "read_write",
+      "verification": [
+        "Run targeted tests from task-3.",
+        "Run the primary build/test command used by CI or release workflow.",
+        "Report any skipped checks with reason."
+      ]
+    },
+    {
+      "id": "task-7",
+      "title": "Commit Release Changes",
+      "description": "Create the appropriate release commit for version 0.3.0 using the repository's established commit style. Stage only intended files and explicitly avoid unrelated dirty worktree changes.",
+      "dependencies": [
+        "task-6"
+      ],
+      "recommended_role": "release-manager",
+      "permissions": "read_write",
+      "verification": [
+        "Run `git diff --stat` and inspect staged diff before commit.",
+        "Run `git status --short` to confirm unrelated changes remain unstaged.",
+        "Record commit SHA and commit message."
+      ]
+    },
+    {
+      "id": "task-8",
+      "title": "Tag And Publish 0.3.0",
+      "description": "Use the repository's established release workflow to create the 0.3.0 tag, push the release commit and tag, publish the package if applicable, and create a GitHub release if prior releases or release docs show that is expected.",
+      "dependencies": [
+        "task-7"
+      ],
+      "recommended_role": "release-manager",
+      "permissions": "read_write",
+      "verification": [
+        "Inspect prior tags and release docs before tagging.",
+        "Push only the intended branch and tag.",
+        "Run the package publication command documented by the repo, if applicable.",
+        "Create or verify the GitHub release, if applicable.",
+        "Report published version, tag, commit SHA, package registry URL or package name, and GitHub release URL."
+      ]
+    },
+    {
+      "id": "task-9",
+      "title": "Final Release Audit",
+      "description": "Perform a final audit that the repo contains Claude Opus 5 everywhere required, the version is 0.3.0, verification passed, and publication artifacts exist. Separate confirmed results from any unverified or skipped publication steps.",
+      "dependencies": [
+        "task-8"
+      ],
+      "recommended_role": "verifier",
+      "permissions": "read_only",
+      "verification": [
+        "Run read-only searches for Claude Opus 5 identifier coverage and stale version references.",
+        "Check git status for remaining unrelated changes.",
+        "Confirm tag and remote release visibility with read-only git/GitHub/package commands."
+      ]
+    }
+  ],
+  "risks": [
+    "The provided repository context appears to describe SSHPeaches rather than Stringbean; implementers must first confirm they are in the correct repository and stop if Stringbean release files are absent.",
+    "Claude Opus 5 may have multiple marketing names or aliases; using an unverified identifier could break Claude Code execution.",
+    "Dirty worktree entries may include user changes; staging must be path-specific and reviewed before commit.",
+    "Package publication and GitHub release may require credentials or permissions unavailable in the execution environment.",
+    "Release workflow may include generated files or lockfiles; missing those updates could produce an inconsistent 0.3.0 release.",
+    "Network-dependent verification or publication can fail transiently; failures must be reported with exact command output and no retry that risks duplicate publication."
+  ],
+  "advisor_questions": [
+    "Confirm whether `/home/zenulabidin/Documents/sshpeaches` is actually the intended Stringbean repository before assigning implementation, because the visible context looks like an Android SSHPeaches app.",
+    "If publication credentials are unavailable, should the release-manager stop after preparing the commit and tag locally, or continue with every publish step that does not require unavailable credentials?"
+  ]
+}

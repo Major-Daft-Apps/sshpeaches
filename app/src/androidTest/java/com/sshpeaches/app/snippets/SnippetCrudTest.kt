@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.snippets
 
-import android.Manifest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -17,7 +16,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
@@ -34,8 +33,7 @@ class SnippetCrudTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()

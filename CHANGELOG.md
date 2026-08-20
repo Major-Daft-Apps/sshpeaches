@@ -4,6 +4,27 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.10.14 (1014)
+
+Release date: 2026-07-28
+
+- Made network-related connection failures explicit on the connection screen.
+- Restored detailed SSH session diagnostics during connection and refined the bounded, auto-scrolling debug output.
+- Sped up SFTP directory listings by removing per-symlink network requests and batching large console updates.
+- Fixed unchanged SFTP refreshes and listing failures leaving the command controls stuck on `Working…`.
+
+## 0.10.13 (1013)
+
+Release date: 2026-07-28
+
+- Restored useful SSH transport diagnostics while sampling repetitive packet/window messages to keep the connection screen responsive.
+- Fixed transfer sizes ending in zero being displayed too small, such as 600 KB appearing as 6 KB.
+- Improved SCP and SFTP throughput by enlarging SSH receive flow control and reducing progress-update overhead.
+- Fixed file-transfer UI correctness issues around remote operations, progress, results, and immediate document-picker callbacks.
+- Improved Android widget clarity, sizing, file-transfer shortcuts, and launch reliability across activity recreation.
+- Fixed terminal copy actions on older Android versions.
+- Marked terminal copies as sensitive and suppressed Android emulator clipboard overlays while preserving system paste behavior.
+
 ## 0.10.12 (1012)
 
 Release date: 2026-07-24

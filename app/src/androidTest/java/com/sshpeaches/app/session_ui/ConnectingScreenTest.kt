@@ -1,8 +1,11 @@
 package com.majordaftapps.sshpeaches.app.session_ui
 
+import android.app.Activity
+import android.app.Instrumentation
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -15,7 +18,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,12 +28,20 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.espresso.intent.Intents
+import androidx.test.espresso.intent.Intents.intended
+import androidx.test.espresso.intent.Intents.intending
+import androidx.test.espresso.intent.VerificationModes.times
+import androidx.test.espresso.intent.matcher.IntentMatchers.hasAction
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.view.KeyEvent
@@ -42,8 +55,10 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.service.ConnectionFailureKind
 import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
+import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
@@ -393,7 +408,7 @@ class ConnectingScreenTest {
 
         hideTerminalKeyboardForTest(device)
 
-        doubleTapTerminalPanelWithDevice(device)
+        doubleTapTerminalPanel()
         assertTerminalKeyboardRequested(device)
     }
 
@@ -514,6 +529,7 @@ class ConnectingScreenTest {
             terminalView.startTextSelectionAtViewportCenter()
             terminalView.selectAllText()
             terminalView.performSelectionAction(copy = true)
+            assertTerminalClipboard("copy-paste-selection-target")
             sentPayloads.clear()
         }
 
@@ -851,6 +867,9 @@ class ConnectingScreenTest {
             sentPayloads.clear()
         }
         check(handled) { "IME copy context action was not handled" }
+        composeRule.runOnIdle {
+            assertTerminalClipboard("shadow-copy")
+        }
 
         assertCommittedCtrlAThenPlainA(sentPayloads)
     }
@@ -1063,6 +1082,7 @@ class ConnectingScreenTest {
             }
         }
 
+        composeRule.onNodeWithText("Connection failed").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_RETRY_BUTTON).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_LOG_PANEL).assertIsDisplayed()
         composeRule.onNodeWithText("Authentication failed").assertIsDisplayed()
@@ -1075,8 +1095,152 @@ class ConnectingScreenTest {
     }
 
     @Test
-    fun sftpPanel_runsCommandsAgainstUiCallbacks() {
+    fun networkErrorState_identifiesNetworkFailure() {
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.ERROR,
+                        message = "Connection refused",
+                        failureKind = ConnectionFailureKind.NETWORK
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Network error").assertIsDisplayed()
+        composeRule.onNodeWithText("Connection refused").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_RETRY_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun connectingLogs_useTerminalStyleGrowUpwardAndFollowNewestLine() {
+        val rawMessage = "ssh_packet_global_request: Received SSH_MSG_GLOBAL_REQUEST"
+        var currentLogs by mutableStateOf(
+            listOf(
+                SessionLogBus.Entry(
+                    hostId = "session-ssh",
+                    level = SessionLogBus.LogLevel.DEBUG,
+                    message = rawMessage,
+                    timestamp = 1L
+                )
+            )
+        )
+
+        composeRule.setContent {
+            Box(
+                modifier = Modifier
+                    .width(360.dp)
+                    .height(500.dp)
+            ) {
+                MaterialTheme {
+                    ConnectingLogStatus(logs = currentLogs)
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(rawMessage).assertIsDisplayed()
+        composeRule.onNodeWithText("[DEBUG] $rawMessage").assertDoesNotExist()
+        val oneLineBounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_LOG_PANEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        composeRule.runOnIdle {
+            currentLogs = (1..40).map { index ->
+                SessionLogBus.Entry(
+                    hostId = "session-ssh",
+                    level = SessionLogBus.LogLevel.DEBUG,
+                    message = "ssh_packet_line_$index",
+                    timestamp = index.toLong()
+                )
+            }
+        }
+        waitUntilOrFail(
+            timeoutMillis = 5_000,
+            failureMessage = "The connecting log did not follow the newest line"
+        ) {
+            runCatching {
+                composeRule.onNodeWithText("ssh_packet_line_40").assertIsDisplayed()
+            }.isSuccess
+        }
+        val cappedBounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_LOG_PANEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val density = composeRule.activity.resources.displayMetrics.density
+        val tolerancePx = density * 2f
+        val expectedMaxHeightPx = density * 120f
+        check(cappedBounds.height > oneLineBounds.height) {
+            "The log pane should grow upward as lines are added"
+        }
+        check(kotlin.math.abs(cappedBounds.bottom - oneLineBounds.bottom) <= tolerancePx) {
+            "The growing log pane should stay anchored to the bottom"
+        }
+        check(cappedBounds.height <= expectedMaxHeightPx + tolerancePx) {
+            "The log pane exceeded its 24% max height: ${cappedBounds.height}px"
+        }
+
+        composeRule.runOnIdle {
+            currentLogs = (1..80).map { index ->
+                SessionLogBus.Entry(
+                    hostId = "session-ssh",
+                    level = SessionLogBus.LogLevel.DEBUG,
+                    message = "ssh_packet_line_$index",
+                    timestamp = index.toLong()
+                )
+            }
+        }
+        waitUntilOrFail(
+            timeoutMillis = 5_000,
+            failureMessage = "The capped connecting log did not follow the newest line"
+        ) {
+            runCatching {
+                composeRule.onNodeWithText("ssh_packet_line_80").assertIsDisplayed()
+            }.isSuccess
+        }
+        val overflowBounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_LOG_PANEL)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        check(kotlin.math.abs(overflowBounds.height - cappedBounds.height) <= tolerancePx) {
+            "The log pane should stop growing after reaching its max height"
+        }
+    }
+
+    @Test
+    fun sftpPanel_identicalListingWithNewTokenCompletesCommand() {
         var listedPath: String? = null
+        var remoteDirectory by mutableStateOf(
+            SessionService.RemoteDirectorySnapshot(
+                path = "/docs",
+                entries = listOf(
+                    SessionService.RemoteDirectoryEntry(
+                        name = "welcome.txt",
+                        isDirectory = false,
+                        sizeBytes = 12
+                    )
+                ),
+                refreshToken = 10L
+            )
+        )
 
         composeRule.setContent {
             MaterialTheme {
@@ -1088,23 +1252,19 @@ class ConnectingScreenTest {
                     ),
                     logs = emptyList(),
                     shellOutput = "",
-                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
-                        path = "/docs",
-                        entries = listOf(
-                            SessionService.RemoteDirectoryEntry(
-                                name = "welcome.txt",
-                                isDirectory = false,
-                                sizeBytes = 12
-                            )
-                        )
-                    ),
+                    remoteDirectory = remoteDirectory,
                     terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
                     terminalSelectionMode = TerminalSelectionMode.NATURAL,
                     keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
                     snippets = emptyList(),
                     onSendShellBytes = {},
                     onTerminalResize = { _, _ -> },
-                    onSftpListDirectory = { listedPath = it },
+                    onSftpListDirectory = {
+                        listedPath = it
+                        remoteDirectory = remoteDirectory.copy(
+                            refreshToken = remoteDirectory.refreshToken + 1L
+                        )
+                    },
                     onSftpDownload = { _, _ -> },
                     onSftpUpload = { _, _ -> },
                     onScpDownload = { _, _ -> },
@@ -1123,13 +1283,101 @@ class ConnectingScreenTest {
         composeRule.onNodeWithText("Commands: ls [path]", substring = true).assertIsDisplayed()
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
-            .performTextReplacement("ls /uploads")
+            .performTextReplacement("ls /docs")
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON).performClick()
 
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON)
+                    .assertIsEnabled()
+            }.isSuccess
+        }
         composeRule.runOnIdle {
-            check(listedPath == "/uploads") {
+            check(listedPath == "/docs") {
                 "SFTP list callback did not receive the requested remote path"
             }
+        }
+        composeRule.onNodeWithText("Remote directory: /docs", substring = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("- 12 welcome.txt", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun sftpGetWithoutLocalPath_downloadsImmediatePickerResult() {
+        val destinationUri = Uri.parse("content://sshpeaches.test/sftp-download")
+        val downloadRequests = mutableListOf<Pair<String, String?>>()
+
+        Intents.init()
+        try {
+            intending(hasAction(Intent.ACTION_CREATE_DOCUMENT)).respondWith(
+                Instrumentation.ActivityResult(
+                    Activity.RESULT_OK,
+                    Intent().setData(destinationUri)
+                )
+            )
+            setSftpPickerContent(
+                onSftpDownload = { remote, local -> downloadRequests += remote to local }
+            )
+
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+                .performTextReplacement("get welcome.txt")
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON).performClick()
+
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                downloadRequests.isNotEmpty()
+            }
+            intended(hasAction(Intent.ACTION_CREATE_DOCUMENT), times(1))
+            composeRule.runOnIdle {
+                check(
+                    downloadRequests == listOf(
+                        "/docs/welcome.txt" to destinationUri.toString()
+                    )
+                ) {
+                    "SFTP get should use the remote path captured before launching the picker: $downloadRequests"
+                }
+            }
+        } finally {
+            Intents.release()
+        }
+    }
+
+    @Test
+    fun sftpPutWithoutLocalPath_uploadsImmediatePickerResult() {
+        val pickedUri = Uri.parse("content://sshpeaches.test/sftp-upload")
+        val uploadRequests = mutableListOf<Pair<String, String>>()
+
+        Intents.init()
+        try {
+            intending(hasAction(Intent.ACTION_OPEN_DOCUMENT)).respondWith(
+                Instrumentation.ActivityResult(
+                    Activity.RESULT_OK,
+                    Intent().setData(pickedUri)
+                )
+            )
+            setSftpPickerContent(
+                onSftpUpload = { local, remote -> uploadRequests += local to remote }
+            )
+
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+                .performTextReplacement("put")
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON).performClick()
+
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                uploadRequests.isNotEmpty()
+            }
+            intended(hasAction(Intent.ACTION_OPEN_DOCUMENT), times(1))
+            composeRule.runOnIdle {
+                check(
+                    uploadRequests == listOf(
+                        pickedUri.toString() to "/docs/upload.bin"
+                    )
+                ) {
+                    "SFTP put should use the remote base captured before launching the picker: $uploadRequests"
+                }
+            }
+        } finally {
+            Intents.release()
         }
     }
 
@@ -1201,7 +1449,6 @@ class ConnectingScreenTest {
     @Test
     fun sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback() {
         val shownMessages = mutableListOf<String>()
-        var logs by mutableStateOf<List<SessionLogBus.Entry>>(emptyList())
         var activeTransfer by mutableStateOf<FileTransferProgress?>(
             FileTransferProgress(
                 sessionId = "session-sftp",
@@ -1210,6 +1457,7 @@ class ConnectingScreenTest {
                 fileName = "welcome.txt",
                 sourceLabel = "/docs/welcome.txt",
                 destinationLabel = "/storage/emulated/0/Download/welcome.txt",
+                operationId = "download-1",
                 bytesTransferred = 6L,
                 totalBytes = 12L,
                 hasStarted = true
@@ -1224,7 +1472,7 @@ class ConnectingScreenTest {
                         phase = QuickConnectPhase.SUCCESS,
                         message = "SFTP browser ready"
                     ),
-                    logs = logs,
+                    logs = emptyList(),
                     shellOutput = "",
                     remoteDirectory = SessionService.RemoteDirectorySnapshot(
                         path = "/docs",
@@ -1259,22 +1507,18 @@ class ConnectingScreenTest {
         }
 
         composeRule.runOnIdle {
-            activeTransfer = null
-            logs = listOf(
-                SessionLogBus.Entry(
-                    hostId = "session-sftp",
-                    level = SessionLogBus.LogLevel.INFO,
-                    message = "SFTP download complete: /docs/welcome.txt -> /storage/emulated/0/Download/welcome.txt"
-                )
+            activeTransfer = activeTransfer?.copy(
+                bytesTransferred = 12L,
+                status = FileTransferStatus.SUCCEEDED,
+                completedAtEpochMillis = 1L
             )
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP).assertIsDisplayed()
-        composeRule.onNodeWithText("file transferred succesfully").assertIsDisplayed()
+        composeRule.onNodeWithText("Download completed: welcome.txt").assertIsDisplayed()
 
         composeRule.runOnIdle {
-            check(shownMessages == listOf("file transferred succesfully")) {
+            check(shownMessages == listOf("Download completed: welcome.txt")) {
                 "SFTP completion did not trigger the snackbar callback."
             }
         }
@@ -1345,14 +1589,9 @@ class ConnectingScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/subdir")).performClick()
-        composeRule.runOnIdle {
-            check(listedPath == null) {
-                "Selecting a folder row should not navigate without the folder open affordance."
-            }
-        }
-
         composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/existing.txt")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/existing.txt"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).assertIsEnabled()
         composeRule.runOnIdle {
             check(downloadRequest == null) {
@@ -1360,10 +1599,10 @@ class ConnectingScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/uploads/subdir")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/subdir")).performClick()
         composeRule.runOnIdle {
             check(listedPath == "/uploads/subdir") {
-                "SCP browser did not request directory listing from the folder open affordance."
+                "Tapping an SCP folder row should open that folder."
             }
         }
     }
@@ -1409,12 +1648,176 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
             .assertIsDisplayed()
             .assertIsEnabled()
-        composeRule.onNodeWithText("Choose a local file, then upload it into the current folder.")
+        composeRule.onNodeWithText("Upload into this folder, or select a remote file to download.")
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("choose_local_file")).assertDoesNotExist()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("upload_here")).assertDoesNotExist()
+    }
+
+    @Test
+    fun scpUploadButton_reviewsDestinationBeforeEachUpload() {
+        val pickedUri = Uri.parse("content://sshpeaches.test/picked-file")
+        val uploadRequests = mutableListOf<Pair<String, String>>()
+
+        Intents.init()
+        try {
+            intending(hasAction(Intent.ACTION_OPEN_DOCUMENT)).respondWith(
+                Instrumentation.ActivityResult(
+                    Activity.RESULT_OK,
+                    Intent().setData(pickedUri)
+                )
+            )
+            composeRule.setContent {
+                MaterialTheme {
+                    ConnectingScreen(
+                        request = requestFor(ConnectionMode.SCP).copy(
+                            initialFileTransferEntryMode = FileTransferEntryMode.UPLOAD
+                        ),
+                        state = QuickConnectUiState(
+                            phase = QuickConnectPhase.SUCCESS,
+                            message = "SCP transfer ready"
+                        ),
+                        logs = emptyList(),
+                        shellOutput = "",
+                        remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                            path = "/uploads",
+                            entries = emptyList()
+                        ),
+                        terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                        terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                        keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                        snippets = emptyList(),
+                        onSendShellBytes = {},
+                        onTerminalResize = { _, _ -> },
+                        onSftpListDirectory = {},
+                        onSftpDownload = { _, _ -> },
+                        onSftpUpload = { _, _ -> },
+                        onScpDownload = { _, _ -> },
+                        onScpUpload = { local, remote -> uploadRequests += local to remote },
+                        onManageRemotePath = { _, _, _ -> },
+                        onRetry = {},
+                        onToggleConnectedHostBar = {},
+                        onOpenSettings = {},
+                        findRequestToken = 0
+                    )
+                }
+            }
+
+            repeat(2) { index ->
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON).performClick()
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_DIALOG)
+                    .assertIsDisplayed()
+                composeRule.runOnIdle {
+                    check(uploadRequests.size == index) {
+                        "Picking a file must not start an upload before destination review."
+                    }
+                }
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_DESTINATION_INPUT)
+                    .assertIsDisplayed()
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_UPLOAD_CONFIRM_BUTTON)
+                    .performClick()
+                composeRule.waitUntil(timeoutMillis = 5_000) {
+                    uploadRequests.size == index + 1
+                }
+            }
+
+            intended(hasAction(Intent.ACTION_OPEN_DOCUMENT), times(2))
+            composeRule.runOnIdle {
+                check(
+                    uploadRequests == listOf(
+                        pickedUri.toString() to "/uploads/upload.bin",
+                        pickedUri.toString() to "/uploads/upload.bin"
+                    )
+                ) {
+                    "Each confirmed upload should use the reviewed destination: $uploadRequests"
+                }
+            }
+        } finally {
+            Intents.release()
+        }
+    }
+
+    @Test
+    fun scpDownloadButton_downloadsPickerResultImmediatelyAndRepicksEveryTime() {
+        val destinationUri = Uri.parse("content://sshpeaches.test/download-file")
+        val downloadRequests = mutableListOf<Pair<String, String?>>()
+
+        Intents.init()
+        try {
+            intending(hasAction(Intent.ACTION_CREATE_DOCUMENT)).respondWith(
+                Instrumentation.ActivityResult(
+                    Activity.RESULT_OK,
+                    Intent().setData(destinationUri)
+                )
+            )
+            composeRule.setContent {
+                MaterialTheme {
+                    ConnectingScreen(
+                        request = requestFor(ConnectionMode.SCP),
+                        state = QuickConnectUiState(
+                            phase = QuickConnectPhase.SUCCESS,
+                            message = "SCP transfer ready"
+                        ),
+                        logs = emptyList(),
+                        shellOutput = "",
+                        remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                            path = "/uploads",
+                            entries = listOf(
+                                SessionService.RemoteDirectoryEntry(
+                                    name = "report.txt",
+                                    isDirectory = false,
+                                    sizeBytes = 24
+                                )
+                            )
+                        ),
+                        terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                        terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                        keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                        snippets = emptyList(),
+                        onSendShellBytes = {},
+                        onTerminalResize = { _, _ -> },
+                        onSftpListDirectory = {},
+                        onSftpDownload = { _, _ -> },
+                        onSftpUpload = { _, _ -> },
+                        onScpDownload = { remote, local -> downloadRequests += remote to local },
+                        onScpUpload = { _, _ -> },
+                        onManageRemotePath = { _, _, _ -> },
+                        onRetry = {},
+                        onToggleConnectedHostBar = {},
+                        onOpenSettings = {},
+                        findRequestToken = 0
+                    )
+                }
+            }
+
+            composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads/report.txt"))
+                .performClick()
+            repeat(2) { index ->
+                composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON).performClick()
+                composeRule.waitUntil(timeoutMillis = 5_000) {
+                    downloadRequests.size == index + 1
+                }
+            }
+
+            intended(hasAction(Intent.ACTION_CREATE_DOCUMENT), times(2))
+            composeRule.runOnIdle {
+                check(
+                    downloadRequests == listOf(
+                        "/uploads/report.txt" to destinationUri.toString(),
+                        "/uploads/report.txt" to destinationUri.toString()
+                    )
+                ) {
+                    "Each download button press should pick and immediately download one file: $downloadRequests"
+                }
+            }
+        } finally {
+            Intents.release()
+        }
     }
 
     @Test
@@ -1517,7 +1920,7 @@ class ConnectingScreenTest {
                 refreshToken = 1L
             )
         }
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/home/tester/docs")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/home/tester/docs")).performClick()
         composeRule.runOnIdle {
             remoteDirectory = SessionService.RemoteDirectorySnapshot(
                 path = "/home/tester/docs",
@@ -1683,7 +2086,7 @@ class ConnectingScreenTest {
             )
         }
 
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteOpen("/home/tester/docs")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/home/tester/docs")).performClick()
         composeRule.runOnIdle {
             check(listedPaths.lastOrNull() == "/home/tester/docs") {
                 "SCP browser did not navigate into the selected subdirectory"
@@ -1695,7 +2098,11 @@ class ConnectingScreenTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("Home").performClick()
+        val homeActionTag = UiTestTags.connectingScpAction("home")
+        if (composeRule.onAllNodesWithTag(homeActionTag).fetchSemanticsNodes().isEmpty()) {
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        }
+        composeRule.onNodeWithTag(homeActionTag).performClick()
         composeRule.runOnIdle {
             check(listedPaths.lastOrNull() == "/home/tester") {
                 "SCP Home button should reuse the canonical home path instead of requesting '.'"
@@ -1750,6 +2157,36 @@ class ConnectingScreenTest {
                 )
             }
         }
+    }
+
+    @Composable
+    private fun ConnectingLogStatus(logs: List<SessionLogBus.Entry>) {
+        ConnectingScreen(
+            request = requestFor(ConnectionMode.SSH),
+            state = QuickConnectUiState(
+                phase = QuickConnectPhase.CONNECTING,
+                message = "Opening SSH connection..."
+            ),
+            logs = logs,
+            shellOutput = "",
+            remoteDirectory = null,
+            terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+            terminalSelectionMode = TerminalSelectionMode.NATURAL,
+            keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+            snippets = emptyList(),
+            onSendShellBytes = {},
+            onTerminalResize = { _, _ -> },
+            onSftpListDirectory = {},
+            onSftpDownload = { _, _ -> },
+            onSftpUpload = { _, _ -> },
+            onScpDownload = { _, _ -> },
+            onScpUpload = { _, _ -> },
+            onManageRemotePath = { _, _, _ -> },
+            onRetry = {},
+            onToggleConnectedHostBar = {},
+            onOpenSettings = {},
+            findRequestToken = 0
+        )
     }
 
     @Composable
@@ -1943,6 +2380,78 @@ class ConnectingScreenTest {
         clipboard.setPrimaryClip(ClipData.newPlainText("terminal-selection", text))
     }
 
+    private fun assertTerminalClipboard(expectedText: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipData = clipboard.primaryClip
+            ?: error("Terminal copy did not populate the clipboard")
+        val copiedText = clipData
+            .takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+        check(copiedText?.contains(expectedText) == true) {
+            "Terminal copy produced ${copiedText ?: "no text"}"
+        }
+        check(
+            clipData.description.extras
+                ?.getBoolean("android.content.extra.IS_SENSITIVE") == true
+        ) {
+            "Terminal copy did not mark terminal text as sensitive"
+        }
+        check(
+            clipData.description.extras
+                ?.getBoolean("com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY") == true
+        ) {
+            "Terminal copy did not suppress the emulator clipboard overlay"
+        }
+    }
+
+    private fun setSftpPickerContent(
+        onSftpDownload: (String, String?) -> Unit = { _, _ -> },
+        onSftpUpload: (String, String) -> Unit = { _, _ -> }
+    ) {
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SFTP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SFTP browser ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/docs",
+                        entries = listOf(
+                            SessionService.RemoteDirectoryEntry(
+                                name = "welcome.txt",
+                                isDirectory = false,
+                                sizeBytes = 12
+                            )
+                        )
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = onSftpDownload,
+                    onSftpUpload = onSftpUpload,
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+    }
+
     private fun requestFor(mode: ConnectionMode) = QuickConnectRequest(
         sessionId = "session-${mode.name.lowercase()}",
         name = "Sandbox ${mode.name}",
@@ -1993,16 +2502,9 @@ class ConnectingScreenTest {
         }.getOrDefault(false)
     }
 
-    private fun doubleTapTerminalPanelWithDevice(device: UiDevice) {
-        val bounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
-            .fetchSemanticsNode()
-            .boundsInRoot
-        val rootOffset = IntArray(2)
-        composeRule.activity.window.decorView.getLocationOnScreen(rootOffset)
-        val x = rootOffset[0] + bounds.center.x.toInt()
-        val y = rootOffset[1] + bounds.center.y.toInt()
-        device.click(x, y)
-        device.click(x, y)
+    private fun doubleTapTerminalPanel() {
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+            .performTouchInput { doubleClick() }
     }
 
     private companion object {

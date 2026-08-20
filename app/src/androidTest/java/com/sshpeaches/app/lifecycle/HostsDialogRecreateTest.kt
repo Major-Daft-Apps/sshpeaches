@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.lifecycle
 
-import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,7 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.navigateDrawer
@@ -26,8 +25,7 @@ class HostsDialogRecreateTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()

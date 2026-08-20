@@ -1,0 +1,50 @@
+{
+  "status": "completed",
+  "summary": "Implemented/validated task-7 and task-2 scope for standalone-emulator codepoint routing. TerminalView already had the required routing shape in the dirty worktree: effective Ctrl/Alt are computed before the null TerminalSession fallback, mClient.onCodePoint() is offered the codepoint with a null session, and only the default writeCodePoint fallback requires mTermSession. I added stricter focused regression coverage for commitText(\"a\") with standalone TerminalEmulator/no TerminalSession, including latched Ctrl state reaching the client and no TerminalOutput fallback write. Task count: 2. Review rounds: 0.",
+  "files_changed": [
+    "third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java"
+  ],
+  "commands_run": [
+    "sed -n '1,220p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260715183043/skills/sbx/SKILL.md",
+    "git status --short",
+    "sed -n '1,240p' docs/plans/ctrl-ime-copy-paste-fix.md",
+    "rg -n \"inputCodePoint|setTerminalSession|TerminalEmulator|TerminalViewClient|onCodePoint\" third_party/termux-playstore/terminal-view/src/main/java third_party/termux-playstore/terminal-view/src/test third_party/termux-playstore/terminal-view/src/androidTest app/src/androidTest app/src/test",
+    "sed -n '760,845p' third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "sed -n '1,240p' third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java",
+    "sed -n '1,220p' third_party/termux-playstore/terminal-view/build.gradle.kts",
+    "rg -n \"connectedDebugAndroidTest|terminal-view|androidTest|testInstrumentationRunner\" settings.gradle.kts build.gradle.kts app/build.gradle.kts third_party/termux-playstore/terminal-view/build.gradle.kts",
+    "sed -n '320,435p' third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "sed -n '1,130p' third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java",
+    "rg -n \"inputCodePoint\\(|commitText\\(|readControlKey\\(|readAltKey\\(\" third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "sed -n '845,875p' third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "./gradlew :terminal-view:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest'",
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "./gradlew :terminal-view:assembleDebugAndroidTest :app:assembleDebug :app:assembleDebugAndroidTest",
+    "git diff -- third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java",
+    "git status --short -- third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :terminal-view:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest'",
+      "result": "failed: androidTest sources compiled and APK packaged, then task failed with DeviceException: No connected devices"
+    },
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "failed: app and androidTest APKs built/packaged, then task failed with DeviceException: No connected devices"
+    },
+    {
+      "command": "./gradlew :terminal-view:assembleDebugAndroidTest :app:assembleDebug :app:assembleDebugAndroidTest",
+      "result": "passed: BUILD SUCCESSFUL"
+    }
+  ],
+  "remaining_issues": [
+    "Connected instrumentation execution could not be completed because this environment has no connected Android device/emulator.",
+    "Could not confirm the new regression test fails before implementation because the required TerminalView inputCodePoint implementation was already present in the dirty worktree when this task began, and no device was available."
+  ],
+  "handoff_notes": [
+    "Preserved unrelated dirty-worktree changes.",
+    "Kept hidden-editor sentinel cleanup out of scope.",
+    "TerminalViewClient.onCodePoint() exposes Ctrl but not Alt, so the focused client assertion covers effective Ctrl state; Alt remains computed for the Termux fallback path."
+  ]
+}

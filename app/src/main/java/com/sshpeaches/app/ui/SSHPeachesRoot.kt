@@ -309,7 +309,8 @@ data class SSHPeachesRootActions(
     val onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
     val onRequestCorePermissions: () -> Unit,
     val onOpenAppPermissionSettings: () -> Unit,
-    val onStartupRouteHandled: () -> Unit
+    val onStartupRouteHandled: () -> Unit,
+    val onCancelFileTransfer: (String) -> Unit = {}
 )
 
 data class SSHPeachesRootRuntime(
@@ -328,6 +329,33 @@ data class SSHPeachesRootRuntime(
     val corePermissions: List<CorePermissionStatus>,
     val requestedStartupRoute: String? = null
 )
+
+internal fun quickConnectUiStateFromSnapshot(
+    snapshot: SessionSnapshot,
+    host: HostConnection
+): QuickConnectUiState = when (snapshot.status) {
+    com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+        QuickConnectUiState(
+            phase = QuickConnectPhase.CONNECTING,
+            message = snapshot.statusMessage ?: "Connecting to ${host.host}:${host.port}..."
+        )
+    }
+
+    com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+        QuickConnectUiState(
+            phase = QuickConnectPhase.SUCCESS,
+            message = snapshot.statusMessage ?: "Connected successfully"
+        )
+    }
+
+    com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+        QuickConnectUiState(
+            phase = QuickConnectPhase.ERROR,
+            message = snapshot.statusMessage ?: "Connection failed",
+            failureKind = snapshot.failureKind
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -422,6 +450,7 @@ fun SSHPeachesRoot(
     val onManageRemotePath = actions.onManageRemotePath
     val onScpDownloadFile = actions.onScpDownloadFile
     val onScpUploadFile = actions.onScpUploadFile
+    val onCancelFileTransfer = actions.onCancelFileTransfer
     val onOpenSessionRequestHandled = actions.onOpenSessionRequestHandled
     val onRespondToHostKeyPrompt = actions.onRespondToHostKeyPrompt
     val onRespondToPasswordPrompt = actions.onRespondToPasswordPrompt
@@ -506,32 +535,6 @@ fun SSHPeachesRoot(
     val snippetRunInProgress = remember { mutableStateOf(false) }
     val snippetRunResult = remember { mutableStateOf<SnippetRunResult?>(null) }
 
-    fun quickStateFromSnapshot(
-        snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
-        host: HostConnection
-    ): QuickConnectUiState = when (snapshot.status) {
-        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
-            QuickConnectUiState(
-                phase = QuickConnectPhase.CONNECTING,
-                message = snapshot.statusMessage ?: "Connecting to ${host.host}:${host.port}..."
-            )
-        }
-
-        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
-            QuickConnectUiState(
-                phase = QuickConnectPhase.SUCCESS,
-                message = snapshot.statusMessage ?: "Connected successfully"
-            )
-        }
-
-        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
-            QuickConnectUiState(
-                phase = QuickConnectPhase.ERROR,
-                message = snapshot.statusMessage ?: "Connection failed"
-            )
-        }
-    }
-
     fun quickRequestFromSnapshot(
         snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
         fileTransferEntryMode: FileTransferEntryMode = FileTransferEntryMode.DOWNLOAD
@@ -612,7 +615,7 @@ fun SSHPeachesRoot(
         else -> rawQuickConnectRequest
     }
     val effectiveQuickConnectState = currentQuickConnectSnapshot?.let { snapshot ->
-        quickStateFromSnapshot(snapshot, snapshot.host)
+        quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
     } ?: quickConnectState.value
     val isActualSessionVerticalRoute =
         currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
@@ -733,7 +736,7 @@ fun SSHPeachesRoot(
             snapshot,
             requestedOpenSessionFileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
         )
-        quickConnectState.value = quickStateFromSnapshot(snapshot, host)
+        quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, host)
         pendingConnectingNavigation.value = false
         autoResumeHandled.value = true
         if (currentRoute != targetRoute) {
@@ -781,7 +784,7 @@ fun SSHPeachesRoot(
         if (quickConnectRequest.value != reconciledRequest) {
             quickConnectRequest.value = reconciledRequest
         }
-        val reconciledState = quickStateFromSnapshot(snapshot, snapshot.host)
+        val reconciledState = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
         if (quickConnectState.value != reconciledState) {
             quickConnectState.value = reconciledState
         }
@@ -839,26 +842,17 @@ fun SSHPeachesRoot(
 
             com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
                 sawSnapshotForCurrentRequest.value = true
-                quickConnectState.value = QuickConnectUiState(
-                    phase = QuickConnectPhase.CONNECTING,
-                    message = snapshot.statusMessage ?: "Connecting to ${request.host}:${request.port}..."
-                )
+                quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
             }
 
             com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
                 sawSnapshotForCurrentRequest.value = true
-                quickConnectState.value = QuickConnectUiState(
-                    phase = QuickConnectPhase.SUCCESS,
-                    message = snapshot.statusMessage ?: "Connected successfully"
-                )
+                quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
             }
 
             com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
                 sawSnapshotForCurrentRequest.value = true
-                quickConnectState.value = QuickConnectUiState(
-                    phase = QuickConnectPhase.ERROR,
-                    message = snapshot.statusMessage ?: "Connection failed"
-                )
+                quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
             }
         }
     }
@@ -956,7 +950,7 @@ fun SSHPeachesRoot(
                 existingSnapshot,
                 fileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
             )
-            quickConnectState.value = quickStateFromSnapshot(existingSnapshot, existingSnapshot.host)
+            quickConnectState.value = quickConnectUiStateFromSnapshot(existingSnapshot, existingSnapshot.host)
             pendingConnectingNavigation.value = false
         } else {
             if (existingSnapshot != null) {
@@ -1488,6 +1482,11 @@ fun SSHPeachesRoot(
                         onScpUploadFile(current.sessionId, localPath, remotePath)
                     }
                 },
+                onCancelFileTransfer = {
+                    request?.let { current ->
+                        onCancelFileTransfer(current.sessionId)
+                    }
+                },
                 onManageRemotePath = { operation, sourcePath, destinationPath ->
                     request?.let { current ->
                         onManageRemotePath(current.sessionId, operation, sourcePath, destinationPath)
@@ -1847,7 +1846,7 @@ fun SSHPeachesRoot(
                                     sessions.firstOrNull { it.hostId == sessionId }?.let { snapshot ->
                                         markHostUsage(snapshot.host)
                                         quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
-                                        quickConnectState.value = quickStateFromSnapshot(snapshot, snapshot.host)
+                                        quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
                                         pendingConnectingNavigation.value = false
                                         scope.launch {
                                             drawerState.close()

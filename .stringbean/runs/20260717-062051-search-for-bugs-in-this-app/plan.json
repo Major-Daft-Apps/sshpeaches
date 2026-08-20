@@ -1,0 +1,148 @@
+{
+  "summary": "Perform a read-only/create-only bug audit of the Android app, prioritizing security-sensitive SSH, credential, import/export, data-loss, crash, and core transfer/forwarding behavior. Do not apply fixes. Use static source review as the default verification method, and run only commands that are proven not to modify pre-existing repository paths or excluded paths. Report only substantiated bugs as confirmed, with evidence, reachability, file and line references, and reproduction or verification steps; keep unverified suspicions separate.",
+  "assumptions": [
+    "The audit scope is limited to /home/zenulabidin/Documents/sshpeaches and non-excluded paths only.",
+    "The effective permission is read_only/create-only: new files or directories may be created only if necessary, but no pre-existing repository path may be modified, deleted, renamed, moved, or type-changed.",
+    "Excluded paths and credential-like files must not be read, listed, searched, summarized, modified, or transmitted, even if they appear relevant.",
+    "Broad repository traversal commands must use exclude filters aligned with the policy so protected paths are not inspected indirectly.",
+    "Static source review is sufficient verification when build, test, lint, emulator, dependency, or Gradle commands would modify pre-existing paths, write caches, generate reports, require network access, or touch excluded paths.",
+    "Confirmed findings require concrete reachability evidence from app entry points, public UI flows, imports, persisted state, or documented runtime paths.",
+    "Existing uncommitted changes may be present and must not be reverted or normalized."
+  ],
+  "tasks": [
+    {
+      "id": "task-0",
+      "title": "Read-only preflight and safety boundaries",
+      "description": "Establish the repository shape, policy-safe search filters, and current working-tree context without reading excluded paths or modifying existing files. Use only read-only commands such as pwd, git status --short, rg --files with explicit glob exclusions, and targeted file reads. Do not use denied git operations or broad traversal that can enter excluded paths.",
+      "dependencies": [],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Record the repository root and whether git status indicates a dirty tree, without changing anything.",
+        "Define and use exclude filters for .stringbean/runs, .env*, secrets, credentials, service-account files, private keys, certificates, and other protected patterns.",
+        "Confirm no excluded paths were listed, searched, read, summarized, or transmitted."
+      ]
+    },
+    {
+      "id": "task-1",
+      "title": "Map app structure and entry points",
+      "description": "Inspect non-excluded Gradle settings, Android manifests, source roots, package layout, navigation entry points, services, receivers, activities, repositories, and major feature areas to identify runtime surfaces and likely bug-prone paths.",
+      "dependencies": [
+        "task-0"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "List inspected modules and key source roots.",
+        "Identify main app entry points and user-reachable feature areas.",
+        "Record any skipped excluded paths without reading or listing their contents."
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Review build configuration statically",
+      "description": "Read non-excluded Gradle configuration, Android SDK settings, manifest declarations, ProGuard/R8 settings, packaging rules, dependency declarations, and configuration references for defects that could break builds, runtime permissions, packaging, or platform compatibility. Treat Gradle dependency reports, build tasks, lint, tests, and dependency resolution as optional and run them only after proving their write locations are limited to newly created allowed paths and they will not touch pre-existing repository paths, excluded paths, network state, or external caches.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Substantiate each confirmed build/config issue with exact file and line references.",
+        "If Gradle or Android tooling is skipped, document that it was skipped because it commonly writes .gradle, build outputs, reports, daemon state, or caches.",
+        "Classify unsupported concerns as unverified suspicions instead of confirmed bugs."
+      ]
+    },
+    {
+      "id": "task-3",
+      "title": "Audit SSH, SFTP, SCP, and port-forward flows",
+      "description": "Prioritize connection setup, authentication selection, host key verification, session lifecycle, SFTP/SCP transfer logic, file integrity, port forwarding, reconnect handling, cancellation paths, and error propagation. Trace reachable call paths from UI or public app actions to backend operations.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Trace each suspected issue from an app entry point to the affected runtime code.",
+        "Use source-level control-flow reasoning or existing non-mutating evidence when runtime reproduction is impractical.",
+        "Provide minimal reproduction or verification steps for every confirmed issue."
+      ]
+    },
+    {
+      "id": "task-4",
+      "title": "Audit persistence, credentials, import/export, and QR sharing",
+      "description": "Review saved hosts, identities, snippets, forwards, settings, credential handling, encrypted or sensitive storage, import/export parsing, QR payload handling, migrations, and validation logic for credential leakage, data corruption, validation bypasses, crashes, or data loss. Do not inspect excluded credential files or secret paths.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Inspect serializers, validators, database entities, repositories, migrations, and UI import/export paths.",
+        "Check whether malformed, missing, or hostile fields are reachable through public UI, import files, QR scans, or persisted state.",
+        "Report only defects supported by code evidence and reachability."
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "Audit Android UI state, lifecycle, and crash/data-loss paths",
+      "description": "Review Compose or View screens, ViewModels, navigation, lifecycle-aware collection, permission prompts, dialogs, menus, background task interactions, and configuration-change behavior for confirmed crashes, stale state, lost user input, broken navigation, or inaccessible documented actions. Prioritize defects that affect core SSH, transfer, credential, import/export, or persistence workflows over UI polish.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Trace state ownership and lifecycle boundaries for each suspected issue.",
+        "Provide exact UI-path reproduction steps for confirmed user-facing bugs.",
+        "Keep low-confidence lifecycle concerns in an unverified section."
+      ]
+    },
+    {
+      "id": "task-6",
+      "title": "Optional safe verification commands",
+      "description": "Run only verification commands that are proven not to modify pre-existing repository paths, write caches or reports into existing directories, require network access, touch excluded paths, or use denied commands. If no such command is safe, skip command execution and rely on static review. Runtime command verification is optional and not a dependency for producing the report.",
+      "dependencies": [
+        "task-2",
+        "task-3",
+        "task-4",
+        "task-5"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "For each command run, capture the command, exit status, and concise relevant output.",
+        "Before running any Gradle, lint, test, dependency, emulator, or Android tooling command, verify it will not write to existing .gradle, build, report, daemon, cache, or app data paths.",
+        "If a command is skipped, document the safety reason and continue with static verification."
+      ]
+    },
+    {
+      "id": "task-7",
+      "title": "Prepare findings-first bug audit report",
+      "description": "Produce a concise report containing confirmed bugs first, ordered by severity and confidence. Each confirmed bug must include severity, affected behavior, reachability evidence, file and line references, verification or reproduction steps, and residual uncertainty. Put well-supported but unverified suspicions in a clearly separate section. State that no fixes were written or applied.",
+      "dependencies": [
+        "task-3",
+        "task-4",
+        "task-5",
+        "task-6"
+      ],
+      "recommended_role": "reviewer",
+      "permissions": "read_only",
+      "verification": [
+        "Ensure every confirmed finding has concrete evidence, reachability, and line references.",
+        "Ensure theoretical or partially verified concerns are not mixed with confirmed bugs.",
+        "Confirm no repository files were modified and no excluded paths were inspected."
+      ]
+    }
+  ],
+  "risks": [
+    "Gradle, lint, test, emulator, and dependency commands commonly write build outputs, .gradle state, reports, caches, daemon state, or app data; most may need to be skipped under the read-only/create-only policy.",
+    "Runtime reproduction may require an Android emulator, device, SSH server, network access, or writable app state, so some findings may need to rely on source-level verification.",
+    "Excluded credential and secret paths may contain configuration relevant to full runtime behavior, but they must still be skipped.",
+    "Existing uncommitted changes may affect observed behavior; the report should note dirty-tree context if present.",
+    "Overbroad search commands could accidentally list or inspect excluded paths unless precise exclude patterns are used consistently."
+  ],
+  "advisor_questions": [
+    "No blocking questions. Default prioritization is security-sensitive SSH/authentication, host key verification, credential storage/export, import/export and QR parsing, file transfer integrity, port forwarding lifecycle, crashes, and data loss before general UI issues."
+  ]
+}

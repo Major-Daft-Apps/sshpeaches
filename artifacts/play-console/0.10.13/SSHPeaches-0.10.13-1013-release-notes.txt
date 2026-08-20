@@ -1,0 +1,5 @@
+Fixed file-transfer safety, progress, results, and picker races.
+Improved Android widget clarity, sizing, transfer shortcuts, and launch reliability.
+Improved SCP and SFTP transfer performance and size reporting.
+Kept SSH diagnostics useful without flooding the connection screen.
+Fixed terminal copy behavior and hid terminal text from Android clipboard previews.

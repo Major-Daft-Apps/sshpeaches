@@ -1,0 +1,630 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.3
+--------
+workdir: /home/zenulabidin/Documents/sshpeaches
+model: gpt-5.5
+provider: openai
+approval: on-request
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f6ee3-2be8-7c72-b244-bfa285a24a7c
+--------
+user
+Stringbean execution policy:
+- Ordinary remote processing of task text and non-excluded, in-scope workspace context by Stringbean's configured hosted providers is inherent to this requested run; do not pause for separate provider-use approval.
+- Execution profile: ro. Treat this run as create-only. You may create new files or new directories, but you must not modify, delete, rename, move, or type-change pre-existing repository paths. Stringbean will treat forbidden changes as policy violations, even for agents whose configured role is read_write.
+- Effective permission for this call: read_only.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+- Default workspace boundary: /home/zenulabidin/Documents/sshpeaches. Do not inspect unrelated parent or sibling paths. A path explicitly named by the user's task is in scope unless an excluded-path rule protects it.
+- Ordered excluded-path rules (`!` means an allowed exception): .stringbean/runs, .stringbean/runs/**, **/.stringbean/runs, **/.stringbean/runs/**, .env*, **/.env*, !.env.example, !**/.env.example, !.env.sample, !**/.env.sample, !.env.template, !**/.env.template, .secrets, .secrets/**, **/.secrets, **/.secrets/**, secrets, secrets/**, **/secrets, **/secrets/**, credentials, credentials/**, **/credentials, **/credentials/**, credentials.json, **/credentials.json, service-account*.json, **/service-account*.json, *.pem, **/*.pem, *.key, **/*.key, *.p12, **/*.p12, *.pfx, **/*.pfx. Built-in credential exclusions are mandatory: a project or configured `!` rule can only re-include paths excluded by other project-added rules.
+- Never read, list, search, summarize, modify, or transmit content from paths excluded by those rules.
+- If an excluded path appears relevant, skip it and continue with the rest of the task. Do not retry access, ask the user for permission to inspect it, or ask another agent to inspect it.
+
+You are an implementer.
+Implement only the listed task and avoid unrelated changes.
+
+Task:
+Search for bugs in this app only. Do not write or apply any bug fixes. Verify what is actually a bug before reporting it. Perform a read-only audit, reproduce or otherwise substantiate each finding where feasible, distinguish confirmed bugs from unverified suspicions, and report evidence with relevant file and line references plus verification steps.
+
+Objective:
+task-0 - Read-only preflight and safety boundaries
+
+Plan task:
+{
+  "id": "task-0",
+  "title": "Read-only preflight and safety boundaries",
+  "description": "Establish the repository shape, policy-safe search filters, and current working-tree context without reading excluded paths or modifying existing files. Use only read-only commands such as pwd, git status --short, rg --files with explicit glob exclusions, and targeted file reads. Do not use denied git operations or broad traversal that can enter excluded paths.",
+  "dependencies": [],
+  "recommended_role": "implementer",
+  "permissions": "read_only",
+  "verification": [
+    "Record the repository root and whether git status indicates a dirty tree, without changing anything.",
+    "Define and use exclude filters for .stringbean/runs, .env*, secrets, credentials, service-account files, private keys, certificates, and other protected patterns.",
+    "Confirm no excluded paths were listed, searched, read, summarized, or transmitted."
+  ]
+}
+
+Required verification:
+Record the repository root and whether git status indicates a dirty tree, without changing anything.
+Define and use exclude filters for .stringbean/runs, .env*, secrets, credentials, service-account files, private keys, certificates, and other protected patterns.
+Confirm no excluded paths were listed, searched, read, summarized, or transmitted.
+
+Known constraints:
+Record the repository root and whether git status indicates a dirty tree, without changing anything.
+Define and use exclude filters for .stringbean/runs, .env*, secrets, credentials, service-account files, private keys, certificates, and other protected patterns.
+Confirm no excluded paths were listed, searched, read, summarized, or transmitted.
+
+Prior constraints/advisor notes:
+implementer
+
+Allowed file scope:
+
+
+Return JSON:
+{
+  "status": "completed",
+  "summary": "...",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": []
+}
+
+codex
+I’ll do the preflight with read-only commands and explicit path exclusions so protected files are neither listed nor inspected.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git rev-parse --show-toplevel' in /home/zenulabidin/Documents/sshpeaches
+exec
+/usr/bin/zsh -lc pwd in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 645ms:
+/home/zenulabidin/Documents/sshpeaches
+
+ succeeded in 658ms:
+/home/zenulabidin/Documents/sshpeaches
+
+codex
+The repository root matches the workspace. Next I’m checking working-tree status and file inventory with the protected pathspecs and ripgrep globs excluded.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "git status --short -- . ':(exclude).stringbean/runs' ':(exclude).stringbean/runs/**' ':(exclude)**/.stringbean/runs' ':(exclude)**/.stringbean/runs/**' ':(exclude).env*' ':(exclude)**/.env*' ':(exclude).secrets' ':(exclude).secrets/**' ':(exclude)**/.secrets' ':(exclude)**/.secrets/**' ':(exclude)secrets' ':(exclude)secrets/**' ':(exclude)**/secrets' ':(exclude)**/secrets/**' ':(exclude)credentials' ':(exclude)credentials/**' ':(exclude)**/credentials' ':(exclude)**/credentials/**' ':(exclude)credentials.json' ':(exclude)**/credentials.json' ':(exclude)service-account*.json' ':(exclude)**/service-account*.json' ':(exclude)*.pem' ':(exclude)**/*.pem' ':(exclude)*.key' ':(exclude)**/*.key' ':(exclude)*.p12' ':(exclude)**/*.p12' ':(exclude)*.pfx' ':(exclude)**/*.pfx'" in /home/zenulabidin/Documents/sshpeaches
+exec
+/usr/bin/zsh -lc "rg --files -g '"'!.stringbean/runs'"' -g '"'!.stringbean/runs/**'"' -g '"'!**/.stringbean/runs'"' -g '"'!**/.stringbean/runs/**'"' -g '"'!.env*'"' -g '"'!**/.env*'"' -g '"'!.secrets'"' -g '"'!.secrets/**'"' -g '"'!**/.secrets'"' -g '"'!**/.secrets/**'"' -g '"'!secrets'"' -g '"'!secrets/**'"' -g '"'!**/secrets'"' -g '"'!**/secrets/**'"' -g '"'!credentials'"' -g '"'!credentials/**'"' -g '"'!**/credentials'"' -g '"'!**/credentials/**'"' -g '"'!credentials.json'"' -g '"'!**/credentials.json'"' -g '"'!service-account*.json'"' -g '"'!**/service-account*.json'"' -g '"'!*.pem'"' -g '"'!**/*.pem'"' -g '"'!*.key'"' -g '"'!**/*.key'"' -g '"'!*.p12'"' -g '"'!**/*.p12'"' -g '"'!*.pfx'"' -g '"'!**/*.pfx'"'" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 223ms:
+ M CHANGELOG.md
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+ M app/src/main/java/com/sshpeaches/app/MainActivity.kt
+ M app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+ M app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+ M app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+ M app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+ M app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+ M app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+ M app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+ M third_party/termux-playstore/terminal-view/build.gradle.kts
+ M third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java
+ M third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java
+?? .codex
+?? .stringbean/
+?? app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+?? app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt
+?? app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+?? docs/plans/ctrl-ime-copy-paste-fix.md
+?? docs/task-2-summary.json
+?? docs/task-3-summary.json
+?? third_party/termux-playstore/terminal-view/src/androidTest/
+
+ succeeded in 1447ms:
+gradle.properties
+build.gradle.kts
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew.bat
+CHANGELOG.md
+prompt_instructions.txt
+settings.gradle.kts
+prompt_state_snapshot.txt
+README.md
+app/proguard-rules.pro
+app/proguard-release-androidtest-rules.pro
+app/build.gradle.kts
+third_party/termux-playstore/terminal-view/proguard-rules.pro
+third_party/termux-playstore/terminal-view/build.gradle.kts
+app/src/androidTest/AndroidManifest.xml
+third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java
+third_party/termux-playstore/terminal-emulator/proguard-rules.pro
+third_party/termux-playstore/terminal-emulator/build.gradle.kts
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_right_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_left_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/values/strings.xml
+third_party/termux-playstore/terminal-view/src/main/AndroidManifest.xml
+macrobenchmark/build.gradle.kts
+macrobenchmark/src/main/AndroidManifest.xml
+macrobenchmark/src/main/java/com/majordaftapps/sshpeaches/macrobenchmark/StartupAndScrollBenchmark.kt
+LICENSE
+gradlew
+third_party/termux-playstore/terminal-emulator/src/main/jni/Android.mk
+third_party/termux-playstore/terminal-emulator/src/main/jni/termux.c
+third_party/termux-playstore/terminal-emulator/src/main/AndroidManifest.xml
+functions/package.json
+functions/index.js
+functions/package-lock.json
+lint.xml
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/arm64-v8a/libtermux.so
+tools/live-ssh-server/build.gradle.kts
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/x86_64/libtermux.so
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSession.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalOutput.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSessionClient.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColors.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/KeyHandler.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/ByteQueue.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalBuffer.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/WcWidth.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColorScheme.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalRow.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/JNI.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TextStyle.java
+tools/live-ssh-server/src/main/kotlin/com/majordaftapps/sshpeaches/livetest/LiveSshServer.kt
+app/src/benchmark/AndroidManifest.xml
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/GestureAndScaleRecognizer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionHandleView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalRenderer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java
+app/src/test/java/com/sshpeaches/app/ui/TransferPayloadCodecTest.kt
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+app/src/test/java/com/sshpeaches/app/service/FileTransferProgressTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeNotificationsTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeSummaryCalculatorTest.kt
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt
+app/src/test/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepositoryTest.kt
+app/src/test/java/com/sshpeaches/app/data/importer/OpenSshConfigImporterTest.kt
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+app/src/test/java/com/sshpeaches/app/data/local/ConvertersTest.kt
+app/src/test/java/com/sshpeaches/app/util/PortForwardsTest.kt
+docs/task-2-summary.json
+app/src/release/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/release/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/release/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+docs/user-wiki/Troubleshooting.md
+app/src/debug/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/debug/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/debug/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+docs/user-wiki/developer/UI-Design-Notes.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/Getting-Started.md
+app/src/androidTest/java/com/sshpeaches/app/permissions/NotificationPermissionStateTest.kt
+docs/user-wiki/Home.md
+docs/README.md
+docs/task-3-summary.json
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/favorites/FavoritesScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt
+docs/plans/chromebook-tier2-adaptive-design.md
+docs/plans/ctrl-ime-copy-paste-fix.md
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt
+app/src/androidTest/java/com/sshpeaches/app/uptime/UptimeScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsDialogRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/ManagerSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/ThemeEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/TerminalThemeApplicationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetter.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LifecycleTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/NotificationPermissionHelper.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/TestSuites.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetRule.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/KnownHostsSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LiveBackendConfig.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ActivityLaunchHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityLockRuntimeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityManagerVaultTest.kt
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/AccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/VisualSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/QuickConnectAccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/RtlSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsPreferencesTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsRestoreDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SecuritySettingsTest.kt
+firebase.json
+third_party/termux-playstore/terminal-emulator/src/test/java/android/util/Base64.java
+app/src/androidTest/java/com/sshpeaches/app/snippets/SnippetCrudTest.kt
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/UnicodeInputTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/OperatingSystemControlTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalRowTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DeviceControlStringTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DecSetTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScreenBufferTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/VtCompatibilityTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ApcTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ControlSequenceIntroducerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TextStyleTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ResizeTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ByteQueueTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/KeyHandlerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTestCase.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/HistoryTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/WcWidthTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/RectangularAreasTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScrollRegionTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/CursorAndScreenTest.java
+app/src/main/AndroidManifest.xml
+app/src/main/assets/licenses/maven_licenses.json
+app/src/main/assets/licenses/fonts/droid-sans-mono-notice.txt
+app/src/main/assets/licenses/fonts/google-fonts-ofl.txt
+app/src/main/assets/licenses/fonts/cascadia-code-license.txt
+app/src/main/assets/licenses/fonts/open-dyslexic-readme.md
+app/src/main/assets/licenses/fonts/droid-sans-mono-module-license.txt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalSelectionMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/FileTransferEntryMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalBellMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/v/vt100
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalFontSupport.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalRenderView.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ModalSizing.kt
+app/src/main/java/com/sshpeaches/app/ui/util/EnumDisplay.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ExportPassphraseCache.kt
+app/src/main/java/com/sshpeaches/app/ui/util/PasswordTailReveal.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/UptimeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/OpenSourceLicensesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/PortForwardScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/FavoritesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HomeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeProfileEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/KeyboardEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HostsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetManagerScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/IdentitiesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HelpScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/permissions/CorePermissionStatus.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Color.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Type.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Theme.kt
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/arm64-v8a/lib/libncursesw.so.6
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libandroid-support.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_statusor.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/arm64-v8a/lib/libc++_shared.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_int128.so
+app/src/main/assets/mosh/arm64-v8a/lib/libprotobuf.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strerror.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hash.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_base.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_status.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings.so
+app/src/main/assets/mosh/arm64-v8a/lib/libutf8_validity.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_city.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord.so
+app/src/main/assets/mosh/arm64-v8a/lib/libcrypto.so.3
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libz.so.1
+app/src/main/java/com/sshpeaches/app/ui/logging/UiDebugLog.kt
+app/src/main/assets/mosh/arm64-v8a/bin/mosh-client
+app/src/main/java/com/sshpeaches/app/ui/qr/AdaptiveCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/PortraitCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/QrScanOptions.kt
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/ReleaseTestHostActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrImportHandlers.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostCard.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AuthChoice.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AppDrawer.kt
+app/src/main/java/com/sshpeaches/app/ui/components/GroupedSections.kt
+app/src/main/java/com/sshpeaches/app/ui/components/LockScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrDecode.kt
+app/src/main/java/com/sshpeaches/app/ui/components/SnippetQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/EmptyState.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/PortForwardQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/IdentityQr.kt
+app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt
+app/src/main/assets/mosh/x86_64/share/terminfo/v/vt100
+app/src/main/java/com/sshpeaches/app/ui/adaptive/AdaptiveLayout.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/DesktopInput.kt
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm
+app/src/main/java/com/sshpeaches/app/ui/navigation/Routes.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/DrawerDestinations.kt
+app/src/main/java/com/sshpeaches/app/AppIconManager.kt
+app/src/main/java/com/sshpeaches/app/security/SecurityManager.kt
+app/src/main/java/com/sshpeaches/app/SSHPeachesApplication.kt
+app/src/main/java/com/sshpeaches/app/data/settings/AppIconOption.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsDefaults.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+app/src/main/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/UptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/x86_64/lib/libncursesw.so.6
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libandroid-support.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_statusor.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/x86_64/lib/libc++_shared.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_int128.so
+app/src/main/assets/mosh/x86_64/lib/libprotobuf.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strerror.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hash.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_base.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_check_op.so
+app/src/main/java/com/sshpeaches/app/data/importer/OpenSshConfigImporter.kt
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_status.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings.so
+app/src/main/assets/mosh/x86_64/lib/libutf8_validity.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_city.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord.so
+app/src/main/assets/mosh/x86_64/lib/libcrypto.so.3
+app/src/main/assets/mosh/x86_64/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/x86_64/lib/libz.so.1
+app/src/main/java/com/sshpeaches/app/data/ssh/Ed25519IdentityKeyProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/IdentityKeyInstaller.kt
+app/src/main/assets/mosh/x86_64/bin/mosh-client
+app/src/main/assets/mosh/NOTICE.txt
+app/src/main/assets/gpl-3.0.txt
+app/src/main/java/com/sshpeaches/app/data/model/HostConnection.kt
+app/src/main/java/com/sshpeaches/app/data/model/UptimeModels.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalProfile.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalFont.kt
+app/src/main/assets/fonts/SourceCodePro.ttf
+app/src/main/assets/fonts/OpenDyslexicMono-Regular.ttf
+app/src/main/assets/fonts/FiraCode.ttf
+app/src/main/assets/fonts/CascadiaMono-Regular.ttf
+app/src/main/assets/fonts/JetBrainsMono.ttf
+app/src/main/assets/fonts/Inconsolata-Regular.ttf
+app/src/main/assets/fonts/RobotoMono.ttf
+app/src/main/assets/fonts/DroidSansMono.ttf
+app/src/main/java/com/sshpeaches/app/data/local/UptimeMappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/SshPeachesDatabase.kt
+app/src/main/java/com/sshpeaches/app/data/local/Converters.kt
+app/src/main/java/com/sshpeaches/app/data/local/Dao.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeDao.kt
+app/src/main/java/com/sshpeaches/app/data/local/Mappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/Entities.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeEntities.kt
+app/src/main/java/com/sshpeaches/app/util/ValidationUtils.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyGenerator.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyFingerprint.kt
+app/src/main/java/com/sshpeaches/app/util/SnippetReference.kt
+app/src/main/java/com/sshpeaches/app/util/PortForwards.kt
+app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+app/src/main/java/com/sshpeaches/app/service/FileTransferProgress.kt
+app/src/main/java/com/sshpeaches/app/service/SessionLogBus.kt
+app/src/main/java/com/sshpeaches/app/service/MoshRuntime.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsBundle.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploader.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploadWorker.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsScheduler.kt
+app/src/main/java/com/sshpeaches/app/widget/HostWidgets.kt
+app/src/main/java/com/sshpeaches/app/widget/WidgetSessionStore.kt
+app/src/main/res/raw/suse.svg
+app/src/main/res/raw/debian.svg
+app/src/main/res/raw/ubuntu.svg
+app/src/main/res/raw/bsd.svg
+app/src/main/res/raw/apple.svg
+app/src/main/res/raw/windows.svg
+app/src/main/res/raw/fedora.svg
+app/src/main/res/raw/arch.svg
+app/src/main/res/raw/linux_mint.svg
+app/src/main/res/raw/linux.svg
+app/src/main/res/raw/redhat.svg
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeScheduler.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeSummaryCalculator.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerDelegate.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeWorker.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeNotifications.kt
+app/src/main/java/com/sshpeaches/app/uptime/NoOpUptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/MainActivity.kt
+app/src/main/res/values-night/themes.xml
+app/src/main/res/drawable-night/ic_notification_logo.xml
+app/src/main/res/layout/widget_quick_connect.xml
+app/src/main/res/layout/widget_sessions.xml
+app/src/main/res/layout/widget_open_session_row.xml
+app/src/main/res/layout/widget_host_row.xml
+app/src/main/res/drawable/ic_widget_close.xml
+app/src/main/res/drawable/ic_widget_cloud_download.xml
+app/src/main/res/drawable/ic_launcher_foreground.xml
+app/src/main/res/drawable/ic_widget_open.xml
+app/src/main/res/drawable/ic_notification_logo.xml
+app/src/main/res/drawable/widget_action_secondary_background.xml
+app/src/main/res/drawable/ic_widget_cloud_upload.xml
+app/src/main/res/drawable/widget_section_surface.xml
+app/src/main/res/drawable/widget_row_surface.xml
+app/src/main/res/drawable/ic_widget_terminal.xml
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+app/src/main/res/drawable/widget_action_primary_background.xml
+app/src/main/res/drawable/widget_action_danger_background.xml
+app/src/main/res/drawable/widget_surface.xml
+app/src/main/res/xml/data_extraction_rules.xml
+app/src/main/res/xml/widget_quick_connect_info.xml
+app/src/main/res/xml/backup_rules.xml
+app/src/main/res/xml/widget_sessions_info.xml
+app/src/main/res/values-night-v31/themes.xml
+app/src/main/res/values/strings.xml
+app/src/main/res/values/colors.xml
+app/src/main/res/values/themes.xml
+app/src/main/res/values-v31/themes.xml
+app/src/main/res/drawable-nodpi/keyboard.png
+app/src/main/res/drawable-nodpi/major_daft_apps_white.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar.png
+app/src/main/res/drawable-nodpi/major_daft_apps_black.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_dark_foreground_art.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_light_foreground_art.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar_black.png
+app/src/main/res/drawable-nodpi/sshpeaches.png
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_dark.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+app/src/androidTest/java/com/sshpeaches/app/navigation/AppInfoNavigationTest.kt
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_light.xml
+app/src/androidTest/java/com/sshpeaches/app/navigation/ExternalLinksNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityCrudTest.kt
+
+codex
+{
+  "status": "completed",
+  "summary": "Read-only preflight completed. Repository root is /home/zenulabidin/Documents/sshpeaches. Git status indicates a dirty working tree in allowed scope, with modified tracked files and untracked allowed-scope paths. Explicit exclude filters were used for .stringbean/runs, .env*, secrets, credentials, service-account files, private keys, and certificate/key archive patterns. No files were changed, and no excluded paths were intentionally listed, searched, read, summarized, or transmitted.",
+  "files_changed": [],
+  "commands_run": [
+    "pwd",
+    "git rev-parse --show-toplevel",
+    "git status --short -- . with explicit :(exclude) pathspecs for protected paths",
+    "rg --files with explicit -g exclusion filters for protected paths"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "This completed only task-0 preflight and safety-boundary verification. No bug audit beyond repository shape/status was performed in this step."
+  ]
+}
+tokens used
+41,609

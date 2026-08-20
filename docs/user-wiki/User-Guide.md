@@ -44,8 +44,8 @@ Use this screen to manage saved servers.
 ### Host card actions
 
 - `SSH` starts terminal mode.
-- `SFTP` opens SFTP browser mode.
-- `SCP` opens dual-pane transfer mode.
+- `Upload` opens the remote file browser with upload guidance.
+- `Download` opens the same remote file browser with download guidance.
 - `Info` manages/runs info snippets for that host.
 - `QR` shares host config.
 
@@ -63,8 +63,12 @@ If a host has a saved password, QR export prompts for a passphrase and encrypts 
 After a successful connection, behavior depends on mode:
 
 - `SSH`: terminal view with compact custom key row
-- `SFTP`: file browsing and upload/download controls
-- `SCP`: local/remote panes with copy operations
+- `File transfer`: a remote file browser with upload and download controls available together
+
+In the file browser, tap folders to open them and tap a file to select it. Uploads show
+the remote destination for review and require confirmation before replacing an existing
+file. Deleting a folder requires a separate confirmation that states its contents will
+also be deleted.
 
 Common behaviors:
 

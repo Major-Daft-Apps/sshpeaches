@@ -1,0 +1,19 @@
+{
+  "verdict": "approve",
+  "severity": "none",
+  "summary": "The plan is coherent, regression-first, and correctly separates the main behavioral fix from optional hidden-editor sentinel cleanup. It identifies the right architectural boundaries: forced selection teardown in terminal-view, focus restoration in ConnectingScreen without changing keyboard visibility intent, unified app-level modifier routing, router API expansion, and standalone emulator codepoint delivery.",
+  "blockers": [],
+  "concerns": [
+    "The current effective permission is read_only, so this advisor run cannot implement or validate the requested repository changes.",
+    "Instrumentation package names must be verified against existing declarations before adding test filters, since the plan notes a possible mismatch between package paths and source layout.",
+    "Forced selection dismissal in vendored terminal-view code is the riskiest part because callback ordering and idempotency must be exact to avoid duplicate copyModeChanged events or stale ActionMode references.",
+    "IME focus restoration should be posted after ActionMode teardown and guarded against detached or replaced bridge instances to avoid restoring focus to stale UI."
+  ],
+  "recommendations": [
+    "Proceed with the saved plan under read_write permission.",
+    "Keep hidden-editor sentinel cleanup explicitly out of scope unless all primary regression tests already pass and the patch remains small.",
+    "Add failing exact-byte tests before implementation and preserve them as the primary proof that Ctrl is consumed once after Copy and Paste.",
+    "Use one shared modifier dispatch path for TerminalViewClient and TerminalImeBridgeEditText so future fixes cannot diverge.",
+    "Report skipped managed-device or connected-device validation exactly, rather than replacing it with broader claims."
+  ]
+}

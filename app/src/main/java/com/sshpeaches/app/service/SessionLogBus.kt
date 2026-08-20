@@ -37,20 +37,40 @@ object SessionLogBus {
 
 class SessionLoggerFactory(
     private val hostId: String,
+    private val connectionTranscriptEnabled: () -> Boolean = { true },
     private val diagnosticsEnabled: () -> Boolean = { false },
-    private val delegate: LoggerFactory = LoggerFactory.DEFAULT
+    private val delegate: LoggerFactory = LoggerFactory.DEFAULT,
+    private val logcatEnabled: Boolean = BuildConfig.DEBUG
 ) : LoggerFactory {
+    private val transportLogSampler = SshTransportLogSampler(
+        intervalNanos = TRANSPORT_LOG_SAMPLE_INTERVAL_NANOS
+    )
+
     override fun getLogger(name: String): Logger =
-        SessionLogger(hostId, diagnosticsEnabled, delegate.getLogger(name))
+        SessionLogger(
+            hostId = hostId,
+            connectionTranscriptEnabled = connectionTranscriptEnabled,
+            diagnosticsEnabled = diagnosticsEnabled,
+            delegate = delegate.getLogger(name),
+            transportLogSampler = transportLogSampler,
+            logcatEnabled = logcatEnabled
+        )
 
     override fun getLogger(clazz: Class<*>?): Logger =
         getLogger(clazz?.name ?: "unknown")
+
+    private companion object {
+        private const val TRANSPORT_LOG_SAMPLE_INTERVAL_NANOS = 1_000_000_000L
+    }
 }
 
 private class SessionLogger(
     private val hostId: String,
+    private val connectionTranscriptEnabled: () -> Boolean,
     private val diagnosticsEnabled: () -> Boolean,
-    private val delegate: Logger
+    private val delegate: Logger,
+    private val transportLogSampler: SshTransportLogSampler,
+    private val logcatEnabled: Boolean
 ) : MarkerIgnoringBase() {
     companion object {
         private const val LOGCAT_TAG = "SSHPeachesSSH"
@@ -58,6 +78,8 @@ private class SessionLogger(
 
     override fun getName(): String = delegate.name
 
+    // Keep these capability checks delegated. Forcing them on enables SSHJ's guarded
+    // packet/key hex dumps; its semantic connection events are emitted unguarded.
     override fun isTraceEnabled(): Boolean = delegate.isTraceEnabled
     override fun trace(msg: String?) {
         delegate.trace(msg)
@@ -194,14 +216,16 @@ private class SessionLogger(
         args: Array<out Any?>? = null,
         throwable: Throwable? = null
     ) {
-        if (!shouldPublishSshLog(level, message, diagnosticsEnabled())) return
+        val connectionTranscriptActive = connectionTranscriptEnabled()
+        if (!shouldPublishSshLog(level, connectionTranscriptActive, diagnosticsEnabled())) return
         val text = when {
             message == null -> throwable?.message ?: return
             args == null -> message
             else -> MessageFormatter.arrayFormat(message, args).message
         }
         if (text.isNullOrBlank()) return
-        if (BuildConfig.DEBUG) {
+        if (!transportLogSampler.shouldPublish(level, text, connectionTranscriptActive)) return
+        if (logcatEnabled) {
             val logcatMessage = "[$hostId] $text"
             when (level) {
                 LogLevel.DEBUG -> Log.d(LOGCAT_TAG, logcatMessage, throwable)
@@ -216,18 +240,36 @@ private class SessionLogger(
 
 internal fun shouldPublishSshLog(
     level: LogLevel,
-    messageFormat: String?,
+    connectionTranscriptEnabled: Boolean,
     diagnosticsEnabled: Boolean
-): Boolean {
-    if (level != LogLevel.DEBUG) return true
-    if (!diagnosticsEnabled) return false
-    if (messageFormat == null) return true
-    return NOISY_SSH_LOG_MARKERS.none(messageFormat::contains)
+): Boolean = level != LogLevel.DEBUG || connectionTranscriptEnabled || diagnosticsEnabled
+
+internal class SshTransportLogSampler(
+    private val intervalNanos: Long,
+    private val nanoTime: () -> Long = System::nanoTime
+) {
+    private var lastTransportLogNanos: Long? = null
+
+    @Synchronized
+    fun shouldPublish(
+        level: LogLevel,
+        message: String,
+        connectionTranscriptEnabled: Boolean = false
+    ): Boolean {
+        if (connectionTranscriptEnabled) return true
+        if (level != LogLevel.DEBUG || !isHighFrequencyTransportLog(message)) return true
+        val now = nanoTime()
+        val previous = lastTransportLogNanos
+        if (previous == null || now - previous >= intervalNanos) {
+            lastTransportLogNanos = now
+            return true
+        }
+        return false
+    }
 }
 
-private val NOISY_SSH_LOG_MARKERS = listOf(
-    "Received packet",
-    "Consuming by",
-    "Increasing by",
-    "Sending after interval"
-)
+internal fun isHighFrequencyTransportLog(message: String): Boolean =
+    message.contains("Received packet") ||
+        message.contains("Consuming by") ||
+        message.contains("Increasing by") ||
+        message.contains("Sending after interval")

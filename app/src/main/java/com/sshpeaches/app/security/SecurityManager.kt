@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -639,7 +640,7 @@ object SecurityManager {
         val existing = keyStore.getCertificate(BIOMETRIC_KEY_ALIAS)?.publicKey
         if (existing != null) return existing
         val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, KEYSTORE_NAME)
-        val spec = KeyGenParameterSpec.Builder(
+        val specBuilder = KeyGenParameterSpec.Builder(
             BIOMETRIC_KEY_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
@@ -648,11 +649,18 @@ object SecurityManager {
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
             .setUserAuthenticationRequired(true)
             .setInvalidatedByBiometricEnrollment(true)
-            .setUserAuthenticationParameters(
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            specBuilder.setUserAuthenticationParameters(
                 0,
                 KeyProperties.AUTH_BIOMETRIC_STRONG
             )
-            .build()
+        } else {
+            @Suppress("DEPRECATION")
+            specBuilder.setUserAuthenticationValidityDurationSeconds(-1)
+        }
+
+        val spec = specBuilder.build()
         generator.initialize(spec)
         return generator.generateKeyPair().public
     }

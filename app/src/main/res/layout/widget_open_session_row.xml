@@ -1,47 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="6dp"
     android:background="@drawable/widget_row_surface"
     android:gravity="center_vertical"
+    android:minHeight="56dp"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:padding="6dp">
 
-    <TextView
-        android:id="@+id/widget_open_session_title"
+    <ImageView
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_widget_terminal"
+        android:tint="@color/color_widget_text_secondary" />
+
+    <LinearLayout
+        android:id="@+id/widget_open_session_identity"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/color_widget_text_primary"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:contentDescription="@string/widget_action_open_session"
+        android:orientation="vertical"
+        android:paddingVertical="6dp">
 
-    <ImageView
+        <TextView
+            android:id="@+id/widget_open_session_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/color_widget_text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_open_session_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/color_widget_text_secondary"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/widget_btn_open"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="44dp"
+        android:layout_height="46dp"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_action_primary_background"
         android:contentDescription="@string/widget_action_open_session"
-        android:padding="7dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_widget_open"
-        app:tint="@color/color_widget_text_primary" />
+        android:gravity="center">
 
-    <ImageView
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_widget_open"
+            android:tint="@color/color_hard_black" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/widget_btn_disconnect"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
+        android:layout_width="44dp"
+        android:layout_height="46dp"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_action_danger_background"
         android:contentDescription="@string/widget_action_disconnect_session"
-        android:padding="7dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_widget_close"
-        app:tint="@color/color_widget_text_primary" />
+        android:gravity="center">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_widget_close"
+            android:tint="@color/color_widget_text_primary" />
+    </LinearLayout>
 
 </LinearLayout>

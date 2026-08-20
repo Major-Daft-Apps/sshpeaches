@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Added task-2 focus restoration and IME context-action instrumentation coverage in ConnectingScreenTest.kt. The new tests cover terminal ActionMode Copy/Paste focus contracts, selection dismissal waits without fixed sleeps, keyboardVisibleRequested preservation, compact Ctrl plus commitText exact bytes, IME paste, IME paste-as-plain-text, and IME copy from selected shadow text. Task count: 2 audited/implemented. Review rounds: 0.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "commands_run": [
+    "sed -n '1,240p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260715183043/skills/sbx/SKILL.md",
+    "sed -n '1,260p' docs/plans/ctrl-ime-copy-paste-fix.md",
+    "rg -n \"Ctrl|IME|Ime|InputConnection|performContextMenuAction|keyboardVisibleRequested|copy|paste|ActionMode|TerminalImeBridgeEditText|TerminalView|selection\" app/src/androidTest app/src/main",
+    "sed -n focused ranges of app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt",
+    "sed -n focused ranges of third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java",
+    "sed -n focused ranges of app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt",
+    "git diff -- app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt",
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "./gradlew :app:compileDebugAndroidTestKotlin",
+    "rg -n focused new test/helper names app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "FAILED: Android test APK compiled, but execution failed with DeviceException: No connected devices."
+    },
+    {
+      "command": "./gradlew :app:compileDebugAndroidTestKotlin",
+      "result": "PASSED"
+    }
+  ],
+  "remaining_issues": [
+    "Full required connected instrumentation execution could not run because this environment has no connected Android device.",
+    "The hidden-editor sentinel cleanup was not touched, per the plan's optional/separate guidance."
+  ],
+  "handoff_notes": [
+    "Existing dirty-worktree changes were preserved; only ConnectingScreenTest.kt was edited for this task.",
+    "Assertions use composeRule.waitUntil for selection inactive and IME bridge focus restoration, with no fixed timing sleeps in the new tests.",
+    "Task-1 seams were confirmed present before editing: hidden EditText discovery, TerminalView discovery, ActionMode Copy/Paste helper, keyboard requested semantics helper, InputConnection helper, and raw virtual-key regression tests."
+  ]
+}

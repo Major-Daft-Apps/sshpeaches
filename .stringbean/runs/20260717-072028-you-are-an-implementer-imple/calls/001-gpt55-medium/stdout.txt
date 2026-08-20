@@ -1,0 +1,39 @@
+{
+  "status": "completed",
+  "summary": "Read-only structure map completed. Inspected Gradle settings and module declarations in settings.gradle.kts, root/app/module Gradle files, app/src/main/AndroidManifest.xml, MainActivity, SSHPeachesApplication, SSHPeachesRoot navigation, AppContainer, SessionService, HostWidgets, source root layout, repository/database/viewmodel anchors, and major UI screen registrations. Modules inspected: :app, :macrobenchmark, :terminal-emulator, :terminal-view, and :tools:live-ssh-server. Key source roots inspected: app/src/main/java, app/src/main/res, app/src/main/assets, app/src/debug/java, app/src/release/java, app/src/test/java, app/src/androidTest/java, app/src/benchmark, macrobenchmark/src/main/java, third_party/termux-playstore/terminal-emulator/src/main/java, terminal-emulator/src/main/jni, terminal-emulator/src/main/jniLibs, terminal-emulator/src/test/java, third_party/termux-playstore/terminal-view/src/main/java, terminal-view/src/androidTest/java, terminal-view/src/main/res, and tools/live-ssh-server/src/main/kotlin. Main runtime entry points identified: SSHPeachesApplication initializes security, settings, telemetry/app check, uptime notifications/scheduling, diagnostics scheduling, and app icon updates; MainActivity is the exported activity target behind launcher aliases and handles startup route, widget connect, and notification open-session intents; SSHPeachesRoot owns Compose navigation with Home, Connecting/Session, Help, Hosts, Uptime, Identities, Port Forwards, Snippets, Snippet Editor, Keyboard, Theme Editor, Theme Profile Editor, Settings, and Open Source Licenses; SessionService is the foreground/bound service for SSH/Mosh/SFTP/SCP sessions and notification actions; HostWidgets exposes QuickConnectWidgetProvider and SessionsWidgetProvider receiver surfaces; WorkManager surfaces include UptimeWorker and DiagnosticsUploadWorker. No bug findings were reported in this task because the objective was structure and entry point mapping only.",
+  "files_changed": [],
+  "commands_run": [
+    "pwd",
+    "rg --files -g '!**/.stringbean/runs/**' -g '!.env*' -g '!**/.env*' -g '!**/.secrets/**' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/credentials.json' -g '!**/service-account*.json' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "sed -n '1,220p' settings.gradle.kts",
+    "sed -n '1,260p' build.gradle.kts",
+    "nl -ba app/build.gradle.kts | sed -n '1,260p'",
+    "nl -ba app/src/main/AndroidManifest.xml | sed -n '1,260p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/MainActivity.kt | sed -n '1,1040p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/SSHPeachesApplication.kt | sed -n '1,220p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt | sed -n '1,360p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt | sed -n '420,760p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt | sed -n '1740,2275p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/ui/navigation/Routes.kt | sed -n '1,240p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt | sed -n '1,260p'",
+    "rg -n \"NavHost|composable\\(|startDestination|navigate\\(|requestedStartupRoute|QUICK_CONNECT|CONNECTING|SESSION\" app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt app/src/main/java/com/sshpeaches/app/MainActivity.kt",
+    "rg -n \"class .*Provider|BroadcastReceiver|AppWidgetProvider|Worker|ForegroundService|Service\\(|class SessionService|onStartCommand|onBind|PendingIntent|ACTION_\" app/src/main/java/com/sshpeaches/app -g '!**/.env*' -g '!**/*.key'",
+    "find app/src/main/java/com/sshpeaches/app -maxdepth 3 -type d | sort",
+    "nl -ba app/src/main/java/com/sshpeaches/app/service/SessionService.kt | sed -n '1,190p'",
+    "nl -ba app/src/main/java/com/sshpeaches/app/widget/HostWidgets.kt | sed -n '1,390p'",
+    "nl -ba macrobenchmark/build.gradle.kts | sed -n '1,220p'",
+    "nl -ba third_party/termux-playstore/terminal-emulator/build.gradle.kts | sed -n '1,220p'",
+    "nl -ba third_party/termux-playstore/terminal-view/build.gradle.kts | sed -n '1,220p'",
+    "nl -ba tools/live-ssh-server/build.gradle.kts | sed -n '1,220p'",
+    "find app/src -maxdepth 3 -type d | sort",
+    "find macrobenchmark/src third_party/termux-playstore/terminal-emulator/src third_party/termux-playstore/terminal-view/src tools/live-ssh-server/src -maxdepth 4 -type d | sort",
+    "rg -n \"class SshPeachesDatabase|@Database|interface .*Dao|@Dao|class RoomAppRepository|interface AppRepository|class AppViewModel|data class AppUiState\" app/src/main/java/com/sshpeaches/app/data app/src/main/java/com/sshpeaches/app/ui/state"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "Relevant entry point references: settings.gradle.kts lines 16-22 declare included modules; app/build.gradle.kts lines 36-86 define app namespace/applicationId/minSdk/targetSdk; app/src/main/AndroidManifest.xml lines 27-134 declare application, MainActivity, launcher aliases, QR capture activities, SessionService, and widget receivers; MainActivity.kt lines 287-305 cold-start intent handling, 739-743 new-intent handling, 812-881 supported startup/widget/session intent handling; SSHPeachesRoot.kt lines 1762-2266 Compose NavHost destinations; SessionService.kt lines 98-154 service lifecycle/onStartCommand/onBind; HostWidgets.kt lines 283-363 widget receiver classes and actions.",
+    "User-reachable feature areas mapped: Home/favorites/recents/open sessions, Quick Connect, Hosts, Identities, Port Forwards, Snippets/Snippet Editor, SSH terminal session, SFTP/SCP transfer session, Uptime, Keyboard editor, Theme editor/profile editor, Settings/security/permissions/export-import, Help/support links, Open Source Licenses, launcher aliases/app icon changes, widgets, notifications, QR scan/import surfaces, diagnostics upload, and uptime background checks.",
+    "Excluded paths were not read, listed, searched, summarized, or modified. Skipped excluded path patterns include .stringbean/runs, .env*, .secrets/**, secrets/**, credentials/**, credentials.json, service-account*.json, *.pem, *.key, *.p12, and *.pfx."
+  ]
+}

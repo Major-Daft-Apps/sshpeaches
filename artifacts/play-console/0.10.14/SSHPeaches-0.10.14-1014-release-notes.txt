@@ -1,0 +1,4 @@
+Made network-related connection failures explicit on the connection screen.
+Restored detailed SSH session diagnostics with bounded, auto-scrolling output.
+Sped up SFTP directory listings by removing per-symlink network requests and batching large console updates.
+Fixed unchanged SFTP refreshes and listing failures leaving command controls stuck on “Working…”.

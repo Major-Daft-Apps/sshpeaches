@@ -1,9 +1,13 @@
 package com.termux.view;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
@@ -25,6 +29,31 @@ import java.util.List;
 
 @RunWith(AndroidJUnit4.class)
 public final class TerminalViewStandaloneInputTest {
+
+    @Test
+    public void copyTextMarksStandaloneTerminalSelectionSensitive() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            TerminalView view = new TerminalView(context, null);
+            view.copyTextToClipboard("terminal-secret");
+
+            ClipboardManager clipboard =
+                (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            assertNotNull(clipboard);
+            ClipData clipData = clipboard.getPrimaryClip();
+            assertNotNull(clipData);
+            assertEquals("terminal-secret", clipData.getItemAt(0).getText().toString());
+            assertNotNull(clipData.getDescription().getExtras());
+            assertTrue(
+                clipData.getDescription().getExtras().getBoolean("android.content.extra.IS_SENSITIVE")
+            );
+            assertTrue(
+                clipData.getDescription().getExtras().getBoolean(
+                    "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
+                )
+            );
+        });
+    }
 
     @Test
     public void commitTextRoutesCodePointToClientWithoutTerminalSession() {

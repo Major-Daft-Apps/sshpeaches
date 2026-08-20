@@ -1,0 +1,13 @@
+{
+  "status": "completed",
+  "summary": "Scope identification stopped safely. No explicit known-safe Ctrl/IME-related paths were supplied, so no files were inspected and no review was performed. Confirmed requested review target was Opus 4.8. Reviewed file list is empty; no broad changed-path listing, recursive listing, repository-wide search, excluded-path access, tests, or repository modifications occurred.",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "Reviewed paths: none.",
+    "Skipped safely known ambiguous paths: none.",
+    "Scope identification stopped due to lack of explicit non-excluded target paths."
+  ]
+}

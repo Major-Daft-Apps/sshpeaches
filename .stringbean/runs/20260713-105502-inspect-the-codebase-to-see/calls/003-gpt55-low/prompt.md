@@ -1,0 +1,122 @@
+Stringbean execution policy:
+- Execution profile: rw. Agents with read_write permission may modify files in service of the task. Agents with read_only permission must not modify files; Stringbean will treat modifications as a policy violation.
+- Effective permission for this call: read_only.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+
+You are the architecture advisor.
+Review this plan and provide one structured response.
+
+Task:
+inspect the codebase to see the description
+
+Plan:
+{
+  "summary": "SSHPeaches is a Kotlin/Jetpack Compose Android SSH client. The repository description is already documented in README.md and corroborated by docs/task-2-summary.json and docs/task-3-summary.json: it connects to servers over SSH/Mosh, manages saved hosts and identities, supports terminal sessions, SFTP/SCP transfers, local port forwards, QR import/export, command snippets, terminal themes, custom keyboard layouts, widgets, uptime checks, and security settings. The current worktree contains a broad set of uncommitted changes centered on terminal input ordering, Mosh input buffering/reconnect behavior, keyboard layout/icon handling, settings/session UI, and matching unit/instrumented tests. Because this role is read-only, no files were modified; the plan below is for validating and completing the codebase description/audit work without overwriting existing changes.",
+  "assumptions": [
+    "The requested outcome is an implementation plan for describing/auditing the repository, not an immediate source edit.",
+    "Existing uncommitted files may include prior agent work and should be preserved.",
+    "docs/task-2-summary.json and docs/task-3-summary.json are intended prior artifacts for project purpose and architecture summaries.",
+    "Forbidden .stringbean run files and final-summary.md must not be edited by this role."
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Consolidate project description sources",
+      "description": "Read README.md, docs/README.md, user wiki pages, developer notes, docs/task-2-summary.json, and docs/task-3-summary.json. Produce a concise canonical description covering product purpose, user-facing capabilities, platform target, architecture, and key source areas. Keep documented claims separate from implementation-verified claims.",
+      "dependencies": [],
+      "recommended_role": "advisor",
+      "permissions": "read_only",
+      "verification": [
+        "Confirm every product claim is traceable to README.md, docs/user-wiki, or source files.",
+        "Confirm architecture claims mention concrete paths/classes such as SessionService.kt, AppViewModel.kt, SettingsStore.kt, SshClientProvider.kt, and Termux terminal integration.",
+        "Confirm future/design-goal material is not presented as already shipped behavior unless verified in source."
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Audit current uncommitted change themes",
+      "description": "Inspect git status and the touched source/test files to classify the current worktree changes by feature area: Mosh input buffering, terminal input routing, custom keyboard behavior, settings/session UI, SSH provider behavior, and test coverage. Do not revert or overwrite existing modifications.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "advisor",
+      "permissions": "read_only",
+      "verification": [
+        "List modified and untracked files by functional area.",
+        "Identify whether the codebase description should mention active Mosh and keyboard-input work as current implementation or in-progress changes.",
+        "Flag any apparent mismatch between documentation and observed source behavior for follow-up."
+      ]
+    },
+    {
+      "id": "task-3",
+      "title": "Validate source-backed feature inventory",
+      "description": "Sample key implementation files to verify that documented capabilities map to real modules: SSH/Mosh sessions in service/, persistence in data/local and data/settings, security in security/, UI flows in ui/screens, QR components in ui/components, terminal rendering/input in ui/terminal and ui/keyboard, and tests under src/test and src/androidTest.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "advisor",
+      "permissions": "read_only",
+      "verification": [
+        "Verify each major feature area has a corresponding implementation path.",
+        "Mark any feature as inferred if only model or UI names are observed without end-to-end code review.",
+        "Avoid exhaustive line-by-line review unless a discrepancy appears."
+      ]
+    },
+    {
+      "id": "task-4",
+      "title": "Create or update a human-readable repository description artifact",
+      "description": "If write permission is later granted, add a concise description artifact such as docs/project-description.md or update an existing summary file. It should summarize product purpose, main features, technical architecture, source map, and testing strategy without duplicating long README content.",
+      "dependencies": [
+        "task-1",
+        "task-2",
+        "task-3"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_write",
+      "verification": [
+        "Run git diff to ensure only the intended documentation artifact changed.",
+        "Check Markdown formatting and links manually.",
+        "Confirm no .stringbean run metadata or forbidden paths were modified."
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "Run focused verification commands",
+      "description": "If execution is allowed, run non-destructive checks appropriate to the final deliverable. For documentation-only work, use rg-based link/path spot checks. For any code changes discovered as necessary, run targeted Gradle unit tests around changed areas before final handoff.",
+      "dependencies": [
+        "task-4"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_write",
+      "verification": [
+        "./gradlew testDebugUnitTest for unit-testable changes, if code is edited.",
+        "Targeted tests such as BoundedMoshInputQueueTest, TerminalInputRouterTest, KeyboardLayoutDefaultsTest, KeyboardIconPackTest, and SshClientProviderTest if those areas are changed.",
+        "No denied commands or denied git operations are used."
+      ]
+    }
+  ],
+  "risks": [
+    "The worktree is already dirty, so a write-capable implementation must avoid overwriting prior user or agent changes.",
+    "Documentation may describe aspirational behavior from developer blueprints; those claims need clear labeling unless source-verified.",
+    "Mosh and terminal input behavior involve concurrency and service lifecycle paths, so superficial source inspection may miss runtime issues.",
+    "Instrumented Android tests may require emulator/device setup and could be unavailable in the current execution environment.",
+    "The retry policy forbids modifying specific .stringbean artifacts; any automated summarization step must avoid those paths."
+  ],
+  "advisor_questions": [
+    "Should the final description artifact be a new docs/project-description.md file, an update to README.md, or only a structured summary returned to the orchestrator?",
+    "Should in-progress uncommitted Mosh/keyboard changes be described as current functionality, or should the description stick only to committed/documented behavior?",
+    "Is the intended audience end users, contributors, app-store reviewers, or future coding agents?"
+  ]
+}
+
+Return JSON:
+{
+  "verdict": "approve|revise|block",
+  "severity": "none",
+  "summary": "...",
+  "blockers": [],
+  "concerns": [],
+  "recommendations": []
+}

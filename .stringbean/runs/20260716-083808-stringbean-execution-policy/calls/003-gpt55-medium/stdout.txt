@@ -1,0 +1,35 @@
+{
+  "summary": "Revise the read-only Opus 4.8 review plan so scope identification avoids broad changed-path discovery and inspects only explicitly known, non-excluded Ctrl/IME-related paths. If no safe target paths are already known, the implementer must stop and report that review scope cannot be identified without risking excluded-path disclosure.",
+  "assumptions": [
+    "The task is scope identification and review only; no repository files may be modified, deleted, renamed, moved, or type-changed.",
+    "The requested reviewer/provider target remains Opus 4.8.",
+    "Allowed file scope is currently empty, so there are no pre-approved repository paths to inspect unless the implementer already has explicit, non-excluded Ctrl/IME-related paths from the task context.",
+    "Excluded paths and excluded path names must not be listed, searched, opened, summarized, transmitted, created, or modified."
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Identify Ctrl/IME Change Scope",
+      "description": "Use only targeted read-only git commands against explicitly known, non-excluded paths that are clearly related to Ctrl key handling, IME input, soft keyboard behavior, terminal input dispatch, or associated tests. Do not run broad discovery commands such as `git status --short`, `git diff --name-only`, recursive file listings, or repository-wide searches because they may reveal excluded path names. Acceptable commands are limited to targeted forms such as `git diff -- <known-safe-path>` or `git diff -- <known-safe-directory>/` after verifying the target path is not excluded by policy. If no explicit known-safe Ctrl/IME-related paths are available, stop without inspecting files and report that scope identification cannot proceed safely.",
+      "dependencies": [],
+      "recommended_role": "reviewer",
+      "permissions": "read_only",
+      "verification": [
+        "Confirm the reviewed file list is limited to explicitly known, non-excluded Ctrl/IME-related paths.",
+        "Confirm no broad changed-path listing, recursive listing, or repository-wide search was run.",
+        "Confirm no excluded paths were listed, searched, opened, summarized, transmitted, created, or modified.",
+        "Confirm no repository files were modified.",
+        "Confirm Opus 4.8 is the requested review model/provider target.",
+        "Report reviewed paths, commands run, tests run if any, skipped safely known ambiguous paths if any, and whether scope identification was stopped due to lack of safe target paths."
+      ]
+    }
+  ],
+  "risks": [
+    "With an empty allowed file scope, the reviewer may have no safe path targets and must stop rather than discover paths broadly.",
+    "Using broad git metadata commands could disclose excluded path names, which is forbidden by policy.",
+    "Ambiguous changed files cannot be safely classified unless their paths are already known through non-excluded, in-scope task context."
+  ],
+  "advisor_questions": [
+    "Can the advisor or requester provide an explicit allowlist of non-excluded Ctrl/IME-related file paths for targeted review?"
+  ]
+}

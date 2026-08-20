@@ -1,0 +1,37 @@
+{
+  "status": "completed",
+  "summary": "Added deterministic JVM regression coverage for stale terminal route recovery, including service-readiness delay, render gating before cleanup navigation, valid live requested-session preservation, stale requestedOpenSessionId handling, and route recovery behavior.",
+  "files_changed": [
+    "app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt"
+  ],
+  "commands_run": [
+    "sed -n '1,220p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260713154557/skills/sbx/SKILL.md",
+    "pwd",
+    "rg --files -g '!**/.stringbean/runs/**' -g '!**/.env*' -g '!**/.secrets/**' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/credentials.json' -g '!**/service-account*.json' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "git status --short",
+    "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt",
+    "sed -n '1,260p' app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "rg -n \"decideStaleSessionRoute|decideSessionRouteRendering|renderTerminalContent|sessionServiceReady|requestedOpenSessionId|routeBeforeConnecting|quickConnectRequestSessionId|sawSnapshot\" app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt",
+    "sed -n '1,220p' app/build.gradle.kts",
+    "sed -n '1,220p' app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt",
+    "rg -n \"SSHPeachesRoot\\(|AppUiState\\(|SessionRouteReadiness\" app/src/test/java app/src/androidTest/java -g '!**/.stringbean/runs/**' -g '!**/.env*' -g '!**/.secrets/**' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/credentials.json' -g '!**/service-account*.json' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "sed -n '280,380p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '400,840p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '1300,1375p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '220,420p' app/build.gradle.kts",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+    "git diff -- app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt",
+    "git status --short app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+      "result": "passed"
+    }
+  ],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "The worktree had many pre-existing dirty and untracked files. I only changed app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt for this task."
+  ]
+}

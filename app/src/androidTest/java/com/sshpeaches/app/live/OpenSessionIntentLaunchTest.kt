@@ -1,10 +1,8 @@
 package com.majordaftapps.sshpeaches.app.live
 
-import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
-import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.runtime.MutableState
@@ -20,7 +18,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.UiDevice
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -32,6 +29,7 @@ import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.LiveBackendConfig
 import com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.testutil.launchMainActivityThroughFramework
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
@@ -41,7 +39,6 @@ import java.util.UUID
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.rules.TestRule
 
 @RunWith(AndroidJUnit4::class)
 @LiveTransportTest
@@ -51,12 +48,7 @@ class OpenSessionIntentLaunchTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: TestRule =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            TestRule { base, _ -> base }
-        }
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @get:Rule(order = 2)
     val composeRule = createEmptyComposeRule()

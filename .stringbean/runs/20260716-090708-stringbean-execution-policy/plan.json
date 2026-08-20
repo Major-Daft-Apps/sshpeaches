@@ -1,0 +1,7 @@
+{
+  "summary": "Prepared a read-only review plan for task-1 focused on identifying the scope of existing Ctrl/IME-related changes without modifying files. The plan limits inspection to read-only git metadata and narrowly targeted diffs for paths clearly related to Ctrl key handling, IME input, soft keyboard behavior, terminal input dispatch, or associated tests. Opus 4.8 is the requested review model/provider target.",
+  "assumptions": [],
+  "tasks": [],
+  "risks": [],
+  "advisor_questions": []
+}

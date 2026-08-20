@@ -49,6 +49,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
@@ -86,10 +87,13 @@ class MainActivity : FragmentActivity() {
     private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
     private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
     private val pendingWidgetConnectFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
+    private val pendingWidgetConnectSessionId = mutableStateOf<String?>(null)
     private val corePermissionsRefreshTick = mutableStateOf(0)
     private val pendingSftpDirectoryRequests = LinkedHashMap<String, String>()
+    private val pendingFileTransferRequests = mutableListOf<PendingFileTransferRequest>()
     private var latestAllowBackgroundSessions: Boolean = true
     private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
+    private var latestUiState: AppUiState = AppUiState()
     private var backgroundSessionTimeoutJob: Job? = null
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -109,7 +113,17 @@ class MainActivity : FragmentActivity() {
                 }
                 pendingSftpDirectoryRequests.clear()
             }
-            UiDebugLog.result("SessionService.onServiceConnected", true, "bound=true")
+            if (service != null && pendingFileTransferRequests.isNotEmpty()) {
+                val pending = pendingFileTransferRequests.toList()
+                pendingFileTransferRequests.clear()
+                pending.forEach { request -> dispatchFileTransfer(service, request) }
+            }
+            tryStartPendingWidgetSession(service)
+            UiDebugLog.result(
+                "SessionService.onServiceConnected",
+                service != null,
+                "bound=true, serviceReady=${service != null}"
+            )
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -294,8 +308,10 @@ class MainActivity : FragmentActivity() {
         restorePendingIntentState(savedInstanceState)
         lifecycleScope.launch {
             appViewModel.uiState.collect { state ->
+                latestUiState = state
                 latestAllowBackgroundSessions = state.allowBackgroundSessions
                 latestBackgroundSessionTimeout = state.backgroundSessionTimeout
+                tryStartPendingWidgetSession()
             }
         }
         // Only consume the launch intent on a cold start. During recreation the pending
@@ -390,37 +406,6 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
-            LaunchedEffect(
-                pendingWidgetConnectHostId.value,
-                pendingWidgetConnectMode.value,
-                pendingWidgetConnectFileTransferEntryMode.value,
-                uiState.hosts,
-                sessionService
-            ) {
-                val hostId = pendingWidgetConnectHostId.value ?: return@LaunchedEffect
-                val mode = pendingWidgetConnectMode.value ?: return@LaunchedEffect
-                if (sessionService == null) {
-                    ensureSessionServiceConnection()
-                    return@LaunchedEffect
-                }
-                val host = uiState.hosts.firstOrNull { it.id == hostId }
-                if (host == null) {
-                    UiDebugLog.result("widgetStartSession", false, "host-not-found hostId=$hostId")
-                    pendingWidgetConnectHostId.value = null
-                    pendingWidgetConnectMode.value = null
-                    pendingWidgetConnectFileTransferEntryMode.value = null
-                    return@LaunchedEffect
-                }
-                val sessionId = "$hostId|${mode.name}|${UUID.randomUUID()}"
-                startSession(sessionId, host, mode, null, true)
-                requestedOpenSessionHostId.value = sessionId
-                requestedOpenSessionFileTransferEntryMode.value =
-                    pendingWidgetConnectFileTransferEntryMode.value
-                pendingWidgetConnectHostId.value = null
-                pendingWidgetConnectMode.value = null
-                pendingWidgetConnectFileTransferEntryMode.value = null
-                UiDebugLog.result("widgetStartSession", true, "sessionId=$sessionId")
-            }
             val stopSession: (String) -> Unit = remember(sessionService) {
                 { id: String ->
                     UiDebugLog.action("uiStopSession", "hostId=$id, serviceReady=${sessionService != null}")
@@ -476,12 +461,28 @@ class MainActivity : FragmentActivity() {
             }
             val sftpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
                 { hostId: String, remotePath: String, localPath: String? ->
-                    sessionService?.sftpDownloadFile(hostId, remotePath, localPath)
+                    submitOrQueueFileTransfer(
+                        sessionService,
+                        PendingFileTransferRequest(
+                            kind = PendingFileTransferKind.SFTP_DOWNLOAD,
+                            sessionId = hostId,
+                            sourcePath = remotePath,
+                            destinationPath = localPath
+                        )
+                    )
                 }
             }
             val sftpUploadFile: (String, String, String) -> Unit = remember(sessionService) {
                 { hostId: String, localPath: String, remotePath: String ->
-                    sessionService?.sftpUploadFile(hostId, localPath, remotePath)
+                    submitOrQueueFileTransfer(
+                        sessionService,
+                        PendingFileTransferRequest(
+                            kind = PendingFileTransferKind.SFTP_UPLOAD,
+                            sessionId = hostId,
+                            sourcePath = localPath,
+                            destinationPath = remotePath
+                        )
+                    )
                 }
             }
             val manageRemotePath: (String, String, String, String?) -> Unit = remember(sessionService) {
@@ -491,12 +492,33 @@ class MainActivity : FragmentActivity() {
             }
             val scpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
                 { hostId: String, remotePath: String, localPath: String? ->
-                    sessionService?.scpDownloadFile(hostId, remotePath, localPath)
+                    submitOrQueueFileTransfer(
+                        sessionService,
+                        PendingFileTransferRequest(
+                            kind = PendingFileTransferKind.SCP_DOWNLOAD,
+                            sessionId = hostId,
+                            sourcePath = remotePath,
+                            destinationPath = localPath
+                        )
+                    )
                 }
             }
             val scpUploadFile: (String, String, String) -> Unit = remember(sessionService) {
                 { hostId: String, localPath: String, remotePath: String ->
-                    sessionService?.scpUploadFile(hostId, localPath, remotePath)
+                    submitOrQueueFileTransfer(
+                        sessionService,
+                        PendingFileTransferRequest(
+                            kind = PendingFileTransferKind.SCP_UPLOAD,
+                            sessionId = hostId,
+                            sourcePath = localPath,
+                            destinationPath = remotePath
+                        )
+                    )
+                }
+            }
+            val cancelFileTransfer: (String) -> Unit = remember(sessionService) {
+                { hostId: String ->
+                    sessionService?.cancelFileTransfer(hostId)
                 }
             }
             val resolveTerminalEmulator: (String) -> TerminalEmulator? = remember(sessionService) {
@@ -679,6 +701,7 @@ class MainActivity : FragmentActivity() {
                         onManageRemotePath = manageRemotePath,
                         onScpDownloadFile = scpDownloadFile,
                         onScpUploadFile = scpUploadFile,
+                        onCancelFileTransfer = cancelFileTransfer,
                         onOpenSessionRequestHandled = { handledSessionId ->
                             val pendingSessionId = requestedOpenSessionHostId.value
                             val matchesPendingRequest = pendingSessionId == handledSessionId
@@ -733,9 +756,14 @@ class MainActivity : FragmentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_REQUESTED_OPEN_SESSION_ID, requestedOpenSessionHostId.value)
+        outState.putString(
+            STATE_REQUESTED_OPEN_SESSION_FILE_TRANSFER_ENTRY_MODE,
+            requestedOpenSessionFileTransferEntryMode.value?.name
+        )
         outState.putString(STATE_REQUESTED_STARTUP_ROUTE, requestedStartupRoute.value)
         outState.putString(STATE_PENDING_WIDGET_HOST_ID, pendingWidgetConnectHostId.value)
         outState.putString(STATE_PENDING_WIDGET_MODE, pendingWidgetConnectMode.value?.name)
+        outState.putString(STATE_PENDING_WIDGET_SESSION_ID, pendingWidgetConnectSessionId.value)
         outState.putString(
             STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE,
             pendingWidgetConnectFileTransferEntryMode.value?.name
@@ -757,7 +785,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
+        // Incoming actions are represented by explicit, saved state below. Keeping the original
+        // launch intent stable also prevents lifecycle observers from losing ownership of this
+        // Activity after a singleTop delivery.
         handleIncomingIntent(intent)
     }
 
@@ -871,6 +901,9 @@ class MainActivity : FragmentActivity() {
                 pendingWidgetConnectHostId.value = hostId
                 pendingWidgetConnectMode.value = mode
                 pendingWidgetConnectFileTransferEntryMode.value = fileTransferEntryMode
+                pendingWidgetConnectSessionId.value = generateWidgetSessionId(hostId, mode)
+                ensureSessionServiceConnection()
+                tryStartPendingWidgetSession()
                 UiDebugLog.result("handleWidgetConnectIntent", true, "hostId=$hostId, mode=$mode")
             }
         }
@@ -880,6 +913,9 @@ class MainActivity : FragmentActivity() {
         if (savedInstanceState == null) return
         requestedOpenSessionHostId.value =
             savedInstanceState.getString(STATE_REQUESTED_OPEN_SESSION_ID)
+        requestedOpenSessionFileTransferEntryMode.value =
+            savedInstanceState.getString(STATE_REQUESTED_OPEN_SESSION_FILE_TRANSFER_ENTRY_MODE)
+                ?.let { value -> runCatching { FileTransferEntryMode.valueOf(value) }.getOrNull() }
         requestedStartupRoute.value =
             savedInstanceState.getString(STATE_REQUESTED_STARTUP_ROUTE)
                 ?.takeIf(::isSupportedStartupRoute)
@@ -888,9 +924,118 @@ class MainActivity : FragmentActivity() {
         pendingWidgetConnectMode.value =
             savedInstanceState.getString(STATE_PENDING_WIDGET_MODE)
                 ?.let { value -> runCatching { ConnectionMode.valueOf(value) }.getOrNull() }
+        pendingWidgetConnectSessionId.value =
+            savedInstanceState.getString(STATE_PENDING_WIDGET_SESSION_ID)
         pendingWidgetConnectFileTransferEntryMode.value =
             savedInstanceState.getString(STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE)
                 ?.let { value -> runCatching { FileTransferEntryMode.valueOf(value) }.getOrNull() }
+    }
+
+    private fun tryStartPendingWidgetSession(
+        service: SessionService? = sessionServiceState.value
+    ) {
+        val hostId = pendingWidgetConnectHostId.value ?: return
+        val mode = pendingWidgetConnectMode.value ?: return
+        if (!latestUiState.resourcesLoaded) {
+            UiDebugLog.result(
+                "widgetStartSession",
+                false,
+                "waiting-for-resources hostId=$hostId"
+            )
+            return
+        }
+        if (service == null) {
+            ensureSessionServiceConnection()
+            UiDebugLog.result(
+                "widgetStartSession",
+                false,
+                "waiting-for-service hostId=$hostId"
+            )
+            return
+        }
+        val host = latestUiState.hosts.firstOrNull { it.id == hostId }
+        if (host == null) {
+            clearPendingWidgetConnect()
+            UiDebugLog.result("widgetStartSession", false, "host-not-found hostId=$hostId")
+            return
+        }
+        val sessionId = pendingWidgetConnectSessionId.value
+            ?: generateWidgetSessionId(hostId, mode)
+        requestedOpenSessionHostId.value = sessionId
+        requestedOpenSessionFileTransferEntryMode.value =
+            pendingWidgetConnectFileTransferEntryMode.value
+        service.startSession(
+            requestedSessionId = sessionId,
+            host = host,
+            mode = mode,
+            passwordOverride = null,
+            availableForwards = latestUiState.portForwards,
+            availableSnippets = latestUiState.snippets,
+            autoStartForwards = latestUiState.autoStartForwards,
+            autoTrustUnknownHostKey = latestUiState.autoTrustHostKey,
+            hostKeyPromptEnabled = latestUiState.hostKeyPromptEnabled,
+            allowPasswordSave = true,
+            terminalEmulation = latestUiState.terminalEmulation
+        )
+        clearPendingWidgetConnect()
+        UiDebugLog.result("widgetStartSession", true, "sessionId=$sessionId")
+    }
+
+    private fun clearPendingWidgetConnect() {
+        pendingWidgetConnectHostId.value = null
+        pendingWidgetConnectMode.value = null
+        pendingWidgetConnectFileTransferEntryMode.value = null
+        pendingWidgetConnectSessionId.value = null
+    }
+
+    private fun generateWidgetSessionId(hostId: String, mode: ConnectionMode): String =
+        "$hostId|${mode.name}|${UUID.randomUUID()}"
+
+    private fun submitOrQueueFileTransfer(
+        service: SessionService?,
+        request: PendingFileTransferRequest
+    ) {
+        if (service != null) {
+            dispatchFileTransfer(service, request)
+            return
+        }
+        pendingFileTransferRequests.removeAll {
+            it.sessionId == request.sessionId && it.kind == request.kind
+        }
+        pendingFileTransferRequests += request
+        ensureSessionServiceConnection()
+    }
+
+    private fun dispatchFileTransfer(
+        service: SessionService,
+        request: PendingFileTransferRequest
+    ) {
+        when (request.kind) {
+            PendingFileTransferKind.SFTP_DOWNLOAD ->
+                service.sftpDownloadFile(
+                    request.sessionId,
+                    request.sourcePath,
+                    request.destinationPath
+                )
+            PendingFileTransferKind.SFTP_UPLOAD ->
+                service.sftpUploadFile(
+                    request.sessionId,
+                    request.sourcePath,
+                    request.destinationPath.orEmpty()
+                )
+            PendingFileTransferKind.SCP_DOWNLOAD ->
+                service.scpDownloadFile(
+                    request.sessionId,
+                    request.sourcePath,
+                    request.destinationPath
+                )
+            PendingFileTransferKind.SCP_UPLOAD ->
+                service.scpUploadFile(
+                    request.sessionId,
+                    request.sourcePath,
+                    request.destinationPath.orEmpty()
+                )
+        }
     }
 
     private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
@@ -916,10 +1061,27 @@ class MainActivity : FragmentActivity() {
         private const val CORE_PERMISSION_PREFS = "core_permission_state"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
         private const val STATE_REQUESTED_OPEN_SESSION_ID = "state_requested_open_session_id"
+        private const val STATE_REQUESTED_OPEN_SESSION_FILE_TRANSFER_ENTRY_MODE =
+            "state_requested_open_session_file_transfer_entry_mode"
         private const val STATE_REQUESTED_STARTUP_ROUTE = "state_requested_startup_route"
         private const val STATE_PENDING_WIDGET_HOST_ID = "state_pending_widget_host_id"
         private const val STATE_PENDING_WIDGET_MODE = "state_pending_widget_mode"
+        private const val STATE_PENDING_WIDGET_SESSION_ID = "state_pending_widget_session_id"
         private const val STATE_PENDING_WIDGET_FILE_TRANSFER_ENTRY_MODE =
             "state_pending_widget_file_transfer_entry_mode"
     }
 }
+
+private enum class PendingFileTransferKind {
+    SFTP_DOWNLOAD,
+    SFTP_UPLOAD,
+    SCP_DOWNLOAD,
+    SCP_UPLOAD
+}
+
+private data class PendingFileTransferRequest(
+    val kind: PendingFileTransferKind,
+    val sessionId: String,
+    val sourcePath: String,
+    val destinationPath: String?
+)

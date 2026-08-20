@@ -1,0 +1,27 @@
+{
+  "status": "completed",
+  "summary": "Diagnosed stale terminal route: after background session shutdown, the Compose route and quickConnectRequest can remain on CONNECTING/SESSION while SessionService is bound with no matching SessionSnapshot, so resolveTerminalEmulator would return null and the terminal pane could render empty. Fixed by passing sessionServiceReady into SSHPeachesRoot, reading SessionService StateFlows with their current values, detecting missing backed sessions on ready service, suppressing stale SessionVerticalContent, and navigating immediately back to routeBeforeConnecting/Home. Live-session behavior is preserved by only treating the route as stale after service readiness and either SESSION route or prior snapshot observation.",
+  "files_changed": [
+    "app/src/main/java/com/sshpeaches/app/MainActivity.kt",
+    "app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt"
+  ],
+  "commands_run": [
+    "./gradlew :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin",
+    "./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.live.LiveTransportSuiteTest#foregroundAfterBackgroundClosesTerminalSession_returnsHomeWithoutStaleTerminal,com.majordaftapps.sshpeaches.app.live.LiveTransportSuiteTest#backgroundAndForegroundWhileTerminalSessionIsOpen_keepsConnectingRoute,com.majordaftapps.sshpeaches.app.live.LiveTransportSuiteTest#recreateWhileTerminalSessionIsOpen_restoresConnectingRoute,com.majordaftapps.sshpeaches.app.live.OpenSessionIntentLaunchTest#openSessionIntentColdLaunch_restoresExistingLiveTerminal,com.majordaftapps.sshpeaches.app.live.OpenSessionIntentLaunchTest#launcherRelaunchShowsOpenSessionAndResumesItFromHome",
+    "./gradlew :app:testDebugUnitTest"
+  ],
+  "tests": [
+    "PASS: :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin",
+    "PASS: :app:testDebugUnitTest",
+    "BLOCKED: targeted connectedDebugAndroidTest could not run because Gradle reported no connected devices"
+  ],
+  "remaining_issues": [
+    "Targeted instrumentation tests, including the new stale-session regression and the four named valid-session tests, still need to be run on a connected emulator/device with the live SSH backend available."
+  ],
+  "handoff_notes": [
+    "Added regression test foregroundAfterBackgroundClosesTerminalSession_returnsHomeWithoutStaleTerminal.",
+    "Existing valid-session tests referenced by the task were included in the targeted instrumentation command but could not execute due no connected devices.",
+    "Worktree had substantial pre-existing modifications; only the listed files were touched for this task."
+  ]
+}

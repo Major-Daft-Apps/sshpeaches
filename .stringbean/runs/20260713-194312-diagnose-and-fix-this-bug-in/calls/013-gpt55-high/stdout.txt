@@ -1,0 +1,10 @@
+{
+  "verdict": "approve",
+  "summary": "The changes implement a focused stale-session readiness gate before terminal content is composed, recover to a validated prior non-session route, consume stale open-session intents, and preserve valid live active-session rendering. Regression coverage was added for stale resume/open-session paths, and the relevant unit tests plus androidTest compilation pass.",
+  "blocking_issues": [],
+  "non_blocking_issues": [],
+  "required_fixes": [],
+  "tests_recommended": [
+    "Run the connected/live instrumentation tests on a device or emulator with the live SSH backend, especially the new stale foreground/open-session resume cases."
+  ]
+}

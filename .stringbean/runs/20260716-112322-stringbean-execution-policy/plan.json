@@ -1,0 +1,56 @@
+{
+  "summary": "Revise the read-only Opus 4.8 review plan for existing task-1 Ctrl/IME changes with explicit exclusion-safe scoping, concrete inspection limits, and a strict no-create/no-modify repository policy.",
+  "assumptions": [
+    "Task-1 produced an in-scope changed-file list or patch reference that can be identified without broad workspace scanning.",
+    "The reviewer has access to Opus 4.8. If Opus 4.8 is unavailable, the review must stop and report the model mismatch instead of using a substitute.",
+    "Only non-excluded repository paths may be listed, opened, searched, summarized, or transmitted.",
+    "The stricter effective policy is read-only for the review: do not create, modify, delete, rename, move, type-change, commit, push, or otherwise mutate any repository path."
+  ],
+  "tasks": [
+    {
+      "id": "task-2.1",
+      "title": "Identify changed input paths",
+      "description": "Identify only task-1 changed paths from a known in-scope source, such as a previously provided task-1 path list, a task-1 patch reference, or read-only git metadata constrained by explicit pathspec exclusions. Apply the excluded-path and credential-like filters before listing, opening, searching, or summarizing any path. Do not run broad filesystem search over the whole workspace.",
+      "dependencies": [],
+      "recommended_role": "reviewer",
+      "permissions": "read_only",
+      "verification": [
+        "List only in-scope task-1 changed files relevant to Ctrl/IME behavior.",
+        "Confirm excluded paths, credential paths, key files, certificate files, and secret-like paths were not listed for content, opened, searched, summarized, or transmitted.",
+        "Confirm no broad workspace search was used.",
+        "Confirm no repository files or artifacts were created, modified, deleted, renamed, moved, or type-changed."
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Review input handling semantics",
+      "description": "Using Opus 4.8 only, review the filtered task-1 Ctrl/IME code paths for correctness across hardware Ctrl combinations, Android meta-state handling, soft keyboard composition, delete/backspace, enter, escape, Unicode text input, key down/up behavior, repeat handling, terminal writer behavior, and control-sequence emission. Produce review findings only, with file and line references where applicable, and do not modify files.",
+      "dependencies": [
+        "task-2.1"
+      ],
+      "recommended_role": "reviewer",
+      "permissions": "read_only",
+      "verification": [
+        "Check whether Ctrl combinations map to expected terminal control bytes, including Ctrl+A through Ctrl+Z, bracket, backslash, right-bracket, caret, underscore, and ambiguous platform meta-state cases.",
+        "Check whether composed IME text is preserved and not double-sent through commitText, composing paths, and key event fallback paths.",
+        "Check whether delete, backspace, enter, and escape produce expected terminal bytes or sequences for hardware and soft keyboard paths.",
+        "Check whether key down/up and repeat behavior avoid duplicate terminal input, especially for printable keys, Ctrl-modified keys, and long-press repeat events.",
+        "Check whether Unicode text input outside simple ASCII is forwarded without truncation, lossy keyCode conversion, or duplicate emission.",
+        "Check whether terminal writer calls preserve ordering and do not mix text commits with control-sequence writes incorrectly.",
+        "Confirm no repository files or artifacts were created, modified, deleted, renamed, moved, or type-changed during the review."
+      ]
+    }
+  ],
+  "risks": [
+    "Task-1 changes may be mixed with unrelated working-tree changes, so the reviewer must anchor scope to a known task-1 source and exclude unrelated paths.",
+    "A broad git or filesystem command may reveal excluded path names before filtering, so changed-file enumeration must use explicit exclusions or an already-filtered task-1 path source.",
+    "Android keyboard behavior varies by hardware keyboard, soft keyboard, IME, and device version, so source review findings should distinguish confirmed bugs from cases needing device or emulator validation.",
+    "Ctrl/meta behavior can be affected by KeyEvent normalization and modifier masks, making simple ASCII tests insufficient.",
+    "If Opus 4.8 is unavailable, proceeding with another model would violate the execution requirement."
+  ],
+  "advisor_questions": [
+    "What exact in-scope source should the reviewer use to identify task-1 changed files without broad enumeration: a task-1 patch, a prior file list, or constrained git diff output?",
+    "What terminal compatibility target should Ctrl mapping be judged against: POSIX control bytes only, xterm-style extended sequences, or existing app behavior?",
+    "Should changed tests or fixtures from task-1 be treated as authoritative expected behavior, or should the review validate independently against terminal conventions?"
+  ]
+}

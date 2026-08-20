@@ -1,0 +1,4003 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.0
+--------
+workdir: /home/zenulabidin/Documents/sshpeaches
+model: gpt-5.5
+provider: openai
+approval: on-request
+sandbox: danger-full-access
+reasoning effort: high
+reasoning summaries: none
+session id: 019f5d27-3d9d-7031-b7ab-2afab1afdd65
+--------
+user
+Stringbean execution policy:
+- Execution profile: rw. Agents with read_write permission may modify files in service of the task. Agents with read_only permission must not modify files; Stringbean will treat modifications as a policy violation.
+- Effective permission for this call: read_write.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+- Default workspace boundary: /home/zenulabidin/Documents/sshpeaches. Do not inspect unrelated parent or sibling paths. A path explicitly named by the user's task is in scope unless an excluded-path rule protects it.
+- Ordered excluded-path rules (`!` means an allowed exception): .stringbean/runs, .stringbean/runs/**, **/.stringbean/runs, **/.stringbean/runs/**, .env*, **/.env*, !.env.example, !**/.env.example, !.env.sample, !**/.env.sample, !.env.template, !**/.env.template, .secrets, .secrets/**, **/.secrets, **/.secrets/**, secrets, secrets/**, **/secrets, **/secrets/**, credentials, credentials/**, **/credentials, **/credentials/**, credentials.json, **/credentials.json, service-account*.json, **/service-account*.json, *.pem, **/*.pem, *.key, **/*.key, *.p12, **/*.p12, *.pfx, **/*.pfx.
+- Never read, list, search, summarize, modify, or transmit content from paths excluded by those rules.
+- If an excluded path appears relevant, skip it and continue with the rest of the task. Do not retry access and do not ask another agent to inspect it.
+
+You are an implementer.
+Implement only the listed task and avoid unrelated changes.
+
+Task:
+Diagnose and fix this bug in the sshpeaches Android app: If an OpenSSH terminal session is open, the SSH connection closes in the background while the app is not foregrounded, and the app is later foregrounded via a notification, Activity Manager, launcher, or another resume path, it shows the SSH Terminal Open pane with a completely empty and unusable terminal because no backing terminal/session exists. The user currently has to press Back. On foreground/resume, automatically return to the previous screen before the stale terminal pane is drawn, with no fade, animation, brief flicker, or empty terminal frame. Inspect the existing architecture and lifecycle/navigation handling, implement the smallest robust fix across all relevant foreground entry paths, preserve valid live-session behavior, add or update regression tests, and run appropriate tests. Do not merely report a diagnosis: make the code changes and verify them.
+
+Objective:
+task-6 - Add root navigation regression tests
+
+Plan task:
+{
+  "id": "task-6",
+  "title": "Add root navigation regression tests",
+  "description": "Add deterministic tests for the pure helper and, where the existing architecture allows, Compose/root navigation behavior without requiring a live SSH backend. Cover stale route gating, readiness delay, valid live snapshot preservation, requestedOpenSessionId handling, and routeBeforeConnecting validation.",
+  "dependencies": [
+    "task-5"
+  ],
+  "recommended_role": "implementer",
+  "permissions": "read_write",
+  "verification": [
+    "Core stale-route behavior is covered by tests that can run without emulator/live SSH infrastructure.",
+    "Tests assert terminal content is gated for stale routes before cleanup navigation completes.",
+    "Tests assert no redirect while service is not ready."
+  ]
+}
+
+Required verification:
+Core stale-route behavior is covered by tests that can run without emulator/live SSH infrastructure.
+Tests assert terminal content is gated for stale routes before cleanup navigation completes.
+Tests assert no redirect while service is not ready.
+
+Known constraints:
+Core stale-route behavior is covered by tests that can run without emulator/live SSH infrastructure.
+Tests assert terminal content is gated for stale routes before cleanup navigation completes.
+Tests assert no redirect while service is not ready.
+
+Prior constraints/advisor notes:
+implementer
+
+Allowed file scope:
+task-5
+
+Return JSON:
+{
+  "status": "completed",
+  "summary": "...",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": []
+}
+
+codex
+I’ll inspect the repo’s navigation/session test structure first, then add the narrow regression coverage requested without touching unrelated code.
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260713154557/skills/sbx/SKILL.md" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+---
+name: "sbx"
+description: "Use when the user wants to run Stringbean, sbx, or local agent orchestration from inside Codex; delegate a task to Stringbean's orchestrator; or get a full visible Stringbean run with a final sentinel result."
+---
+
+# Stringbean sbx
+
+Use this skill to invoke Stringbean from inside Codex.
+
+## Behavior
+
+1. Convert the user's request into the exact task text for Stringbean.
+2. Run Stringbean with full plugin output enabled:
+
+```bash
+sbx "<task and flags>" --plugin-full-output
+```
+
+If the current working directory is the Stringbean repository and the repo-local wrapper exists,
+this equivalent command is also acceptable:
+
+```bash
+plugins/stringbean/scripts/sbx-codex "<task and flags>"
+```
+
+3. Preserve user-specified Stringbean flags such as `--rw`, `--ro`, `--mode auto`,
+   `--mode low`, `--mode medium`, and `--mode high`.
+4. Do not add a permissions flag unless the user asks for one. Stringbean's default profile is
+   `rw`; use `--ro` only when the user explicitly asks for create-only/read-only behavior.
+5. Show useful live Stringbean output while the command runs. Lines beginning with
+   `STRINGBEAN_INTERMEDIATE:` are progress/status lines only, not final output.
+   Use the host's longest non-destructive wait or a persistent terminal session. Treat every
+   finite host timeout as a polling boundary, never permission to kill the workflow. If the terminal yields a running
+   session, poll it every 5-10 seconds and continue across as many bounded waits as necessary.
+   Do not terminate while fresh Stringbean heartbeat or agent-output lines continue to arrive.
+   Multi-hour implementation calls are valid. Stop only after a confirmed process failure or an
+   explicit user-approved interruption.
+6. If Stringbean emits `STRINGBEAN_INTERMEDIATE: Watchdog: approval required`, keep that exact
+   terminal session alive and ask the user whether to stop it. The watchdog line is a warning, not
+   termination authorization. Interrupt that session only after an unambiguous yes; otherwise keep
+   polling. If the host cannot preserve the process while asking, default to continuing it.
+7. After the command finishes, find the final block between:
+
+```text
+STRINGBEAN_FINAL_START
+STRINGBEAN_FINAL_END
+```
+
+Inside it, keep backward compatibility by reading the result block between:
+
+```text
+STRINGBEAN_RESULT_START
+STRINGBEAN_RESULT_END
+```
+
+8. The visible final answer must report the useful fields from that block, especially:
+   `Status`, `Result`, `Tasks`, `Review rounds`, and `Artifacts`.
+
+## During the run
+
+Stringbean emits normal visible run output and explicitly marked progress lines before the final block:
+
+```text
+STRINGBEAN_INTERMEDIATE: Progress: ...
+STRINGBEAN_INTERMEDIATE: Agent: ...
+STRINGBEAN_INTERMEDIATE: Agent output: ...
+```
+
+Plugin wrappers request a heartbeat every five seconds by default. A live heartbeat means
+the command is active, even when the provider is still waiting for its next model response.
+Each provider subprocess launch also emits an explicit `STRINGBEAN_INTERMEDIATE: Command:` line.
+
+Use those lines for brief user-facing updates if the run takes time. These lines are already
+sanitized: they describe phases, selected agents, parsed summaries, verdicts, bounded
+still-running heartbeats, visible assistant messages, tool calls, and capped tool output. They do
+not include hidden chain-of-thought or raw transcripts. Do not confuse them with final output, and
+do not invent generic progress text when a specific `STRINGBEAN_INTERMEDIATE:` line is available.
+
+## Output rules
+
+- Prefer the visible final result block over raw logs.
+- Do not tell the user to press Ctrl+T to see the result.
+- Do not expose hidden chain-of-thought. Progress lines are observable status, not reasoning.
+- Keep the final answer short and focused on Stringbean's final result.
+- If Stringbean fails, report the concise failure reason and any artifact path that was printed.
+
+codex
+I found the Stringbean instructions, but this request is already the implementation work rather than a request to launch a nested Stringbean run. I’m continuing locally and respecting the command/path restrictions from the policy.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc pwd in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+/home/zenulabidin/Documents/sshpeaches
+
+exec
+/usr/bin/zsh -lc "rg --files -g '"'!**/.stringbean/runs/**'"' -g '"'!**/.env*'"' -g '"'!**/.secrets/**'"' -g '"'!**/secrets/**'"' -g '"'!**/credentials/**'"' -g '"'!**/credentials.json'"' -g '"'!**/service-account*.json'"' -g '"'!**/*.pem'"' -g '"'!**/*.key'"' -g '"'!**/*.p12'"' -g '"'!**/*.pfx'"'" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+gradle.properties
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew.bat
+CHANGELOG.md
+prompt_instructions.txt
+settings.gradle.kts
+prompt_state_snapshot.txt
+README.md
+third_party/termux-playstore/terminal-view/proguard-rules.pro
+third_party/termux-playstore/terminal-view/build.gradle.kts
+macrobenchmark/build.gradle.kts
+functions/package.json
+functions/index.js
+functions/package-lock.json
+lint.xml
+gradlew
+LICENSE
+build.gradle.kts
+macrobenchmark/src/main/AndroidManifest.xml
+app/proguard-rules.pro
+app/proguard-release-androidtest-rules.pro
+app/build.gradle.kts
+app/src/androidTest/AndroidManifest.xml
+tools/live-ssh-server/build.gradle.kts
+macrobenchmark/src/main/java/com/majordaftapps/sshpeaches/macrobenchmark/StartupAndScrollBenchmark.kt
+firebase.json
+third_party/termux-playstore/terminal-emulator/proguard-rules.pro
+third_party/termux-playstore/terminal-emulator/build.gradle.kts
+third_party/termux-playstore/terminal-emulator/src/main/jni/Android.mk
+third_party/termux-playstore/terminal-emulator/src/main/jni/termux.c
+third_party/termux-playstore/terminal-emulator/src/main/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsDialogRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/ManagerSearchRecreateTest.kt
+tools/live-ssh-server/src/main/kotlin/com/majordaftapps/sshpeaches/livetest/LiveSshServer.kt
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/ThemeEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/TerminalThemeApplicationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/favorites/FavoritesScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsPreferencesTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsRestoreDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SecuritySettingsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt
+app/src/androidTest/java/com/sshpeaches/app/uptime/UptimeScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/ExternalLinksNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/AppInfoNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetter.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LifecycleTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/NotificationPermissionHelper.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/TestSuites.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetRule.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/KnownHostsSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LiveBackendConfig.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ActivityLaunchHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/snippets/SnippetCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityLockRuntimeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityManagerVaultTest.kt
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/AccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/VisualSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/QuickConnectAccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/RtlSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/permissions/NotificationPermissionStateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+app/src/main/assets/licenses/maven_licenses.json
+third_party/termux-playstore/terminal-emulator/src/test/java/android/util/Base64.java
+app/src/main/assets/licenses/fonts/droid-sans-mono-notice.txt
+app/src/main/assets/licenses/fonts/google-fonts-ofl.txt
+app/src/main/assets/licenses/fonts/cascadia-code-license.txt
+app/src/main/assets/licenses/fonts/open-dyslexic-readme.md
+app/src/main/assets/licenses/fonts/droid-sans-mono-module-license.txt
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/x86_64/libtermux.so
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/UnicodeInputTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/OperatingSystemControlTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalRowTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DeviceControlStringTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DecSetTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScreenBufferTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/VtCompatibilityTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ApcTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ControlSequenceIntroducerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TextStyleTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ResizeTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ByteQueueTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/KeyHandlerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTestCase.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/HistoryTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/WcWidthTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/RectangularAreasTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScrollRegionTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/CursorAndScreenTest.java
+app/src/main/assets/gpl-3.0.txt
+app/src/main/assets/fonts/SourceCodePro.ttf
+app/src/main/assets/fonts/OpenDyslexicMono-Regular.ttf
+app/src/main/assets/fonts/FiraCode.ttf
+app/src/main/assets/fonts/CascadiaMono-Regular.ttf
+app/src/main/assets/fonts/JetBrainsMono.ttf
+app/src/main/assets/fonts/Inconsolata-Regular.ttf
+app/src/main/assets/fonts/RobotoMono.ttf
+app/src/main/assets/fonts/DroidSansMono.ttf
+app/src/test/java/com/sshpeaches/app/ui/TransferPayloadCodecTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+app/src/main/assets/mosh/x86_64/share/terminfo/v/vt100
+app/src/main/res/raw/suse.svg
+app/src/main/res/raw/debian.svg
+app/src/main/res/raw/ubuntu.svg
+app/src/main/res/raw/bsd.svg
+app/src/main/res/raw/apple.svg
+app/src/main/res/raw/windows.svg
+app/src/main/res/raw/fedora.svg
+app/src/main/res/raw/arch.svg
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+app/src/main/res/raw/linux_mint.svg
+app/src/main/res/raw/linux.svg
+app/src/main/res/raw/redhat.svg
+app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt
+app/src/main/res/values-night/themes.xml
+app/src/test/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepositoryTest.kt
+app/src/main/res/drawable/ic_widget_close.xml
+app/src/main/res/drawable/ic_widget_cloud_download.xml
+app/src/main/res/drawable/ic_launcher_foreground.xml
+app/src/test/java/com/sshpeaches/app/data/importer/OpenSshConfigImporterTest.kt
+app/src/main/res/drawable/ic_widget_open.xml
+app/src/main/res/drawable/ic_notification_logo.xml
+app/src/main/res/drawable/widget_action_secondary_background.xml
+app/src/main/res/drawable/ic_widget_cloud_upload.xml
+app/src/main/res/drawable/widget_section_surface.xml
+app/src/main/res/drawable/widget_row_surface.xml
+app/src/main/res/drawable/ic_widget_terminal.xml
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+app/src/main/res/drawable/widget_action_primary_background.xml
+app/src/main/res/drawable/widget_action_danger_background.xml
+app/src/main/res/drawable/widget_surface.xml
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+app/src/main/res/values-night-v31/themes.xml
+app/src/test/java/com/sshpeaches/app/data/local/ConvertersTest.kt
+app/src/test/java/com/sshpeaches/app/util/PortForwardsTest.kt
+app/src/main/res/values/strings.xml
+app/src/main/res/values/colors.xml
+app/src/main/res/values/themes.xml
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+app/src/test/java/com/sshpeaches/app/service/FileTransferProgressTest.kt
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_light.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_dark.xml
+app/src/main/res/drawable-night/ic_notification_logo.xml
+app/src/main/res/layout/widget_quick_connect.xml
+app/src/main/res/layout/widget_sessions.xml
+app/src/main/res/layout/widget_open_session_row.xml
+app/src/main/res/layout/widget_host_row.xml
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/v/vt100
+app/src/main/res/xml/data_extraction_rules.xml
+app/src/main/res/xml/widget_quick_connect_info.xml
+app/src/main/res/xml/backup_rules.xml
+app/src/main/res/xml/widget_sessions_info.xml
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm
+app/src/main/res/values-v31/themes.xml
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSession.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalOutput.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSessionClient.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColors.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/KeyHandler.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/ByteQueue.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalBuffer.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/WcWidth.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColorScheme.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalRow.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/JNI.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TextStyle.java
+app/src/main/assets/mosh/x86_64/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_base.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_status.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings.so
+app/src/main/assets/mosh/x86_64/lib/libutf8_validity.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_city.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord.so
+app/src/main/assets/mosh/x86_64/lib/libcrypto.so.3
+app/src/main/assets/mosh/x86_64/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/x86_64/lib/libz.so.1
+app/src/main/res/drawable-nodpi/keyboard.png
+app/src/main/res/drawable-nodpi/major_daft_apps_white.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar.png
+app/src/main/res/drawable-nodpi/major_daft_apps_black.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_dark_foreground_art.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_light_foreground_art.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar_black.png
+app/src/main/res/drawable-nodpi/sshpeaches.png
+app/src/main/AndroidManifest.xml
+app/src/main/assets/mosh/x86_64/bin/mosh-client
+app/src/main/assets/mosh/NOTICE.txt
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_statusor.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/x86_64/lib/libc++_shared.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_int128.so
+app/src/main/assets/mosh/x86_64/lib/libprotobuf.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strerror.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hash.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libandroid-support.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/x86_64/lib/libncursesw.so.6
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings.so
+app/src/main/assets/mosh/arm64-v8a/lib/libutf8_validity.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_city.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord.so
+app/src/main/assets/mosh/arm64-v8a/lib/libcrypto.so.3
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libz.so.1
+app/src/main/assets/mosh/arm64-v8a/bin/mosh-client
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_base.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_status.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_int128.so
+app/src/main/assets/mosh/arm64-v8a/lib/libprotobuf.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strerror.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hash.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/arm64-v8a/lib/libc++_shared.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc32c.so
+app/src/test/java/com/sshpeaches/app/uptime/UptimeSummaryCalculatorTest.kt
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/arm64-v8a/lib/libncursesw.so.6
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libandroid-support.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_statusor.so
+app/src/test/java/com/sshpeaches/app/uptime/UptimeNotificationsTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerTest.kt
+docs/task-2-summary.json
+app/src/benchmark/AndroidManifest.xml
+docs/user-wiki/Troubleshooting.md
+docs/user-wiki/developer/UI-Design-Notes.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/Getting-Started.md
+docs/user-wiki/Home.md
+docs/README.md
+docs/task-3-summary.json
+docs/plans/chromebook-tier2-adaptive-design.md
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalSelectionMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/FileTransferEntryMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalBellMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/AdaptiveLayout.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/DesktopInput.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/Routes.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/DrawerDestinations.kt
+app/src/main/java/com/sshpeaches/app/AppIconManager.kt
+app/src/debug/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/main/java/com/sshpeaches/app/security/SecurityManager.kt
+app/src/main/java/com/sshpeaches/app/SSHPeachesApplication.kt
+app/src/debug/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/debug/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/main/java/com/sshpeaches/app/data/settings/AppIconOption.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsDefaults.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+app/src/main/java/com/sshpeaches/app/ui/logging/UiDebugLog.kt
+app/src/main/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/UptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/AdaptiveCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/PortraitCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/QrScanOptions.kt
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+app/src/main/java/com/sshpeaches/app/data/importer/OpenSshConfigImporter.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/ReleaseTestHostActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/Ed25519IdentityKeyProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/IdentityKeyInstaller.kt
+app/src/main/java/com/sshpeaches/app/data/model/HostConnection.kt
+app/src/main/java/com/sshpeaches/app/data/model/UptimeModels.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalProfile.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalFont.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrImportHandlers.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostCard.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AuthChoice.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AppDrawer.kt
+app/src/main/java/com/sshpeaches/app/ui/components/GroupedSections.kt
+app/src/main/java/com/sshpeaches/app/ui/components/LockScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrDecode.kt
+app/src/main/java/com/sshpeaches/app/ui/components/SnippetQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/EmptyState.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/PortForwardQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/IdentityQr.kt
+app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeMappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/SshPeachesDatabase.kt
+app/src/main/java/com/sshpeaches/app/data/local/Converters.kt
+app/src/main/java/com/sshpeaches/app/data/local/Dao.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeDao.kt
+app/src/main/java/com/sshpeaches/app/data/local/Mappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/Entities.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeEntities.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/UptimeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/OpenSourceLicensesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/PortForwardScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/FavoritesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HomeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeProfileEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/KeyboardEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HostsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetManagerScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/IdentitiesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HelpScreen.kt
+app/src/main/java/com/sshpeaches/app/util/ValidationUtils.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyGenerator.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyFingerprint.kt
+app/src/main/java/com/sshpeaches/app/util/SnippetReference.kt
+app/src/main/java/com/sshpeaches/app/util/PortForwards.kt
+app/src/main/java/com/sshpeaches/app/ui/permissions/CorePermissionStatus.kt
+app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+app/src/main/java/com/sshpeaches/app/service/FileTransferProgress.kt
+app/src/main/java/com/sshpeaches/app/service/SessionLogBus.kt
+app/src/main/java/com/sshpeaches/app/service/MoshRuntime.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Color.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Type.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Theme.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsBundle.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploader.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploadWorker.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsScheduler.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ModalSizing.kt
+app/src/main/java/com/sshpeaches/app/ui/util/EnumDisplay.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ExportPassphraseCache.kt
+app/src/main/java/com/sshpeaches/app/ui/util/PasswordTailReveal.kt
+app/src/main/java/com/sshpeaches/app/widget/HostWidgets.kt
+app/src/main/java/com/sshpeaches/app/widget/WidgetSessionStore.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalFontSupport.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalRenderView.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+app/src/main/java/com/sshpeaches/app/MainActivity.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeNotifications.kt
+app/src/main/java/com/sshpeaches/app/uptime/NoOpUptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeWorker.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerDelegate.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeScheduler.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeSummaryCalculator.kt
+third_party/termux-playstore/terminal-view/src/main/AndroidManifest.xml
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_right_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_left_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/values/strings.xml
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/GestureAndScaleRecognizer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionHandleView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalRenderer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java
+app/src/release/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/release/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/release/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/arm64-v8a/libtermux.so
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+
+codex
+The repo already has a `SessionRouteReadiness` unit test file, so I’m checking that helper and the root composable integration points before deciding whether task-6 needs a new test file or extensions to the existing one.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui
+
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class SessionRouteReadinessTest {
+
+    @Test
+    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = false,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+
+        assertNull(decision.recoveryRoute)
+        assertFalse(decision.consumeRequestedOpenSessionId)
+    }
+
+    @Test
+    fun serviceReadyWithMissingRequestedSessionRedirectsAndConsumesRequest() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = "session-1",
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = false,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+
+        assertEquals(Routes.HOSTS, decision.recoveryRoute)
+        assertEquals(true, decision.gateTerminalContent)
+        assertEquals(true, decision.consumeRequestedOpenSessionId)
+
+        val rendering = decideSessionRouteRendering(
+            currentRoute = Routes.SESSION,
+            staleSessionRouteDecision = decision
+        )
+
+        assertEquals(Routes.HOSTS, rendering.chromeRoute)
+        assertFalse(rendering.renderTerminalContent)
+    }
+
+    @Test
+    fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.HOSTS,
+            requestedOpenSessionId = "session-1",
+            quickConnectRequestSessionId = null,
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = false,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOME
+        )
+
+        assertNull(decision.recoveryRoute)
+        assertFalse(decision.gateTerminalContent)
+        assertEquals(true, decision.consumeRequestedOpenSessionId)
+    }
+
+    @Test
+    fun serviceReadyWithMatchingLiveSnapshotPreservesTerminalRoute() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = listOf(
+                SessionRouteSnapshot(
+                    sessionId = "session-1",
+                    status = SessionRouteSnapshotStatus.ACTIVE,
+                    requiresTerminalEmulator = true,
+                    terminalEmulatorAvailable = true
+                )
+            ),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+
+        assertNull(decision.recoveryRoute)
+        assertFalse(decision.gateTerminalContent)
+        assertFalse(decision.consumeRequestedOpenSessionId)
+
+        val rendering = decideSessionRouteRendering(
+            currentRoute = Routes.SESSION,
+            staleSessionRouteDecision = decision
+        )
+
+        assertEquals(Routes.SESSION, rendering.chromeRoute)
+        assertEquals(true, rendering.renderTerminalContent)
+    }
+
+    @Test
+    fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = listOf(
+                SessionRouteSnapshot(
+                    sessionId = "session-1",
+                    status = SessionRouteSnapshotStatus.ACTIVE,
+                    requiresTerminalEmulator = true,
+                    terminalEmulatorAvailable = false
+                )
+            ),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+        val rendering = decideSessionRouteRendering(
+            currentRoute = Routes.SESSION,
+            staleSessionRouteDecision = decision
+        )
+
+        assertEquals(Routes.HOSTS, decision.recoveryRoute)
+        assertEquals(true, decision.gateTerminalContent)
+        assertEquals(Routes.HOSTS, rendering.chromeRoute)
+        assertFalse(rendering.renderTerminalContent)
+    }
+
+    @Test
+    fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.CONNECTING,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = null,
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = false,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+        val rendering = decideSessionRouteRendering(
+            currentRoute = Routes.CONNECTING,
+            staleSessionRouteDecision = decision
+        )
+
+        assertEquals(Routes.HOSTS, decision.recoveryRoute)
+        assertEquals(true, decision.gateTerminalContent)
+        assertEquals(Routes.HOSTS, rendering.chromeRoute)
+        assertFalse(rendering.renderTerminalContent)
+    }
+
+    @Test
+    fun brandNewPendingConnectingRequestCanRenderUntilFirstSnapshotChancePasses() {
+        val firstPassDecision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.CONNECTING,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = false,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+        val firstPassRendering = decideSessionRouteRendering(
+            currentRoute = Routes.CONNECTING,
+            staleSessionRouteDecision = firstPassDecision
+        )
+
+        assertNull(firstPassDecision.recoveryRoute)
+        assertFalse(firstPassDecision.gateTerminalContent)
+        assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+        assertEquals(true, firstPassRendering.renderTerminalContent)
+
+        val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.CONNECTING,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.HOSTS
+        )
+        val staleAfterSnapshotChanceRendering = decideSessionRouteRendering(
+            currentRoute = Routes.CONNECTING,
+            staleSessionRouteDecision = staleAfterSnapshotChanceDecision
+        )
+
+        assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
+        assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+        assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+    }
+
+    @Test
+    fun staleRouteBeforeConnectingValuesFallBackToHome() {
+        val sessionRouteDecision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.CONNECTING
+        )
+        val invalidRouteDecision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SESSION,
+            requestedOpenSessionId = null,
+            quickConnectRequestSessionId = "session-1",
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = true,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = "not-a-real-route"
+        )
+
+        assertEquals(Routes.HOME, sessionRouteDecision.recoveryRoute)
+        assertEquals(Routes.HOME, invalidRouteDecision.recoveryRoute)
+    }
+
+    @Test
+    fun foregroundStaleOpenSessionRequestOnExistingNonSessionRouteOnlyConsumesRequest() {
+        val decision = decideStaleSessionRoute(
+            sessionServiceReady = true,
+            currentRoute = Routes.SETTINGS,
+            requestedOpenSessionId = "session-1",
+            quickConnectRequestSessionId = null,
+            pendingConnectingNavigation = false,
+            sawSnapshotForCurrentRequest = false,
+            sessionSnapshots = emptyList(),
+            routeBeforeConnecting = Routes.SETTINGS
+        )
+
+        assertNull(decision.recoveryRoute)
+        assertFalse(decision.gateTerminalContent)
+        assertEquals(true, decision.consumeRequestedOpenSessionId)
+    }
+}
+
+exec
+/usr/bin/zsh -lc "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui
+
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+
+internal enum class SessionRouteSnapshotStatus {
+    CONNECTING,
+    ACTIVE,
+    ERROR
+}
+
+internal data class SessionRouteSnapshot(
+    val sessionId: String,
+    val status: SessionRouteSnapshotStatus,
+    val requiresTerminalEmulator: Boolean,
+    val terminalEmulatorAvailable: Boolean
+)
+
+internal data class StaleSessionRouteDecision(
+    val gateTerminalContent: Boolean,
+    val consumeRequestedOpenSessionId: Boolean,
+    val recoveryRoute: String?
+)
+
+internal data class SessionRouteRenderDecision(
+    val chromeRoute: String,
+    val renderTerminalContent: Boolean
+)
+
+internal fun decideStaleSessionRoute(
+    sessionServiceReady: Boolean,
+    currentRoute: String,
+    requestedOpenSessionId: String?,
+    quickConnectRequestSessionId: String?,
+    pendingConnectingNavigation: Boolean,
+    sawSnapshotForCurrentRequest: Boolean,
+    sessionSnapshots: List<SessionRouteSnapshot>,
+    routeBeforeConnecting: String
+): StaleSessionRouteDecision {
+    val isSessionVerticalRoute = currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+    val snapshotsBySessionId = sessionSnapshots.associateBy { it.sessionId }
+    val requestedOpenSessionSnapshot = requestedOpenSessionId?.let(snapshotsBySessionId::get)
+    val requestedOpenSessionIsStale = sessionServiceReady &&
+        requestedOpenSessionId != null &&
+        requestedOpenSessionSnapshot?.hasUsableBackingSession() != true
+    val targetSessionId = quickConnectRequestSessionId ?: requestedOpenSessionId
+    val targetSnapshot = targetSessionId?.let(snapshotsBySessionId::get)
+    val hasUsableRouteSession = targetSnapshot?.hasUsableBackingSession() == true
+    val routeHasNoSessionRequest = quickConnectRequestSessionId == null && requestedOpenSessionId == null
+    val canRecoverFromCurrentSessionRoute =
+        currentRoute == Routes.SESSION || sawSnapshotForCurrentRequest || routeHasNoSessionRequest
+    val currentSessionRouteIsStale = sessionServiceReady &&
+        isSessionVerticalRoute &&
+        !pendingConnectingNavigation &&
+        !hasUsableRouteSession &&
+        canRecoverFromCurrentSessionRoute
+    val shouldRecoverRoute = currentSessionRouteIsStale
+    val shouldGateContent = when {
+        shouldRecoverRoute -> true
+        !isSessionVerticalRoute -> false
+        pendingConnectingNavigation -> false
+        sessionServiceReady -> false
+        currentRoute == Routes.SESSION -> true
+        quickConnectRequestSessionId != null || requestedOpenSessionId != null -> true
+        else -> false
+    }
+
+    return StaleSessionRouteDecision(
+        gateTerminalContent = shouldGateContent,
+        consumeRequestedOpenSessionId = requestedOpenSessionIsStale,
+        recoveryRoute = if (shouldRecoverRoute) {
+            validatedSessionRecoveryRoute(routeBeforeConnecting)
+        } else {
+            null
+        }
+    )
+}
+
+internal fun decideSessionRouteRendering(
+    currentRoute: String,
+    staleSessionRouteDecision: StaleSessionRouteDecision
+): SessionRouteRenderDecision {
+    val isSessionVerticalRoute = currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+    if (!isSessionVerticalRoute) {
+        return SessionRouteRenderDecision(
+            chromeRoute = currentRoute,
+            renderTerminalContent = false
+        )
+    }
+    return if (staleSessionRouteDecision.gateTerminalContent) {
+        SessionRouteRenderDecision(
+            chromeRoute = staleSessionRouteDecision.recoveryRoute ?: currentRoute,
+            renderTerminalContent = false
+        )
+    } else {
+        SessionRouteRenderDecision(
+            chromeRoute = currentRoute,
+            renderTerminalContent = true
+        )
+    }
+}
+
+internal fun validatedSessionRecoveryRoute(routeBeforeConnecting: String): String =
+    routeBeforeConnecting.takeIf { it in sessionRecoveryRoutes } ?: Routes.HOME
+
+private fun SessionRouteSnapshot.hasUsableBackingSession(): Boolean =
+    status != SessionRouteSnapshotStatus.ACTIVE ||
+        !requiresTerminalEmulator ||
+        terminalEmulatorAvailable
+
+private val sessionRecoveryRoutes = setOf(
+    Routes.HOME,
+    Routes.HELP,
+    Routes.HOSTS,
+    Routes.UPTIME,
+    Routes.IDENTITIES,
+    Routes.FORWARDS,
+    Routes.SNIPPETS,
+    Routes.KEYBOARD,
+    Routes.THEME_EDITOR,
+    Routes.SETTINGS,
+    Routes.OPEN_SOURCE_LICENSES
+)
+
+exec
+/usr/bin/zsh -lc 'git status --short' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+ M CHANGELOG.md
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+ M app/src/main/java/com/sshpeaches/app/MainActivity.kt
+ M app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+ M app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+ M app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+ M app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+ M app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+ M app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+ M app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+?? .codex
+?? .stringbean/
+?? app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+?? app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt
+?? app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+?? docs/task-2-summary.json
+?? docs/task-3-summary.json
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import android.content.Intent
+import android.view.KeyEvent
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.window.core.layout.WindowWidthSizeClass
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
+import com.majordaftapps.sshpeaches.app.data.local.Converters
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
+import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
+import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
+import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.KeyboardEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.OpenSourceLicensesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.PortForwardScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectPhase
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectRequest
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectUiState
+import com.majordaftapps.sshpeaches.app.ui.screens.SettingsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.SnippetEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.UptimeScreen
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
+import com.majordaftapps.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
+import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
+import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.MainActivity
+import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
+
+private enum class AppSnackbarKind {
+    DEFAULT,
+    SUCCESS
+}
+
+private data class AppSnackbarVisuals(
+    override val message: String,
+    override val actionLabel: String? = null,
+    override val withDismissAction: Boolean = false,
+    override val duration: SnackbarDuration = SnackbarDuration.Short,
+    val kind: AppSnackbarKind = AppSnackbarKind.DEFAULT
+) : SnackbarVisuals
+
+data class SSHPeachesRootActions(
+    val onSortModeChange: (SortMode) -> Unit,
+    val onThemeModeChange: (ThemeMode) -> Unit,
+    val onAppIconChange: (AppIconOption) -> Unit,
+    val onBackgroundModeChange: (Boolean) -> Unit,
+    val onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
+    val onBiometricToggle: (Boolean) -> Unit,
+    val onLockTimeoutChange: (LockTimeout) -> Unit,
+    val onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    val onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
+    val onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
+    val onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
+    val onTerminalBellModeChange: (TerminalBellMode) -> Unit,
+    val onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
+    val onTerminalMarginPxChange: (Int) -> Unit,
+    val onMoshServerCommandChange: (String) -> Unit,
+    val onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
+    val onCrashReportsToggle: (Boolean) -> Unit,
+    val onAnalyticsToggle: (Boolean) -> Unit,
+    val onDiagnosticsToggle: (Boolean) -> Unit,
+    val onIncludeSecretsInQrToggle: (Boolean) -> Unit,
+    val onAutoStartForwardsToggle: (Boolean) -> Unit,
+    val onHostKeyPromptToggle: (Boolean) -> Unit,
+    val onAutoTrustHostKeyToggle: (Boolean) -> Unit,
+    val onUsageReportsToggle: (Boolean) -> Unit,
+    val onDefaultTerminalProfileChange: (String) -> Unit,
+    val onSaveTerminalProfile: (TerminalProfile) -> Unit,
+    val onDeleteTerminalProfile: (String) -> Unit,
+    val onRestoreDefaultSettings: () -> Unit,
+    val onSetPin: (String) -> Unit,
+    val onClearPin: () -> Unit,
+    val onLockApp: () -> Unit,
+    val onUnlockWithPin: (String) -> Boolean,
+    val onBiometricUnlock: () -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    val onHostDelete: (String) -> Unit,
+    val onAddHostToUptime: (String) -> Unit,
+    val onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
+    val onSetUptimeEnabled: (String, Boolean) -> Unit,
+    val onRemoveHostFromUptime: (String) -> Unit,
+    val onRefreshUptime: (String?) -> Unit,
+    val onImportHost: (HostConnection) -> Unit,
+    val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
+
+codex
+There are many unrelated dirty files in the worktree, so I’m treating the current stale-session implementation as existing task-5 work and only adding/adjusting tests around it.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui.testing
+
+object UiTestTags {
+    const val ABOUT_DIALOG = "about_dialog"
+    const val ABOUT_WEBSITE_LINK = "about_website_link"
+    const val ABOUT_LICENSES_LINK = "about_licenses_link"
+    const val ABOUT_SUPPORT_LINK = "about_support_link"
+    const val ABOUT_PRIVACY_LINK = "about_privacy_link"
+    const val HELP_SCREEN = "help_screen"
+    const val HELP_MORE_HELP_BUTTON = "help_more_help_button"
+    const val DRAWER_SCROLL_CONTAINER = "drawer_scroll_container"
+    const val SCREEN_HOME = "screen_home"
+    const val SCREEN_FAVORITES = SCREEN_HOME
+    const val SCREEN_CONNECTING = "screen_connecting"
+    const val SCREEN_HOSTS = "screen_hosts"
+    const val SCREEN_UPTIME = "screen_uptime"
+    const val SCREEN_IDENTITIES = "screen_identities"
+    const val SCREEN_FORWARDS = "screen_forwards"
+    const val SCREEN_SNIPPETS = "screen_snippets"
+    const val SCREEN_SNIPPET_EDITOR = "screen_snippet_editor"
+    const val SCREEN_KEYBOARD = "screen_keyboard"
+    const val SCREEN_THEME_EDITOR = "screen_theme_editor"
+    const val SCREEN_THEME_PROFILE_EDITOR = "screen_theme_profile_editor"
+    const val SCREEN_SETTINGS = "screen_settings"
+    const val SCREEN_OPEN_SOURCE_LICENSES = "screen_open_source_licenses"
+    fun helpStep(index: Int): String = "help_step_$index"
+    fun openSessionAction(sessionId: String, action: String): String = "open_session_${sessionId}_$action"
+    const val HOME_WELCOME = "home_welcome"
+    const val HOME_WELCOME_ADD_HOST = "home_welcome_add_host"
+    const val HOME_WELCOME_ADD_IDENTITY = "home_welcome_add_identity"
+    const val HOME_WELCOME_ADD_FORWARD = "home_welcome_add_forward"
+    const val HOME_WELCOME_ADD_SNIPPET = "home_welcome_add_snippet"
+    const val HOME_RECENTS_SECTION = "home_recents_section"
+    fun homeRecentItem(key: String): String = "home_recent_${sanitize(key)}"
+    fun homeRecentOverflowButton(key: String): String = "home_recent_${sanitize(key)}_overflow_button"
+    fun homeRecentOverflowAction(key: String, action: String): String =
+        "home_recent_${sanitize(key)}_overflow_${sanitize(action)}"
+    fun homeFavoriteOverflowButton(key: String): String = "home_favorite_${sanitize(key)}_overflow_button"
+    fun homeFavoriteOverflowAction(key: String, action: String): String =
+        "home_favorite_${sanitize(key)}_overflow_${sanitize(action)}"
+
+    const val DRAWER_QUICK_CONNECT = "drawer_quick_connect"
+    fun drawerItem(route: String): String = "drawer_item_$route"
+    const val QUICK_CONNECT_HOST_INPUT = "quick_connect_host_input"
+    const val QUICK_CONNECT_PORT_INPUT = "quick_connect_port_input"
+    const val QUICK_CONNECT_USERNAME_INPUT = "quick_connect_username_input"
+    const val QUICK_CONNECT_PASSWORD_INPUT = "quick_connect_password_input"
+    const val QUICK_CONNECT_CONNECT_BUTTON = "quick_connect_connect_button"
+    const val QUICK_CONNECT_STATUS_TEXT = "quick_connect_status_text"
+
+    const val HOST_ADD_BUTTON = "host_add_button"
+    const val HOST_IMPORT_BUTTON = "host_import_button"
+    const val HOST_SEARCH_INPUT = "host_search_input"
+    const val HOST_SORT_FIELD = "host_sort_field"
+    fun hostAction(id: String, action: String): String = "host_${id}_action_$action"
+    fun hostFavorite(id: String): String = "host_${id}_favorite"
+    fun hostOverflowButton(id: String): String = "host_${id}_overflow_button"
+    fun hostOverflowAction(id: String, action: String): String = "host_${id}_overflow_$action"
+    const val HOST_QR_DIALOG = "host_qr_dialog"
+    const val HOST_EXPORT_PASSWORD_DIALOG = "host_export_password_dialog"
+    const val HOST_EXPORT_PASSWORD_INPUT = "host_export_password_input"
+    const val HOST_EXPORT_PASSWORD_CONFIRM_INPUT = "host_export_password_confirm_input"
+    const val HOST_EXPORT_PASSWORD_CONFIRM_BUTTON = "host_export_password_confirm_button"
+    const val HOST_DIALOG_NAME_INPUT = "host_dialog_name_input"
+    const val HOST_DIALOG_HOST_INPUT = "host_dialog_host_input"
+    const val HOST_DIALOG_PORT_INPUT = "host_dialog_port_input"
+    const val HOST_DIALOG_USERNAME_INPUT = "host_dialog_username_input"
+    const val HOST_DIALOG_SCROLL = "host_dialog_scroll"
+    const val HOST_DIALOG_AUTH_FIELD = "host_dialog_auth_field"
+    fun hostDialogAuthOption(authMethodName: String): String = "host_dialog_auth_option_$authMethodName"
+    const val HOST_DIALOG_CONFIRM_BUTTON = "host_dialog_confirm_button"
+    const val HOST_DIALOG_CANCEL_BUTTON = "host_dialog_cancel_button"
+    const val HOST_DIALOG_ERROR = "host_dialog_error"
+
+    const val UPTIME_ADD_BUTTON = "uptime_add_button"
+    const val UPTIME_HOST_PICKER = "uptime_host_picker"
+    fun uptimeHostOption(hostId: String): String = "uptime_host_option_$hostId"
+    const val UPTIME_METHOD_FIELD = "uptime_method_field"
+    fun uptimeMethodOption(method: String): String = "uptime_method_option_$method"
+    const val UPTIME_PORT_INPUT = "uptime_port_input"
+    const val UPTIME_INTERVAL_INPUT = "uptime_interval_input"
+    const val UPTIME_ENABLED_SWITCH = "uptime_enabled_switch"
+    const val UPTIME_SAVE_BUTTON = "uptime_save_button"
+    const val UPTIME_CANCEL_BUTTON = "uptime_cancel_button"
+    const val UPTIME_EMPTY_SAVED_HOSTS = "uptime_empty_saved_hosts"
+    const val UPTIME_EMPTY_MONITORS = "uptime_empty_monitors"
+    const val UPTIME_REMOVE_CONFIRM_DIALOG = "uptime_remove_confirm_dialog"
+    const val UPTIME_REMOVE_CONFIRM_BUTTON = "uptime_remove_confirm_button"
+    const val UPTIME_REMOVE_CANCEL_BUTTON = "uptime_remove_cancel_button"
+    fun uptimeCard(hostId: String): String = "uptime_card_$hostId"
+    fun uptimeRefresh(hostId: String): String = "uptime_refresh_$hostId"
+    fun uptimeEdit(hostId: String): String = "uptime_edit_$hostId"
+    fun uptimeRemove(hostId: String): String = "uptime_remove_$hostId"
+    fun uptimeEnabled(hostId: String): String = "uptime_enabled_$hostId"
+
+    const val IDENTITY_SEARCH_INPUT = "identity_search_input"
+    const val IDENTITY_ADD_BUTTON = "identity_add_button"
+    const val IDENTITY_IMPORT_BUTTON = "identity_import_button"
+    const val IDENTITY_GROUP_FIELD = "identity_group_field"
+    const val IDENTITY_DIALOG_LABEL_INPUT = "identity_dialog_label_input"
+    const val IDENTITY_DIALOG_GENERATE_BUTTON = "identity_dialog_generate_button"
+    const val IDENTITY_DIALOG_FINGERPRINT_INPUT = "identity_dialog_fingerprint_input"
+    fun identityFavorite(id: String): String = "identity_${id}_favorite"
+    fun identityShare(id: String): String = "identity_${id}_share"
+    fun identityOverflowButton(id: String): String = "identity_${id}_overflow_button"
+    fun identityOverflowAction(id: String, action: String): String = "identity_${id}_overflow_$action"
+    const val IDENTITY_SHARE_PASSPHRASE_INPUT = "identity_share_passphrase_input"
+    const val IDENTITY_SHARE_CONFIRM_PASSPHRASE_INPUT = "identity_share_confirm_passphrase_input"
+    const val IDENTITY_CARD_EDIT_BUTTON = "identity_card_edit_button"
+    const val IDENTITY_CARD_DELETE_BUTTON = "identity_card_delete_button"
+
+    const val FORWARD_SEARCH_INPUT = "forward_search_input"
+    const val FORWARD_ADD_BUTTON = "forward_add_button"
+    const val FORWARD_IMPORT_BUTTON = "forward_import_button"
+    const val FORWARD_GROUP_FIELD = "forward_group_field"
+    const val FORWARD_DIALOG_LABEL_INPUT = "forward_dialog_label_input"
+    const val FORWARD_DIALOG_BIND_INPUT = "forward_dialog_bind_input"
+    const val FORWARD_DIALOG_SOURCE_PORT_INPUT = "forward_dialog_source_port_input"
+    const val FORWARD_DIALOG_HOST_FIELD = "forward_dialog_host_field"
+    const val FORWARD_HOST_BACKGROUND_ERROR = "forward_host_background_error"
+    const val FORWARD_DIALOG_ERROR = "forward_dialog_error"
+    const val FORWARD_DIALOG_CONFIRM_BUTTON = "forward_dialog_confirm_button"
+    const val FORWARD_DIALOG_CANCEL_BUTTON = "forward_dialog_cancel_button"
+    fun forwardHostOption(hostId: String): String = "forward_host_option_$hostId"
+    const val FORWARD_DIALOG_DEST_HOST_INPUT = "forward_dialog_dest_host_input"
+    const val FORWARD_DIALOG_DEST_PORT_INPUT = "forward_dialog_dest_port_input"
+    fun forwardFavorite(id: String): String = "forward_${id}_favorite"
+    fun forwardShare(id: String): String = "forward_${id}_share"
+    fun forwardOverflowButton(id: String): String = "forward_${id}_overflow_button"
+    fun forwardOverflowAction(id: String, action: String): String = "forward_${id}_overflow_$action"
+    const val FORWARD_CARD_EDIT_BUTTON = "forward_card_edit_button"
+    const val FORWARD_CARD_DELETE_BUTTON = "forward_card_delete_button"
+
+    const val SNIPPET_SEARCH_INPUT = "snippet_search_input"
+    const val SNIPPET_ADD_BUTTON = "snippet_add_button"
+    const val SNIPPET_IMPORT_BUTTON = "snippet_import_button"
+    const val SNIPPET_EDITOR_GROUP_INPUT = "snippet_editor_group_input"
+    const val SNIPPET_EDITOR_TITLE_INPUT = "snippet_editor_title_input"
+    const val SNIPPET_EDITOR_DESCRIPTION_INPUT = "snippet_editor_description_input"
+    const val SNIPPET_EDITOR_COMMAND_INPUT = "snippet_editor_command_input"
+    const val SNIPPET_EDITOR_SAVE_BUTTON = "snippet_editor_save_button"
+    fun snippetRow(title: String): String = "snippet_row_${sanitize(title)}"
+    fun snippetRun(id: String): String = "snippet_${id}_run"
+    fun snippetEdit(id: String): String = "snippet_${id}_edit"
+    fun snippetDelete(id: String): String = "snippet_${id}_delete"
+    fun snippetOverflowButton(id: String): String = "snippet_${id}_overflow_button"
+    fun snippetOverflowAction(id: String, action: String): String = "snippet_${id}_overflow_$action"
+
+    fun groupHeader(vertical: String, group: String): String = "group_header_${sanitize(vertical)}_${sanitize(group)}"
+    fun groupToggle(vertical: String, group: String): String = "group_toggle_${sanitize(vertical)}_${sanitize(group)}"
+    fun topBarAdd(route: String): String = "top_bar_add_${sanitize(route)}"
+    fun topBarImport(route: String): String = "top_bar_import_${sanitize(route)}"
+    const val DELETE_CONFIRM_DIALOG = "delete_confirm_dialog"
+    const val DELETE_CONFIRM_BUTTON = "delete_confirm_button"
+    const val DELETE_CANCEL_BUTTON = "delete_cancel_button"
+
+    const val KEYBOARD_RESET_BUTTON = "keyboard_reset_button"
+    fun keyboardSlot(index: Int): String = "keyboard_slot_$index"
+    const val KEYBOARD_EDITOR_BACK_BUTTON = "keyboard_editor_back_button"
+    const val KEYBOARD_EDITOR_TEXT_INPUT = "keyboard_editor_text_input"
+    const val KEYBOARD_EDITOR_USE_TEXT_BUTTON = "keyboard_editor_use_text_button"
+    const val KEYBOARD_EDITOR_ADVANCED_BUTTON = "keyboard_editor_advanced_button"
+    const val KEYBOARD_EDITOR_SEQUENCE_INPUT = "keyboard_editor_sequence_input"
+    const val KEYBOARD_EDITOR_USE_SEQUENCE_BUTTON = "keyboard_editor_use_sequence_button"
+
+    const val THEME_DEFAULT_FIELD = "theme_default_field"
+    const val THEME_CREATE_BUTTON = "theme_create_button"
+    fun themeDefaultOption(name: String): String =
+        "theme_default_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun themeDuplicate(id: String): String = "theme_${id}_duplicate"
+    fun themeEdit(id: String): String = "theme_${id}_edit"
+    fun themeDelete(id: String): String = "theme_${id}_delete"
+    fun themeDeleteByName(name: String): String = "theme_${sanitize(name)}_delete"
+    fun themeProfileRow(name: String): String =
+        "theme_profile_row_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    const val THEME_DELETE_CONFIRM = "theme_delete_confirm"
+    const val THEME_DELETE_CANCEL = "theme_delete_cancel"
+    const val THEME_PROFILE_NAME_INPUT = "theme_profile_name_input"
+    const val THEME_PROFILE_FONT_BUTTON = "theme_profile_font_button"
+    const val THEME_PROFILE_FONT_FIELD = "theme_profile_font_field"
+    fun themeProfileFontOption(name: String): String =
+        "theme_profile_font_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    const val THEME_PROFILE_SAVE_BUTTON = "theme_profile_save_button"
+    const val THEME_PROFILE_CANCEL_BUTTON = "theme_profile_cancel_button"
+    const val THEME_PROFILE_ERROR = "theme_profile_error"
+
+    const val SETTINGS_THEME_MODE_FIELD = "settings_theme_mode_field"
+    fun settingsThemeOption(name: String): String =
+        "settings_theme_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsAppIconOption(name: String): String =
+        "settings_app_icon_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsTerminalOption(name: String): String =
+        "settings_terminal_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    fun settingsTerminalBellOption(name: String): String =
+        "settings_terminal_bell_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    const val SETTINGS_BUILTIN_KEYBOARD_SWITCH = "settings_built_in_keyboard_switch"
+    fun settingsCategory(name: String): String =
+        "settings_category_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"
+    const val SETTINGS_BACKGROUND_SWITCH = "settings_background_switch"
+    const val SETTINGS_TERMINAL_EMULATION_FIELD = "settings_terminal_emulation_field"
+    const val SETTINGS_TERMINAL_BELL_FIELD = "settings_terminal_bell_field"
+    const val SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH = "settings_terminal_volume_buttons_switch"
+    const val SETTINGS_TERMINAL_MARGIN_INPUT = "settings_terminal_margin_input"
+    const val SETTINGS_MOSH_SERVER_COMMAND_INPUT = "settings_mosh_server_command_input"
+    const val SETTINGS_DIAGNOSTICS_SWITCH = "settings_diagnostics_switch"
+    const val SETTINGS_INCLUDE_SECRETS_SWITCH = "settings_include_secrets_switch"
+    const val SETTINGS_BIOMETRIC_SWITCH = "settings_biometric_switch"
+    const val SETTINGS_PIN_STATUS_TEXT = "settings_pin_status_text"
+    const val SETTINGS_SET_PIN_BUTTON = "settings_set_pin_button"
+    const val SETTINGS_DISABLE_PIN_BUTTON = "settings_disable_pin_button"
+    const val SETTINGS_PIN_DIALOG = "settings_pin_dialog"
+    const val SETTINGS_PIN_INPUT = "settings_pin_input"
+    const val SETTINGS_PIN_CONFIRM_INPUT = "settings_pin_confirm_input"
+    const val SETTINGS_PIN_SAVE_BUTTON = "settings_pin_save_button"
+    const val SETTINGS_DISABLE_PIN_CONFIRM = "settings_disable_pin_confirm"
+    const val SETTINGS_HOST_KEY_PROMPT_SWITCH = "settings_host_key_prompt_switch"
+    const val SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH = "settings_auto_trust_host_key_switch"
+    const val SETTINGS_RESTORE_DEFAULTS_BUTTON = "settings_restore_defaults_button"
+    const val SETTINGS_RESTORE_DEFAULTS_CONFIRM = "settings_restore_defaults_confirm"
+
+exec
+/usr/bin/zsh -lc 'rg -n "decideStaleSessionRoute|decideSessionRouteRendering|renderTerminalContent|sessionServiceReady|requestedOpenSessionId|routeBeforeConnecting|quickConnectRequestSessionId|sawSnapshot" app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:315:    val sessionServiceReady: Boolean = false,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:322:    val requestedOpenSessionId: String?,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:429:    val sessionServiceReady = runtime.sessionServiceReady
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:436:    val requestedOpenSessionId = runtime.requestedOpenSessionId
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:454:    val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.HOME) }
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:455:    val sawSnapshotForCurrentRequest = rememberSaveable { mutableStateOf(false) }
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:573:            val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:625:    val staleSessionRouteDecision = decideStaleSessionRoute(
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:626:        sessionServiceReady = sessionServiceReady,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:628:        requestedOpenSessionId = requestedOpenSessionId,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:629:        quickConnectRequestSessionId = rawQuickConnectRequest?.sessionId,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:631:        sawSnapshotForCurrentRequest = sawSnapshotForCurrentRequest.value,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:633:        routeBeforeConnecting = routeBeforeConnecting.value
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:635:    val sessionRouteRendering = decideSessionRouteRendering(
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:690:            routeBeforeConnecting.value = currentRoute
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:695:        requestedOpenSessionId,
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:701:        val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:734:        sawSnapshotForCurrentRequest.value = false
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:772:    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute, sessionServiceReady) {
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:778:                    sessionServiceReady &&
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:779:                    sawSnapshotForCurrentRequest.value &&
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:795:                sawSnapshotForCurrentRequest.value = true
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:803:                sawSnapshotForCurrentRequest.value = true
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:811:                sawSnapshotForCurrentRequest.value = true
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:1334:        val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt:1345:        if (!sessionRouteRendering.renderTerminalContent) {
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' app/build.gradle.kts" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
+	id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
+    id("com.google.firebase.firebase-perf")
+}
+
+import java.util.Properties
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
+import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.tasks.bundling.Zip
+
+// The Firebase project currently has a release client only; skip non-release processing.
+tasks.configureEach {
+    if (
+        name.startsWith("process") &&
+        name.endsWith("GoogleServices") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
+    if (
+        name.startsWith("uploadCrashlyticsMappingFile") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
+}
+
+val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
+val releaseAbiFilters = listOf("arm64-v8a", "x86_64")
+
+android {
+    namespace = "com.majordaftapps.sshpeaches.app"
+    compileSdk = 36
+    val liveSuiteAnnotation = "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
+    val releaseLaneAnnotation = "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    val releaseInstrumentationRequested = gradle.startParameter.taskNames.any { taskName ->
+        val lowerName = taskName.lowercase()
+        lowerName.contains("releaselaneandroidtest") ||
+            lowerName.contains("releaselanemanageddevicescheck") ||
+            (lowerName.contains("release") && lowerName.contains("androidtest"))
+    }
+    val liveSuiteRequested = gradle.startParameter.taskNames.any {
+        it.contains("liveAndroidTest", ignoreCase = true)
+    }
+    val liveSshHost = (findProperty("liveSshHost") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "10.0.2.2"
+    val liveSshPort = ((findProperty("liveSshPort") as? String)?.toIntOrNull() ?: 56321).coerceAtLeast(1024)
+    val liveSshUsername = (findProperty("liveSshUsername") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "tester"
+    val liveSshPassword = (findProperty("liveSshPassword") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "peaches-password"
+
+    val keystoreProperties = Properties().apply {
+        val propsFile = rootProject.file(".keystore/keystore.properties")
+        if (propsFile.exists()) {
+            propsFile.inputStream().use { load(it) }
+        }
+    }
+    fun keystoreProp(name: String): String? =
+        (keystoreProperties[name] as? String)
+            ?: (project.findProperty(name) as? String)
+            ?: System.getenv(name)
+
+    val diagnosticsEndpoint = (
+        keystoreProp("SSHPEACHES_DIAGNOSTICS_ENDPOINT")
+            ?: ""
+        ).replace("\"", "\\\"")
+
+    defaultConfig {
+        applicationId = "com.majordaftapps.sshpeaches"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 108
+        versionName = "0.10.8"
+        buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
+        ndk {
+            abiFilters += releaseAbiFilters
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        if (liveSuiteRequested) {
+            testInstrumentationRunnerArguments["annotation"] = liveSuiteAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = releaseLaneAnnotation
+            testInstrumentationRunnerArguments["liveSshHost"] = liveSshHost
+            testInstrumentationRunnerArguments["liveSshPort"] = liveSshPort.toString()
+            testInstrumentationRunnerArguments["liveSshUsername"] = liveSshUsername
+            testInstrumentationRunnerArguments["liveSshPassword"] = liveSshPassword
+            testInstrumentationRunnerArguments["liveSshKeyUsername"] = "tester-key"
+            testInstrumentationRunnerArguments["liveForwardHttpPort"] = liveForwardHttpPort.toString()
+        } else if (releaseInstrumentationRequested) {
+            testInstrumentationRunnerArguments["annotation"] = releaseLaneAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = liveSuiteAnnotation
+        } else {
+            testInstrumentationRunnerArguments["notAnnotation"] =
+                "$liveSuiteAnnotation,$releaseLaneAnnotation"
+        }
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    val storeFilePath = keystoreProp("SSHPEACHES_STORE_FILE")
+        ?: keystoreProp("storeFile")
+        ?: keystoreProp("STORE_FILE")
+        ?: rootProject.file(".keystore/sshpeaches").takeIf { it.exists() }?.path
+    val storePassword = keystoreProp("SSHPEACHES_STORE_PASSWORD")
+        ?: keystoreProp("storePassword")
+        ?: keystoreProp("STORE_PASSWORD")
+    val keyAlias = keystoreProp("SSHPEACHES_KEY_ALIAS")
+        ?: keystoreProp("keyAlias")
+        ?: keystoreProp("KEY_ALIAS")
+    val keyPassword = keystoreProp("SSHPEACHES_KEY_PASSWORD")
+        ?: keystoreProp("keyPassword")
+        ?: keystoreProp("KEY_PASSWORD")
+
+    val releaseSigning = if (
+        !storeFilePath.isNullOrBlank() &&
+        !storePassword.isNullOrBlank() &&
+        !keyAlias.isNullOrBlank() &&
+        !keyPassword.isNullOrBlank()
+    ) {
+        signingConfigs.create("release") {
+            storeFile = file(storeFilePath)
+            this.storePassword = storePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
+        }
+    } else {
+        null
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (releaseInstrumentationRequested) {
+                proguardFile("proguard-release-androidtest-rules.pro")
+            }
+            if (releaseSigning != null) {
+                signingConfig = releaseSigning
+            } else {
+                logger.warn("Release signing is not configured; set SSHPEACHES_* keystore properties.")
+            }
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    sourceSets {
+        getByName("benchmark") {
+            java.srcDir("src/debug/java")
+        }
+    }
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel2Api34") {
+                    device = "Medium Phone"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
+                }
+                create("nexus9Api34") {
+                    device = "Nexus 9"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
+                }
+            }
+        }
+    }
+    testBuildType = if (releaseInstrumentationRequested) "release" else "debug"
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "rg -n \"SSHPeachesRoot\\(|AppUiState\\(|SessionRouteReadiness\" app/src/test/java app/src/androidTest/java -g '"'!**/.stringbean/runs/**'"' -g '"'!**/.env*'"' -g '"'!**/.secrets/**'"' -g '"'!**/secrets/**'"' -g '"'!**/credentials/**'"' -g '"'!**/credentials.json'"' -g '"'!**/service-account*.json'"' -g '"'!**/*.pem'"' -g '"'!**/*.key'"' -g '"'!**/*.p12'"' -g '"'!**/*.pfx'"'" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt:9:class SessionRouteReadinessTest {
+
+codex
+The pure helper already has some coverage, but it does not yet pin all required cases. I’m reading the root lifecycle block around route decisions to see whether a JVM-level root navigation test is practical here or whether the deterministic helper tests are the correct boundary.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '280,380p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+    val onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
+    val onRemoveIdentityKey: (String) -> Unit,
+    val onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
+    val onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
+    val onKeyboardReset: () -> Unit,
+    val onImportTerminalProfiles: (List<TerminalProfile>, String?) -> Unit,
+    val onSnippetAdd: (String, String?, String, String) -> Unit,
+    val onImportSnippet: (Snippet) -> Unit,
+    val onSnippetUpdate: (String, String, String?, String, String) -> Unit,
+    val onSnippetDelete: (String) -> Unit,
+    val onToggleFavorite: (String) -> Unit,
+    val onMarkHostUsed: (String) -> Unit,
+    val onMarkIdentityUsed: (String) -> Unit,
+    val onMarkPortForwardUsed: (String) -> Unit,
+    val onMarkSnippetUsed: (String) -> Unit,
+    val onSendSessionShortcut: (String, String) -> Unit,
+    val onSendShellBytes: (String, ByteArray) -> Unit,
+    val onResizeShell: (String, Int, Int) -> Unit,
+    val onListSftpDirectory: (String, String) -> Unit,
+    val onSftpDownloadFile: (String, String, String?) -> Unit,
+    val onSftpUploadFile: (String, String, String) -> Unit,
+    val onManageRemotePath: (String, String, String, String?) -> Unit,
+    val onScpDownloadFile: (String, String, String?) -> Unit,
+    val onScpUploadFile: (String, String, String) -> Unit,
+    val onOpenSessionRequestHandled: () -> Unit,
+    val onRespondToHostKeyPrompt: (String, Boolean) -> Unit,
+    val onRespondToPasswordPrompt: (String, String?, Boolean) -> Unit,
+    val onRequestCorePermissions: () -> Unit,
+    val onOpenAppPermissionSettings: () -> Unit,
+    val onStartupRouteHandled: () -> Unit
+)
+
+data class SSHPeachesRootRuntime(
+    val resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator?,
+    val resolveRuntimeSessionPassword: (String) -> String?,
+    val sessionServiceReady: Boolean = false,
+    val sessions: List<SessionSnapshot>,
+    val shellOutputs: Map<String, String>,
+    val remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
+    val fileTransferProgresses: Map<String, FileTransferProgress>,
+    val hostKeyPrompts: List<HostKeyPrompt>,
+    val passwordPrompts: List<PasswordPrompt>,
+    val requestedOpenSessionId: String?,
+    val requestedOpenSessionFileTransferEntryMode: FileTransferEntryMode? = null,
+    val corePermissions: List<CorePermissionStatus>,
+    val requestedStartupRoute: String? = null
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SSHPeachesRoot(
+    uiState: AppUiState,
+    biometricAvailable: Boolean,
+    actions: SSHPeachesRootActions,
+    runtime: SSHPeachesRootRuntime
+) {
+    val onSortModeChange = actions.onSortModeChange
+    val onThemeModeChange = actions.onThemeModeChange
+    val onAppIconChange = actions.onAppIconChange
+    val onBackgroundModeChange = actions.onBackgroundModeChange
+    val onBackgroundSessionTimeoutChange = actions.onBackgroundSessionTimeoutChange
+    val onBiometricToggle = actions.onBiometricToggle
+    val onLockTimeoutChange = actions.onLockTimeoutChange
+    val onCustomLockTimeoutMinutesChange = actions.onCustomLockTimeoutMinutesChange
+    val onSnippetRunTimeoutSecondsChange = actions.onSnippetRunTimeoutSecondsChange
+    val onTerminalEmulationChange = actions.onTerminalEmulationChange
+    val onTerminalSelectionModeChange = actions.onTerminalSelectionModeChange
+    val onTerminalBellModeChange = actions.onTerminalBellModeChange
+    val onTerminalVolumeButtonsAdjustFontSizeChange = actions.onTerminalVolumeButtonsAdjustFontSizeChange
+    val onTerminalMarginPxChange = actions.onTerminalMarginPxChange
+    val onMoshServerCommandChange = actions.onMoshServerCommandChange
+    val onUseBuiltInKeyboardToggle = actions.onUseBuiltInKeyboardToggle
+    val onCrashReportsToggle = actions.onCrashReportsToggle
+    val onAnalyticsToggle = actions.onAnalyticsToggle
+    val onDiagnosticsToggle = actions.onDiagnosticsToggle
+    val onIncludeSecretsInQrToggle = actions.onIncludeSecretsInQrToggle
+    val onAutoStartForwardsToggle = actions.onAutoStartForwardsToggle
+    val onHostKeyPromptToggle = actions.onHostKeyPromptToggle
+    val onAutoTrustHostKeyToggle = actions.onAutoTrustHostKeyToggle
+    val onUsageReportsToggle = actions.onUsageReportsToggle
+    val onDefaultTerminalProfileChange = actions.onDefaultTerminalProfileChange
+    val onSaveTerminalProfile = actions.onSaveTerminalProfile
+    val onDeleteTerminalProfile = actions.onDeleteTerminalProfile
+    val onRestoreDefaultSettings = actions.onRestoreDefaultSettings
+    val onSetPin = actions.onSetPin
+    val onClearPin = actions.onClearPin
+    val onLockApp = actions.onLockApp
+    val onUnlockWithPin = actions.onUnlockWithPin
+    val onBiometricUnlock = actions.onBiometricUnlock
+    val onHostAdd = actions.onHostAdd
+    val onHostUpdate = actions.onHostUpdate
+    val onHostDelete = actions.onHostDelete
+    val onAddHostToUptime = actions.onAddHostToUptime
+    val onUpdateUptimeConfig = actions.onUpdateUptimeConfig
+    val onSetUptimeEnabled = actions.onSetUptimeEnabled
+    val onRemoveHostFromUptime = actions.onRemoveHostFromUptime
+    val onRefreshUptime = actions.onRefreshUptime
+    val onImportHost = actions.onImportHost
+    val onHostInfoCommandsChange = actions.onHostInfoCommandsChange
+    val onPortForwardAdd = actions.onPortForwardAdd
+    val onImportPortForward = actions.onImportPortForward
+
+exec
+/usr/bin/zsh -lc "sed -n '220,420p' app/build.gradle.kts" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.8.2")
+
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.01")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3.adaptive:adaptive:1.0.0")
+    implementation("androidx.compose.material3.adaptive:adaptive-layout:1.0.0")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
+    implementation("com.hierynomus:sshj:0.40.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    implementation("com.google.zxing:core:3.5.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation(project(":terminal-emulator"))
+    implementation(project(":terminal-view"))
+    implementation("com.google.guava:listenablefuture:1.0")
+    debugRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    releaseRuntimeOnly("org.slf4j:slf4j-nop:2.0.7")
+
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.apache.sshd:sshd-core:2.12.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation("androidx.tracing:tracing:1.0.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    val firebaseBom = platform("com.google.firebase:firebase-bom:33.7.0")
+    releaseImplementation(firebaseBom)
+    releaseImplementation("com.google.firebase:firebase-crashlytics")
+    releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
+    releaseImplementation("com.google.firebase:firebase-analytics")
+    releaseImplementation("com.google.firebase:firebase-perf")
+    releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
+    add("benchmarkImplementation", firebaseBom)
+    add("benchmarkImplementation", "com.google.firebase:firebase-perf")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+val liveServerMainClass = "com.majordaftapps.sshpeaches.livetest.LiveSshServerKt"
+val liveServerPort = ((findProperty("liveSshPort") as? String)?.toIntOrNull() ?: 56321).coerceAtLeast(1024)
+val liveServerStateDir = rootProject.layout.buildDirectory.dir("live-ssh-server-state")
+val liveServerMarkerFile = layout.buildDirectory.file("live-ssh-server/process.properties")
+val liveServerLogFile = layout.buildDirectory.file("live-ssh-server/server.log")
+val liveSshUseAdbReverse = (findProperty("liveSshUseAdbReverse") as? String)?.equals("true", ignoreCase = true) == true
+val liveSshDeviceSerial = (findProperty("liveSshDeviceSerial") as? String)?.takeIf { it.isNotBlank() }
+val liveSshHostKeyAlgorithm = (findProperty("liveSshHostKeyAlgorithm") as? String)?.takeIf { it.isNotBlank() } ?: "RSA"
+
+fun adbExecutablePath(): String {
+    val adbName = if (OperatingSystem.current().isWindows) "adb.exe" else "adb"
+    return File(android.sdkDirectory, "platform-tools/$adbName").absolutePath
+}
+
+fun Project.helperRuntimeClasspath(): String {
+    val helperProject = project(":tools:live-ssh-server")
+    val jarTask = helperProject.tasks.named("jar").get()
+    val jarFile = jarTask.outputs.files.singleFile
+    val runtimeClasspath = helperProject.configurations.getByName("runtimeClasspath").files
+    return (runtimeClasspath + jarFile).joinToString(File.pathSeparator) { it.absolutePath }
+}
+
+fun adbCommand(vararg args: String): List<String> = buildList {
+    add(adbExecutablePath())
+    liveSshDeviceSerial?.let {
+        add("-s")
+        add(it)
+    }
+    addAll(args)
+}
+
+fun Project.captureCommandOutput(command: List<String>, ignoreExitValue: Boolean = false): String {
+    val output = ByteArrayOutputStream()
+    exec {
+        isIgnoreExitValue = ignoreExitValue
+        commandLine(command)
+        standardOutput = output
+        errorOutput = output
+    }
+    return output.toString(Charsets.UTF_8).trim()
+}
+
+tasks.register("startLiveSshServer") {
+    dependsOn(":tools:live-ssh-server:jar")
+    doLast {
+        val markerFile = liveServerMarkerFile.get().asFile
+        val logFile = liveServerLogFile.get().asFile
+        markerFile.parentFile.mkdirs()
+        logFile.parentFile.mkdirs()
+        if (markerFile.exists()) {
+            logger.lifecycle("Live SSH server marker exists; stopping stale process first.")
+            val pid = markerFile.readLines()
+                .firstOrNull { it.startsWith("pid=") }
+                ?.substringAfter("=")
+                ?.toLongOrNull()
+            if (pid != null) {
+                ProcessHandle.of(pid).ifPresent { handle ->
+                    handle.destroy()
+                    handle.onExit().get(5, TimeUnit.SECONDS)
+                }
+            }
+            markerFile.delete()
+        }
+
+        val javaExecutable = File(
+            System.getProperty("java.home"),
+            if (OperatingSystem.current().isWindows) "bin/java.exe" else "bin/java"
+        ).absolutePath
+        val process = ProcessBuilder(
+            javaExecutable,
+            "-cp",
+            helperRuntimeClasspath(),
+            liveServerMainClass,
+            "--port=$liveServerPort",
+            "--httpPort=$liveForwardHttpPort",
+            "--stateDir=${liveServerStateDir.get().asFile.absolutePath}",
+            "--keyProfile=primary",
+            "--hostKeyAlgorithm=$liveSshHostKeyAlgorithm"
+        )
+            .directory(rootProject.projectDir)
+            .redirectErrorStream(true)
+            .start()
+
+        val reader = process.inputStream.bufferedReader()
+        val readyLine = buildString {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+            while (System.nanoTime() < deadline) {
+                val line = reader.readLine() ?: break
+                logFile.appendText(line + System.lineSeparator())
+                if (line.startsWith("LIVE_SSH_SERVER_READY")) {
+                    append(line)
+                    break
+                }
+            }
+        }
+
+        check(readyLine.isNotBlank()) {
+            "Live SSH server failed to start. Check ${logFile.absolutePath}"
+        }
+
+        val pid = process.pid()
+        markerFile.writeText(
+            buildString {
+                appendLine("pid=$pid")
+                appendLine("ready=$readyLine")
+            }
+        )
+
+        if (liveSshUseAdbReverse) {
+            val adbArgs = buildList {
+                add(adbExecutablePath())
+                liveSshDeviceSerial?.let {
+                    add("-s")
+                    add(it)
+                }
+                add("reverse")
+                add("tcp:$liveServerPort")
+                add("tcp:$liveServerPort")
+            }
+            exec {
+                commandLine(adbArgs)
+            }
+        }
+    }
+}
+
+tasks.register("stopLiveSshServer") {
+    doLast {
+        if (liveSshUseAdbReverse) {
+            val adbArgs = buildList {
+
+exec
+/usr/bin/zsh -lc "sed -n '400,840p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+    val onKeyboardReset = actions.onKeyboardReset
+    val onImportTerminalProfiles = actions.onImportTerminalProfiles
+    val onSnippetAdd = actions.onSnippetAdd
+    val onImportSnippet = actions.onImportSnippet
+    val onSnippetUpdate = actions.onSnippetUpdate
+    val onSnippetDelete = actions.onSnippetDelete
+    val onToggleFavorite = actions.onToggleFavorite
+    val onMarkHostUsed = actions.onMarkHostUsed
+    val onMarkIdentityUsed = actions.onMarkIdentityUsed
+    val onMarkPortForwardUsed = actions.onMarkPortForwardUsed
+    val onMarkSnippetUsed = actions.onMarkSnippetUsed
+    val onSendSessionShortcut = actions.onSendSessionShortcut
+    val onSendShellBytes = actions.onSendShellBytes
+    val onResizeShell = actions.onResizeShell
+    val onMoveRuntimeSessionPassword = actions.onMoveRuntimeSessionPassword
+    val onListSftpDirectory = actions.onListSftpDirectory
+    val onSftpDownloadFile = actions.onSftpDownloadFile
+    val onSftpUploadFile = actions.onSftpUploadFile
+    val onManageRemotePath = actions.onManageRemotePath
+    val onScpDownloadFile = actions.onScpDownloadFile
+    val onScpUploadFile = actions.onScpUploadFile
+    val onOpenSessionRequestHandled = actions.onOpenSessionRequestHandled
+    val onRespondToHostKeyPrompt = actions.onRespondToHostKeyPrompt
+    val onRespondToPasswordPrompt = actions.onRespondToPasswordPrompt
+    val onRequestCorePermissions = actions.onRequestCorePermissions
+    val onOpenAppPermissionSettings = actions.onOpenAppPermissionSettings
+    val onStartupRouteHandled = actions.onStartupRouteHandled
+    val resolveTerminalEmulator = runtime.resolveTerminalEmulator
+    val resolveRuntimeSessionPassword = runtime.resolveRuntimeSessionPassword
+    val sessionServiceReady = runtime.sessionServiceReady
+    val sessions = runtime.sessions
+    val shellOutputs = runtime.shellOutputs
+    val remoteDirectories = runtime.remoteDirectories
+    val fileTransferProgresses = runtime.fileTransferProgresses
+    val hostKeyPrompts = runtime.hostKeyPrompts
+    val passwordPrompts = runtime.passwordPrompts
+    val requestedOpenSessionId = runtime.requestedOpenSessionId
+    val requestedOpenSessionFileTransferEntryMode = runtime.requestedOpenSessionFileTransferEntryMode
+    val corePermissions = runtime.corePermissions
+    val requestedStartupRoute = runtime.requestedStartupRoute
+    val navController = rememberNavController()
+    val initialStartDestination = remember {
+        requestedStartupRoute
+            ?.takeUnless { it == Routes.CONNECTING }
+            ?: Routes.HOME
+    }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val showQuickConnect = rememberSaveable { mutableStateOf(false) }
+    val showShortcutHelp = rememberSaveable { mutableStateOf(false) }
+    val showAbout = rememberSaveable { mutableStateOf(false) }
+    val quickConnectRequest = rememberSaveable { mutableStateOf<QuickConnectRequest?>(null) }
+    val quickConnectState = rememberSaveable { mutableStateOf(QuickConnectUiState()) }
+    val pendingConnectingNavigation = rememberSaveable { mutableStateOf(false) }
+    val routeBeforeConnecting = rememberSaveable { mutableStateOf(Routes.HOME) }
+    val sawSnapshotForCurrentRequest = rememberSaveable { mutableStateOf(false) }
+    val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
+    val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
+    val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val suppressHomeWelcomeOnReturn = rememberSaveable { mutableStateOf(false) }
+    val uptimeAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val hostEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
+    val hostImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val identityEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
+    val identityImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val forwardEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
+    val forwardImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val snippetEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
+    val snippetImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val emptyStateByRoute = remember { mutableStateMapOf<String, Boolean>() }
+    val context = LocalContext.current
+    val activity = context as? MainActivity
+    val helpUrl = context.getString(R.string.support_url)
+    val backStackEntry = navController.currentBackStackEntryAsState().value
+    val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
+    val missingCorePermissions = corePermissions.filterNot { it.granted }
+    val activeSshSessions = sessions.filter {
+        it.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+            it.mode == ConnectionMode.SSH
+    }
+    val openSessionSnapshots = sessions.filter {
+        it.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR
+    }
+    val rawQuickConnectRequest = quickConnectRequest.value
+    val snippetRunSelection = remember { mutableStateOf<Snippet?>(null) }
+    val snippetRunTargetHostId = remember { mutableStateOf<String?>(null) }
+    val snippetRunInProgress = remember { mutableStateOf(false) }
+    val snippetRunResult = remember { mutableStateOf<SnippetRunResult?>(null) }
+
+    fun quickStateFromSnapshot(
+        snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
+        host: HostConnection
+    ): QuickConnectUiState = when (snapshot.status) {
+        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+            QuickConnectUiState(
+                phase = QuickConnectPhase.CONNECTING,
+                message = snapshot.statusMessage ?: "Connecting to ${host.host}:${host.port}..."
+            )
+        }
+
+        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+            QuickConnectUiState(
+                phase = QuickConnectPhase.SUCCESS,
+                message = snapshot.statusMessage ?: "Connected successfully"
+            )
+        }
+
+        com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+            QuickConnectUiState(
+                phase = QuickConnectPhase.ERROR,
+                message = snapshot.statusMessage ?: "Connection failed"
+            )
+        }
+    }
+
+    fun quickRequestFromSnapshot(
+        snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
+        fileTransferEntryMode: FileTransferEntryMode = FileTransferEntryMode.DOWNLOAD
+    ): QuickConnectRequest {
+        val host = snapshot.host
+        val savedHostId = uiState.hosts.firstOrNull { it.id == host.id }?.id
+        return QuickConnectRequest(
+            sessionId = snapshot.hostId,
+            name = host.name,
+            host = host.host,
+            port = host.port,
+            username = host.username,
+            auth = host.preferredAuth,
+            mode = snapshot.mode,
+            savedHostId = savedHostId,
+            useMosh = host.useMosh,
+            preferredIdentityId = host.preferredIdentityId,
+            forwardId = host.preferredForwardId,
+            script = host.startupScript,
+            terminalProfileId = host.terminalProfileId,
+            initialFileTransferEntryMode = fileTransferEntryMode
+        )
+    }
+
+    fun reconcileQuickConnectRequest(
+        current: QuickConnectRequest,
+        snapshot: SessionSnapshot
+    ): QuickConnectRequest {
+        val host = snapshot.host
+        val savedHostId = uiState.hosts.firstOrNull { it.id == host.id }?.id ?: current.savedHostId
+        return current.copy(
+            name = host.name,
+            host = host.host,
+            port = host.port,
+            username = host.username,
+            auth = host.preferredAuth,
+            mode = snapshot.mode,
+            savedHostId = savedHostId,
+            useMosh = host.useMosh,
+            preferredIdentityId = host.preferredIdentityId,
+            forwardId = host.preferredForwardId,
+            script = host.startupScript,
+            terminalProfileId = host.terminalProfileId
+        )
+    }
+
+    fun navigateBackFromConnecting() {
+        pendingConnectingNavigation.value = false
+        val popped = navController.popBackStack()
+        if (!popped) {
+            val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
+            navController.navigate(destination) {
+                popUpTo(Routes.HOME)
+            }
+        }
+    }
+
+    fun returnFromMissingSessionRoute(destination: String) {
+        val recoveryRoute = validatedSessionRecoveryRoute(destination)
+        pendingConnectingNavigation.value = false
+        quickConnectRequest.value = null
+        quickConnectState.value = QuickConnectUiState()
+        suppressHomeWelcomeOnReturn.value = recoveryRoute == Routes.HOME
+        navController.navigate(recoveryRoute) {
+            popUpTo(Routes.HOME)
+            launchSingleTop = true
+        }
+    }
+
+    val currentQuickConnectSnapshot = rawQuickConnectRequest?.let { current ->
+        sessions.firstOrNull { it.hostId == current.sessionId }
+    }
+    val effectiveQuickConnectRequest = when {
+        rawQuickConnectRequest != null && currentQuickConnectSnapshot != null -> {
+            reconcileQuickConnectRequest(rawQuickConnectRequest, currentQuickConnectSnapshot)
+        }
+
+        else -> rawQuickConnectRequest
+    }
+    val effectiveQuickConnectState = currentQuickConnectSnapshot?.let { snapshot ->
+        quickStateFromSnapshot(snapshot, snapshot.host)
+    } ?: quickConnectState.value
+    val isActualSessionVerticalRoute =
+        currentRoute == Routes.CONNECTING || currentRoute == Routes.SESSION
+    val routeReadinessSnapshots = sessions.map { snapshot ->
+        val requiresTerminalEmulator = snapshot.mode == ConnectionMode.SSH
+        SessionRouteSnapshot(
+            sessionId = snapshot.hostId,
+            status = when (snapshot.status) {
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING ->
+                    SessionRouteSnapshotStatus.CONNECTING
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE ->
+                    SessionRouteSnapshotStatus.ACTIVE
+                com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR ->
+                    SessionRouteSnapshotStatus.ERROR
+            },
+            requiresTerminalEmulator = requiresTerminalEmulator,
+            terminalEmulatorAvailable = !requiresTerminalEmulator ||
+                snapshot.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE ||
+                resolveTerminalEmulator(snapshot.hostId) != null
+        )
+    }
+    val staleSessionRouteDecision = decideStaleSessionRoute(
+        sessionServiceReady = sessionServiceReady,
+        currentRoute = currentRoute,
+        requestedOpenSessionId = requestedOpenSessionId,
+        quickConnectRequestSessionId = rawQuickConnectRequest?.sessionId,
+        pendingConnectingNavigation = pendingConnectingNavigation.value,
+        sawSnapshotForCurrentRequest = sawSnapshotForCurrentRequest.value,
+        sessionSnapshots = routeReadinessSnapshots,
+        routeBeforeConnecting = routeBeforeConnecting.value
+    )
+    val sessionRouteRendering = decideSessionRouteRendering(
+        currentRoute = currentRoute,
+        staleSessionRouteDecision = staleSessionRouteDecision
+    )
+    val chromeRoute = sessionRouteRendering.chromeRoute
+    val isSessionVerticalRoute =
+        chromeRoute == Routes.CONNECTING || chromeRoute == Routes.SESSION
+    val shellLayoutMode = rememberShellLayoutMode(
+        sessionRoute = isSessionVerticalRoute
+    )
+
+    fun routeForSnapshot(snapshot: SessionSnapshot): String =
+        if (snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE) {
+            Routes.SESSION
+        } else {
+            Routes.CONNECTING
+        }
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+    BackHandler(enabled = isSessionVerticalRoute && !drawerState.isOpen) {
+        navigateBackFromConnecting()
+    }
+    val activeSessionRequest = effectiveQuickConnectRequest
+    val currentTitle = when (chromeRoute) {
+        Routes.HOME -> "Home"
+        Routes.CONNECTING,
+        Routes.SESSION -> activeSessionRequest?.name?.ifBlank {
+            activeSessionRequest.host
+        } ?: "Connecting"
+        Routes.HELP -> "Help"
+        Routes.HOSTS -> "Hosts"
+        Routes.UPTIME -> "Uptime"
+        Routes.IDENTITIES -> "Identities"
+        Routes.FORWARDS -> "Port Forwards"
+        Routes.SNIPPETS -> "Snippets"
+        Routes.SNIPPET_EDITOR_ROUTE -> "Snippet Editor"
+        Routes.KEYBOARD -> "Keyboard Editor"
+        Routes.THEME_EDITOR -> "Theme Editor"
+        Routes.THEME_EDITOR_EDIT_ROUTE -> "Theme Editor"
+        Routes.SETTINGS -> "Settings"
+        Routes.OPEN_SOURCE_LICENSES -> "Open Source Licenses"
+        else -> "SSHPeaches"
+    }
+
+    LaunchedEffect(uiState.isLocked) {
+        if (uiState.isLocked) {
+            showQuickConnect.value = false
+            showAbout.value = false
+        }
+    }
+
+    LaunchedEffect(currentRoute) {
+        if (!isActualSessionVerticalRoute) {
+            routeBeforeConnecting.value = currentRoute
+        }
+    }
+
+    LaunchedEffect(
+        requestedOpenSessionId,
+        requestedOpenSessionFileTransferEntryMode,
+        sessions,
+        currentRoute,
+        staleSessionRouteDecision.consumeRequestedOpenSessionId
+    ) {
+        val targetHostId = requestedOpenSessionId ?: return@LaunchedEffect
+        if (staleSessionRouteDecision.consumeRequestedOpenSessionId) return@LaunchedEffect
+        val snapshot = sessions.firstOrNull { it.hostId == targetHostId } ?: return@LaunchedEffect
+        val host = snapshot.host
+        val targetRoute = routeForSnapshot(snapshot)
+        quickConnectRequest.value = quickRequestFromSnapshot(
+            snapshot,
+            requestedOpenSessionFileTransferEntryMode ?: FileTransferEntryMode.DOWNLOAD
+        )
+        quickConnectState.value = quickStateFromSnapshot(snapshot, host)
+        pendingConnectingNavigation.value = false
+        autoResumeHandled.value = true
+        if (currentRoute != targetRoute) {
+            navController.navigate(targetRoute) {
+                popUpTo(Routes.HOME)
+            }
+        }
+        onOpenSessionRequestHandled()
+    }
+
+    LaunchedEffect(requestedStartupRoute, backStackEntry?.destination?.route) {
+        val startupRoute = requestedStartupRoute ?: return@LaunchedEffect
+        if (backStackEntry == null) return@LaunchedEffect
+        if (startupRoute != currentRoute && startupRoute != Routes.CONNECTING) {
+            navController.navigate(startupRoute) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
+        }
+        onStartupRouteHandled()
+    }
+
+    LaunchedEffect(quickConnectRequest.value?.sessionId) {
+        sawSnapshotForCurrentRequest.value = false
+        connectedHostBarCollapsed.value = false
+    }
+
+    LaunchedEffect(rawQuickConnectRequest, currentQuickConnectSnapshot) {
+        val request = rawQuickConnectRequest ?: return@LaunchedEffect
+        val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        val reconciledRequest = reconcileQuickConnectRequest(request, snapshot)
+        if (quickConnectRequest.value != reconciledRequest) {
+            quickConnectRequest.value = reconciledRequest
+        }
+        val reconciledState = quickStateFromSnapshot(snapshot, snapshot.host)
+        if (quickConnectState.value != reconciledState) {
+            quickConnectState.value = reconciledState
+        }
+    }
+
+    LaunchedEffect(currentQuickConnectSnapshot?.status, currentRoute) {
+        val snapshot = currentQuickConnectSnapshot ?: return@LaunchedEffect
+        when {
+            snapshot.status == com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                currentRoute == Routes.CONNECTING -> {
+                navController.navigate(Routes.SESSION) {
+                    popUpTo(Routes.CONNECTING) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+
+            snapshot.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE &&
+                currentRoute == Routes.SESSION -> {
+                navController.navigate(Routes.CONNECTING) {
+                    popUpTo(Routes.SESSION) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(quickConnectRequest.value?.sessionId, sessions, currentRoute, sessionServiceReady) {
+        val request = quickConnectRequest.value ?: return@LaunchedEffect
+        val snapshot = sessions.firstOrNull { it.hostId == request.sessionId }
+        when (snapshot?.status) {
+            null -> {
+                if (
+                    sessionServiceReady &&
+                    sawSnapshotForCurrentRequest.value &&
+                    !pendingConnectingNavigation.value
+                ) {
+                    if (!isActualSessionVerticalRoute) {
+                        quickConnectRequest.value = null
+                        quickConnectState.value = QuickConnectUiState()
+                    }
+                } else {
+                    quickConnectState.value = QuickConnectUiState(
+                        phase = QuickConnectPhase.CONNECTING,
+                        message = "Connecting to ${request.host}:${request.port}..."
+                    )
+                }
+            }
+
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.CONNECTING -> {
+                sawSnapshotForCurrentRequest.value = true
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.CONNECTING,
+                    message = snapshot.statusMessage ?: "Connecting to ${request.host}:${request.port}..."
+                )
+            }
+
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE -> {
+                sawSnapshotForCurrentRequest.value = true
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.SUCCESS,
+                    message = snapshot.statusMessage ?: "Connected successfully"
+                )
+            }
+
+            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR -> {
+                sawSnapshotForCurrentRequest.value = true
+                quickConnectState.value = QuickConnectUiState(
+                    phase = QuickConnectPhase.ERROR,
+                    message = snapshot.statusMessage ?: "Connection failed"
+                )
+            }
+        }
+    }
+    LaunchedEffect(
+        staleSessionRouteDecision.consumeRequestedOpenSessionId,
+        staleSessionRouteDecision.recoveryRoute
+    ) {
+        if (staleSessionRouteDecision.consumeRequestedOpenSessionId) {
+            onOpenSessionRequestHandled()
+        }
+        staleSessionRouteDecision.recoveryRoute?.let { recoveryRoute ->
+            returnFromMissingSessionRoute(recoveryRoute)
+        }
+    }
+    LaunchedEffect(currentRoute, quickConnectRequest.value?.sessionId) {
+        if (isActualSessionVerticalRoute || quickConnectRequest.value == null) {
+            pendingConnectingNavigation.value = false
+        }
+    }
+
+    LaunchedEffect(sessions) {
+        if (sessions.isEmpty()) {
+            autoResumeHandled.value = false
+        }
+    }
+
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1300,1375p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+                pendingIdentityKeyPassphraseImports.size
+        }
+
+        val parts = mutableListOf<String>()
+        parts += "$importedHosts hosts"
+        parts += "$importedIdentities identities"
+        parts += "$importedForwards forwards"
+        parts += "$importedSnippets snippets"
+        if (importedTerminalProfiles > 0) parts += "$importedTerminalProfiles terminal profiles"
+        if (keyboardLayoutApplied) parts += "keyboard layout applied"
+        if (importedPasswords > 0) parts += "$importedPasswords passwords"
+        if (importedPrivateKeys > 0) parts += "$importedPrivateKeys private keys"
+        if (importedKeyPassphrases > 0) parts += "$importedKeyPassphrases key passphrases"
+        if (settingsApplied) parts += "settings applied"
+        val summary = "Import complete: ${parts.joinToString(", ")}."
+        return buildString {
+            append(summary)
+            if (protectedImportFailures > 0) {
+                append(' ')
+                append("$protectedImportFailures protected items could not be imported. Check the export passphrase and unlock state.")
+            }
+            if (metadataImportFailures > 0) {
+                append(' ')
+                append("$metadataImportFailures identity metadata items could not be imported.")
+            }
+        }
+    }
+
+    fun closeCurrentConnectingSession() {
+        val request = quickConnectRequest.value
+        if (request != null) {
+            onStopSession(request.sessionId)
+        }
+        pendingConnectingNavigation.value = false
+        val destination = validatedSessionRecoveryRoute(routeBeforeConnecting.value)
+        suppressHomeWelcomeOnReturn.value = destination == Routes.HOME
+        navController.navigate(destination) {
+            popUpTo(Routes.HOME)
+        }
+        quickConnectRequest.value = null
+        quickConnectState.value = QuickConnectUiState()
+    }
+
+    @Composable
+    fun SessionVerticalContent() {
+        if (!sessionRouteRendering.renderTerminalContent) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            )
+            return
+        }
+        val showConnectingTopBar =
+            quickConnectState.value.phase != QuickConnectPhase.CONNECTING &&
+                !connectedHostBarCollapsed.value
+        val showSessionTopBar =
+            currentRoute != Routes.SESSION || !connectedHostBarCollapsed.value
+        val showTopBarForCurrentSessionRoute = when (currentRoute) {
+            Routes.CONNECTING -> showConnectingTopBar
+            Routes.SESSION -> showSessionTopBar
+            else -> false
+        }
+        val request = effectiveQuickConnectRequest
+        val screenState = when {
+            currentRoute == Routes.SESSION && request != null -> {
+                effectiveQuickConnectState.copy(
+                    phase = QuickConnectPhase.SUCCESS,
+                    message = effectiveQuickConnectState.message.ifBlank { "Connected successfully" }
+                )
+            }
+
+            else -> effectiveQuickConnectState
+        }
+        val logs = request?.let { current ->
+            sessionLogs.filter { it.hostId == current.sessionId }
+
+codex
+I’m going to extend `SessionRouteReadinessTest` rather than introduce instrumentation tests. The current root composable depends on Android/Compose runtime, while the route decision and render gating were extracted into a pure helper specifically for deterministic JVM coverage.
+hook: PreToolUse
+hook: PreToolUse Completed
+apply patch
+patch: completed
+/home/zenulabidin/Documents/sshpeaches/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+codex
+The test file now covers the missing requested-open-session path, the service-not-ready delay behavior, and an explicit render-gating assertion before navigation cleanup has a chance to run. I’m running the focused JVM test next.
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc './gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest' in /home/zenulabidin/Documents/sshpeaches
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+codex
+The focused Gradle test is still running through the Android unit-test task; compilation has reached the debug unit-test classes.
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+ succeeded in 36025ms:
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :terminal-emulator:preBuild UP-TO-DATE
+> Task :terminal-emulator:preDebugBuild UP-TO-DATE
+> Task :terminal-emulator:writeDebugAarMetadata UP-TO-DATE
+> Task :terminal-view:preBuild UP-TO-DATE
+> Task :terminal-view:preDebugBuild UP-TO-DATE
+> Task :terminal-view:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :terminal-emulator:processDebugNavigationResources UP-TO-DATE
+> Task :terminal-view:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdDebug UP-TO-DATE
+> Task :app:processDebugGoogleServices SKIPPED
+> Task :terminal-emulator:generateDebugResValues UP-TO-DATE
+> Task :terminal-emulator:generateDebugResources UP-TO-DATE
+> Task :terminal-emulator:packageDebugResources UP-TO-DATE
+> Task :terminal-view:generateDebugResValues UP-TO-DATE
+> Task :terminal-view:generateDebugResources UP-TO-DATE
+> Task :terminal-view:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :terminal-emulator:extractDeepLinksDebug UP-TO-DATE
+> Task :terminal-emulator:processDebugManifest UP-TO-DATE
+> Task :terminal-view:extractDeepLinksDebug UP-TO-DATE
+> Task :terminal-view:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :terminal-emulator:compileDebugLibraryResources UP-TO-DATE
+> Task :terminal-emulator:parseDebugLocalResources UP-TO-DATE
+> Task :terminal-emulator:generateDebugRFile UP-TO-DATE
+> Task :terminal-view:compileDebugLibraryResources UP-TO-DATE
+> Task :terminal-view:parseDebugLocalResources UP-TO-DATE
+> Task :terminal-view:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :terminal-emulator:javaPreCompileDebug UP-TO-DATE
+> Task :terminal-emulator:compileDebugJavaWithJavac UP-TO-DATE
+> Task :terminal-emulator:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :terminal-view:javaPreCompileDebug UP-TO-DATE
+> Task :terminal-view:compileDebugJavaWithJavac UP-TO-DATE
+> Task :terminal-view:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:kaptGenerateStubsDebugKotlin UP-TO-DATE
+> Task :app:kaptDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :terminal-emulator:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :terminal-view:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:bundleDebugClassesToRuntimeJar UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :terminal-emulator:processDebugJavaRes NO-SOURCE
+> Task :terminal-view:processDebugJavaRes NO-SOURCE
+> Task :app:kaptGenerateStubsDebugUnitTestKotlin
+> Task :app:kaptDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///home/zenulabidin/Documents/sshpeaches/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 34s
+61 actionable tasks: 5 executed, 56 up-to-date
+
+codex
+The focused regression test passed. I’m doing a quick diff review now to make sure only the intended test file changed.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git diff -- app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+exec
+/usr/bin/zsh -lc 'git status --short app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+?? app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+codex
+{
+  "status": "completed",
+  "summary": "Added deterministic JVM regression coverage for stale terminal route recovery, including service-readiness delay, render gating before cleanup navigation, valid live requested-session preservation, stale requestedOpenSessionId handling, and route recovery behavior.",
+  "files_changed": [
+    "app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt"
+  ],
+  "commands_run": [
+    "sed -n '1,220p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260713154557/skills/sbx/SKILL.md",
+    "pwd",
+    "rg --files -g '!**/.stringbean/runs/**' -g '!**/.env*' -g '!**/.secrets/**' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/credentials.json' -g '!**/service-account*.json' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "git status --short",
+    "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt",
+    "sed -n '1,260p' app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "rg -n \"decideStaleSessionRoute|decideSessionRouteRendering|renderTerminalContent|sessionServiceReady|requestedOpenSessionId|routeBeforeConnecting|quickConnectRequestSessionId|sawSnapshot\" app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt",
+    "sed -n '1,220p' app/build.gradle.kts",
+    "sed -n '1,220p' app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt",
+    "rg -n \"SSHPeachesRoot\\(|AppUiState\\(|SessionRouteReadiness\" app/src/test/java app/src/androidTest/java -g '!**/.stringbean/runs/**' -g '!**/.env*' -g '!**/.secrets/**' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/credentials.json' -g '!**/service-account*.json' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "sed -n '280,380p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '400,840p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '1300,1375p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '220,420p' app/build.gradle.kts",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+    "git diff -- app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt",
+    "git status --short app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+      "result": "passed"
+    }
+  ],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "The worktree had many pre-existing dirty and untracked files. I only changed app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt for this task."
+  ]
+}
+diff --git a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+index 727eb77988a7e106921fa8b4377081d1517f95ec..f3e4f9e21149b92407b73cd88d7a828606dfa261
+--- a/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
++++ b/app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt
+@@ -4,12 +4,13 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class SessionRouteReadinessTest {
+ 
+     @Test
+-    fun serviceNotReadyWithEmptySnapshotsDoesNotRedirect() {
++    fun serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = false,
+             currentRoute = Routes.SESSION,
+@@ -22,7 +23,16 @@
+         )
+ 
+         assertNull(decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
+         assertFalse(decision.consumeRequestedOpenSessionId)
++
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
+@@ -39,8 +49,8 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+ 
+         val rendering = decideSessionRouteRendering(
+             currentRoute = Routes.SESSION,
+@@ -52,6 +62,30 @@
+     }
+ 
+     @Test
++    fun serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = emptyList(),
++            routeBeforeConnecting = Routes.SETTINGS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.SETTINGS, decision.recoveryRoute)
++        assertTrue(decision.gateTerminalContent)
++        assertTrue(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SETTINGS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -66,7 +100,7 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ 
+     @Test
+@@ -99,10 +133,41 @@
+         )
+ 
+         assertEquals(Routes.SESSION, rendering.chromeRoute)
+-        assertEquals(true, rendering.renderTerminalContent)
++        assertTrue(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute() {
++        val decision = decideStaleSessionRoute(
++            sessionServiceReady = true,
++            currentRoute = Routes.SESSION,
++            requestedOpenSessionId = "session-1",
++            quickConnectRequestSessionId = null,
++            pendingConnectingNavigation = false,
++            sawSnapshotForCurrentRequest = false,
++            sessionSnapshots = listOf(
++                SessionRouteSnapshot(
++                    sessionId = "session-1",
++                    status = SessionRouteSnapshotStatus.ACTIVE,
++                    requiresTerminalEmulator = true,
++                    terminalEmulatorAvailable = true
++                )
++            ),
++            routeBeforeConnecting = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertNull(decision.recoveryRoute)
++        assertFalse(decision.gateTerminalContent)
++        assertFalse(decision.consumeRequestedOpenSessionId)
++        assertEquals(Routes.SESSION, rendering.chromeRoute)
++        assertTrue(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -127,12 +192,28 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+ 
+     @Test
++    fun staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes() {
++        val decision = StaleSessionRouteDecision(
++            gateTerminalContent = true,
++            consumeRequestedOpenSessionId = false,
++            recoveryRoute = Routes.HOSTS
++        )
++        val rendering = decideSessionRouteRendering(
++            currentRoute = Routes.SESSION,
++            staleSessionRouteDecision = decision
++        )
++
++        assertEquals(Routes.HOSTS, rendering.chromeRoute)
++        assertFalse(rendering.renderTerminalContent)
++    }
++
++    @Test
+     fun serviceReadySessionRouteWithNoRequestGatesTerminalContent() {
+         val decision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -150,7 +231,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, decision.recoveryRoute)
+-        assertEquals(true, decision.gateTerminalContent)
++        assertTrue(decision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, rendering.chromeRoute)
+         assertFalse(rendering.renderTerminalContent)
+     }
+@@ -175,7 +256,7 @@
+         assertNull(firstPassDecision.recoveryRoute)
+         assertFalse(firstPassDecision.gateTerminalContent)
+         assertEquals(Routes.CONNECTING, firstPassRendering.chromeRoute)
+-        assertEquals(true, firstPassRendering.renderTerminalContent)
++        assertTrue(firstPassRendering.renderTerminalContent)
+ 
+         val staleAfterSnapshotChanceDecision = decideStaleSessionRoute(
+             sessionServiceReady = true,
+@@ -193,7 +274,7 @@
+         )
+ 
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceDecision.recoveryRoute)
+-        assertEquals(true, staleAfterSnapshotChanceDecision.gateTerminalContent)
++        assertTrue(staleAfterSnapshotChanceDecision.gateTerminalContent)
+         assertEquals(Routes.HOSTS, staleAfterSnapshotChanceRendering.chromeRoute)
+         assertFalse(staleAfterSnapshotChanceRendering.renderTerminalContent)
+     }
+@@ -240,6 +321,6 @@
+ 
+         assertNull(decision.recoveryRoute)
+         assertFalse(decision.gateTerminalContent)
+-        assertEquals(true, decision.consumeRequestedOpenSessionId)
++        assertTrue(decision.consumeRequestedOpenSessionId)
+     }
+ }
+
+tokens used
+46,162

@@ -1,0 +1,40 @@
+{
+  "status": "completed",
+  "summary": "Added foreground stale ACTION_OPEN_SESSION instrumentation coverage in OpenSessionIntentLaunchTest. The new test creates a real live session, captures its session id, returns to Hosts, stops that session, delivers a stale open-session intent through the framework launch path, and asserts Hosts remains visible with no Connecting screen or terminal panel. The existing valid openSessionIntentColdLaunch_restoresExistingLiveTerminal test was left unchanged.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt"
+  ],
+  "commands_run": [
+    "rg --files -g '!**/.stringbean/runs/**' -g '!.env*' -g '!**/.env*' -g '!**/secrets/**' -g '!**/credentials/**' -g '!**/*.pem' -g '!**/*.key' -g '!**/*.p12' -g '!**/*.pfx'",
+    "sed -n '1,260p' app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/MainActivity.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SessionRouteReadiness.kt",
+    "git status --short",
+    "./gradlew :app:compileDebugAndroidTestKotlin",
+    "adb devices",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest --rerun-tasks"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:compileDebugAndroidTestKotlin",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest --rerun-tasks",
+      "result": "passed"
+    },
+    {
+      "command": "adb devices",
+      "result": "no attached devices; connected instrumentation could not be run in this environment"
+    }
+  ],
+  "remaining_issues": [
+    "Targeted connected Android instrumentation was not executed because adb reported no attached device or emulator."
+  ],
+  "handoff_notes": [
+    "The new coverage is foregroundStaleOpenSessionIntent_preservesHostsWithoutTerminalPane.",
+    "It specifically verifies stale notification/open intent consumption on a valid non-session route and that no terminal pane is displayed.",
+    "The working tree already contained unrelated uncommitted changes before this edit; only OpenSessionIntentLaunchTest.kt was modified for this task."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "status": "completed",
+  "summary": "Implemented task-7 coverage by adding a focused terminal-view instrumentation test proving commitText(\"a\") routes to TerminalViewClient.onCodePoint() with a standalone TerminalEmulator and no TerminalSession. The existing dirty TerminalView.java change already had inputCodePoint() computing modifiers before the null-session fallback and offering the codepoint to the client first, so I preserved it. Task count: 2 listed; completed task-1 inspection and task-7 implementation/test work. Review rounds: 1 final diff/status review.",
+  "files_changed": [
+    "third_party/termux-playstore/terminal-view/build.gradle.kts",
+    "third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java",
+    "third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java"
+  ],
+  "commands_run": [
+    "sed -n '1,220p' /home/zenulabidin/.codex/plugins/cache/stringbean-local/stringbean/0.1.0+codex.20260715183043/skills/sbx/SKILL.md",
+    "sed -n '1,240p' docs/plans/ctrl-ime-copy-paste-fix.md",
+    "git status --short -- docs/plans/ctrl-ime-copy-paste-fix.md third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java third_party/termux-playstore/terminal-view/src/test third_party/termux-playstore/terminal-view/src/androidTest app/src/androidTest",
+    "./gradlew :terminal-view:compileDebugAndroidTestJavaWithJavac",
+    "./gradlew :terminal-view:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest",
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "adb devices",
+    "git diff -- third_party/termux-playstore/terminal-view/build.gradle.kts third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :terminal-view:compileDebugAndroidTestJavaWithJavac",
+      "result": "passed: BUILD SUCCESSFUL in 44s"
+    },
+    {
+      "command": "./gradlew :terminal-view:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest",
+      "result": "not executed on device: APK packaged, then failed with DeviceException: No connected devices"
+    },
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "not executed on device: app and test APKs packaged, then failed with DeviceException: No connected devices"
+    }
+  ],
+  "remaining_issues": [
+    "Connected instrumentation tests could not run because adb reported no connected devices."
+  ],
+  "handoff_notes": [
+    "Hidden-editor sentinel cleanup was not touched.",
+    "Existing unrelated dirty-worktree changes were preserved.",
+    "The terminal-view module now uses the AndroidX instrumentation runner and AndroidX JUnit runner dependencies for its new androidTest source set."
+  ]
+}

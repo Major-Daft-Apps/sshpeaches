@@ -1,0 +1,3580 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.0
+--------
+workdir: /home/zenulabidin/Documents/sshpeaches
+model: gpt-5.5
+provider: openai
+approval: on-request
+sandbox: danger-full-access
+reasoning effort: low
+reasoning summaries: none
+session id: 019f5ba3-27c8-7a53-9372-cf1cc0017fd6
+--------
+user
+Stringbean execution policy:
+- Execution profile: rw. Agents with read_write permission may modify files in service of the task. Agents with read_only permission must not modify files; Stringbean will treat modifications as a policy violation.
+- Effective permission for this call: read_write.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+
+You are an implementer.
+Implement only the listed task and avoid unrelated changes.
+
+Task:
+describe this project (what does it do?)
+
+Objective:
+task-2 - Inspect application structure
+
+Plan task:
+{
+  "id": "task-2",
+  "title": "Inspect application structure",
+  "description": "Review the Gradle configuration and main app packages to summarize the technical shape of the project, including UI, state management, settings, SSH provider, session service, keyboard, and terminal routing components.",
+  "dependencies": [
+    "task-1"
+  ],
+  "recommended_role": "implementer",
+  "permissions": "read_only",
+  "verification": [
+    "Identify the Android app module and Kotlin package namespace.",
+    "Map key source folders to their responsibilities without changing files."
+  ]
+}
+
+Required verification:
+Identify the Android app module and Kotlin package namespace.
+Map key source folders to their responsibilities without changing files.
+
+Known constraints:
+Identify the Android app module and Kotlin package namespace.
+Map key source folders to their responsibilities without changing files.
+
+Prior constraints/advisor notes:
+implementer
+
+Allowed file scope:
+task-1
+
+Return JSON:
+{
+  "status": "completed",
+  "summary": "...",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": []
+}
+
+codex
+I’ll inspect the Gradle setup and Kotlin source layout, then return the requested JSON with no file changes.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc pwd in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+/home/zenulabidin/Documents/sshpeaches
+
+exec
+/usr/bin/zsh -lc 'rg --files' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+gradle.properties
+build.gradle.kts
+prompt_state_snapshot.txt
+README.md
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew.bat
+CHANGELOG.md
+prompt_instructions.txt
+settings.gradle.kts
+gradlew
+functions/package.json
+functions/index.js
+functions/package-lock.json
+lint.xml
+app/proguard-rules.pro
+app/proguard-release-androidtest-rules.pro
+app/build.gradle.kts
+tools/live-ssh-server/build.gradle.kts
+app/src/androidTest/AndroidManifest.xml
+third_party/termux-playstore/terminal-view/proguard-rules.pro
+third_party/termux-playstore/terminal-view/build.gradle.kts
+tools/live-ssh-server/src/main/kotlin/com/majordaftapps/sshpeaches/livetest/LiveSshServer.kt
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_right_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_left_material.xml
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsDialogRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/ManagerSearchRecreateTest.kt
+third_party/termux-playstore/terminal-view/src/main/res/values/strings.xml
+third_party/termux-playstore/terminal-view/src/main/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt
+macrobenchmark/build.gradle.kts
+app/src/androidTest/java/com/sshpeaches/app/themes/ThemeEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/TerminalThemeApplicationTest.kt
+app/src/test/java/com/sshpeaches/app/ui/TransferPayloadCodecTest.kt
+macrobenchmark/src/main/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityCrudTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsPreferencesTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsRestoreDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SecuritySettingsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/GestureAndScaleRecognizer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionHandleView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalRenderer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt
+third_party/termux-playstore/terminal-emulator/proguard-rules.pro
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt
+third_party/termux-playstore/terminal-emulator/build.gradle.kts
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetter.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LifecycleTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/NotificationPermissionHelper.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/TestSuites.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetRule.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/KnownHostsSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LiveBackendConfig.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ActivityLaunchHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/favorites/FavoritesScreenTest.kt
+app/src/test/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepositoryTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityLockRuntimeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityManagerVaultTest.kt
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt
+app/src/test/java/com/sshpeaches/app/data/importer/OpenSshConfigImporterTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/AccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/VisualSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/QuickConnectAccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/RtlSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt
+third_party/termux-playstore/terminal-emulator/src/main/jni/Android.mk
+third_party/termux-playstore/terminal-emulator/src/main/jni/termux.c
+third_party/termux-playstore/terminal-emulator/src/main/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+app/src/androidTest/java/com/sshpeaches/app/permissions/NotificationPermissionStateTest.kt
+app/src/test/java/com/sshpeaches/app/data/local/ConvertersTest.kt
+app/src/androidTest/java/com/sshpeaches/app/uptime/UptimeScreenTest.kt
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/arm64-v8a/libtermux.so
+app/src/test/java/com/sshpeaches/app/util/PortForwardsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardCrudTest.kt
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/x86_64/libtermux.so
+LICENSE
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+app/src/test/java/com/sshpeaches/app/service/FileTransferProgressTest.kt
+docs/task-2-summary.json
+app/src/test/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeNotificationsTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeSummaryCalculatorTest.kt
+docs/user-wiki/Troubleshooting.md
+app/src/androidTest/java/com/sshpeaches/app/navigation/ExternalLinksNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/AppInfoNavigationTest.kt
+docs/user-wiki/developer/UI-Design-Notes.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/Getting-Started.md
+docs/user-wiki/Home.md
+docs/README.md
+docs/task-3-summary.json
+docs/plans/chromebook-tier2-adaptive-design.md
+app/src/androidTest/java/com/sshpeaches/app/snippets/SnippetCrudTest.kt
+firebase.json
+app/src/benchmark/AndroidManifest.xml
+app/src/main/assets/licenses/maven_licenses.json
+app/src/debug/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/debug/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/main/assets/licenses/fonts/droid-sans-mono-notice.txt
+app/src/main/assets/licenses/fonts/google-fonts-ofl.txt
+app/src/main/assets/licenses/fonts/cascadia-code-license.txt
+app/src/main/assets/licenses/fonts/open-dyslexic-readme.md
+app/src/main/assets/licenses/fonts/droid-sans-mono-module-license.txt
+third_party/termux-playstore/terminal-emulator/src/test/java/android/util/Base64.java
+app/src/debug/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/main/assets/gpl-3.0.txt
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/ByteQueue.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalBuffer.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/WcWidth.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColorScheme.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalRow.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/JNI.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TextStyle.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColors.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/KeyHandler.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalOutput.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSessionClient.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSession.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/UnicodeInputTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/OperatingSystemControlTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalRowTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DeviceControlStringTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DecSetTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScreenBufferTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/VtCompatibilityTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ApcTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ControlSequenceIntroducerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TextStyleTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ResizeTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ByteQueueTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/KeyHandlerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTestCase.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/HistoryTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/WcWidthTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/RectangularAreasTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScrollRegionTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/CursorAndScreenTest.java
+app/src/main/java/com/sshpeaches/app/ui/adaptive/AdaptiveLayout.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/DesktopInput.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalSelectionMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/FileTransferEntryMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalBellMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+app/src/main/java/com/sshpeaches/app/util/ValidationUtils.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyGenerator.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyFingerprint.kt
+app/src/main/java/com/sshpeaches/app/util/SnippetReference.kt
+app/src/main/java/com/sshpeaches/app/util/PortForwards.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+app/src/main/java/com/sshpeaches/app/service/FileTransferProgress.kt
+app/src/main/java/com/sshpeaches/app/service/SessionLogBus.kt
+app/src/main/java/com/sshpeaches/app/service/MoshRuntime.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsBundle.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploader.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploadWorker.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsScheduler.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalFontSupport.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalRenderView.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/v/vt100
+app/src/main/java/com/sshpeaches/app/widget/HostWidgets.kt
+app/src/main/java/com/sshpeaches/app/widget/WidgetSessionStore.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ModalSizing.kt
+app/src/main/java/com/sshpeaches/app/ui/util/EnumDisplay.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ExportPassphraseCache.kt
+app/src/main/java/com/sshpeaches/app/ui/util/PasswordTailReveal.kt
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeScheduler.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeSummaryCalculator.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerDelegate.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeWorker.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeNotifications.kt
+app/src/main/java/com/sshpeaches/app/uptime/NoOpUptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/MainActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/UptimeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/OpenSourceLicensesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/PortForwardScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/FavoritesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HomeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeProfileEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/KeyboardEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HostsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetManagerScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/IdentitiesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HelpScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/permissions/CorePermissionStatus.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Color.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Type.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Theme.kt
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/arm64-v8a/lib/libncursesw.so.6
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libandroid-support.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_statusor.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/arm64-v8a/lib/libc++_shared.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_int128.so
+app/src/main/assets/mosh/arm64-v8a/lib/libprotobuf.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strerror.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hash.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_base.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_status.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings.so
+app/src/main/assets/mosh/arm64-v8a/lib/libutf8_validity.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_functions.so
+app/src/main/java/com/sshpeaches/app/ui/logging/UiDebugLog.kt
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_city.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord.so
+app/src/main/assets/mosh/arm64-v8a/lib/libcrypto.so.3
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libz.so.1
+app/src/main/assets/mosh/arm64-v8a/bin/mosh-client
+app/src/main/java/com/sshpeaches/app/ui/qr/AdaptiveCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/PortraitCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/QrScanOptions.kt
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+app/src/release/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/ReleaseTestHostActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+app/src/release/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/release/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/main/java/com/sshpeaches/app/SSHPeachesApplication.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/Routes.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/DrawerDestinations.kt
+app/src/main/java/com/sshpeaches/app/AppIconManager.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrImportHandlers.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostCard.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AuthChoice.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AppDrawer.kt
+app/src/main/java/com/sshpeaches/app/ui/components/GroupedSections.kt
+app/src/main/java/com/sshpeaches/app/ui/components/LockScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrDecode.kt
+app/src/main/java/com/sshpeaches/app/ui/components/SnippetQr.kt
+app/src/main/java/com/sshpeaches/app/data/settings/AppIconOption.kt
+app/src/main/java/com/sshpeaches/app/ui/components/EmptyState.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsDefaults.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/PortForwardQr.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+app/src/main/java/com/sshpeaches/app/ui/components/IdentityQr.kt
+app/src/main/assets/fonts/Inconsolata-Regular.ttf
+app/src/main/assets/fonts/RobotoMono.ttf
+app/src/main/assets/fonts/DroidSansMono.ttf
+app/src/main/java/com/sshpeaches/app/security/SecurityManager.kt
+app/src/main/AndroidManifest.xml
+app/src/main/assets/fonts/FiraCode.ttf
+app/src/main/assets/fonts/CascadiaMono-Regular.ttf
+app/src/main/assets/fonts/JetBrainsMono.ttf
+app/src/main/assets/fonts/OpenDyslexicMono-Regular.ttf
+app/src/main/assets/fonts/SourceCodePro.ttf
+app/src/main/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/UptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/importer/OpenSshConfigImporter.kt
+app/src/main/res/raw/suse.svg
+app/src/main/res/raw/debian.svg
+app/src/main/java/com/sshpeaches/app/data/ssh/Ed25519IdentityKeyProvider.kt
+app/src/main/res/raw/ubuntu.svg
+app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/IdentityKeyInstaller.kt
+app/src/main/res/raw/bsd.svg
+app/src/main/res/raw/apple.svg
+app/src/main/res/raw/windows.svg
+app/src/main/res/raw/fedora.svg
+app/src/main/res/raw/arch.svg
+app/src/main/res/raw/linux_mint.svg
+app/src/main/res/raw/linux.svg
+app/src/main/res/raw/redhat.svg
+app/src/main/java/com/sshpeaches/app/data/model/HostConnection.kt
+app/src/main/java/com/sshpeaches/app/data/model/UptimeModels.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalProfile.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalFont.kt
+app/src/main/res/values-night/themes.xml
+app/src/main/java/com/sshpeaches/app/data/local/UptimeMappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/SshPeachesDatabase.kt
+app/src/main/java/com/sshpeaches/app/data/local/Converters.kt
+app/src/main/java/com/sshpeaches/app/data/local/Dao.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeDao.kt
+app/src/main/java/com/sshpeaches/app/data/local/Mappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/Entities.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeEntities.kt
+app/src/main/assets/mosh/NOTICE.txt
+app/src/main/assets/mosh/x86_64/bin/mosh-client
+app/src/main/res/drawable/ic_widget_close.xml
+app/src/main/res/drawable/ic_widget_cloud_download.xml
+app/src/main/res/drawable/ic_launcher_foreground.xml
+app/src/main/res/drawable/ic_widget_open.xml
+app/src/main/res/drawable/ic_notification_logo.xml
+app/src/main/res/drawable/widget_action_secondary_background.xml
+app/src/main/res/drawable/ic_widget_cloud_upload.xml
+app/src/main/res/drawable/widget_section_surface.xml
+app/src/main/res/drawable/widget_row_surface.xml
+app/src/main/res/drawable/ic_widget_terminal.xml
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+app/src/main/res/drawable/widget_action_primary_background.xml
+app/src/main/res/drawable/widget_action_danger_background.xml
+app/src/main/res/drawable/widget_surface.xml
+app/src/main/res/layout/widget_quick_connect.xml
+app/src/main/res/layout/widget_sessions.xml
+app/src/main/res/layout/widget_open_session_row.xml
+app/src/main/res/layout/widget_host_row.xml
+app/src/main/res/values/strings.xml
+app/src/main/res/values/colors.xml
+app/src/main/res/values/themes.xml
+app/src/main/res/values-night-v31/themes.xml
+app/src/main/res/xml/data_extraction_rules.xml
+app/src/main/res/xml/widget_quick_connect_info.xml
+app/src/main/res/xml/backup_rules.xml
+app/src/main/res/xml/widget_sessions_info.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_light.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_dark.xml
+app/src/main/res/values-v31/themes.xml
+app/src/main/res/drawable-night/ic_notification_logo.xml
+app/src/main/assets/mosh/x86_64/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/x86_64/lib/libz.so.1
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord.so
+app/src/main/assets/mosh/x86_64/lib/libcrypto.so.3
+app/src/main/assets/mosh/x86_64/lib/libabsl_city.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings.so
+app/src/main/assets/mosh/x86_64/lib/libutf8_validity.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_status.so
+app/src/main/res/drawable-nodpi/keyboard.png
+app/src/main/res/drawable-nodpi/major_daft_apps_white.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar.png
+app/src/main/res/drawable-nodpi/major_daft_apps_black.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_dark_foreground_art.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_light_foreground_art.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar_black.png
+app/src/main/res/drawable-nodpi/sshpeaches.png
+app/src/main/assets/mosh/x86_64/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_base.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_int128.so
+app/src/main/assets/mosh/x86_64/lib/libprotobuf.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strerror.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hash.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/x86_64/lib/libc++_shared.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_statusor.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/x86_64/lib/libncursesw.so.6
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libandroid-support.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_internal.so
+macrobenchmark/src/main/java/com/majordaftapps/sshpeaches/macrobenchmark/StartupAndScrollBenchmark.kt
+app/src/main/assets/mosh/x86_64/share/terminfo/v/vt100
+
+exec
+/usr/bin/zsh -lc "find . -maxdepth 3 -type f -name '*gradle*' -o -name 'settings.gradle*' -o -name 'AndroidManifest.xml'" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 395ms:
+./tools/live-ssh-server/build.gradle.kts
+./gradlew
+./macrobenchmark/build.gradle.kts
+./app/build.gradle.kts
+./build.gradle.kts
+./settings.gradle.kts
+./gradlew.bat
+./gradle/wrapper/gradle-wrapper.properties
+./gradle/wrapper/gradle-wrapper.jar
+./gradle.properties
+./.idea/gradle.xml
+
+codex
+I found a multi-module Android/Kotlin project. Next I’m reading the module configuration and the main package files that define the app entry points, persistence, SSH/session plumbing, UI, and terminal stack.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' settings.gradle.kts" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+import org.gradle.api.initialization.resolve.RepositoriesMode
+
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+
+rootProject.name = "SSHPeaches"
+include(":app")
+include(":macrobenchmark")
+include(":terminal-emulator")
+include(":terminal-view")
+include(":tools:live-ssh-server")
+
+project(":terminal-emulator").projectDir = file("third_party/termux-playstore/terminal-emulator")
+project(":terminal-view").projectDir = file("third_party/termux-playstore/terminal-view")
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/build.gradle.kts" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
+	id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
+    id("com.google.firebase.firebase-perf")
+}
+
+import java.util.Properties
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
+import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.tasks.bundling.Zip
+
+// The Firebase project currently has a release client only; skip non-release processing.
+tasks.configureEach {
+    if (
+        name.startsWith("process") &&
+        name.endsWith("GoogleServices") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
+    if (
+        name.startsWith("uploadCrashlyticsMappingFile") &&
+        !name.contains("Release")
+    ) {
+        enabled = false
+    }
+}
+
+val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
+val releaseAbiFilters = listOf("arm64-v8a", "x86_64")
+
+android {
+    namespace = "com.majordaftapps.sshpeaches.app"
+    compileSdk = 36
+    val liveSuiteAnnotation = "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
+    val releaseLaneAnnotation = "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    val releaseInstrumentationRequested = gradle.startParameter.taskNames.any { taskName ->
+        val lowerName = taskName.lowercase()
+        lowerName.contains("releaselaneandroidtest") ||
+            lowerName.contains("releaselanemanageddevicescheck") ||
+            (lowerName.contains("release") && lowerName.contains("androidtest"))
+    }
+    val liveSuiteRequested = gradle.startParameter.taskNames.any {
+        it.contains("liveAndroidTest", ignoreCase = true)
+    }
+    val liveSshHost = (findProperty("liveSshHost") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "10.0.2.2"
+    val liveSshPort = ((findProperty("liveSshPort") as? String)?.toIntOrNull() ?: 56321).coerceAtLeast(1024)
+    val liveSshUsername = (findProperty("liveSshUsername") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "tester"
+    val liveSshPassword = (findProperty("liveSshPassword") as? String)
+        ?.takeIf { it.isNotBlank() }
+        ?: "peaches-password"
+
+    val keystoreProperties = Properties().apply {
+        val propsFile = rootProject.file(".keystore/keystore.properties")
+        if (propsFile.exists()) {
+            propsFile.inputStream().use { load(it) }
+        }
+    }
+    fun keystoreProp(name: String): String? =
+        (keystoreProperties[name] as? String)
+            ?: (project.findProperty(name) as? String)
+            ?: System.getenv(name)
+
+    val diagnosticsEndpoint = (
+        keystoreProp("SSHPEACHES_DIAGNOSTICS_ENDPOINT")
+            ?: ""
+        ).replace("\"", "\\\"")
+
+    defaultConfig {
+        applicationId = "com.majordaftapps.sshpeaches"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 108
+        versionName = "0.10.8"
+        buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
+        ndk {
+            abiFilters += releaseAbiFilters
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        if (liveSuiteRequested) {
+            testInstrumentationRunnerArguments["annotation"] = liveSuiteAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = releaseLaneAnnotation
+            testInstrumentationRunnerArguments["liveSshHost"] = liveSshHost
+            testInstrumentationRunnerArguments["liveSshPort"] = liveSshPort.toString()
+            testInstrumentationRunnerArguments["liveSshUsername"] = liveSshUsername
+            testInstrumentationRunnerArguments["liveSshPassword"] = liveSshPassword
+            testInstrumentationRunnerArguments["liveSshKeyUsername"] = "tester-key"
+            testInstrumentationRunnerArguments["liveForwardHttpPort"] = liveForwardHttpPort.toString()
+        } else if (releaseInstrumentationRequested) {
+            testInstrumentationRunnerArguments["annotation"] = releaseLaneAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = liveSuiteAnnotation
+        } else {
+            testInstrumentationRunnerArguments["notAnnotation"] =
+                "$liveSuiteAnnotation,$releaseLaneAnnotation"
+        }
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    val storeFilePath = keystoreProp("SSHPEACHES_STORE_FILE")
+        ?: keystoreProp("storeFile")
+        ?: keystoreProp("STORE_FILE")
+        ?: rootProject.file(".keystore/sshpeaches").takeIf { it.exists() }?.path
+    val storePassword = keystoreProp("SSHPEACHES_STORE_PASSWORD")
+        ?: keystoreProp("storePassword")
+        ?: keystoreProp("STORE_PASSWORD")
+    val keyAlias = keystoreProp("SSHPEACHES_KEY_ALIAS")
+        ?: keystoreProp("keyAlias")
+        ?: keystoreProp("KEY_ALIAS")
+    val keyPassword = keystoreProp("SSHPEACHES_KEY_PASSWORD")
+        ?: keystoreProp("keyPassword")
+        ?: keystoreProp("KEY_PASSWORD")
+
+    val releaseSigning = if (
+        !storeFilePath.isNullOrBlank() &&
+        !storePassword.isNullOrBlank() &&
+        !keyAlias.isNullOrBlank() &&
+        !keyPassword.isNullOrBlank()
+    ) {
+        signingConfigs.create("release") {
+            storeFile = file(storeFilePath)
+            this.storePassword = storePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
+        }
+    } else {
+        null
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (releaseInstrumentationRequested) {
+                proguardFile("proguard-release-androidtest-rules.pro")
+            }
+            if (releaseSigning != null) {
+                signingConfig = releaseSigning
+            } else {
+                logger.warn("Release signing is not configured; set SSHPEACHES_* keystore properties.")
+            }
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    sourceSets {
+        getByName("benchmark") {
+            java.srcDir("src/debug/java")
+        }
+    }
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel2Api34") {
+                    device = "Medium Phone"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
+                }
+                create("nexus9Api34") {
+                    device = "Nexus 9"
+                    apiLevel = 34
+                    systemImageSource = "aosp-atd"
+                    testedAbi = "x86_64"
+                }
+            }
+        }
+    }
+    testBuildType = if (releaseInstrumentationRequested) "release" else "debug"
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.8.2")
+
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.01")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3.adaptive:adaptive:1.0.0")
+    implementation("androidx.compose.material3.adaptive:adaptive-layout:1.0.0")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
+    implementation("com.hierynomus:sshj:0.40.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    implementation("com.google.zxing:core:3.5.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation(project(":terminal-emulator"))
+    implementation(project(":terminal-view"))
+    implementation("com.google.guava:listenablefuture:1.0")
+    debugRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
+    releaseRuntimeOnly("org.slf4j:slf4j-nop:2.0.7")
+
+    val roomVersion = "2.6.1"
+
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' app/src/main/AndroidManifest.xml" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
+        tools:node="remove" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <application
+        android:name=".SSHPeachesApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.SSHPeaches">
+        <meta-data
+            android:name="firebase_performance_collection_enabled"
+            android:value="false" />
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            tools:node="remove" />
+        <uses-library
+            android:name="android.ext.adservices"
+            tools:node="remove" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SSHPeaches.Starting"
+            android:windowSoftInputMode="adjustResize" />
+        <activity-alias
+            android:name=".DefaultLauncherAlias"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".PeachLightLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_light"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_light"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".PeachDarkLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_dark"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity
+            android:name=".ui.qr.PortraitCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:stateNotNeeded="true"
+            tools:ignore="LockedOrientationActivity,DiscouragedApi"
+            android:theme="@style/zxing_CaptureTheme" />
+        <activity
+            android:name=".ui.qr.AdaptiveCaptureActivity"
+            android:exported="false"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme" />
+        <activity
+            android:name=".ui.testing.ReleaseTestHostActivity"
+            android:exported="false" />
+        <service
+            android:name=".service.SessionService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+        <receiver
+            android:name=".widget.QuickConnectWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_CONNECT" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_OPEN" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_DISCONNECT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_connect_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.SessionsWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_CONNECT" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_OPEN" />
+                <action android:name="com.majordaftapps.sshpeaches.app.widget.ACTION_DISCONNECT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_sessions_info" />
+        </receiver>
+    </application>
+</manifest>
+
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' README.md" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches for Android
+
+SSHPeaches is an Android SSH client for connecting to servers, managing saved hosts and keys, transferring files, and reusing common connection settings from one place.
+
+If you installed SSHPeaches from F-Droid or Google Play, this repository includes the guides you need to get started and troubleshoot common issues.
+
+## Start Here
+
+- [User wiki home](docs/user-wiki/Home.md)
+- [Getting started](docs/user-wiki/Getting-Started.md)
+- [User guide](docs/user-wiki/User-Guide.md)
+- [Troubleshooting](docs/user-wiki/Troubleshooting.md)
+- [Documentation index](docs/README.md)
+
+## What You Can Do With SSHPeaches
+
+- Open SSH terminal sessions
+- Browse and transfer files with SFTP
+- Copy files with SCP
+- Save hosts for one-tap reuse
+- Manage SSH identities and private keys
+- Set up local port forwards
+- Share or import hosts, identities, and forwards with QR codes
+- Save snippets for repeated commands
+
+Minimum supported Android version: Android 8.0 (API 26).
+
+## Quick Start
+
+1. Open SSHPeaches.
+2. If this is your first launch, the **Home** screen gives you one-tap buttons to add a host, identity, port forward, or snippet.
+3. Use **Quick Connect** for a fast one-time connection, or open **Hosts** to save a server.
+4. Enter your host name or IP address, port, username, and authentication settings.
+5. Connect and verify the server fingerprint if SSHPeaches prompts you.
+6. Save the host if you want to reuse it later for SSH, SFTP, or SCP.
+
+## Main Areas Of The App
+
+- **Home**: open sessions, favorites, and a mixed recents list in one place
+- **Hosts**: save servers and launch SSH, SFTP, or SCP
+- **Identities**: import and manage SSH keys
+- **Port Forwards**: create and manage local forwards
+- **Snippets**: store reusable commands
+- **Settings**: security, theme, terminal, and transfer preferences
+
+The management screens for hosts, identities, port forwards, and snippets all use grouped sections. Each group can be collapsed, and item management actions live in the three-dot menu on the right side of each card.
+
+## Security Notes
+
+- Review host key fingerprints before trusting a server.
+- Set a PIN and enable biometric unlock in **Settings** if you want extra protection.
+- Private-key and password data exported through QR can be protected with an export passphrase.
+
+## Need Help?
+
+- Open the in-app drawer and tap **Help**
+- Read the [troubleshooting guide](docs/user-wiki/Troubleshooting.md)
+- Visit the support page: <https://majordaftapps.com/sshpeaches-support>
+- Report bugs or request features through this repository's GitHub issues
+
+## License
+
+SSHPeaches is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+## Open Source Notices
+
+Open source license notices are available in the app from **About**.
+
+codex
+The namespace/applicationId differ: package code under `com.sshpeaches.app`, Android namespace `com.majordaftapps.sshpeaches.app`, and installed applicationId `com.majordaftapps.sshpeaches`. I’m checking source declarations now so the handoff is precise.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.Image
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import android.content.Intent
+import android.view.KeyEvent
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.window.core.layout.WindowWidthSizeClass
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
+import com.majordaftapps.sshpeaches.app.data.local.Converters
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
+import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
+import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
+import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
+import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
+import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.KeyboardEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.OpenSourceLicensesScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.PortForwardScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectPhase
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectRequest
+import com.majordaftapps.sshpeaches.app.ui.screens.QuickConnectUiState
+import com.majordaftapps.sshpeaches.app.ui.screens.SettingsScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.SnippetEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.UptimeScreen
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.SortMode
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
+import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
+import com.majordaftapps.sshpeaches.app.ui.util.updatePasswordStateWithReveal
+import com.majordaftapps.sshpeaches.app.ui.util.rememberBottomSheetMaxHeight
+import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
+import com.majordaftapps.sshpeaches.app.service.SessionService.HostKeyPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.PasswordPrompt
+import com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.MainActivity
+import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
+
+private enum class AppSnackbarKind {
+    DEFAULT,
+    SUCCESS
+}
+
+private data class AppSnackbarVisuals(
+    override val message: String,
+    override val actionLabel: String? = null,
+    override val withDismissAction: Boolean = false,
+    override val duration: SnackbarDuration = SnackbarDuration.Short,
+    val kind: AppSnackbarKind = AppSnackbarKind.DEFAULT
+) : SnackbarVisuals
+
+data class SSHPeachesRootActions(
+    val onSortModeChange: (SortMode) -> Unit,
+    val onThemeModeChange: (ThemeMode) -> Unit,
+    val onAppIconChange: (AppIconOption) -> Unit,
+    val onBackgroundModeChange: (Boolean) -> Unit,
+    val onBackgroundSessionTimeoutChange: (BackgroundSessionTimeout) -> Unit,
+    val onBiometricToggle: (Boolean) -> Unit,
+    val onLockTimeoutChange: (LockTimeout) -> Unit,
+    val onCustomLockTimeoutMinutesChange: (Int) -> Unit,
+    val onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
+    val onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
+    val onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
+    val onTerminalBellModeChange: (TerminalBellMode) -> Unit,
+    val onTerminalVolumeButtonsAdjustFontSizeChange: (Boolean) -> Unit,
+    val onTerminalMarginPxChange: (Int) -> Unit,
+    val onMoshServerCommandChange: (String) -> Unit,
+    val onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
+    val onCrashReportsToggle: (Boolean) -> Unit,
+    val onAnalyticsToggle: (Boolean) -> Unit,
+    val onDiagnosticsToggle: (Boolean) -> Unit,
+    val onIncludeSecretsInQrToggle: (Boolean) -> Unit,
+    val onAutoStartForwardsToggle: (Boolean) -> Unit,
+    val onHostKeyPromptToggle: (Boolean) -> Unit,
+    val onAutoTrustHostKeyToggle: (Boolean) -> Unit,
+    val onUsageReportsToggle: (Boolean) -> Unit,
+    val onDefaultTerminalProfileChange: (String) -> Unit,
+    val onSaveTerminalProfile: (TerminalProfile) -> Unit,
+    val onDeleteTerminalProfile: (String) -> Unit,
+    val onRestoreDefaultSettings: () -> Unit,
+    val onSetPin: (String) -> Unit,
+    val onClearPin: () -> Unit,
+    val onLockApp: () -> Unit,
+    val onUnlockWithPin: (String) -> Boolean,
+    val onBiometricUnlock: () -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    val onHostDelete: (String) -> Unit,
+    val onAddHostToUptime: (String) -> Unit,
+    val onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
+    val onSetUptimeEnabled: (String, Boolean) -> Unit,
+    val onRemoveHostFromUptime: (String) -> Unit,
+    val onRefreshUptime: (String?) -> Unit,
+    val onImportHost: (HostConnection) -> Unit,
+    val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
+
+exec
+/usr/bin/zsh -lc "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/MainActivity.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app
+
+import android.annotation.SuppressLint
+import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
+import android.provider.Settings
+import android.view.KeyEvent
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.fragment.app.FragmentActivity
+import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.ssh.IdentityKeyInstaller
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.service.SessionService
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRoot
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRootActions
+import com.majordaftapps.sshpeaches.app.ui.SSHPeachesRootRuntime
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionRemediation
+import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.AppViewModel
+import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
+import com.majordaftapps.sshpeaches.app.ui.theme.SSHPeachesTheme
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
+import com.termux.terminal.TerminalEmulator
+import androidx.lifecycle.lifecycleScope
+import java.util.UUID
+import javax.crypto.Cipher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+class MainActivity : FragmentActivity() {
+
+    private val appViewModel: AppViewModel by viewModels {
+        val app = application as SSHPeachesApplication
+        AppViewModel.provideFactory(
+            repository = app.container.repository,
+            uptimeRepository = app.container.uptimeRepository,
+            uptimeMonitorRunner = app.container.uptimeMonitorRunner
+        )
+    }
+    private val sessionServiceState = mutableStateOf<SessionService?>(null)
+    private var serviceBound = false
+    private var serviceConnectionRequested = false
+    private var biometricPrompt: BiometricPrompt? = null
+    private var biometricPromptInfo: BiometricPrompt.PromptInfo? = null
+    private var biometricAvailable: Boolean = false
+    private var appUiBootstrapped = false
+    private var hardwareKeyHandler: ((KeyEvent) -> Boolean)? = null
+    private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
+    private val requestedOpenSessionFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
+    private val requestedStartupRoute = mutableStateOf<String?>(null)
+    private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
+    private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
+    private val pendingWidgetConnectFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
+    private val corePermissionsRefreshTick = mutableStateOf(0)
+    private val pendingSftpDirectoryRequests = LinkedHashMap<String, String>()
+    private var latestAllowBackgroundSessions: Boolean = true
+    private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
+    private var backgroundSessionTimeoutJob: Job? = null
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            UiDebugLog.result("notificationPermissionRequest", granted)
+            refreshCorePermissionStatuses()
+        }
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            val service = (binder as? SessionService.SessionBinder)?.getService()
+            sessionServiceState.value = service
+            serviceBound = true
+            serviceConnectionRequested = true
+            if (service != null && pendingSftpDirectoryRequests.isNotEmpty()) {
+                pendingSftpDirectoryRequests.forEach { (hostId, path) ->
+                    service.listSftpDirectory(hostId, path)
+                }
+                pendingSftpDirectoryRequests.clear()
+            }
+            UiDebugLog.result("SessionService.onServiceConnected", true, "bound=true")
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            sessionServiceState.value = null
+            serviceBound = false
+            serviceConnectionRequested = false
+            UiDebugLog.result("SessionService.onServiceDisconnected", true, "bound=false")
+        }
+    }
+
+    private fun setupBiometricPrompt() {
+        UiDebugLog.action("setupBiometricPrompt")
+        val manager = BiometricManager.from(this)
+        biometricAvailable = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+        if (!biometricAvailable) {
+            biometricPrompt = null
+            biometricPromptInfo = null
+            UiDebugLog.result("setupBiometricPrompt", false, "biometricUnavailable")
+            return
+        }
+        val executor = ContextCompat.getMainExecutor(this)
+        biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                val ok = appViewModel.unlockWithBiometric(result.cryptoObject?.cipher)
+                UiDebugLog.result("biometricAuthentication", ok)
+            }
+        })
+        biometricPromptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock SSHPeaches")
+            .setSubtitle("Authenticate to continue")
+            .setNegativeButtonText("Use PIN")
+            .build()
+        UiDebugLog.result("setupBiometricPrompt", true, "biometricAvailable=true")
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            UiDebugLog.result("notificationPermissionCheck", true, "already-granted")
+            return
+        }
+        markNotificationPermissionRequested()
+        UiDebugLog.action("notificationPermissionRequest", "requesting=true")
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun refreshCorePermissionStatuses() {
+        corePermissionsRefreshTick.value = corePermissionsRefreshTick.value + 1
+    }
+
+    private fun openAppPermissionSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+        startActivity(intent)
+    }
+
+    private fun buildCorePermissionStatuses(): List<CorePermissionStatus> {
+        val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val postNotificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        val notificationsGranted = postNotificationsGranted && notificationsEnabled
+        val notificationsRemediation = notificationPermissionRemediation(postNotificationsGranted)
+
+        val foregroundServiceGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ContextCompat.checkSelfPermission(
+                this,
+                FOREGROUND_SERVICE_PERMISSION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+
+        val foregroundServiceTypeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val dataSyncGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC
+            ) == PackageManager.PERMISSION_GRANTED
+            dataSyncGranted
+        } else {
+            true
+        }
+
+        return listOf(
+            CorePermissionStatus(
+                id = "notifications",
+                title = "Notifications",
+                description = "Required for active SSH session foreground service controls and status.",
+                granted = notificationsGranted,
+                remediation = notificationsRemediation
+            ),
+            CorePermissionStatus(
+                id = "foreground_service",
+                title = "Foreground Service",
+                description = "Required to keep SSH sessions alive in background mode.",
+                granted = foregroundServiceGranted && foregroundServiceTypeGranted,
+                remediation = CorePermissionRemediation.SETTINGS
+            )
+        )
+    }
+
+    private fun notificationPermissionRemediation(postNotificationsGranted: Boolean): CorePermissionRemediation {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || postNotificationsGranted) {
+            return CorePermissionRemediation.REQUEST
+        }
+        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+            return CorePermissionRemediation.REQUEST
+        }
+        return if (wasNotificationPermissionRequested()) {
+            CorePermissionRemediation.SETTINGS
+        } else {
+            CorePermissionRemediation.REQUEST
+        }
+    }
+
+    private fun wasNotificationPermissionRequested(): Boolean =
+        getSharedPreferences(CORE_PERMISSION_PREFS, Context.MODE_PRIVATE)
+
+exec
+/usr/bin/zsh -lc 'find app/src/main/java/com/sshpeaches/app -maxdepth 3 -type d | sort' in /home/zenulabidin/Documents/sshpeaches
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui.state
+
+import com.majordaftapps.sshpeaches.app.BuildConfig
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.viewModelScope
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
+import com.majordaftapps.sshpeaches.app.data.repository.InMemoryUptimeRepository
+import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
+import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.util.normalizeAssociatedHostIds
+import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
+import com.majordaftapps.sshpeaches.app.uptime.NoOpUptimeMonitorRunner
+import com.majordaftapps.sshpeaches.app.uptime.UptimeMonitorRunnerDelegate
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
+import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.util.UUID
+import javax.crypto.Cipher
+
+class AppViewModel(
+    private val repository: AppRepository,
+    private val uptimeRepository: UptimeRepository = InMemoryUptimeRepository(),
+    private val uptimeMonitorRunner: UptimeMonitorRunnerDelegate = NoOpUptimeMonitorRunner()
+) : ViewModel() {
+
+    private val sortMode = MutableStateFlow(SortMode.LAST_USED)
+    private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
+    private val appIconFlow = MutableStateFlow(AppIconOption.DEFAULT)
+    private val backgroundSessionsFlow = MutableStateFlow(true)
+    private val backgroundSessionTimeoutFlow = MutableStateFlow(BackgroundSessionTimeout.FOREVER)
+    private val biometricFlow = MutableStateFlow(false)
+    private val lockTimeoutFlow = MutableStateFlow(LockTimeout.FIVE_MIN)
+    private val customLockTimeoutMinutesFlow = MutableStateFlow(30)
+    private val terminalEmulationFlow = MutableStateFlow(TerminalEmulation.XTERM)
+    private val terminalSelectionModeFlow = MutableStateFlow(TerminalSelectionMode.NATURAL)
+    private val terminalBellModeFlow = MutableStateFlow(TerminalBellMode.DISABLED)
+    private val terminalVolumeButtonsAdjustFontSizeFlow = MutableStateFlow(false)
+    private val terminalMarginPxFlow = MutableStateFlow(0)
+    private val moshServerCommandFlow = MutableStateFlow(DEFAULT_MOSH_SERVER_COMMAND)
+    private val terminalProfilesFlow = MutableStateFlow(TerminalProfileDefaults.builtInProfiles)
+    private val defaultTerminalProfileIdFlow = MutableStateFlow(TerminalProfileDefaults.DEFAULT_PROFILE_ID)
+    private val crashReportsFlow = MutableStateFlow(SettingsStore.defaultCrashReportsEnabled)
+    private val analyticsFlow = MutableStateFlow(SettingsStore.defaultAnalyticsEnabled)
+    private val diagnosticsLoggingFlow = MutableStateFlow(SettingsStore.defaultDiagnosticsEnabled)
+    private val includeSecretsInQrFlow = MutableStateFlow(false)
+    private val autoStartForwardsFlow = MutableStateFlow(true)
+    private val hostKeyPromptFlow = MutableStateFlow(true)
+    private val autoTrustHostKeyFlow = MutableStateFlow(false)
+    private val usageReportsFlow = MutableStateFlow(SettingsStore.defaultUsageReportsEnabled)
+    private val snippetRunTimeoutSecondsFlow = MutableStateFlow(10)
+    private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
+    private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
+    private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+    private val useBuiltInKeyboardFlow = MutableStateFlow(false)
+    private var uptimeTickerJob: Job? = null
+    private var lockTimerJob: Job? = null
+    private var appInBackground: Boolean = false
+
+    init {
+        viewModelScope.launch {
+            SecurityManager.pinConfiguredState().collect { configured ->
+                pinConfiguredFlow.value = configured
+            }
+        }
+        viewModelScope.launch {
+            SecurityManager.lockState().collect { locked ->
+                lockedFlow.value = locked
+                if (locked) {
+                    lockTimerJob?.cancel()
+                    lockTimerJob = null
+                } else if (appInBackground) {
+                    scheduleLockTimer(lockTimeoutFlow.value)
+                } else {
+                    lockTimerJob?.cancel()
+                    lockTimerJob = null
+                }
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.allowBackgroundSessions.collect { enabled ->
+                backgroundSessionsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.backgroundSessionTimeout.collect { timeout ->
+                backgroundSessionTimeoutFlow.value = timeout
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.themeMode.collect { mode ->
+                themeModeFlow.value = mode
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.appIcon.collect { option ->
+                appIconFlow.value = option
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.biometricLockEnabled.collect { enabled ->
+                biometricFlow.value = enabled && SecurityManager.isPinSet()
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.lockTimeout.collect { timeout ->
+                lockTimeoutFlow.value = timeout
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalEmulation.collect { value ->
+                terminalEmulationFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalSelectionMode.collect { value ->
+                terminalSelectionModeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalBellMode.collect { value ->
+                terminalBellModeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalVolumeButtonsAdjustFontSize.collect { value ->
+                terminalVolumeButtonsAdjustFontSizeFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalMarginPx.collect { value ->
+                terminalMarginPxFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.moshServerCommand.collect { value ->
+                moshServerCommandFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.terminalProfiles.collect { value ->
+                terminalProfilesFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.defaultTerminalProfileId.collect { value ->
+                defaultTerminalProfileIdFlow.value = value
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.customLockTimeoutMinutes.collect { minutes ->
+                customLockTimeoutMinutesFlow.value = minutes
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.crashReportsEnabled.collect { enabled ->
+                crashReportsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.analyticsEnabled.collect { enabled ->
+                analyticsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.diagnosticsEnabled.collect { enabled ->
+                diagnosticsLoggingFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.includeSecretsInQr.collect { enabled ->
+                includeSecretsInQrFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.autoStartForwards.collect { enabled ->
+                autoStartForwardsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.hostKeyPromptEnabled.collect { enabled ->
+                hostKeyPromptFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.autoTrustHostKeyEnabled.collect { enabled ->
+                autoTrustHostKeyFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.usageReportsEnabled.collect { enabled ->
+                usageReportsFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.snippetRunTimeoutSeconds.collect { seconds ->
+                snippetRunTimeoutSecondsFlow.value = seconds
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.keyboardLayout.collect { slots ->
+                keyboardSlotsFlow.value = slots
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.useBuiltInKeyboard.collect { enabled ->
+                useBuiltInKeyboardFlow.value = enabled
+            }
+        }
+    }
+
+    private val baseUiState = combine(
+        repository.hosts,
+        repository.identities,
+        repository.portForwards,
+        repository.snippets,
+        sortMode
+    ) { hosts, identities, forwards, snippets, mode ->
+        val hostList = hosts.sortedWith(if (mode == SortMode.ALPHABETICAL) byName else byLastUsed)
+        val favoriteHosts = hostList.filter { it.favorite }
+        val favoriteIdentities = identities.filter { it.favorite }
+        val favoritePorts = forwards.filter { it.favorite }
+        val favoriteSnippets = snippets.filter { it.favorite }
+        val favorites = FavoritesSection(
+            hostFavorites = favoriteHosts,
+            identityFavorites = favoriteIdentities,
+            portFavorites = favoritePorts,
+            snippetFavorites = favoriteSnippets
+        )
+
+ succeeded in 717ms:
+app/src/main/java/com/sshpeaches/app
+app/src/main/java/com/sshpeaches/app/data
+app/src/main/java/com/sshpeaches/app/data/importer
+app/src/main/java/com/sshpeaches/app/data/local
+app/src/main/java/com/sshpeaches/app/data/model
+app/src/main/java/com/sshpeaches/app/data/repository
+app/src/main/java/com/sshpeaches/app/data/settings
+app/src/main/java/com/sshpeaches/app/data/ssh
+app/src/main/java/com/sshpeaches/app/diagnostics
+app/src/main/java/com/sshpeaches/app/security
+app/src/main/java/com/sshpeaches/app/service
+app/src/main/java/com/sshpeaches/app/ui
+app/src/main/java/com/sshpeaches/app/ui/adaptive
+app/src/main/java/com/sshpeaches/app/ui/components
+app/src/main/java/com/sshpeaches/app/ui/keyboard
+app/src/main/java/com/sshpeaches/app/ui/logging
+app/src/main/java/com/sshpeaches/app/ui/navigation
+app/src/main/java/com/sshpeaches/app/ui/permissions
+app/src/main/java/com/sshpeaches/app/ui/qr
+app/src/main/java/com/sshpeaches/app/ui/screens
+app/src/main/java/com/sshpeaches/app/ui/state
+app/src/main/java/com/sshpeaches/app/ui/terminal
+app/src/main/java/com/sshpeaches/app/ui/testing
+app/src/main/java/com/sshpeaches/app/ui/theme
+app/src/main/java/com/sshpeaches/app/ui/util
+app/src/main/java/com/sshpeaches/app/uptime
+app/src/main/java/com/sshpeaches/app/util
+app/src/main/java/com/sshpeaches/app/widget
+
+codex
+The main app package is generated/compiled as `com.majordaftapps.sshpeaches.app` despite the directory still being `com/sshpeaches/app`, so I’ll describe the namespace from source/package declarations and Gradle rather than path names alone.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.data.settings
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.preferencesDataStore
+import com.majordaftapps.sshpeaches.app.BuildConfig
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
+import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
+import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
+import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "app_settings"
+)
+
+object SettingsStore {
+    private lateinit var appContext: Context
+    private const val startupThemePrefsName = "startup_theme_mode"
+    private const val startupThemeKey = "theme_mode"
+    private const val telemetryPrefsName = "telemetry_settings"
+    private const val startupCrashReportsKey = "crash_reports"
+    private const val startupAnalyticsKey = "analytics"
+    private const val startupDiagnosticsKey = "diagnostics"
+    private const val startupUsageReportsKey = "usage_reports"
+
+    private val allowBackgroundSessionsKey = booleanPreferencesKey("allow_background_sessions")
+    private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
+    private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
+    private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
+    private val useBuiltInKeyboardKey = booleanPreferencesKey("use_built_in_terminal_keyboard")
+    private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val appIconKey = stringPreferencesKey("app_icon")
+    private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
+    private val terminalEmulationKey = stringPreferencesKey("terminal_emulation")
+    private val terminalSelectionModeKey = stringPreferencesKey("terminal_selection_mode")
+    private val terminalBellModeKey = stringPreferencesKey("terminal_bell_mode")
+    private val terminalVolumeButtonsAdjustFontSizeKey = booleanPreferencesKey("terminal_volume_buttons_adjust_font_size")
+    private val terminalMarginPxKey = intPreferencesKey("terminal_margin_px")
+    private val moshServerCommandKey = stringPreferencesKey("mosh_server_command")
+    private val terminalProfilesKey = stringPreferencesKey("terminal_profiles")
+    private val defaultTerminalProfileIdKey = stringPreferencesKey("default_terminal_profile_id")
+    private val customLockTimeoutMinutesKey = intPreferencesKey("custom_lock_timeout_minutes")
+    private val crashReportsKey = booleanPreferencesKey("crash_reports")
+    private val analyticsKey = booleanPreferencesKey("analytics")
+    private val diagnosticsKey = booleanPreferencesKey("diagnostics")
+    private val includeSecretsInQrKey = booleanPreferencesKey("include_secrets_in_qr")
+    private val autoStartForwardsKey = booleanPreferencesKey("auto_start_forwards")
+    private val hostKeyPromptKey = booleanPreferencesKey("host_key_prompt")
+    private val autoTrustHostKey = booleanPreferencesKey("auto_trust_host_key")
+    private val usageReportsKey = booleanPreferencesKey("usage_reports")
+    private val snippetRunTimeoutSecondsKey = intPreferencesKey("snippet_run_timeout_seconds")
+
+    val defaultCrashReportsEnabled: Boolean = true
+    val defaultAnalyticsEnabled: Boolean = true
+    val defaultDiagnosticsEnabled: Boolean = BuildConfig.DEBUG
+    val defaultUsageReportsEnabled: Boolean = BuildConfig.DEBUG
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    fun getStartupThemeMode(): ThemeMode {
+        val stored = startupThemePrefs().getString(startupThemeKey, null)
+        val cached = runCatching {
+            stored?.let { ThemeMode.valueOf(it) }
+        }.getOrNull()
+        if (cached != null) return cached
+
+        val fromDataStore = runCatching {
+            runBlocking { themeMode.first() }
+        }.getOrDefault(ThemeMode.SYSTEM)
+        startupThemePrefs().edit().putString(startupThemeKey, fromDataStore.name).apply()
+        return fromDataStore
+    }
+
+    fun getStartupCrashReportsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupCrashReportsKey,
+            runCatching { runBlocking { crashReportsEnabled.first() } }
+                .getOrDefault(defaultCrashReportsEnabled)
+        )
+
+    fun getStartupAnalyticsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupAnalyticsKey,
+            runCatching { runBlocking { analyticsEnabled.first() } }
+                .getOrDefault(defaultAnalyticsEnabled)
+        )
+
+    fun getStartupUsageReportsEnabled(): Boolean =
+        telemetryPrefs().getBoolean(
+            startupUsageReportsKey,
+            runCatching { runBlocking { usageReportsEnabled.first() } }
+                .getOrDefault(defaultUsageReportsEnabled)
+        )
+
+    val allowBackgroundSessions: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[allowBackgroundSessionsKey] ?: true
+        }
+    }
+
+    val biometricLockEnabled: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[biometricLockKey] ?: false
+        }
+    }
+
+    val keyboardLayout: Flow<List<KeyboardSlotAction>> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[keyboardLayoutKey]?.let { decodeKeyboardSlots(it) } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
+        }
+    }
+
+    val useBuiltInKeyboard: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[useBuiltInKeyboardKey] ?: false }
+    }
+
+    val backgroundSessionTimeout: Flow<BackgroundSessionTimeout> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                BackgroundSessionTimeout.valueOf(
+                    prefs[backgroundSessionTimeoutKey] ?: BackgroundSessionTimeout.FOREVER.name
+                )
+            }.getOrDefault(BackgroundSessionTimeout.FOREVER)
+        }
+    }
+
+    val themeMode: Flow<ThemeMode> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                ThemeMode.valueOf(prefs[themeModeKey] ?: ThemeMode.SYSTEM.name)
+            }.getOrDefault(ThemeMode.SYSTEM)
+        }
+    }
+
+    val appIcon: Flow<AppIconOption> by lazy {
+        dataStore.data.map { prefs ->
+            AppIconOption.fromStoredValue(prefs[appIconKey])
+        }
+    }
+
+    val lockTimeout: Flow<LockTimeout> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                LockTimeout.valueOf(prefs[lockTimeoutKey] ?: LockTimeout.FIVE_MIN.name)
+            }.getOrDefault(LockTimeout.FIVE_MIN)
+        }
+    }
+
+    val terminalEmulation: Flow<TerminalEmulation> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalEmulation.valueOf(
+                    prefs[terminalEmulationKey] ?: TerminalEmulation.XTERM.name
+                )
+            }.getOrDefault(TerminalEmulation.XTERM)
+        }
+    }
+
+    val terminalSelectionMode: Flow<TerminalSelectionMode> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalSelectionMode.valueOf(
+                    prefs[terminalSelectionModeKey] ?: TerminalSelectionMode.NATURAL.name
+                )
+            }.getOrDefault(TerminalSelectionMode.NATURAL)
+        }
+    }
+
+    val terminalBellMode: Flow<TerminalBellMode> by lazy {
+        dataStore.data.map { prefs ->
+            runCatching {
+                TerminalBellMode.valueOf(
+                    prefs[terminalBellModeKey] ?: TerminalBellMode.DISABLED.name
+                )
+            }.getOrDefault(TerminalBellMode.DISABLED)
+        }
+    }
+
+    val terminalVolumeButtonsAdjustFontSize: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[terminalVolumeButtonsAdjustFontSizeKey] ?: false
+        }
+    }
+
+    val terminalMarginPx: Flow<Int> by lazy {
+        dataStore.data.map { prefs ->
+            (prefs[terminalMarginPxKey] ?: 0).coerceIn(0, 128)
+        }
+    }
+
+    val moshServerCommand: Flow<String> by lazy {
+        dataStore.data.map { prefs ->
+            prefs[moshServerCommandKey] ?: DEFAULT_MOSH_SERVER_COMMAND
+        }
+    }
+
+    val terminalProfiles: Flow<List<TerminalProfile>> by lazy {
+        dataStore.data.map { prefs ->
+            mergedTerminalProfiles(prefs[terminalProfilesKey])
+        }
+    }
+
+    val defaultTerminalProfileId: Flow<String> by lazy {
+        dataStore.data.map { prefs ->
+            val profiles = mergedTerminalProfiles(prefs[terminalProfilesKey])
+            val configured = prefs[defaultTerminalProfileIdKey] ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+            if (profiles.any { it.id == configured }) {
+                configured
+            } else {
+                profiles.firstOrNull()?.id ?: TerminalProfileDefaults.DEFAULT_PROFILE_ID
+            }
+        }
+    }
+
+    val customLockTimeoutMinutes: Flow<Int> by lazy {
+        dataStore.data.map { prefs ->
+            (prefs[customLockTimeoutMinutesKey] ?: 30).coerceIn(1, 720)
+        }
+    }
+
+    val crashReportsEnabled: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[crashReportsKey] ?: defaultCrashReportsEnabled }
+    }
+
+    val analyticsEnabled: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[analyticsKey] ?: defaultAnalyticsEnabled }
+    }
+
+    val diagnosticsEnabled: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[diagnosticsKey] ?: defaultDiagnosticsEnabled }
+    }
+
+    val includeSecretsInQr: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[includeSecretsInQrKey] ?: false }
+    }
+
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.data.repository
+
+import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+import com.majordaftapps.sshpeaches.app.data.local.asEntity
+import com.majordaftapps.sshpeaches.app.data.local.asModel
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+class RoomAppRepository(
+    private val database: SshPeachesDatabase
+) : AppRepository {
+
+    private val hostDao = database.hostDao()
+    private val identityDao = database.identityDao()
+    private val portForwardDao = database.portForwardDao()
+    private val snippetDao = database.snippetDao()
+
+    override val hosts: Flow<List<HostConnection>> =
+        hostDao.observeAll().map { list -> list.map { it.asModel() } }
+
+    override val identities: Flow<List<Identity>> =
+        identityDao.observeAll().map { list -> list.map { it.asModel() } }
+
+    override val portForwards: Flow<List<PortForward>> =
+        portForwardDao.observeAll().map { list -> list.map { it.asModel() } }
+
+    override val snippets: Flow<List<Snippet>> =
+        snippetDao.observeAll().map { list -> list.map { it.asModel() } }
+
+    override suspend fun toggleFavorite(id: String) {
+        hostDao.getById(id)?.let { host ->
+            hostDao.updateFavorite(id, !host.favorite)
+            return
+        }
+        identityDao.getById(id)?.let { identity ->
+            identityDao.updateFavorite(id, !identity.favorite)
+            return
+        }
+        portForwardDao.getById(id)?.let { forward ->
+            portForwardDao.updateFavorite(id, !forward.favorite)
+            return
+        }
+        snippetDao.getById(id)?.let { snippet ->
+            snippetDao.updateFavorite(id, !snippet.favorite)
+        }
+    }
+
+    override suspend fun addHost(host: HostConnection) {
+        hostDao.upsert(host.asEntity())
+    }
+
+    override suspend fun updateHost(host: HostConnection) {
+        hostDao.upsert(host.asEntity())
+    }
+
+    override suspend fun deleteHost(host: HostConnection) {
+        hostDao.delete(host.asEntity())
+    }
+
+    override suspend fun addIdentity(identity: Identity) {
+        identityDao.upsert(identity.asEntity())
+    }
+
+    override suspend fun updateIdentity(identity: Identity) {
+        identityDao.upsert(identity.asEntity())
+    }
+
+    override suspend fun deleteIdentity(identity: Identity) {
+        identityDao.delete(identity.asEntity())
+    }
+
+    override suspend fun addPortForward(forward: PortForward) {
+        portForwardDao.upsert(forward.asEntity())
+    }
+
+    override suspend fun updatePortForward(forward: PortForward) {
+        portForwardDao.upsert(forward.asEntity())
+    }
+
+    override suspend fun deletePortForward(forward: PortForward) {
+        portForwardDao.delete(forward.asEntity())
+    }
+
+    override suspend fun addSnippet(snippet: Snippet) {
+        snippetDao.upsert(snippet.asEntity())
+    }
+
+    override suspend fun updateSnippet(snippet: Snippet) {
+        snippetDao.upsert(snippet.asEntity())
+    }
+
+    override suspend fun deleteSnippet(snippet: Snippet) {
+        snippetDao.delete(snippet.asEntity())
+    }
+}
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.data.repository
+
+import android.content.Context
+import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+import com.majordaftapps.sshpeaches.app.uptime.UptimeMonitorRunner
+
+class AppContainer(context: Context) {
+    private val database = SshPeachesDatabase.get(context)
+
+    val repository: AppRepository = RoomAppRepository(database)
+    val uptimeRepository: UptimeRepository = RoomUptimeRepository(database)
+    val uptimeMonitorRunner: UptimeMonitorRunner = UptimeMonitorRunner(context, database)
+}
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.data.ssh
+
+import android.content.Context
+import android.util.Log
+import com.hierynomus.sshj.key.BaseKeyAlgorithm
+import com.hierynomus.sshj.key.KeyAlgorithm
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import java.io.File
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
+import java.security.KeyFactory
+import java.security.KeyPairGenerator
+import java.security.MessageDigest
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.Provider
+import java.security.Security
+import java.security.Signature
+import java.security.Signature as JcaSignature
+import java.security.spec.X509EncodedKeySpec
+import java.util.Base64
+import javax.crypto.KeyAgreement
+import net.schmizz.sshj.DefaultConfig
+import net.schmizz.sshj.common.Buffer
+import net.schmizz.sshj.common.Factory
+import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.common.SSHRuntimeException
+import net.schmizz.sshj.common.KeyType
+import net.schmizz.sshj.common.LoggerFactory
+import net.schmizz.sshj.common.SecurityUtils
+import net.schmizz.sshj.signature.Signature as SshjSignature
+import net.schmizz.sshj.transport.verification.HostKeyVerifier
+import net.schmizz.sshj.transport.kex.KeyExchange
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
+
+/**
+ * Minimal SSHJ provider. Callers are responsible for threading/coroutine dispatch.
+ */
+object SshClientProvider {
+
+    private const val TAG = "SshClientProvider"
+    private const val BOUNCY_CASTLE_PROVIDER_NAME = "BC"
+    private const val ED25519_OID = "1.3.101.112"
+    private const val ED25519_KEY_SIZE = 32
+    private val X509_ED25519_PUBLIC_KEY_HEADER = Base64.getDecoder().decode("MCowBQYDK2VwAyEA")
+    private val knownHostsWriteLock = Any()
+    private val providerInstallLock = Any()
+    private const val KEEPALIVE_INTERVAL_SECONDS = 30
+    @Volatile
+    private var testingUnavailableKeyExchangeAlgorithms: Set<String> = emptySet()
+    @Volatile
+    private var hostKeyProviderChecked = false
+
+    data class HostKeyPrompt(
+        val host: String,
+        val port: Int,
+        val fingerprint: String,
+        val keyChanged: Boolean
+    )
+
+    /**
+     * Create a configured SSHClient for the given host.
+     *
+     * [autoTrustUnknownHostKey] controls unknown-host TOFU behavior.
+     * Host-key changes always invoke [onHostKeyPrompt] when available.
+     */
+    fun createClient(
+        context: Context,
+        host: HostConnection,
+        loggerFactory: LoggerFactory? = null,
+        autoTrustUnknownHostKey: Boolean = true,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
+    ): SSHClient {
+        // Keep known_hosts pinning enforceable and host-key changes classified correctly.
+        val knownHostsFile = File(context.filesDir, "known_hosts")
+        return createConfiguredClient(
+            knownHostsFile = knownHostsFile,
+            host = host,
+            loggerFactory = loggerFactory,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt,
+            keyExchangeAvailability = testJcaAlgorithmAvailability(testingUnavailableKeyExchangeAlgorithms)
+        )
+    }
+
+    internal fun setTestingUnavailableKeyExchangeAlgorithms(
+        algorithms: Set<String>
+    ) {
+        testingUnavailableKeyExchangeAlgorithms = algorithms
+            .map { it.lowercase() }
+            .toSet()
+    }
+
+    internal fun clearTestingUnavailableKeyExchangeAlgorithms() {
+        testingUnavailableKeyExchangeAlgorithms = emptySet()
+    }
+
+    internal fun withTestingUnavailableKeyExchangeAlgorithms(
+        algorithms: Set<String>,
+        action: () -> Unit
+    ) {
+        val previous = testingUnavailableKeyExchangeAlgorithms
+        setTestingUnavailableKeyExchangeAlgorithms(algorithms)
+        try {
+            action()
+        } finally {
+            testingUnavailableKeyExchangeAlgorithms = previous
+        }
+    }
+
+    internal fun ensureCompatibleHostKeyAlgorithmsAvailableForTesting() {
+        ensureCompatibleHostKeyAlgorithmsAvailable()
+    }
+
+    internal fun ed25519SignatureForTesting(): SshjSignature {
+        return AndroidEd25519Signature(KeyType.ED25519.toString())
+    }
+
+    internal fun compatibleKeyExchangeNamesForTesting(
+        unavailableAlgorithms: Set<String> = emptySet()
+    ): List<String> {
+        val availability = testJcaAlgorithmAvailability(unavailableAlgorithms)
+        return androidCompatibleKeyExchangeFactories(DefaultConfig().keyExchangeFactories, availability)
+            .map { it.name }
+    }
+
+    internal fun createClientForTesting(
+        knownHostsFile: File,
+        host: HostConnection,
+        loggerFactory: LoggerFactory? = null,
+        autoTrustUnknownHostKey: Boolean = true,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null,
+        unavailableKeyExchangeAlgorithms: Set<String> = emptySet()
+    ): SSHClient {
+        return createConfiguredClient(
+            knownHostsFile = knownHostsFile,
+            host = host,
+            loggerFactory = loggerFactory,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt,
+            keyExchangeAvailability = testJcaAlgorithmAvailability(unavailableKeyExchangeAlgorithms)
+        )
+    }
+
+    internal fun verifyHostKeyForTesting(
+        knownHostsFile: File,
+        host: String,
+        port: Int,
+        key: PublicKey,
+        autoTrustUnknownHostKey: Boolean = true,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)? = null
+    ): Boolean {
+        knownHostsFile.parentFile?.mkdirs()
+        if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
+        return InteractiveKnownHosts(
+            file = knownHostsFile,
+            host = host,
+            port = port,
+            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+            onHostKeyPrompt = onHostKeyPrompt
+        ).verify(host, port, key)
+    }
+
+    private fun createConfiguredClient(
+        knownHostsFile: File,
+        host: HostConnection,
+        loggerFactory: LoggerFactory?,
+        autoTrustUnknownHostKey: Boolean,
+        onHostKeyPrompt: ((HostKeyPrompt) -> Boolean)?,
+        keyExchangeAvailability: JcaAlgorithmAvailability = RealJcaAlgorithmAvailability
+    ): SSHClient {
+        // Keep SSHJ on Android's default provider. bcprov is bundled for key generation,
+        // but letting SSHJ auto-register BC breaks transport digests on Android.
+        SecurityUtils.setRegisterBouncyCastle(false)
+        SecurityUtils.setSecurityProvider(null)
+        ensureBundledBouncyCastleProviderInstalled()
+        ensureCompatibleHostKeyAlgorithmsAvailable()
+        val config = DefaultConfig()
+        loggerFactory?.let { config.setLoggerFactory(it) }
+        val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories, keyExchangeAvailability)
+        if (compatibleKex.isNotEmpty()) {
+            config.keyExchangeFactories = compatibleKex
+        }
+        val compatibleHostKeys = config.keyAlgorithms
+            .map { factory ->
+                androidCompatibleEcdsaHostKeyFactory(factory.name)
+                    ?: androidCompatibleEd25519KeyFactory(factory.name)
+                    ?: factory
+            }
+            .sortedBy { factory -> androidHostKeyPriority(factory.name) }
+        if (compatibleHostKeys.isNotEmpty()) {
+            config.keyAlgorithms = compatibleHostKeys
+        }
+        knownHostsFile.parentFile?.mkdirs()
+        if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
+        return SSHClient(config).apply {
+            addHostKeyVerifier(
+                InteractiveKnownHosts(
+                    file = knownHostsFile,
+                    host = host.host,
+                    port = host.port,
+                    autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+                    onHostKeyPrompt = onHostKeyPrompt
+                )
+            )
+            connectTimeout = 10_000
+            timeout = 20_000
+            connection.keepAlive.keepAliveInterval = KEEPALIVE_INTERVAL_SECONDS
+        }
+    }
+
+    private fun androidCompatibleKeyExchangeFactories(
+        factories: List<Factory.Named<KeyExchange>>,
+        availability: JcaAlgorithmAvailability = RealJcaAlgorithmAvailability
+    ): List<Factory.Named<KeyExchange>> {
+        val compatibleFactories = factories.filter { factory ->
+            keyExchangeFactoryAvailable(factory.name, availability)
+        }
+        return compatibleFactories.sortedWith(
+            compareBy<Factory.Named<KeyExchange>> { factory -> androidKeyExchangePriority(factory.name) }
+                .thenBy { factory -> compatibleFactories.indexOf(factory) }
+        )
+    }
+
+    private fun keyExchangeFactoryAvailable(
+        name: String,
+        availability: JcaAlgorithmAvailability
+    ): Boolean {
+        val lower = name.lowercase()
+        return when {
+            lower.startsWith("ext-info") -> true
+            lower.contains("curve25519") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "X25519",
+                keyAgreementAlgorithm = "X25519",
+                keyFactoryAlgorithm = "X25519"
+            )
+            lower.startsWith("ecdh-") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "EC",
+                keyAgreementAlgorithm = "ECDH",
+                keyFactoryAlgorithm = "EC"
+            )
+            lower.contains("diffie-hellman") -> availability.supportsKeyExchange(
+                keyPairAlgorithm = "DH",
+                keyAgreementAlgorithm = "DH",
+                keyFactoryAlgorithm = "DH"
+            )
+            else -> true
+        }
+    }
+
+    private fun androidKeyExchangePriority(name: String): Int {
+        val lower = name.lowercase()
+        return when {
+            lower.contains("curve25519") -> 0
+            lower == "ecdh-sha2-nistp256" -> 1
+
+codex
+I have enough of the project shape now; I’m checking the service and terminal input path to cover the required SSH provider/session/keyboard/terminal routing components.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/service/SessionService.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.service
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.content.pm.PackageManager
+import android.os.Binder
+import android.os.IBinder
+import android.os.SystemClock
+import android.provider.OpenableColumns
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.majordaftapps.sshpeaches.app.MainActivity
+import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
+import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.OsFamily
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
+import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.data.ssh.Ed25519IdentityKeyProvider
+import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
+import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
+import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
+import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
+import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
+import com.majordaftapps.sshpeaches.app.util.legacyLoopbackDestinationHost
+import com.majordaftapps.sshpeaches.app.widget.HostWidgets
+import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
+import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
+import com.majordaftapps.sshpeaches.app.util.selectedHostId
+import com.termux.terminal.TerminalEmulator
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
+import java.io.BufferedReader
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.nio.charset.StandardCharsets
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketException
+import java.util.Collections
+import java.util.UUID
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel as CoroutineChannel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import net.schmizz.sshj.connection.channel.Channel
+import net.schmizz.sshj.connection.channel.direct.Session
+import net.schmizz.sshj.connection.channel.direct.PTYMode
+import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.sftp.FileAttributes
+import net.schmizz.sshj.sftp.RemoteResourceInfo
+import net.schmizz.sshj.sftp.SFTPClient
+import net.schmizz.sshj.userauth.UserAuthException
+import net.schmizz.sshj.xfer.LocalDestFile
+import net.schmizz.sshj.xfer.FileTransfer
+import net.schmizz.sshj.xfer.FilePermission
+import net.schmizz.sshj.xfer.LocalFileFilter
+import net.schmizz.sshj.xfer.LocalSourceFile
+import net.schmizz.sshj.xfer.TransferListener
+import net.schmizz.sshj.xfer.scp.SCPFileTransfer
+import kotlin.math.absoluteValue
+import kotlin.math.min
+
+/**
+ * Foreground service that keeps SSH/Mosh sessions alive.
+ * Sessions remain connected until explicitly stopped.
+ */
+class SessionService : Service() {
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val binder = SessionBinder()
+    private val activeJobs = ConcurrentHashMap<String, Job>()
+    private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
+    private val runtimeSessionPasswords = ConcurrentHashMap<String, String>()
+    private val sessionSnapshots = MutableStateFlow<List<SessionSnapshot>>(emptyList())
+    private val hostKeyPrompts = MutableStateFlow<List<HostKeyPrompt>>(emptyList())
+    private val hostKeyPromptWaiters = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
+    private val passwordPrompts = MutableStateFlow<List<PasswordPrompt>>(emptyList())
+    private val passwordPromptWaiters = ConcurrentHashMap<String, CompletableFuture<PasswordResponse>>()
+    private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
+    private val fileTransferProgress = MutableStateFlow<Map<String, FileTransferProgress>>(emptyMap())
+    private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
+    private val shellReadSequence = ConcurrentHashMap<String, Int>()
+    private val shellWriteSequence = ConcurrentHashMap<String, Int>()
+    private val pendingShellOutputChunks = ConcurrentHashMap<String, StringBuilder>()
+    private val pendingShellSnapshots = ConcurrentHashMap<String, String>()
+    private val shellOutputPublishJobs = ConcurrentHashMap<String, Job>()
+    private val moshTranscriptPublishJobs = ConcurrentHashMap<String, Job>()
+    private val moshReconnectJobs = ConcurrentHashMap<String, Job>()
+    private val transferNotificationRefreshJobs = ConcurrentHashMap<String, Job>()
+    private val notificationStateLock = Any()
+    private var foregroundNotificationId: Int? = null
+    private val sessionNotificationIds = mutableSetOf<Int>()
+    @Volatile
+    private var diagnosticsEnabled: Boolean = false
+
+    override fun onCreate() {
+        super.onCreate()
+        UiDebugLog.action("SessionService.onCreate")
+        serviceScope.launch {
+            SettingsStore.diagnosticsEnabled.collect { enabled ->
+                diagnosticsEnabled = enabled
+            }
+        }
+        createChannel()
+        UiDebugLog.result("SessionService.onCreate", true)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        UiDebugLog.action("SessionService.onStartCommand", "action=${intent?.action}, startId=$startId")
+        when (intent?.action) {
+            ACTION_STOP_ALL -> stopAllSessions()
+            ACTION_STOP_SESSION -> intent.getStringExtra(EXTRA_HOST_ID)?.let { hostId ->
+                if (hostId.isNotBlank()) {
+                    stopSession(hostId)
+                }
+            }
+        }
+        UiDebugLog.result("SessionService.onStartCommand", true)
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    override fun onDestroy() {
+        UiDebugLog.action("SessionService.onDestroy", "activeSessions=${activeJobs.size}")
+        super.onDestroy()
+        stopAllSessions()
+        clearAllHostKeyPrompts()
+        clearAllPasswordPrompts()
+        runtimeSessionPasswords.clear()
+        shellOutputPublishJobs.values.forEach { it.cancel() }
+        shellOutputPublishJobs.clear()
+        moshTranscriptPublishJobs.values.forEach { it.cancel() }
+        moshTranscriptPublishJobs.clear()
+        moshReconnectJobs.values.forEach { it.cancel() }
+        moshReconnectJobs.clear()
+        transferNotificationRefreshJobs.values.forEach { it.cancel() }
+        transferNotificationRefreshJobs.clear()
+        pendingShellOutputChunks.clear()
+        pendingShellSnapshots.clear()
+        shellOutput.value = emptyMap()
+        remoteDirectories.value = emptyMap()
+        fileTransferProgress.value = emptyMap()
+        shellSizes.clear()
+        shellReadSequence.clear()
+        shellWriteSequence.clear()
+        UiDebugLog.result("SessionService.onDestroy", true)
+    }
+
+    fun startSession(
+        requestedSessionId: String? = null,
+        host: HostConnection,
+        mode: ConnectionMode,
+        passwordOverride: String? = null,
+        availableForwards: List<PortForward> = emptyList(),
+        availableSnippets: List<Snippet> = emptyList(),
+        autoStartForwards: Boolean = true,
+        autoTrustUnknownHostKey: Boolean = false,
+        hostKeyPromptEnabled: Boolean = true,
+        allowPasswordSave: Boolean = false,
+        terminalEmulation: TerminalEmulation = TerminalEmulation.XTERM
+    ) {
+        val resolvedSessionId = requestedSessionId
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: generateSessionId(host.id, mode)
+        UiDebugLog.action(
+            "startSession",
+            "sessionId=$resolvedSessionId, hostId=${host.id}, mode=$mode, alreadyActive=${activeJobs.containsKey(resolvedSessionId)}, hasPasswordOverride=${!passwordOverride.isNullOrBlank()}"
+        )
+        if (activeJobs.containsKey(resolvedSessionId)) {
+            UiDebugLog.result("startSession", false, "already-active sessionId=$resolvedSessionId")
+            return
+        }
+        val sessionId = resolvedSessionId
+        val useRuntimePasswordCache = !allowPasswordSave
+        if (useRuntimePasswordCache && !passwordOverride.isNullOrBlank()) {
+            runtimeSessionPasswords[sessionId] = passwordOverride
+        }
+        val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
+        val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
+        val initialPassword = if (needsPassword) {
+            when {
+                !passwordOverride.isNullOrBlank() -> passwordOverride
+                useRuntimePasswordCache -> runtimeSessionPasswords[sessionId]
+                else -> runCatching { SecurityManager.getHostPassword(host.id) }.getOrNull()
+            }
+        } else {
+            null
+        }
+        val job = serviceScope.launch {
+            var client: SSHClient? = null
+            var shellBinding: ShellBinding? = null
+            var moshBinding: MoshBinding? = null
+            var sftpBinding: SftpBinding? = null
+            var scpBinding: ScpBinding? = null
+            var activeForwardBindings: List<PortForwardBinding> = emptyList()
+            var sessionHost = host
+            val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
+            runCatching {
+                updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+                client = SshClientProvider.createClient(
+                    this@SessionService,
+                    sessionHost,
+                    SessionLoggerFactory(sessionId),
+                    autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+                    onHostKeyPrompt = if (hostKeyPromptEnabled) {
+                        { prompt ->
+                            awaitHostKeyDecision(sessionId, prompt, attemptDeadlineMillis)
+                        }
+                    } else {
+                        null
+                    }
+                )
+                throwIfAttemptTimedOut(attemptDeadlineMillis)
+                client!!.connect(host.host, host.port)
+                throwIfAttemptTimedOut(attemptDeadlineMillis)
+                when (host.preferredAuth) {
+                    AuthMethod.PASSWORD -> {
+                        authenticateWithPassword(
+                            client = client!!,
+                            host = host,
+                            sessionId = sessionId,
+                            mode = mode,
+                            initialPassword = initialPassword,
+                            deadlineMillis = attemptDeadlineMillis,
+                            allowPasswordSave = allowPasswordSave,
+                            useRuntimePasswordCache = useRuntimePasswordCache
+
+exec
+/usr/bin/zsh -lc "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui.terminal
+
+import android.view.KeyEvent
+import com.termux.terminal.KeyHandler
+import com.termux.terminal.TerminalEmulator
+import java.nio.charset.StandardCharsets
+
+class TerminalInputRouter(
+    private val emulatorProvider: () -> TerminalEmulator,
+    private val onWriteToRemote: (ByteArray) -> Unit,
+    private val onRequestPasteText: () -> String? = { null }
+) {
+
+    fun sendText(
+        text: String,
+        ctrlDown: Boolean = false,
+        altDown: Boolean = false,
+        shiftDown: Boolean = false
+    ) {
+        if (text.isEmpty()) return
+        if (!ctrlDown && !altDown && !shiftDown) {
+            onWriteToRemote(text.toByteArray(StandardCharsets.UTF_8))
+            return
+        }
+        var index = 0
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            sendCodePoint(
+                codePoint = if (shiftDown) shiftCodePoint(codePoint) else codePoint,
+                ctrlDown = ctrlDown,
+                altDown = altDown
+            )
+            index += Character.charCount(codePoint)
+        }
+    }
+
+    fun sendRawSequence(sequence: String) {
+        if (sequence.isEmpty()) return
+        onWriteToRemote(sequence.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    fun sendBackspace() {
+        onWriteToRemote(byteArrayOf(0x7F))
+    }
+
+    fun pasteFromClipboard(): Boolean {
+        val text = onRequestPasteText()?.takeIf { it.isNotEmpty() } ?: return false
+        return pasteText(text)
+    }
+
+    fun pasteText(text: String, emulator: TerminalEmulator = emulatorProvider()): Boolean {
+        val normalizedText = normalizePasteText(text).takeIf { it.isNotEmpty() } ?: return false
+        val payload = if (emulator.isBracketedPasteMode) {
+            "\u001B[200~$normalizedText\u001B[201~"
+        } else {
+            normalizedText
+        }
+        onWriteToRemote(payload.toByteArray(StandardCharsets.UTF_8))
+        return true
+    }
+
+    fun sendVirtualKey(
+        keyCode: Int,
+        ctrlDown: Boolean = false,
+        altDown: Boolean = false,
+        shiftDown: Boolean = false,
+        fallbackSequence: String? = null
+    ): Boolean {
+        val numpadLiteral = numpadLiteralForKeyCode(keyCode)
+        if (numpadLiteral != null) {
+            sendText(
+                text = numpadLiteral,
+                ctrlDown = ctrlDown,
+                altDown = altDown,
+                // App-rendered numpad buttons are literal even when Shift is latched.
+                shiftDown = false
+            )
+            return true
+        }
+        var keyMod = 0
+        if (ctrlDown) keyMod = keyMod or KeyHandler.KEYMOD_CTRL
+        if (altDown) keyMod = keyMod or KeyHandler.KEYMOD_ALT
+        if (shiftDown) keyMod = keyMod or KeyHandler.KEYMOD_SHIFT
+        val emulator = emulatorProvider()
+        val code = KeyHandler.getCode(
+            keyCode,
+            keyMod,
+            emulator.isCursorKeysApplicationMode,
+            emulator.isKeypadApplicationMode
+        )
+        if (!code.isNullOrEmpty()) {
+            onWriteToRemote(code.toByteArray(StandardCharsets.UTF_8))
+            return true
+        }
+        if (!fallbackSequence.isNullOrEmpty()) {
+            onWriteToRemote(fallbackSequence.toByteArray(StandardCharsets.UTF_8))
+            return true
+        }
+        val printableText = printableTextForKeyCode(keyCode, shiftDown)
+        if (printableText != null) {
+            sendText(
+                text = printableText,
+                ctrlDown = ctrlDown,
+                altDown = altDown
+            )
+            return true
+        }
+        return false
+    }
+
+    @Suppress("DEPRECATION")
+    fun onAndroidKeyDown(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_MULTIPLE) {
+            if (event.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                val chars = event.characters ?: return true
+                if (chars.isNotEmpty()) {
+                    onWriteToRemote(chars.toByteArray(StandardCharsets.UTF_8))
+                }
+                return true
+            }
+            var handled = false
+            repeat(event.repeatCount.coerceAtLeast(1)) {
+                handled = routeAndroidKeyEvent(event) || handled
+            }
+            return handled
+        }
+
+        return routeAndroidKeyEvent(event)
+    }
+
+    private fun routeAndroidKeyEvent(event: KeyEvent): Boolean {
+        if (event.isSystem && event.keyCode != KeyEvent.KEYCODE_BACK) return false
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) return false
+
+        val metaState = event.metaState
+        val controlDown = (metaState and KeyEvent.META_CTRL_MASK) != 0
+        val altDown = (metaState and KeyEvent.META_ALT_MASK) != 0
+        val leftAltDown = (metaState and KeyEvent.META_ALT_LEFT_ON) != 0
+        val shiftDown = (metaState and KeyEvent.META_SHIFT_MASK) != 0
+
+        if (isPasteShortcut(event.keyCode, metaState)) {
+            return pasteFromClipboard()
+        }
+
+        var keyMod = if (controlDown) KeyHandler.KEYMOD_CTRL else 0
+        if (altDown || leftAltDown) keyMod = keyMod or KeyHandler.KEYMOD_ALT
+        if (shiftDown) keyMod = keyMod or KeyHandler.KEYMOD_SHIFT
+        if ((metaState and KeyEvent.META_NUM_LOCK_ON) != 0) keyMod = keyMod or KeyHandler.KEYMOD_NUM_LOCK
+        val keyCodeSequence = KeyHandler.getCode(
+            event.keyCode,
+            keyMod,
+            emulatorProvider().isCursorKeysApplicationMode,
+            emulatorProvider().isKeypadApplicationMode
+        )
+        if (!keyCodeSequence.isNullOrEmpty()) {
+            onWriteToRemote(keyCodeSequence.toByteArray(StandardCharsets.UTF_8))
+            return true
+        }
+
+        val rightAltDownFromEvent = (event.metaState and KeyEvent.META_ALT_RIGHT_ON) != 0
+        var bitsToClear = KeyEvent.META_CTRL_MASK
+        if (!rightAltDownFromEvent) {
+            bitsToClear = bitsToClear or KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+        }
+        var effectiveMetaState = event.metaState and bitsToClear.inv()
+        if (shiftDown) {
+            effectiveMetaState = effectiveMetaState or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        }
+
+        val unicode = event.getUnicodeChar(effectiveMetaState)
+        if (unicode != 0) {
+            sendCodePoint(unicode, controlDown, altDown || leftAltDown)
+            return true
+        }
+
+        return false
+    }
+
+    internal fun isPasteShortcut(keyCode: Int, metaState: Int): Boolean {
+        val controlDown = (metaState and KeyEvent.META_CTRL_MASK) != 0
+        val shiftDown = (metaState and KeyEvent.META_SHIFT_MASK) != 0
+        val altDown = (metaState and KeyEvent.META_ALT_MASK) != 0
+        return when (keyCode) {
+            KeyEvent.KEYCODE_PASTE -> true
+            KeyEvent.KEYCODE_INSERT -> shiftDown && !controlDown && !altDown
+            KeyEvent.KEYCODE_V -> controlDown && shiftDown && !altDown
+            else -> false
+        }
+    }
+
+    private fun sendCodePoint(codePoint: Int, ctrlDown: Boolean, altDown: Boolean) {
+        val normalized = normalizeCodePoint(codePoint, ctrlDown)
+        if (normalized < 0) return
+        val payload = if (normalized == 0) {
+            byteArrayOf(0)
+        } else {
+            String(Character.toChars(normalized)).toByteArray(StandardCharsets.UTF_8)
+        }
+        if (altDown) {
+            onWriteToRemote(byteArrayOf(0x1B) + payload)
+        } else {
+            onWriteToRemote(payload)
+        }
+    }
+
+    private fun normalizePasteText(text: String): String =
+        text.replace(Regex("(\u001B|[\u0080-\u009F])"), "")
+            .replace(Regex("\r?\n"), "\r")
+
+    private fun normalizeCodePoint(codePoint: Int, ctrlDown: Boolean): Int {
+        if (!ctrlDown) return codePoint
+        return when {
+            codePoint in 'a'.code..'z'.code -> codePoint - 'a'.code + 1
+            codePoint in 'A'.code..'Z'.code -> codePoint - 'A'.code + 1
+            codePoint == ' '.code || codePoint == '2'.code -> 0
+            codePoint == '['.code || codePoint == '3'.code -> 27
+            codePoint == '\\'.code || codePoint == '4'.code -> 28
+            codePoint == ']'.code || codePoint == '5'.code -> 29
+            codePoint == '^'.code || codePoint == '6'.code -> 30
+            codePoint == '_'.code || codePoint == '7'.code || codePoint == '/'.code -> 31
+            codePoint == '8'.code -> 127
+            else -> codePoint
+        }
+    }
+
+    private fun shiftCodePoint(codePoint: Int): Int = when (codePoint) {
+        in 'a'.code..'z'.code -> codePoint - 'a'.code + 'A'.code
+        '0'.code -> ')'.code
+        '1'.code -> '!'.code
+        '2'.code -> '@'.code
+        '3'.code -> '#'.code
+        '4'.code -> '$'.code
+        '5'.code -> '%'.code
+        '6'.code -> '^'.code
+        '7'.code -> '&'.code
+        '8'.code -> '*'.code
+        '9'.code -> '('.code
+        '`'.code -> '~'.code
+        '-'.code -> '_'.code
+        '='.code -> '+'.code
+        '['.code -> '{'.code
+        ']'.code -> '}'.code
+        '\\'.code -> '|'.code
+        ';'.code -> ':'.code
+        '\''.code -> '"'.code
+        ','.code -> '<'.code
+        '.'.code -> '>'.code
+        '/'.code -> '?'.code
+        else -> codePoint
+    }
+
+    private fun numpadLiteralForKeyCode(keyCode: Int): String? {
+        if (keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) {
+            return ('0'.code + keyCode - KeyEvent.KEYCODE_NUMPAD_0).toChar().toString()
+        }
+        return when (keyCode) {
+            KeyEvent.KEYCODE_NUMPAD_ADD -> "+"
+            KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> "-"
+            KeyEvent.KEYCODE_NUMPAD_MULTIPLY -> "*"
+            KeyEvent.KEYCODE_NUMPAD_DIVIDE -> "/"
+
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "sed -n '1,220p' app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui.keyboard
+
+import android.view.KeyEvent
+
+enum class KeyboardActionType {
+    TEXT,
+    KEY,
+    MODIFIER,
+    SEQUENCE,
+    PASSWORD_INJECT,
+    SNIPPET_PICKER
+}
+
+enum class KeyboardModifier {
+    CTRL,
+    ALT,
+    SHIFT
+}
+
+data class KeyboardSlotAction(
+    val type: KeyboardActionType,
+    val label: String,
+    val text: String = "",
+    val keyCode: Int? = null,
+    val modifier: KeyboardModifier? = null,
+    val sequence: String = "",
+    val ctrl: Boolean = false,
+    val alt: Boolean = false,
+    val shift: Boolean = false,
+    val repeatable: Boolean = false,
+    val iconId: String = ""
+) {
+    fun isEmpty(): Boolean =
+        type == KeyboardActionType.TEXT && text.isBlank() && label.isBlank() && iconId.isBlank()
+}
+
+object KeyboardLayoutDefaults {
+    const val SLOT_COLUMNS = 7
+    const val SLOT_ROWS = 4
+    const val SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
+    const val BUILTIN_SLOT_ROWS = SLOT_ROWS
+    const val BUILTIN_SLOT_COUNT = SLOT_COLUMNS * BUILTIN_SLOT_ROWS
+    private const val LEGACY_SLOT_ROWS = 2
+    private const val LEGACY_SLOT_COUNT = SLOT_COLUMNS * LEGACY_SLOT_ROWS
+    private const val EXTENDED_SLOT_COUNT = SLOT_COUNT - LEGACY_SLOT_COUNT
+    const val COMPACT_KEY_LABEL_MAX_CHARS = 6
+    const val COMPACT_KEY_HEIGHT_DP = 30
+    const val COMPACT_KEY_FONT_SP = 10
+
+    val DEFAULT_SLOTS: List<KeyboardSlotAction> = listOf(
+        functionKeyAction(1),
+        functionKeyAction(2),
+        functionKeyAction(3),
+        functionKeyAction(4),
+        functionKeyAction(5),
+        functionKeyAction(6),
+        functionKeyAction(7),
+        functionKeyAction(8),
+        functionKeyAction(9),
+        functionKeyAction(10),
+        functionKeyAction(11),
+        functionKeyAction(12),
+        snippetPickerAction(),
+        passwordInjectAction(),
+        keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
+        modifierAction(KeyboardModifier.ALT, "Alt"),
+        keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
+        keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
+        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
+        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
+        keyAction("Tab", KeyEvent.KEYCODE_TAB),
+        modifierAction(KeyboardModifier.CTRL, "Ctrl"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
+        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true),
+        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+    )
+
+    val modifierPresets: List<KeyboardSlotAction> = listOf(
+        modifierAction(KeyboardModifier.CTRL, "Ctrl"),
+        modifierAction(KeyboardModifier.ALT, "Alt"),
+        modifierAction(KeyboardModifier.SHIFT, "Shift")
+    )
+
+    val navigationPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
+        keyAction("Tab", KeyEvent.KEYCODE_TAB),
+        keyAction("Enter", KeyEvent.KEYCODE_ENTER),
+        keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
+        keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME),
+        keyAction("End", KeyEvent.KEYCODE_MOVE_END),
+        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
+        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right")
+    )
+
+    val functionPresets: List<KeyboardSlotAction> = listOf(
+        functionKeyAction(1),
+        functionKeyAction(2),
+        functionKeyAction(3),
+        functionKeyAction(4),
+        functionKeyAction(5),
+        functionKeyAction(6),
+        functionKeyAction(7),
+        functionKeyAction(8),
+        functionKeyAction(9),
+        functionKeyAction(10),
+        functionKeyAction(11),
+        functionKeyAction(12)
+    )
+
+    val letterPresets: List<KeyboardSlotAction> = ('A'..'Z').map { ch ->
+        val keyCode = KeyEvent.KEYCODE_A + (ch.code - 'A'.code)
+        keyAction(ch.toString(), keyCode)
+    }
+
+    val digitPresets: List<KeyboardSlotAction> = ('0'..'9').map { ch ->
+        val keyCode = KeyEvent.KEYCODE_0 + (ch.code - '0'.code)
+        keyAction(ch.toString(), keyCode)
+    }
+
+    val punctuationPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("`", KeyEvent.KEYCODE_GRAVE),
+        keyAction("~", KeyEvent.KEYCODE_GRAVE, shift = true),
+        keyAction("-", KeyEvent.KEYCODE_MINUS),
+        keyAction("_", KeyEvent.KEYCODE_MINUS, shift = true),
+        keyAction("=", KeyEvent.KEYCODE_EQUALS),
+        keyAction("+", KeyEvent.KEYCODE_EQUALS, shift = true),
+        keyAction("[", KeyEvent.KEYCODE_LEFT_BRACKET),
+        keyAction("{", KeyEvent.KEYCODE_LEFT_BRACKET, shift = true),
+        keyAction("]", KeyEvent.KEYCODE_RIGHT_BRACKET),
+        keyAction("}", KeyEvent.KEYCODE_RIGHT_BRACKET, shift = true),
+        keyAction("\\", KeyEvent.KEYCODE_BACKSLASH),
+        keyAction("|", KeyEvent.KEYCODE_BACKSLASH, shift = true),
+        keyAction(";", KeyEvent.KEYCODE_SEMICOLON),
+        keyAction(":", KeyEvent.KEYCODE_SEMICOLON, shift = true),
+        keyAction("'", KeyEvent.KEYCODE_APOSTROPHE),
+        keyAction("\"", KeyEvent.KEYCODE_APOSTROPHE, shift = true),
+        keyAction(",", KeyEvent.KEYCODE_COMMA),
+        keyAction("<", KeyEvent.KEYCODE_COMMA, shift = true),
+        keyAction(".", KeyEvent.KEYCODE_PERIOD),
+        keyAction(">", KeyEvent.KEYCODE_PERIOD, shift = true),
+        keyAction("/", KeyEvent.KEYCODE_SLASH),
+        keyAction("?", KeyEvent.KEYCODE_SLASH, shift = true)
+    )
+
+    val whitespaceEditingPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Space", KeyEvent.KEYCODE_SPACE),
+        keyAction("Tab", KeyEvent.KEYCODE_TAB),
+        keyAction("Enter", KeyEvent.KEYCODE_ENTER),
+        keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
+        keyAction("Delete", KeyEvent.KEYCODE_FORWARD_DEL, repeatable = true),
+        keyAction("Insert", KeyEvent.KEYCODE_INSERT)
+    )
+
+    val numpadPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Num0", KeyEvent.KEYCODE_NUMPAD_0),
+        keyAction("Num1", KeyEvent.KEYCODE_NUMPAD_1),
+        keyAction("Num2", KeyEvent.KEYCODE_NUMPAD_2),
+        keyAction("Num3", KeyEvent.KEYCODE_NUMPAD_3),
+        keyAction("Num4", KeyEvent.KEYCODE_NUMPAD_4),
+        keyAction("Num5", KeyEvent.KEYCODE_NUMPAD_5),
+        keyAction("Num6", KeyEvent.KEYCODE_NUMPAD_6),
+        keyAction("Num7", KeyEvent.KEYCODE_NUMPAD_7),
+        keyAction("Num8", KeyEvent.KEYCODE_NUMPAD_8),
+        keyAction("Num9", KeyEvent.KEYCODE_NUMPAD_9),
+        keyAction("Num+", KeyEvent.KEYCODE_NUMPAD_ADD),
+        keyAction("Num-", KeyEvent.KEYCODE_NUMPAD_SUBTRACT),
+        keyAction("Num*", KeyEvent.KEYCODE_NUMPAD_MULTIPLY),
+        keyAction("Num/", KeyEvent.KEYCODE_NUMPAD_DIVIDE),
+        keyAction("Num.", KeyEvent.KEYCODE_NUMPAD_DOT),
+        keyAction("NumEnt", KeyEvent.KEYCODE_NUMPAD_ENTER)
+    )
+
+    val lockSystemPresets: List<KeyboardSlotAction> = listOf(
+        keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
+        keyAction("CapsLk", KeyEvent.KEYCODE_CAPS_LOCK),
+        keyAction("NumLk", KeyEvent.KEYCODE_NUM_LOCK),
+        keyAction("ScrLk", KeyEvent.KEYCODE_SCROLL_LOCK),
+        keyAction("PrtSc", KeyEvent.KEYCODE_SYSRQ),
+        keyAction("Pause", KeyEvent.KEYCODE_BREAK),
+        keyAction("Meta", KeyEvent.KEYCODE_META_LEFT)
+    )
+
+    val sequencePresets: List<KeyboardSlotAction> = listOf(
+        sequenceAction("C-C", "\u0003"),
+        sequenceAction("C-D", "\u0004"),
+        sequenceAction("C-Z", "\u001A")
+    )
+
+    val iconAliasPresets: List<KeyboardSlotAction> = listOf(
+        snippetPickerAction(label = "Snippets", iconId = "code"),
+        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
+        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
+        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
+        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
+        passwordInjectAction(label = "Password", iconId = "key"),
+        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
+        textAction(label = "pwd+Enter", text = "pwd\r").copy(iconId = "folder"),
+        textAction(label = "cd+Enter", text = "cd\r").copy(iconId = "home"),
+        textAction(label = "reset+Enter", text = "").copy(iconId = "reset"),
+        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard"),
+        sequenceAction(label = "Ctrl-Z", sequence = "\u001A").copy(iconId = "terminal"),
+        textAction(label = "Settings", text = "").copy(iconId = "build")
+    )
+
+    val advancedSequencePresets: List<KeyboardSlotAction> = listOf(
+        sequenceAction("Clear", "\u001B[2J\u001B[H"),
+        sequenceAction("Clr+Sb", "\u001B[3J\u001B[H\u001B[2J"),
+        sequenceAction("CurHome", "\u001B[H"),
+        sequenceAction("SaveCur", "\u001B7"),
+        sequenceAction("RestCur", "\u001B8"),
+        sequenceAction("CurHide", "\u001B[?25l"),
+        sequenceAction("CurShow", "\u001B[?25h"),
+        sequenceAction("AltOn", "\u001B[?1049h"),
+
+exec
+/usr/bin/zsh -lc "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+package com.majordaftapps.sshpeaches.app.ui.terminal
+
+import android.graphics.Color
+import androidx.core.graphics.toColorInt
+import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
+import com.termux.terminal.TerminalEmulator
+import com.termux.terminal.TerminalOutput
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
+import com.termux.terminal.TextStyle
+
+class TermuxTerminalEngine(
+    private val onWriteToRemote: (ByteArray) -> Unit,
+    private val onCopyToClipboard: (String) -> Unit = {},
+    private val onRequestPasteText: () -> String? = { null },
+    private var onBellAction: () -> Unit = {},
+    private val onTerminalDiagnostic: (String) -> Unit = {}
+) : TerminalOutput(), TerminalSessionClient {
+
+    private val emulator = TerminalEmulator(
+        this,
+        DEFAULT_COLUMNS,
+        DEFAULT_ROWS,
+        DEFAULT_CELL_WIDTH_PX,
+        DEFAULT_CELL_HEIGHT_PX,
+        DEFAULT_TRANSCRIPT_ROWS,
+        this
+    )
+    private var terminalBackgroundColor: Int = Color.BLACK
+    private var incomingSequenceNumber = 0
+    private var outgoingSequenceNumber = 0
+
+    fun appendIncoming(bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+        emitByteDiagnostic(direction = "RX", data = bytes, offset = 0, count = bytes.size)
+        emulator.append(bytes, bytes.size)
+    }
+
+    fun resize(columns: Int, rows: Int, cellWidthPx: Int, cellHeightPx: Int) {
+        // Current published terminal-emulator API only accepts columns/rows.
+        @Suppress("UNUSED_VARIABLE") val unusedCellWidth = cellWidthPx
+        @Suppress("UNUSED_VARIABLE") val unusedCellHeight = cellHeightPx
+        val safeColumns = columns.coerceAtLeast(2)
+        val safeRows = rows.coerceAtLeast(2)
+        emulator.resize(safeColumns, safeRows, cellWidthPx, cellHeightPx)
+    }
+
+    fun reset() {
+        emulator.reset()
+    }
+
+    fun applyProfile(profile: TerminalProfile) {
+        terminalBackgroundColor = applyProfileToEmulator(emulator, profile)
+    }
+
+    fun backgroundColor(): Int = terminalBackgroundColor
+
+    fun emulator(): TerminalEmulator = emulator
+
+    fun setOnBellAction(handler: () -> Unit) {
+        onBellAction = handler
+    }
+
+    fun renderText(): String {
+        return emulator.screen.getTranscriptTextWithoutJoinedLines()
+    }
+
+    override fun write(data: ByteArray, offset: Int, count: Int) {
+        if (count <= 0) return
+        val end = offset + count
+        if (offset < 0 || end > data.size || offset >= end) return
+        emitByteDiagnostic(direction = "TX", data = data, offset = offset, count = count)
+        onWriteToRemote(data.copyOfRange(offset, end))
+    }
+
+    override fun titleChanged(oldTitle: String?, newTitle: String?) {}
+
+    override fun onCopyTextToClipboard(text: String?) {
+        onCopyToClipboard(text.orEmpty())
+    }
+
+    override fun onPasteTextFromClipboard() {
+        val text = onRequestPasteText() ?: return
+        if (text.isBlank()) return
+        emulator.paste(text)
+    }
+
+    override fun onBell() {
+        onBellAction()
+    }
+
+    override fun onColorsChanged() {}
+
+    override fun onTerminalDebug(message: String) {
+        onTerminalDiagnostic(message)
+    }
+
+    override fun onTextChanged(changedSession: TerminalSession) {}
+
+    override fun onTitleChanged(changedSession: TerminalSession) {}
+
+    override fun onSessionFinished(finishedSession: TerminalSession) {}
+
+    override fun onCopyTextToClipboard(session: TerminalSession, text: String?) {
+        onCopyToClipboard(text.orEmpty())
+    }
+
+    override fun onPasteTextFromClipboard(session: TerminalSession?) {
+        onPasteTextFromClipboard()
+    }
+
+    override fun onBell(session: TerminalSession) {
+        onBellAction()
+    }
+
+    override fun onColorsChanged(session: TerminalSession) {}
+
+    override fun onTerminalCursorStateChange(state: Boolean) {}
+
+    companion object {
+        private const val DEFAULT_COLUMNS = 120
+        private const val DEFAULT_ROWS = 40
+        private const val DEFAULT_CELL_WIDTH_PX = 0
+        private const val DEFAULT_CELL_HEIGHT_PX = 0
+        private const val DEFAULT_TRANSCRIPT_ROWS = 5_000
+        private const val DEFAULT_FOREGROUND_COLOR = 0xFFE6E6E6.toInt()
+        private const val DEFAULT_CURSOR_COLOR = 0xFFFFB74D.toInt()
+        private const val DIAGNOSTIC_PREVIEW_BYTES = 48
+        fun applyProfileToEmulator(
+            emulator: TerminalEmulator,
+            profile: TerminalProfile
+        ): Int {
+            val foreground = parseColorValue(profile.foregroundHex, DEFAULT_FOREGROUND_COLOR)
+            val background = parseColorValue(profile.backgroundHex, Color.BLACK)
+            val cursor = parseColorValue(profile.cursorHex, DEFAULT_CURSOR_COLOR)
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = foreground
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = background
+            emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = cursor
+            emulator.setCursorStyle(profile.cursorStyle.toTerminalCursorStyle())
+            return background
+        }
+
+        private fun parseColorValue(value: String, fallback: Int): Int =
+            runCatching { value.toColorInt() }.getOrDefault(fallback)
+
+        private fun TerminalCursorStyle.toTerminalCursorStyle(): Int = when (this) {
+            TerminalCursorStyle.BLOCK -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK
+            TerminalCursorStyle.UNDERLINE -> TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE
+            TerminalCursorStyle.BAR -> TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
+        }
+    }
+
+    private fun emitByteDiagnostic(direction: String, data: ByteArray, offset: Int, count: Int) {
+        if (count <= 0) return
+        val sequence = if (direction == "RX") {
+            incomingSequenceNumber += 1
+            incomingSequenceNumber
+        } else {
+            outgoingSequenceNumber += 1
+            outgoingSequenceNumber
+        }
+        val previewLength = minOf(count, DIAGNOSTIC_PREVIEW_BYTES)
+        val hex = buildString {
+            for (index in 0 until previewLength) {
+                if (index > 0) append(' ')
+                val value = data[offset + index].toInt() and 0xFF
+                append(value.toString(16).padStart(2, '0'))
+            }
+        }
+        val ascii = buildString {
+            for (index in 0 until previewLength) {
+                val value = data[offset + index].toInt() and 0xFF
+                append(
+                    when (value) {
+                        0x1B -> "\\e"
+                        0x0D -> "\\r"
+                        0x0A -> "\\n"
+                        in 0x20..0x7E -> value.toChar().toString()
+                        else -> "\\x" + value.toString(16).padStart(2, '0')
+                    }
+                )
+            }
+        }
+        val truncated = if (count > previewLength) " (+${count - previewLength} bytes)" else ""
+        onTerminalDiagnostic("TERM-EMU $direction#$sequence bytes=$count hex=$hex ascii=\"$ascii\"$truncated")
+    }
+}
+
+codex
+No edits have been made. I’m doing a final status check and then I’ll return the structured handoff.
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git status --short' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+ M CHANGELOG.md
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+ M app/src/main/java/com/sshpeaches/app/MainActivity.kt
+ M app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+ M app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+ M app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+ M app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+ M app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+ M app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+ M app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+?? .codex
+?? .stringbean/
+?? app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+?? app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+?? docs/task-2-summary.json
+?? docs/task-3-summary.json
+
+codex
+{
+  "status": "completed",
+  "summary": "SSHPeaches is a multi-module Android SSH client. The Android app module is `:app`; supporting modules include `:terminal-emulator`, `:terminal-view`, `:macrobenchmark`, and `:tools:live-ssh-server`. Gradle config sets Android namespace `com.majordaftapps.sshpeaches.app`, applicationId `com.majordaftapps.sshpeaches`, and Kotlin source packages also declare `com.majordaftapps.sshpeaches.app` even though files are stored under `app/src/main/java/com/sshpeaches/app`. The app uses Jetpack Compose/Material3 for UI, Navigation Compose for routing, Room repositories for saved hosts/identities/port forwards/snippets/uptime data, DataStore plus some startup SharedPreferences for settings, SSHJ plus BouncyCastle for SSH transport/key support, Termux terminal emulator/view modules for terminal behavior, and a foreground `SessionService` for SSH/Mosh/SFTP/SCP sessions. Key source-folder responsibilities: `ui/screens` contains major Compose screens such as Home, Hosts, Settings, Identities, Port Forwards, Snippets, Terminal/theme editors, and Uptime; `ui/state` holds `AppViewModel` and `AppUiState`, combining repository flows and settings flows into app state; `ui/navigation` defines route/drawer destinations; `ui/components` contains shared Compose widgets and QR helpers; `ui/keyboard` defines configurable terminal keyboard slots, presets, icons, and editor support; `ui/terminal` wraps Termux terminal emulation/rendering and routes Android/virtual key input to remote byte streams; `data/local` contains Room database, DAOs, entities, converters, and mappers; `data/repository` exposes Room-backed repositories and the app container; `data/settings` stores runtime preferences for theme, security, telemetry, terminal, keyboard, host-key, QR, and background-session behavior; `data/ssh` configures SSHJ clients, Android-compatible algorithms, known_hosts verification, and identity key installation; `service` owns foreground session lifecycle, host-key/password prompts, shell I/O, file transfer progress, port forwards, Mosh runtime integration, and session logs; `security` manages PIN/biometric lock and protected secrets; `uptime` schedules/runs uptime checks and notifications; `widget` provides quick-connect/session app widgets; `diagnostics` handles diagnostic bundle upload/scheduling; `util` contains validation, SSH key generation/fingerprints, snippets, and port-forward helpers. No files were changed.",
+  "files_changed": [],
+  "commands_run": [
+    "pwd",
+    "rg --files",
+    "find . -maxdepth 3 -type f -name '*gradle*' -o -name 'settings.gradle*' -o -name 'AndroidManifest.xml'",
+    "sed -n '1,220p' settings.gradle.kts",
+    "sed -n '1,260p' app/build.gradle.kts",
+    "sed -n '1,220p' app/src/main/AndroidManifest.xml",
+    "sed -n '1,220p' README.md",
+    "find app/src/main/java/com/sshpeaches/app -maxdepth 3 -type d | sort",
+    "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/MainActivity.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/service/SessionService.kt",
+    "sed -n '1,260p' app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt",
+    "sed -n '1,240p' app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt",
+    "sed -n '1,220p' app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt",
+    "git status --short"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "Repository already had many modified/untracked files before/while this read-only inspection; none were changed for this task.",
+    "No tests were run because this task only required project structure inspection."
+  ]
+}
+tokens used
+54,412

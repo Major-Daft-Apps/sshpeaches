@@ -1,0 +1,3 @@
+Fixed notification actions opening the wrong terminal.
+Fixed SSH sessions getting stuck on Connecting.
+Reduced connection-screen stalls.

@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "summary": "sshpeaches appears to be an Android SSH client/terminal app. Test coverage signals show validation around saved hosts, quick connect/session launch, live SSH terminal transport, host key trust prompts, password and identity authentication, SFTP/SCP panels, local port forwarding, snippets, QR import/export, settings, security/vault behavior, keyboard layouts, terminal input routing, and uptime monitoring. Confirmed test files exist for core SSH/session concerns (`SshClientProviderTest`, `LiveTransportTest`, `ConnectingScreenTest`), UI/navigation/host concerns (`HostsCrudTest`, `HostsBrowserTest`, `SmokeNavigationTest`, startup launch tests), keyboard defaults/editor concerns (`KeyboardLayoutDefaultsTest`, `KeyboardIconPackTest`, `KeyboardEditorTest`), terminal input routing (`TerminalInputRouterTest`), and bounded mosh input queue behavior (`BoundedMoshInputQueueTest`). I did not run tests, so this is only a coverage-signal review, not a pass/fail statement.",
+  "files_changed": [],
+  "commands_run": [
+    "pwd && rg --files | rg '(^|/)(test|androidTest|src/test|src/androidTest)|Test\\.(kt|java)$|Tests\\.(kt|java)$'",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/androidTest/java/com/sshpeaches/app/ui app/src/androidTest/java/com/sshpeaches/app/hosts app/src/androidTest/java/com/sshpeaches/app/startup app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt app/src/test/java/com/sshpeaches/app/ui/components app/src/test/java/com/sshpeaches/app/ui/qr app/src/androidTest/java/com/sshpeaches/app/qr"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "No tests were executed; avoid making claims about current passing status.",
+    "The initial declaration-search command failed due to shell quoting and was rerun successfully with single-quoted rg patterns."
+  ]
+}

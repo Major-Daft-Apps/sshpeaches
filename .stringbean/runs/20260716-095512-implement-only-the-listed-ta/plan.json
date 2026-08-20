@@ -1,0 +1,34 @@
+{
+  "summary": "Plan a read-only scope-identification review for existing Ctrl/IME changes. Because the allowed file scope is empty and no explicit known-safe Ctrl/IME-related paths were provided, the safe implementation is to stop before inspecting repository files or running broad discovery commands, then report that scope identification cannot proceed safely.",
+  "assumptions": [
+    "Opus 4.8 is the requested review model/provider target.",
+    "No explicit known-safe Ctrl/IME-related repository paths are available in the task input.",
+    "The execution profile is read-only/create-only, and this plan must not modify existing repository paths.",
+    "Broad discovery commands such as git status --short, git diff --name-only, recursive listings, or repository-wide searches are forbidden for this task."
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Identify Ctrl/IME Change Scope",
+      "description": "Apply the safety gate before inspection: verify that no explicit known-safe Ctrl/IME-related paths were supplied, do not run broad changed-path discovery or repository-wide searches, do not inspect ambiguous paths, and stop with a report that scope identification cannot proceed safely without explicit non-excluded target paths.",
+      "dependencies": [],
+      "recommended_role": "reviewer",
+      "permissions": "read_only",
+      "verification": [
+        "Confirm the reviewed file list is empty because no explicit known-safe Ctrl/IME-related paths were available.",
+        "Confirm no broad changed-path listing, recursive listing, or repository-wide search was run.",
+        "Confirm no excluded paths were listed, searched, opened, summarized, transmitted, created, or modified.",
+        "Confirm no repository files were modified.",
+        "Confirm Opus 4.8 is the requested review model/provider target.",
+        "Report reviewed paths as empty, commands run as none, tests run as none, skipped safely known ambiguous paths as none, and scope identification stopped due to lack of safe target paths."
+      ]
+    }
+  ],
+  "risks": [
+    "Actual Ctrl/IME changes may exist among the 38 changed entries, but identifying them would require forbidden broad discovery unless explicit safe paths are provided.",
+    "No code-review findings can be produced without inspecting targeted diffs."
+  ],
+  "advisor_questions": [
+    "Provide explicit non-excluded Ctrl/IME-related paths to review, if a follow-up read-only targeted review should proceed."
+  ]
+}

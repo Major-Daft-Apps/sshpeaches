@@ -1,0 +1,32 @@
+{
+  "status": "completed",
+  "summary": "Implemented task-2/task-3 test changes in ConnectingScreenTest.kt. Added/confirmed Copy/Paste focus contract coverage, IME context paste/paste-as-plain-text/copy coverage, exact Ctrl-A/plain-a byte assertions, waitUntil-based selection/focus waits, and renamed the terminal Copy focus contract to clearly distinguish ActionMode Copy. Also fixed the ActionMode helper to access the private vendored mActionMode field via reflection so the instrumentation tests compile.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "commands_run": [
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "rg -n \"Sleep|sleep|SystemClock|Thread\\.sleep|terminalActionModeCopy|terminalSelectionPaste_restoresImeFocus|terminalImeContextPaste|terminalImeContextCopy|waitUntil\" app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt",
+    "./gradlew :app:compileDebugAndroidTestKotlin"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "failed after successful test APK compilation: No connected devices"
+    },
+    {
+      "command": "./gradlew :app:compileDebugAndroidTestKotlin",
+      "result": "passed"
+    }
+  ],
+  "remaining_issues": [
+    "Connected instrumentation execution could not run in this environment because Gradle reported: No connected devices.",
+    "Runtime pass/fail of the new instrumentation tests still needs a connected emulator or device."
+  ],
+  "handoff_notes": [
+    "Task count: 2 tasks addressed: task-2 and task-3.",
+    "Review rounds: 1 implementation self-review plus focused compile/static verification.",
+    "No fixed timing sleeps were introduced; focused waits use composeRule.waitUntil.",
+    "Exact-byte assertions remain limited to final Ctrl-A/plain-a payloads."
+  ]
+}

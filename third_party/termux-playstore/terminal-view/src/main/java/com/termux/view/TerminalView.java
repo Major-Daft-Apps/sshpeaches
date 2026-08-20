@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Typeface;
+import android.os.PersistableBundle;
 import android.os.SystemClock;
 import android.text.Editable;
 import android.text.InputType;
@@ -49,6 +50,9 @@ public final class TerminalView extends View {
     public final static int KEY_EVENT_SOURCE_SOFT_KEYBOARD = 0;
 
     private static final String LOG_TAG = "TerminalView";
+    private static final String EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE";
+    private static final String EXTRA_SUPPRESS_CLIPBOARD_OVERLAY =
+        "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY";
 
     /**
      * Log terminal view key and IME events.
@@ -1279,7 +1283,14 @@ public final class TerminalView extends View {
         }
         ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("terminal-selection", text));
+            ClipData clipData = ClipData.newPlainText("terminal-selection", text);
+            PersistableBundle extras = new PersistableBundle();
+            extras.putBoolean(EXTRA_IS_SENSITIVE, true);
+            // AOSP SystemUI honors this on emulators, where clipboard feedback otherwise
+            // obscures instrumentation. Physical devices safely ignore the private hint.
+            extras.putBoolean(EXTRA_SUPPRESS_CLIPBOARD_OVERLAY, true);
+            clipData.getDescription().setExtras(extras);
+            clipboard.setPrimaryClip(clipData);
         }
     }
 

@@ -1,0 +1,33 @@
+{
+  "status": "completed",
+  "summary": "Targeted verification completed. Compile and stale-session unit tests passed. Connected Android tests were attempted but could not run because no device/emulator was connected.",
+  "files_changed": [],
+  "commands_run": [
+    "./gradlew :app:compileDebugKotlin",
+    "rg -n --glob '!**/.stringbean/runs/**' --glob '!.stringbean/runs/**' --glob '!**/.env*' --glob '!.env*' --glob '!**/.secrets/**' --glob '!secrets/**' --glob '!**/secrets/**' --glob '!credentials/**' --glob '!**/credentials/**' --glob '!**/*.pem' --glob '!**/*.key' --glob '!**/*.p12' --glob '!**/*.pfx' 'stale|session|terminal|resume' app/src",
+    "sed -n '1,40p' app/src/test/java/com/sshpeaches/app/ui/SessionRouteReadinessTest.kt",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+    "./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.live.LiveTransportTest,com.majordaftapps.sshpeaches.app.live.OpenSessionIntentLaunchTest"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:compileDebugKotlin",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.live.LiveTransportTest,com.majordaftapps.sshpeaches.app.live.OpenSessionIntentLaunchTest",
+      "result": "blocked",
+      "failure": "Execution failed for task ':app:connectedDebugAndroidTest'. > com.android.builder.testing.api.DeviceException: No connected devices!"
+    }
+  ],
+  "remaining_issues": [
+    "Connected Android verification still needs to be rerun with an attached emulator/device and any required live SSH backend."
+  ],
+  "handoff_notes": [
+    "The stale-session decision tests are in com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest."
+  ]
+}

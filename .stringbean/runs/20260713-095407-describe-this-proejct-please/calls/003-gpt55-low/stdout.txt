@@ -1,0 +1,94 @@
+{
+  "summary": "Produce a read-only project description for SSHPeaches by inspecting repository structure, README/docs, source layout, tests, and git status. The description should distinguish documented capabilities from source-confirmed implementation and inferred architecture, and should include a concise caveat about any current uncommitted work without treating it as complete or stable.",
+  "assumptions": [
+    "The request is informational: describe the project in the final response, not create or modify repository files.",
+    "The execution policy for this run is read-only; no existing files or directories should be modified, deleted, renamed, moved, or type-changed.",
+    "Existing modified and untracked files belong to prior work and should only be observed, not changed.",
+    "A balanced technical onboarding description is acceptable without asking the user to choose a specific audience first."
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Inventory repository structure",
+      "description": "Read top-level files and directory layout to identify the Gradle project, Android app module, source sets, documentation folders, test folders, and configuration files.",
+      "dependencies": [],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Root Gradle files and app module layout are identified.",
+        "Documentation, Android source, unit tests, and instrumentation tests are separately described.",
+        "Tooling/context directories such as .codex, .agents, or .stringbean are not treated as product source unless directly relevant."
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Summarize documented purpose and capabilities",
+      "description": "Use README and docs content to describe the project's stated purpose and user-facing capabilities, carefully labeling these as documented features unless implementation is also verified in source.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Summary matches README and documentation claims.",
+        "No unsupported features are invented.",
+        "Documented goals are not overstated as fully implemented behavior unless source inspection supports that claim."
+      ]
+    },
+    {
+      "id": "task-3",
+      "title": "Summarize technical architecture",
+      "description": "Inspect source package names and major app files to describe the Android architecture, likely UI/state layers, SSH/session components, settings/persistence areas, input handling, and test utilities. Clearly mark inferred architecture where source names imply behavior but detailed implementation is not fully reviewed.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Architecture summary references real repository paths or source areas.",
+        "Confirmed implementation facts are distinguished from reasonable inferences.",
+        "The summary stays concise and contributor-oriented."
+      ]
+    },
+    {
+      "id": "task-4",
+      "title": "Summarize current worktree state",
+      "description": "Use read-only git status inspection to identify broad active change areas, if any. Present them as current worktree context only, without claiming the changes are complete, tested, or intended for release.",
+      "dependencies": [
+        "task-1"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Major modified and untracked areas from git status are represented at a high level.",
+        "No dirty worktree file is modified or reverted.",
+        "The description clearly separates committed project structure from current local changes."
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "Prepare concise project description",
+      "description": "Produce a human-readable project description suitable for onboarding, with sections covering purpose, main capabilities, repository layout, architecture overview, tests/docs, license or project metadata if present, and current worktree caveat.",
+      "dependencies": [
+        "task-2",
+        "task-3",
+        "task-4"
+      ],
+      "recommended_role": "implementer",
+      "permissions": "read_only",
+      "verification": [
+        "Description is clear for a new contributor.",
+        "Description is concise enough to be useful in a README, handoff note, or project summary.",
+        "Facts are traceable to repository files or explicitly framed as inferences.",
+        "No file creation, edit, build, test, or other write-producing operation is performed."
+      ]
+    }
+  ],
+  "risks": [
+    "README or docs may describe intended capabilities that are only partially implemented in the current source.",
+    "The worktree may be dirty, so observed local state may differ from the last committed project state.",
+    "Some architecture details may require inference from filenames and package layout if a full source audit is too broad for a concise project description.",
+    "Read-only policy prevents creating a documentation artifact or running build/test commands that would generate outputs."
+  ],
+  "advisor_questions": []
+}

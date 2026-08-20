@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+echo "stringbean policy: command 'pkill' is denied for subagents." >&2
+echo "denied commands: chgrp, chown, dd, halt, kill, killall, mkfs, mount, pkill, poweroff, reboot, rm, rmdir, service, setfacl, shred, shutdown, su, sudo, systemctl, umount, wipefs" >&2
+exit 126

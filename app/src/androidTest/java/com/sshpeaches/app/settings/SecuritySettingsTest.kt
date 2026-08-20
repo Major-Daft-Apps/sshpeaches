@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.settings
 
-import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
@@ -13,7 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.rule.GrantPermissionRule
+import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
@@ -32,8 +31,7 @@ class SecuritySettingsTest {
     val appStateResetRule = AppStateResetRule()
 
     @get:Rule(order = 1)
-    val notificationPermissionRule: GrantPermissionRule =
-        GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionRule = NotificationPermissionHelper.grantRule()
 
     @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()
@@ -58,7 +56,9 @@ class SecuritySettingsTest {
                 true
             }.getOrDefault(false)
         }
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON)
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_CONFIRM).performClick()
 

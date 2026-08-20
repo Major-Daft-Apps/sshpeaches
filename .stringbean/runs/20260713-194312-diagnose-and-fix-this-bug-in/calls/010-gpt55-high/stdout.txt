@@ -1,0 +1,33 @@
+{
+  "status": "completed",
+  "summary": "Added foreground-resume instrumentation coverage for stale SSH terminal routes. The new tests open a live SSH terminal from Hosts, background the app with background sessions disabled so the backing session is removed, then resume through an ACTION_OPEN_SESSION path and a launcher relaunch path. Both assert recovery to Home or Hosts and assert SCREEN_CONNECTING and CONNECTING_TERMINAL_PANEL are absent. Existing live-session preservation coverage remains unchanged.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt"
+  ],
+  "commands_run": [
+    "adb devices",
+    "./gradlew :app:compileDebugAndroidTestKotlin",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouterTest",
+    "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:compileDebugAndroidTestKotlin",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouterTest",
+      "result": "passed"
+    }
+  ],
+  "remaining_issues": [
+    "Instrumentation execution was not possible in this environment because adb devices returned no attached device or emulator, so the new live tests were compiled but not run here."
+  ],
+  "handoff_notes": [
+    "Run the live instrumentation class on a device/emulator with the live SSH backend available: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.live.OpenSessionIntentLaunchTest"
+  ]
+}

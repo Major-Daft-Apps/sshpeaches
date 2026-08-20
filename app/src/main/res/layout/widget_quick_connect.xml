@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_surface"
+    android:contentDescription="@string/widget_action_open_app"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -12,7 +14,7 @@
         android:layout_height="wrap_content"
         android:background="@drawable/widget_section_surface"
         android:orientation="vertical"
-        android:padding="10dp"
+        android:padding="8dp"
         android:visibility="gone">
 
         <TextView
@@ -27,9 +29,10 @@
         <TextView
             android:id="@+id/widget_open_sessions_empty"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:background="@drawable/widget_row_surface"
-            android:padding="10dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
             android:text="@string/widget_no_connections"
             android:textColor="@color/color_widget_text_secondary"
             android:textSize="11sp"
@@ -49,7 +52,7 @@
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_section_surface"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="8dp">
 
         <TextView
             android:layout_width="match_parent"
@@ -63,9 +66,10 @@
         <TextView
             android:id="@+id/widget_hosts_empty"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:background="@drawable/widget_row_surface"
-            android:padding="10dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
             android:text="@string/widget_no_recent_hosts"
             android:textColor="@color/color_widget_text_secondary"
             android:textSize="11sp"
@@ -77,5 +81,19 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_overflow"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_action_secondary_background"
+        android:contentDescription="@string/widget_action_open_app"
+        android:gravity="center"
+        android:paddingHorizontal="8dp"
+        android:textColor="@color/color_widget_text_primary"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
 </LinearLayout>

@@ -1,0 +1,36 @@
+{
+  "status": "completed",
+  "summary": "Implemented/validated task-7 routing: TerminalView.inputCodePoint() computes effective Ctrl/Alt before the TerminalSession null check, offers codepoints to TerminalViewClient.onCodePoint() with a null session, returns when handled, and only requires TerminalSession for writeCodePoint fallback. Added focused standalone-emulator instrumentation coverage for commitText(\"a\") reaching the client without TerminalSession. Task count: 2 plan items addressed (task-7 implementation and task-5 focused verification). Review rounds: 0.",
+  "files_changed": [
+    "third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java",
+    "third_party/termux-playstore/terminal-view/src/androidTest/java/com/termux/view/TerminalViewStandaloneInputTest.java"
+  ],
+  "commands_run": [
+    "./gradlew :terminal-view:compileDebugAndroidTestJavaWithJavac",
+    "./gradlew :terminal-view:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest'",
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :terminal-view:compileDebugAndroidTestJavaWithJavac",
+      "result": "passed"
+    },
+    {
+      "command": "./gradlew :terminal-view:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.termux.view.TerminalViewStandaloneInputTest'",
+      "result": "failed: com.android.builder.testing.api.DeviceException: No connected devices!"
+    },
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "failed: com.android.builder.testing.api.DeviceException: No connected devices!"
+    }
+  ],
+  "remaining_issues": [
+    "Device-backed instrumentation tests could not execute because no Android device/emulator is connected in this environment.",
+    "Hidden-editor sentinel cleanup was intentionally not touched."
+  ],
+  "handoff_notes": [
+    "Preserved existing dirty-worktree changes and did not revert unrelated files.",
+    "The standalone test file is currently untracked in the worktree.",
+    "Terminal-view androidTest sources compile successfully, so the remaining validation blocker is runtime device availability."
+  ]
+}

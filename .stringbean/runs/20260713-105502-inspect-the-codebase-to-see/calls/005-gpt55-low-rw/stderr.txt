@@ -1,0 +1,1646 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.0
+--------
+workdir: /home/zenulabidin/Documents/sshpeaches
+model: gpt-5.5
+provider: openai
+approval: on-request
+sandbox: danger-full-access
+reasoning effort: low
+reasoning summaries: none
+session id: 019f5b26-980c-7b11-9785-68020368a2c0
+--------
+user
+Stringbean execution policy:
+- Execution profile: rw. Agents with read_write permission may modify files in service of the task. Agents with read_only permission must not modify files; Stringbean will treat modifications as a policy violation.
+- Effective permission for this call: read_write.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+
+You are an implementer.
+Implement only the listed task and avoid unrelated changes.
+
+Task:
+inspect the codebase to see the description
+
+Objective:
+task-1 - Collect committed documentation signals
+
+Plan task:
+{
+  "id": "task-1",
+  "title": "Collect committed documentation signals",
+  "description": "Read committed documentation such as README.md, docs/README.md if present, committed user wiki pages, and developer notes. Extract the repository description and user-facing feature claims exactly as documented, keeping README-backed claims distinct from any untracked or generated summaries.",
+  "dependencies": [],
+  "recommended_role": "advisor",
+  "permissions": "read_only",
+  "verification": [
+    "Identify which documentation files are committed versus untracked.",
+    "List README-documented capabilities separately from other documentation claims.",
+    "Do not present untracked summary files as authoritative committed project state."
+  ]
+}
+
+Required verification:
+Identify which documentation files are committed versus untracked.
+List README-documented capabilities separately from other documentation claims.
+Do not present untracked summary files as authoritative committed project state.
+
+Known constraints:
+Identify which documentation files are committed versus untracked.
+List README-documented capabilities separately from other documentation claims.
+Do not present untracked summary files as authoritative committed project state.
+
+Prior constraints/advisor notes:
+advisor
+
+Allowed file scope:
+
+
+Return JSON:
+{
+  "status": "completed",
+  "summary": "...",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": []
+}
+
+codex
+I’ll inspect the repository docs and git status only, keeping committed documentation separate from untracked files as requested.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git ls-files' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+.firebaserc
+.github/workflows/publish-wiki.yml
+.gitignore
+.run/Hermetic Android Tests.run.xml
+.run/Live Android Tests.run.xml
+.run/Macrobenchmark Android Tests.run.xml
+.run/Release Lane Android Tests.run.xml
+.run/Release Lane Managed Devices.run.xml
+.run/Release Launch Check.run.xml
+CHANGELOG.md
+LICENSE
+README.md
+app/build.gradle.kts
+app/proguard-release-androidtest-rules.pro
+app/proguard-rules.pro
+app/src/androidTest/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/favorites/FavoritesScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsDialogRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/ManagerSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/AppInfoNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/ExternalLinksNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/permissions/NotificationPermissionStateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/AccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/QuickConnectAccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/RtlSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/VisualSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityLockRuntimeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityManagerVaultTest.kt
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SecuritySettingsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsPreferencesTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsRestoreDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/snippets/SnippetCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ActivityLaunchHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetRule.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetter.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/KnownHostsSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LifecycleTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LiveBackendConfig.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/NotificationPermissionHelper.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/TestSuites.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/TerminalThemeApplicationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/ThemeEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/uptime/UptimeScreenTest.kt
+app/src/benchmark/AndroidManifest.xml
+app/src/debug/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/debug/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/debug/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/main/AndroidManifest.xml
+app/src/main/assets/fonts/CascadiaMono-Regular.ttf
+app/src/main/assets/fonts/DroidSansMono.ttf
+app/src/main/assets/fonts/FiraCode.ttf
+app/src/main/assets/fonts/Inconsolata-Regular.ttf
+app/src/main/assets/fonts/JetBrainsMono.ttf
+app/src/main/assets/fonts/OpenDyslexicMono-Regular.ttf
+app/src/main/assets/fonts/RobotoMono.ttf
+app/src/main/assets/fonts/SourceCodePro.ttf
+app/src/main/assets/gpl-3.0.txt
+app/src/main/assets/licenses/fonts/.keep
+app/src/main/assets/licenses/fonts/cascadia-code-license.txt
+app/src/main/assets/licenses/fonts/droid-sans-mono-module-license.txt
+app/src/main/assets/licenses/fonts/droid-sans-mono-notice.txt
+app/src/main/assets/licenses/fonts/google-fonts-ofl.txt
+app/src/main/assets/licenses/fonts/open-dyslexic-readme.md
+app/src/main/assets/licenses/maven_licenses.json
+app/src/main/assets/mosh/NOTICE.txt
+app/src/main/assets/mosh/arm64-v8a/bin/mosh-client
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_base.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_city.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hash.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_int128.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_status.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_statusor.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strerror.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/arm64-v8a/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/arm64-v8a/lib/libandroid-support.so
+app/src/main/assets/mosh/arm64-v8a/lib/libc++_shared.so
+app/src/main/assets/mosh/arm64-v8a/lib/libcrypto.so.3
+app/src/main/assets/mosh/arm64-v8a/lib/libncursesw.so.6
+app/src/main/assets/mosh/arm64-v8a/lib/libprotobuf.so
+app/src/main/assets/mosh/arm64-v8a/lib/libutf8_validity.so
+app/src/main/assets/mosh/arm64-v8a/lib/libz.so.1
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/v/vt100
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm
+app/src/main/assets/mosh/arm64-v8a/share/terminfo/x/xterm-256color
+app/src/main/assets/mosh/x86_64/bin/mosh-client
+app/src/main/assets/mosh/x86_64/lib/libabsl_base.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_city.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cord_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_functions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_handle.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_cordz_info.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc32c.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_cord_state.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_crc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_die_if_null.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_examine_stack.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_exponential_biased.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_commandlineflag_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_config.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_flags_program_name.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hash.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_hashtablez_sampler.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_int128.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_kernel_timeout_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_leak_check.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_check_op.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_conditions.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_format.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_globals.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_log_sink_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_message.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_nullguard.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_internal_structured_proto.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_log_sink.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_malloc_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_hash_set.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_raw_logging_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_spinlock_wait.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_stacktrace.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_status.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_statusor.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_str_format_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strerror.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_strings_internal.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_symbolize.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_synchronization.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_time_zone.so
+app/src/main/assets/mosh/x86_64/lib/libabsl_tracing_internal.so
+app/src/main/assets/mosh/x86_64/lib/libandroid-support.so
+app/src/main/assets/mosh/x86_64/lib/libc++_shared.so
+app/src/main/assets/mosh/x86_64/lib/libcrypto.so.3
+app/src/main/assets/mosh/x86_64/lib/libncursesw.so.6
+app/src/main/assets/mosh/x86_64/lib/libprotobuf.so
+app/src/main/assets/mosh/x86_64/lib/libutf8_validity.so
+app/src/main/assets/mosh/x86_64/lib/libz.so.1
+app/src/main/assets/mosh/x86_64/share/terminfo/v/vt100
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm
+app/src/main/assets/mosh/x86_64/share/terminfo/x/xterm-256color
+app/src/main/java/com/sshpeaches/app/AppIconManager.kt
+app/src/main/java/com/sshpeaches/app/MainActivity.kt
+app/src/main/java/com/sshpeaches/app/SSHPeachesApplication.kt
+app/src/main/java/com/sshpeaches/app/data/importer/OpenSshConfigImporter.kt
+app/src/main/java/com/sshpeaches/app/data/local/Converters.kt
+app/src/main/java/com/sshpeaches/app/data/local/Dao.kt
+app/src/main/java/com/sshpeaches/app/data/local/Entities.kt
+app/src/main/java/com/sshpeaches/app/data/local/Mappers.kt
+app/src/main/java/com/sshpeaches/app/data/local/SshPeachesDatabase.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeDao.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeEntities.kt
+app/src/main/java/com/sshpeaches/app/data/local/UptimeMappers.kt
+app/src/main/java/com/sshpeaches/app/data/model/HostConnection.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalFont.kt
+app/src/main/java/com/sshpeaches/app/data/model/TerminalProfile.kt
+app/src/main/java/com/sshpeaches/app/data/model/UptimeModels.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppContainer.kt
+app/src/main/java/com/sshpeaches/app/data/repository/AppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomAppRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/RoomUptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/repository/UptimeRepository.kt
+app/src/main/java/com/sshpeaches/app/data/settings/AppIconOption.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsDefaults.kt
+app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/Ed25519IdentityKeyProvider.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/IdentityKeyInstaller.kt
+app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsBundle.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsScheduler.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploadWorker.kt
+app/src/main/java/com/sshpeaches/app/diagnostics/DiagnosticsUploader.kt
+app/src/main/java/com/sshpeaches/app/security/SecurityManager.kt
+app/src/main/java/com/sshpeaches/app/service/FileTransferProgress.kt
+app/src/main/java/com/sshpeaches/app/service/MoshRuntime.kt
+app/src/main/java/com/sshpeaches/app/service/SessionLogBus.kt
+app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/AdaptiveLayout.kt
+app/src/main/java/com/sshpeaches/app/ui/adaptive/DesktopInput.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AppDrawer.kt
+app/src/main/java/com/sshpeaches/app/ui/components/AuthChoice.kt
+app/src/main/java/com/sshpeaches/app/ui/components/EmptyState.kt
+app/src/main/java/com/sshpeaches/app/ui/components/GroupedSections.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostCard.kt
+app/src/main/java/com/sshpeaches/app/ui/components/HostQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/IdentityQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/LockScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/components/PortForwardQr.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrDecode.kt
+app/src/main/java/com/sshpeaches/app/ui/components/QrImportHandlers.kt
+app/src/main/java/com/sshpeaches/app/ui/components/SnippetQr.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+app/src/main/java/com/sshpeaches/app/ui/logging/UiDebugLog.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/DrawerDestinations.kt
+app/src/main/java/com/sshpeaches/app/ui/navigation/Routes.kt
+app/src/main/java/com/sshpeaches/app/ui/permissions/CorePermissionStatus.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/AdaptiveCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/PortraitCaptureActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/qr/QrScanOptions.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/FavoritesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HelpScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HomeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/HostsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/IdentitiesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/KeyboardEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/OpenSourceLicensesScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/PortForwardScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/SnippetManagerScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/ThemeProfileEditorScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/screens/UptimeScreen.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+app/src/main/java/com/sshpeaches/app/ui/state/FileTransferEntryMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalBellMode.kt
+app/src/main/java/com/sshpeaches/app/ui/state/TerminalSelectionMode.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalFontSupport.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalRenderView.kt
+app/src/main/java/com/sshpeaches/app/ui/terminal/TermuxTerminalEngine.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/ReleaseTestHostActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Color.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Theme.kt
+app/src/main/java/com/sshpeaches/app/ui/theme/Type.kt
+app/src/main/java/com/sshpeaches/app/ui/util/EnumDisplay.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ExportPassphraseCache.kt
+app/src/main/java/com/sshpeaches/app/ui/util/ModalSizing.kt
+app/src/main/java/com/sshpeaches/app/ui/util/PasswordTailReveal.kt
+app/src/main/java/com/sshpeaches/app/uptime/NoOpUptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunner.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerDelegate.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeNotifications.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeScheduler.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeSummaryCalculator.kt
+app/src/main/java/com/sshpeaches/app/uptime/UptimeWorker.kt
+app/src/main/java/com/sshpeaches/app/util/PortForwards.kt
+app/src/main/java/com/sshpeaches/app/util/SnippetReference.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyFingerprint.kt
+app/src/main/java/com/sshpeaches/app/util/SshKeyGenerator.kt
+app/src/main/java/com/sshpeaches/app/util/ValidationUtils.kt
+app/src/main/java/com/sshpeaches/app/widget/HostWidgets.kt
+app/src/main/java/com/sshpeaches/app/widget/WidgetSessionStore.kt
+app/src/main/res/drawable-night/ic_notification_logo.xml
+app/src/main/res/drawable-nodpi/ic_launcher_peach_dark_foreground_art.png
+app/src/main/res/drawable-nodpi/ic_launcher_peach_light_foreground_art.png
+app/src/main/res/drawable-nodpi/keyboard.png
+app/src/main/res/drawable-nodpi/major_daft_apps_black.png
+app/src/main/res/drawable-nodpi/major_daft_apps_white.png
+app/src/main/res/drawable-nodpi/sshpeaches.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar.png
+app/src/main/res/drawable-nodpi/sshpeaches_activitybar_black.png
+app/src/main/res/drawable/ic_launcher_foreground.xml
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+app/src/main/res/drawable/ic_notification_logo.xml
+app/src/main/res/drawable/ic_widget_close.xml
+app/src/main/res/drawable/ic_widget_cloud_download.xml
+app/src/main/res/drawable/ic_widget_cloud_upload.xml
+app/src/main/res/drawable/ic_widget_open.xml
+app/src/main/res/drawable/ic_widget_terminal.xml
+app/src/main/res/drawable/widget_action_danger_background.xml
+app/src/main/res/drawable/widget_action_primary_background.xml
+app/src/main/res/drawable/widget_action_secondary_background.xml
+app/src/main/res/drawable/widget_row_surface.xml
+app/src/main/res/drawable/widget_section_surface.xml
+app/src/main/res/drawable/widget_surface.xml
+app/src/main/res/layout/widget_host_row.xml
+app/src/main/res/layout/widget_open_session_row.xml
+app/src/main/res/layout/widget_quick_connect.xml
+app/src/main/res/layout/widget_sessions.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_dark.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_peach_light.xml
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+app/src/main/res/raw/apple.svg
+app/src/main/res/raw/arch.svg
+app/src/main/res/raw/bsd.svg
+app/src/main/res/raw/debian.svg
+app/src/main/res/raw/fedora.svg
+app/src/main/res/raw/linux.svg
+app/src/main/res/raw/linux_mint.svg
+app/src/main/res/raw/redhat.svg
+app/src/main/res/raw/suse.svg
+app/src/main/res/raw/ubuntu.svg
+app/src/main/res/raw/windows.svg
+app/src/main/res/values-night-v31/themes.xml
+app/src/main/res/values-night/themes.xml
+app/src/main/res/values-v31/themes.xml
+app/src/main/res/values/colors.xml
+app/src/main/res/values/strings.xml
+app/src/main/res/values/themes.xml
+app/src/main/res/xml/backup_rules.xml
+app/src/main/res/xml/data_extraction_rules.xml
+app/src/main/res/xml/widget_quick_connect_info.xml
+app/src/main/res/xml/widget_sessions_info.xml
+app/src/release/java/com/sshpeaches/app/appcheck/AppCheckInitializer.kt
+app/src/release/java/com/sshpeaches/app/diagnostics/AppCheckTokenProvider.kt
+app/src/release/java/com/sshpeaches/app/telemetry/TelemetryInitializer.kt
+app/src/test/java/com/sshpeaches/app/data/importer/OpenSshConfigImporterTest.kt
+app/src/test/java/com/sshpeaches/app/data/local/ConvertersTest.kt
+app/src/test/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepositoryTest.kt
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+app/src/test/java/com/sshpeaches/app/service/FileTransferProgressTest.kt
+app/src/test/java/com/sshpeaches/app/ui/TransferPayloadCodecTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeNotificationsTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeSummaryCalculatorTest.kt
+app/src/test/java/com/sshpeaches/app/util/PortForwardsTest.kt
+build.gradle.kts
+docs/README.md
+docs/plans/chromebook-tier2-adaptive-design.md
+docs/user-wiki/Getting-Started.md
+docs/user-wiki/Home.md
+docs/user-wiki/Troubleshooting.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/UI-Design-Notes.md
+firebase.json
+functions/index.js
+functions/package-lock.json
+functions/package.json
+gradle.properties
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew
+gradlew.bat
+lint.xml
+macrobenchmark/build.gradle.kts
+macrobenchmark/src/main/AndroidManifest.xml
+macrobenchmark/src/main/java/com/majordaftapps/sshpeaches/macrobenchmark/StartupAndScrollBenchmark.kt
+prompt_instructions.txt
+prompt_state_snapshot.txt
+settings.gradle.kts
+third_party/termux-playstore/terminal-emulator/build.gradle.kts
+third_party/termux-playstore/terminal-emulator/proguard-rules.pro
+third_party/termux-playstore/terminal-emulator/src/main/AndroidManifest.xml
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/ByteQueue.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/JNI.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/KeyHandler.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalBuffer.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColorScheme.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalColors.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalOutput.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalRow.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSession.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TerminalSessionClient.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/TextStyle.java
+third_party/termux-playstore/terminal-emulator/src/main/java/com/termux/terminal/WcWidth.java
+third_party/termux-playstore/terminal-emulator/src/main/jni/Android.mk
+third_party/termux-playstore/terminal-emulator/src/main/jni/termux.c
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/arm64-v8a/libtermux.so
+third_party/termux-playstore/terminal-emulator/src/main/jniLibs/x86_64/libtermux.so
+third_party/termux-playstore/terminal-emulator/src/test/java/android/util/Base64.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ApcTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ByteQueueTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ControlSequenceIntroducerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/CursorAndScreenTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DecSetTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DeviceControlStringTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/HistoryTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/KeyHandlerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/OperatingSystemControlTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/RectangularAreasTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ResizeTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScreenBufferTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScrollRegionTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalRowTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTestCase.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TextStyleTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/UnicodeInputTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/VtCompatibilityTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/WcWidthTest.java
+third_party/termux-playstore/terminal-view/build.gradle.kts
+third_party/termux-playstore/terminal-view/proguard-rules.pro
+third_party/termux-playstore/terminal-view/src/main/AndroidManifest.xml
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/GestureAndScaleRecognizer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalRenderer.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalView.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TerminalViewClient.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionCursorController.java
+third_party/termux-playstore/terminal-view/src/main/java/com/termux/view/TextSelectionHandleView.java
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_left_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/drawable/text_select_handle_right_material.xml
+third_party/termux-playstore/terminal-view/src/main/res/values/strings.xml
+tools/live-ssh-server/build.gradle.kts
+tools/live-ssh-server/src/main/kotlin/com/majordaftapps/sshpeaches/livetest/LiveSshServer.kt
+
+exec
+/usr/bin/zsh -lc "rg --files -g 'README*' -g 'docs/**' -g '*wiki*' -g '*notes*' -g '*.md'" in /home/zenulabidin/Documents/sshpeaches
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git status --short' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+ M CHANGELOG.md
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+ M app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+ M app/src/main/java/com/sshpeaches/app/MainActivity.kt
+ M app/src/main/java/com/sshpeaches/app/data/settings/SettingsStore.kt
+ M app/src/main/java/com/sshpeaches/app/data/ssh/SshClientProvider.kt
+ M app/src/main/java/com/sshpeaches/app/service/SessionService.kt
+ M app/src/main/java/com/sshpeaches/app/ui/SSHPeachesRoot.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPack.kt
+ M app/src/main/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaults.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/ConnectingScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/screens/SettingsScreen.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppUiState.kt
+ M app/src/main/java/com/sshpeaches/app/ui/state/AppViewModel.kt
+ M app/src/main/java/com/sshpeaches/app/ui/terminal/TerminalInputRouter.kt
+ M app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+ M app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+ M app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+?? .codex
+?? .stringbean/
+?? app/src/main/java/com/sshpeaches/app/service/BoundedMoshInputQueue.kt
+?? app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+?? app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+?? docs/task-2-summary.json
+?? docs/task-3-summary.json
+
+ succeeded in 142ms:
+CHANGELOG.md
+README.md
+docs/task-2-summary.json
+docs/user-wiki/Troubleshooting.md
+docs/user-wiki/developer/UI-Design-Notes.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/Getting-Started.md
+docs/user-wiki/Home.md
+docs/README.md
+docs/task-3-summary.json
+docs/plans/chromebook-tier2-adaptive-design.md
+app/src/main/assets/licenses/fonts/open-dyslexic-readme.md
+
+codex
+The tracked documentation set is clear: `README.md`, `docs/README.md`, committed wiki pages under `docs/user-wiki/`, a committed plan under `docs/plans/`, and `CHANGELOG.md` with local modifications. I’m reading committed content via `git show HEAD:...` so modified/untracked summaries do not leak into the authoritative description.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse
+exec
+/usr/bin/zsh -lc 'git show HEAD:README.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches for Android
+
+SSHPeaches is an Android SSH client for connecting to servers, managing saved hosts and keys, transferring files, and reusing common connection settings from one place.
+
+If you installed SSHPeaches from F-Droid or Google Play, this repository includes the guides you need to get started and troubleshoot common issues.
+
+## Start Here
+
+- [User wiki home](docs/user-wiki/Home.md)
+- [Getting started](docs/user-wiki/Getting-Started.md)
+- [User guide](docs/user-wiki/User-Guide.md)
+- [Troubleshooting](docs/user-wiki/Troubleshooting.md)
+- [Documentation index](docs/README.md)
+
+## What You Can Do With SSHPeaches
+
+- Open SSH terminal sessions
+- Browse and transfer files with SFTP
+- Copy files with SCP
+- Save hosts for one-tap reuse
+- Manage SSH identities and private keys
+- Set up local port forwards
+- Share or import hosts, identities, and forwards with QR codes
+- Save snippets for repeated commands
+
+Minimum supported Android version: Android 8.0 (API 26).
+
+## Quick Start
+
+1. Open SSHPeaches.
+2. If this is your first launch, the **Home** screen gives you one-tap buttons to add a host, identity, port forward, or snippet.
+3. Use **Quick Connect** for a fast one-time connection, or open **Hosts** to save a server.
+4. Enter your host name or IP address, port, username, and authentication settings.
+5. Connect and verify the server fingerprint if SSHPeaches prompts you.
+6. Save the host if you want to reuse it later for SSH, SFTP, or SCP.
+
+## Main Areas Of The App
+
+- **Home**: open sessions, favorites, and a mixed recents list in one place
+- **Hosts**: save servers and launch SSH, SFTP, or SCP
+- **Identities**: import and manage SSH keys
+- **Port Forwards**: create and manage local forwards
+- **Snippets**: store reusable commands
+- **Settings**: security, theme, terminal, and transfer preferences
+
+The management screens for hosts, identities, port forwards, and snippets all use grouped sections. Each group can be collapsed, and item management actions live in the three-dot menu on the right side of each card.
+
+## Security Notes
+
+- Review host key fingerprints before trusting a server.
+- Set a PIN and enable biometric unlock in **Settings** if you want extra protection.
+- Private-key and password data exported through QR can be protected with an export passphrase.
+
+## Need Help?
+
+- Open the in-app drawer and tap **Help**
+- Read the [troubleshooting guide](docs/user-wiki/Troubleshooting.md)
+- Visit the support page: <https://majordaftapps.com/sshpeaches-support>
+- Report bugs or request features through this repository's GitHub issues
+
+## License
+
+SSHPeaches is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+## Open Source Notices
+
+Open source license notices are available in the app from **About**.
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/Home.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches User Wiki
+
+This wiki is for people using SSHPeaches on Android.
+
+## Start Here
+
+- [Getting Started](Getting-Started) - first launch, first connection, and recommended security setup
+- [User Guide](User-Guide) - what each screen does and how to use it
+- [Troubleshooting](Troubleshooting) - common issues and fixes
+
+## What SSHPeaches Does
+
+- SSH terminal sessions
+- SFTP browsing and transfers
+- SCP file transfers
+- Saved hosts and SSH identities
+- Local port forwards
+- QR import and export
+- Reusable command snippets
+
+Minimum Android version: Android 8.0 (API 26).
+
+## Developer Section
+
+Contributor and release documentation lives under [developer/](developer/Developer-Home).
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/User-Guide.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches User Guide
+
+This document explains each major screen in SSHPeaches 0.1.x.
+
+## Navigation overview
+
+Use the left drawer to access:
+
+- Home
+- Hosts
+- Identities
+- Port Forwards
+- Snippets
+- Keyboard Editor
+- Theme Editor
+- Settings
+- Help
+- About
+
+The drawer also includes a dedicated **Quick Connect** button for ad-hoc sessions.
+
+## Home
+
+Home is the default landing screen.
+
+- Shows open sessions when any are active.
+- Shows favorites grouped by type: hosts, identities, port forwards, and snippets.
+- Shows a single recents list across all four resource types.
+- If the app has no saved resources yet, Home shows a welcome screen with buttons to add your first host, identity, port forward, or snippet.
+- Open session rows use icons for reopen and disconnect actions.
+
+## Hosts
+
+Use this screen to manage saved servers.
+
+### Host list actions
+
+- Search hosts by name.
+- Sort menu: `Last Used` or `Alphabetical`.
+- Hosts are organized into collapsible groups.
+- Use the top app bar icons to add a host, scan a host QR, or import hosts from an OpenSSH config file.
+- Use the three-dot menu on a host card for `Edit` and `Delete`.
+
+### Host card actions
+
+- `SSH` starts terminal mode.
+- `SFTP` opens SFTP browser mode.
+- `SCP` opens dual-pane transfer mode.
+- `Info` manages/runs info snippets for that host.
+- `QR` shares host config.
+
+If a host has a saved password, QR export prompts for a passphrase and encrypts that password payload.
+
+### Host fields
+
+- Required: name, host/IP, port, username
+- Auth: password, identity, or both
+- In the add/edit form, the authentication block sits directly below `Username`
+- Optional: group, notes, transport (SSH/Mosh), terminal profile, preferred local forward, startup snippet, background behavior
+
+## Connecting Screen
+
+After a successful connection, behavior depends on mode:
+
+- `SSH`: terminal view with compact custom key row
+- `SFTP`: file browsing and upload/download controls
+- `SCP`: local/remote panes with copy operations
+
+Common behaviors:
+
+- Connection logs are shown in real time.
+- You can close/retry from the top bar.
+- Session notifications support quick open/disconnect while running in background.
+
+## Identities
+
+Use identities for SSH key authentication.
+
+- Add/Edit/Delete identities
+- Import private keys from file
+- Generate/share identity QR
+- Import identity via QR
+- Mark favorites
+- Organize identities into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
+
+When exporting an identity with a private key, SSHPeaches requires an export passphrase and encrypts key data inside the QR payload.
+
+## Port Forwards
+
+SSHPeaches currently supports local forwards only (`-L`).
+
+- Add/Edit/Delete forwards
+- Enable/disable a forward
+- Associate forwards with hosts for auto-start
+- Share/import via QR
+- Mark favorites
+- Organize forwards into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
+
+Remote (`-R`) and dynamic (`-D`) forwarding are not in the current app scope.
+
+## Snippets
+
+Use snippets for reusable shell commands.
+
+- Add snippet
+- Edit/delete snippet
+- Import snippet via QR
+- Run snippet
+- Organize snippets into collapsible groups
+- Use the three-dot menu for `Edit` and `Delete`
+
+Current run behavior: snippets run against the first active session. If no session is active, run is rejected.
+
+## Keyboard Editor
+
+Customize the compact terminal key row.
+
+- Tap any slot to assign or change key action
+- Choose from modifiers, letters, function keys, navigation keys, and sequences
+- Assign icons and modifier combos
+- Reset layout anytime
+
+## Theme Editor
+
+Manage terminal themes/profiles.
+
+- Select default terminal profile
+- Duplicate built-in profiles
+- Create custom profiles
+- Edit custom profile name, font size, colors, cursor style/blink
+- Delete custom profiles
+
+Hosts referencing a deleted profile fall back to the app default profile.
+
+## Settings
+
+Settings includes:
+
+- Theme mode (System/Light/Dark)
+- Background session toggle
+- Terminal emulation (`xterm` or `vt100`)
+- Selection mode (`Natural` or `Block`)
+- Security:
+  - PIN
+  - biometric unlock (requires PIN)
+  - lock timeout
+  - host key prompt controls
+- Port forward auto-start
+- Diagnostics/privacy toggles
+- Restore defaults
+- Transfer data via QR (include identities/settings options)
+
+## About, Help, and licenses
+
+- **Help** shows an in-app guide for connecting, identities, terminal input, file transfers, QR sharing, and common troubleshooting. The guide also links to the external support site for longer notes.
+- **About** shows version, website, privacy policy, support links, and license entry points.
+- Open source license notices are available from About.
+
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/README.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches Wiki Sources
+
+This folder now uses a single wiki root with a nested developer section.
+
+## User Wiki
+
+For people using SSHPeaches on Android:
+
+- [Home](user-wiki/Home.md)
+- [Getting Started](user-wiki/Getting-Started.md)
+- [User Guide](user-wiki/User-Guide.md)
+- [Troubleshooting](user-wiki/Troubleshooting.md)
+
+Current app structure:
+
+- `Home` is the landing screen.
+- `Hosts`, `Identities`, `Port Forwards`, and `Snippets` use grouped, collapsible lists.
+- Add/import actions for those management screens live in the top app bar.
+
+## Developer Section
+
+For contributors, maintainers, and release work:
+
+- [Developer Home](user-wiki/developer/Home.md)
+- [Product Blueprint](user-wiki/developer/Product-Blueprint.md)
+- [UI Design Notes](user-wiki/developer/UI-Design-Notes.md)
+- [Google Play Publish Checklist](user-wiki/developer/Google-Play-Publish-Checklist.md)
+
+codex
+One doc index link points at developer files that are not present under those exact committed names, but the committed developer docs do exist under `Developer-Home.md`, `Product-Blueprint.md`, and `UI-Design-Notes.md`. I’m checking those plus getting-started and troubleshooting for additional user-facing claims.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/developer/Product-Blueprint.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+﻿# SSHPeaches Product Blueprint
+
+> **Last updated:** 2026-03-20. See `UI-Design-Notes` for corresponding UI layouts.
+
+## Vision & Goals
+- Provide a trustworthy, modern Android-phone/tablet SSH/Mosh client that feels tailored for touch interaction yet powerful enough for professional administrators.
+- Ship a Play Store-ready app within 6-8 months, launching as *SSHPeaches* with all features available for free at launch.
+- Differentiate through first-class key management, offline-friendly sharing, and polished UX (Material You, accessibility, gesture support).
+
+## Target Users & Personas
+1. **On-call SRE ("Nadia")** - needs dependable connections, multi-factor auth, fast host switching, audit trail.
+2. **Indie developer ("Leo")** - values customization, fast remote access, simple offline backups (QR export, USB).
+3. **IT consultant ("Priya")** - jumps between client environments, wants per-client folders, shared settings, and quick macros.
+
+## Constraints & Principles
+- Android 8.0+ (API 26) baseline on phones/tablets; Kotlin-first, Jetpack Compose UI; minimize native code.
+- Respect user security: private keys never leave device unencrypted; biometric unlock required for sensitive actions.
+- Offline-first: core SSH must work without network services; QR-based peer sync avoids recurring cloud costs.
+- Transparent roadmap: launch fully free; revisit optional donations or support packages only after stable release.
+- Scope boundary: no Telnet or on-device local shell modes to maintain focus on SSH/SFTP/SCP/Mosh.
+
+## Feature Set
+- Home is the default landing view. It combines open sessions, favorites grouped by type, and a mixed recents feed across hosts, identities, port forwards, and snippets. If the app is empty, Home shows a welcome panel with direct add actions for each resource type. Hamburger menu opens the rest of the app (Quick Connect, Hosts, Identities, Port Forwards, Snippets, Keyboard Editor, Settings, Help, About). Help launches the official support website; About opens an in-app sheet with logo, version, build info, and links to licenses.
+- Multi-mode sessions: per-host quick-launch icon buttons (large icon + label such as "SSH", "SFTP", "SCP", "Info", "Move") covering terminal, full two-way SFTP browser (FileZilla-style), SCP "Quick Transfer", and informational panels; supports multiple simultaneous sessions, reconnect, keep-alive, and agent forwarding (where possible via ssh-agent emulation).
+- SFTP explorer: dual-pane (local/remote) view with drag-to-queue transfers, resumable progress, bookmarks, and transfer history.
+- Credential vault: password + key pair auth managed in an Identities screen with top-app-bar add/import actions for manual entry, file import, or on-device key generation; defaults to last-used sort with alphabetical option, plus secure notes and tagging. Fingerprints display in short mobile-friendly form (e.g., SHA-256 truncated to 8-10 chars or classic colon-separated hex).
+- Connection manager: grouped sections, search, favorites, quick actions, import/export (JSON/URI), inline icon buttons (SSH, SFTP, SCP, Info, Move), configurable default mode, and top-app-bar add/import actions. Sorting (Last Used / A->Z) sits beside the search bar. Edit and delete now live in each host card's overflow menu instead of a screen-wide edit mode. Hosts screen accessible from drawer; cards show OS icon (left), host/group labels, last-used timestamp, and large action buttons underneath.
+- Quick Connect panel: drawer shortcut opens a bottom sheet with Host/IP, Port (default 22), Username, auth selector (password, identity, both), Mosh toggle, forwarded-port dropdown, and optional script picker; includes "Connect" + "Pin to Favorites" buttons and retains last-used values for fast reuse.
+- New Connection sheet: Basic section (Name, Host, Port, Username). Authentication fields sit directly under Username and include auth mode, password controls, and identity selection, with support for password, identity, or both. The remainder of the form covers group, notes, forwarded port selection, optional shell script, Mosh, and background behavior. No local shell or Telnet modes.
+- Port forwards manager: Local (`-L`) forwards only; each forward has bind/destination fields, host association (auto-start when that host connects), manual enable toggle, favorite icon, and edit/delete controls. Session toolbar shows active forward indicator for toggling on/off mid-session with toast notifications on success/failure.
+- Per-connection Info panel: "Info" button runs editable command presets (default: `uname -a`, `uptime`, `who`, `free -h`, `df -h` in that order) to show host diagnostics; presets configurable per connection.
+- Info panel editor: accessible from connection settings or within the Info panel via "Edit Commands," presenting ordered list of shell snippets (fields for label + command). Users can add/remove/reorder commands, toggle "Run automatically" vs "Run on demand," and preview output formatting.
+- Snippet manager: global library of reusable commands/scripts grouped by tags; snippets can insert variables (e.g., `{host}`, `{user}`), be pinned to hosts/groups for auto-run, shared via QR/export, and triggered from the session toolbar.
+- OS detection & branding: on each successful connect we parse `uname`/`/etc/os-release` (if present) to assign distro/OS icons (Ubuntu, Debian, RHEL, CentOS, Linux Mint, Arch, Gentoo, Fedora, SUSE/openSUSE, Pop!_OS, Manjaro, elementaryOS, Peppermint OS, Linux Lite, Zorin, Rocky, Alma, Asahi, NixOS, macOS, BSD variants). Icons use white glyphs on distro-colored backgrounds (e.g., Ubuntu orange, Fedora blue, SUSE green). Unknown systems fall back to a generic Linux icon; never-connected hosts show a default desktop icon.
+- QR export/import flows: Move icon triggers single-host share via QR; "Export All" (hosts, keys metadata, settings) splits into multi-frame codes with checksum/resume support. Scanner UI shows frame counter, checksum indicator, and pause/resume controls.
+- Default keyboard row: ESC, TAB, CTRL, HOME, END, `/`, `-`, `_`, sticky swipe-to-arrow toggle (always available; control only switches sticky vs one-shot), swipe-to-scroll toggle, and Keyboard Editor shortcut. Users can replace/extend this via the Keyboard Editor pane, which provides a tiered key palette (modifiers, navigation toggles, plus dropdown families Fn, lowercase letters, uppercase letters, numbers, symbols). Drag & drop behaves like a freeform canvas per row-keys can be positioned anywhere without grid constraints; up to three rows (default single row, "+" adds more), plus optional compact-key mode.
+- Logging & diagnostics: session history with timestamps, crash reporting, optional anonymized analytics.
+- Background session control: global setting ("Run shells in background") determines whether SSH/Mosh sessions can continue running when the app is backgrounded; per-connection override available.
+- Security lock: Settings include "Require biometric unlock after X minutes of inactivity" (configurable timeout, immediate lock option). App returns to lock screen when triggered, protecting identities and sessions.
+
+### Differentiators
+- Offline QR sync: encode connection/credential bundles (serialized via Kotlinx JSON, minified + Deflate-compressed before encryption) into QR frames with multi-frame playback plus LAN discovery option.
+- Port forwarding manager focused on Local (`-L`) forwards for Play Store-safe behavior: define forwards globally, attach them to hosts for auto-activation, and toggle them per session (with notifications on success/failure).
+- Automation snippets/macros triggered on connect; quick buttons for frequently used commands.
+- Monitoring widgets/tiles (e.g., home screen quick connect).
+- Biometric + hardware key (Passkey/YubiKey via NFC/BLE) unlock for key usage.
+
+### Future Enhancements
+- EC2/Linode/Vultr discovery integrations.
+- Team sharing once we introduce a backend sync service.
+- Real-time collaboration (pair terminal view).
+- Configurable terminal rendering backend (GPU-accelerated).
+- Plugin marketplace (long-term).
+
+## Technical Architecture
+### Client Layers
+- **Presentation**: Jetpack Compose, Material 3, Navigation Component, ViewModels.
+- **Domain**: Kotlin coroutines + Flow, use case classes orchestrating SSH actions, connection state, and preferences.
+- **Data**: Repository pattern storing metadata in Room database, secrets in Android Keystore-backed encrypted storage; optional sync service interfacing with backend APIs.
+
+### Terminal & Protocol Stack
+- Utilize `sshj` or `JSCH` fork for SSH; evaluate open-source terminal emulator (e.g., `blink-caret/term`) for rendering; wrap in Kotlin module with state reducers.
+- Mosh support through native library compiled with NDK (Phase 2).
+- File transfers via SFTP module (sshj) powering dual-pane explorer plus SCP helper for single-shot transfers.
+
+### Security
+- All private keys stored with AES-256 keys derived from Android Keystore; optional user-supplied passphrase; biometric gate.
+- Zero-knowledge QR/LAN sync: secrets encrypted locally before encoding/transit; metadata minimized.
+- Crash/analytics opt-in; logs scrub sensitive data.
+- Automated security testing: static analysis (Detekt, Android Lint), dependency scanning (OWASP Dependency-Check or Gradle plugins).
+- Strict host-key checks: surface host key fingerprints on first connect, prompt on mismatches before proceeding, and refresh OS identity icons only after trust is established.
+
+### Backend (Optional Purchase Verification)
+- No backend required at launch; QR sync keeps everything local/offline.
+- Add a lightweight HTTPS endpoint later only to verify optional Play Store donations/support purchases (dummy handler until monetization exists).
+- Infra TBD (Cloud Functions, Firebase HTTPS endpoint) but should be stateless and low-cost.
+
+## UX & Visual Design
+- **Information Architecture**: Main screen opens on Home. Home shows open sessions first when present, then favorites by type, then recents. Drawer entries navigate to Quick Connect, Hosts, Identities, Port Forwards, Snippets, Keyboard Editor, Settings, Help, About. Help item launches the external support site in a Custom Tab; About opens a modal showing logo, version/build, and acknowledgments. Quick Connect remains the fast path for unsaved sessions.
+- **Connection List**: grouped card rows with OS/distro icons (default desktop until OS detected), environment labels, status indicators, large icon buttons with text labels (SSH, SFTP, SCP, Info, Move) along the bottom, and per-item overflow menus for edit/delete. Default sorting remains "Last Used" with alphabetical toggle. Info panel uses a modal showing command list, outputs, and Edit Commands entry point.
+- **Info Panel Editor**: sheet with reorderable list of command cards (label + shell snippet + auto-run toggle). Includes buttons for Add Command, Reset to defaults, and Preview output; drag handles for ordering and delete icons for removal.
+- **Quick Connect Sheet**: bottom sheet with Host/IP, Port, Username, auth toggle (password/identity/both), forwarded-port selector, optional script picker, and Mosh toggle; includes sticky "last used" chip row and buttons for Connect + Pin to Favorites.
+- **Terminal Screen**: edge-to-edge black canvas, custom toolbar (latency, toggle keep-awake, keyboard row, background toggle reflecting the global "Run shells in background" setting with per-connection overrides) with default row (ESC, TAB, CTRL, HOME, END, `/`, `-`, `_`, sticky swipe-to-arrow toggle, swipe-to-scroll toggle, Keyboard Editor shortcut). Users can redesign via the Keyboard Editor (drag from palette, add rows, compact mode). Gestures: pinch zoom, two-finger pan, hold for selection.
+- **Key Vault**: identities tab with floating "+" button (bottom-right) offering manual entry, file import, or keypair generation; defaults to "Last Used" sorting with alphabetical toggle, visual strength indicators, and tagging for all secrets.
+- **Theming**: Material You dynamic colors + curated Carbon Black (`#191919`) + Blazing Flame (`#F15025`) palette distinct from JuiceSSH's black/yellow, emphasizing high-contrast terminals; typography optimized for monospace readability; accessibility guidelines (min 4.5:1 contrast, adjustable font scaling).
+- **Empty States & Guidance**: friendly copy, quick-start cards, in-app tutorials (coach marks).
+- **Branding**: playful "peach" accent with black-and-orange palette, but professional tone; simple peach pit logo adaptable for launcher icon + marketing.
+
+## Roadmap (Tentative)
+1. **Phase 0 - Research & Technical Spikes (Month 0-1)**: Evaluate SSH libraries, prototype terminal rendering, confirm key storage approach, survey competitors.
+2. **Phase 1 - Core MVP Build (Month 1-4)**: Implement architecture skeleton, connection manager, SSH sessions, keyboard, settings. Internal dogfooding.
+3. **Phase 2 - Beta & QR Polish (Month 4-6)**: Add QR sync flow, port forwarding, automation, analytics, polish UX, prepare Play Store listing, closed beta.
+4. **Phase 3 - Public Launch (Month 6-8)**: Harden security, finalize marketing site, documentation, open beta -> production rollout.
+5. **Phase 4 - Post-Launch (ongoing)**: Iterate on Mosh and enterprise-requested features; explore optional donations/supporter perks without gating functionality.
+
+## Open Questions & Next Steps
+- Decide licensing of 3rd-party SSH/terminal libs (compatibility with Play Store + monetization).
+- Decide if/when to add optional donations/support tiers while keeping all functionality free.
+- Determine minimal infra for any future purchase-verification endpoint.
+- Begin brand asset production (logos, palette) for SSHPeaches.
+- Define QR sync technical approach (chunking, encryption, error correction) and add to spike list.
+- Next actions: create detailed PRD, wireframes (Figma), technical spike tickets, and initial repository scaffolding (Gradle/Kotlin setup).
+
+
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/developer/Developer-Home.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches Developer Wiki
+
+This wiki is for contributors and maintainers working on the app, product direction, and release process.
+
+## Core Documents
+
+- [Product Blueprint](Product-Blueprint) - product scope, roadmap, and feature expectations
+- [UI Design Notes](UI-Design-Notes) - screen layouts, interaction notes, and visual direction
+- [Google Play Publish Checklist](Google-Play-Publish-Checklist) - release readiness, code-submission gate, and publish tasks
+
+## Intended Use
+
+Use this wiki for implementation guidance, design alignment, and release operations. End-user help belongs in the user wiki instead of this section.
+
+## Submission Workflow
+
+Before submitting changes for review, use the release checklist as the source of truth for required validation:
+
+- `:app:connectedDebugAndroidTest`
+- `:app:liveAndroidTest`
+- release-lane and benchmark tasks when the change touches release-sensitive or performance-sensitive areas
+
+Before cutting a release candidate, run the full submission gate documented in [Google Play Publish Checklist](Google-Play-Publish-Checklist).
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/Troubleshooting.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches Troubleshooting
+
+## Connection fails immediately
+
+Check:
+
+- Host/IP and port are correct.
+- Device network can reach the server.
+- Username and auth method match the server.
+- If using identity auth, an identity key is selected and imported.
+
+If the app asks for password repeatedly, verify server-side SSH settings (`PasswordAuthentication`, `PubkeyAuthentication`, and allowed users).
+
+## Host key warning or mismatch
+
+If SSHPeaches reports a changed host key:
+
+1. Stop and verify server fingerprint through an out-of-band method.
+2. Do not trust automatically unless you confirmed the change.
+3. In host edit dialog, use **Clear host key** when rotation is expected and trusted.
+
+## Identity import fails
+
+Common causes:
+
+- App is locked (unlock first).
+- Invalid key format in file.
+- Wrong passphrase when importing encrypted QR key payload.
+
+Try importing a standard OpenSSH private key file again from **Identities**.
+
+## QR import says duplicate or invalid
+
+- Host QR import rejects duplicates by host name.
+- Identity QR may request overwrite if fingerprint already exists.
+- Port forward import supports only local forwarding type.
+- Export passphrase must match exactly when encrypted payload is included.
+
+## Snippet run does nothing
+
+Snippets require an active session.
+
+- Open/connect at least one host first.
+- Re-run snippet from **Snippets**.
+- If still failing, check connection logs in the active session screen.
+
+## SFTP/SCP transfer issues
+
+Check:
+
+- Remote path exists and permissions allow access.
+- Local destination path is writable.
+- Session is still active.
+- For SCP, select source and destination before copy actions.
+
+## Background sessions not staying alive
+
+Verify:
+
+- **Settings** -> **Run shells in background** is enabled.
+- Android battery optimization is not aggressively stopping the app.
+- App notifications are allowed (required for foreground session service behavior on modern Android).
+
+## Locked out by PIN
+
+- Use **Unlock with PIN** on lock screen.
+- If biometric is configured and available, use biometric unlock.
+- If PIN is forgotten, app reinstall may be required to reset secure local secrets.
+
+## Data restore/import expectations
+
+QR transfer supports:
+
+- Host definitions
+- Identity metadata (and encrypted private keys when exported that way)
+- Port forwards
+- Optional app settings (when selected at export time)
+
+It is local-device transfer, not cloud sync.
+
+## Need more help
+
+- In-app: Drawer -> **Help**
+- Support page: <https://majordaftapps.com/sshpeaches-support>
+- GitHub issues in this repository
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/developer/UI-Design-Notes.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+﻿# SSHPeaches UI Design Notes
+
+> **Last updated:** 2026-03-20. Pair this with `Product-Blueprint` for product context.
+
+This document captures first-pass layouts for key SSHPeaches screens. Use it as a blueprint when building mockups (Figma/Penpot) and implementing Compose UI.
+
+---
+
+## 1. Home Screen
+```text
++---------------- App Bar ----------------+
+| [Menu] SSHPeaches         [Quick Connect] |
++-----------------------------------------+
+```
+- `Quick Connect` icon opens ad-hoc bottom sheet. Drawer also includes Help (external site via Custom Tab) and About (modal moved out of Settings; shows icon, version, build info, license links). Global theme uses Carbon Black `#191919` backgrounds with Blazing Flame `#F15025` highlight accents.
+- Body uses vertically stacked sections:
+  - **Open Sessions** appears only when at least one session exists. Each row has icon-only reopen and disconnect actions.
+  - **Favorites** stays grouped by type: Hosts, Identities, Port Forwards, Snippets.
+  - **Recents** is a single mixed list ordered newest-first.
+- Empty app state uses a branded welcome panel with the `sshpeaches` artwork, a short onboarding line, and four stacked buttons for adding the first resource.
+
+## 2. Hosts Screen
+- Same app bar.
+- Content:
+  - Search bar with group-aware filtering and sort menu for Last Used / A->Z.
+  - Add and Import QR actions live in the top app bar.
+  - Hosts are rendered inside collapsible group sections.
+- Card layout keeps the existing host action buttons. Empty space on the card is not clickable. Edit and delete sit in the overflow menu. OS icon: white glyph on colored background tied to distro (e.g., Ubuntu orange, Debian red, Fedora blue, SUSE green, Mint teal, macOS gray, BSD maroon, Arch cyan). Default desktop icon used until detection runs.
+
+### Port Forwarding UI <-> SSH flags
+- Each forward is a card with a Local (`-L`) badge, label, summary of bind/destination, enable toggle, edit/delete icons.
+- "Add port forward" dialog fields:
+  - Type: Local only (`-L`)
+  - Bind address + Port (local bind) -> `[bind_address:]port`
+  - Destination host + port -> `dstHost:dstPort`
+  - Toggle "Fail if bind can't start" -> `-o ExitOnForwardFailure=yes`
+  - Enabled switch (applies immediately when wired to backend)
+- Notes shown in dialog:
+  - Remote (`-R`) and Dynamic (`-D`) forwarding are intentionally out of scope.
+  - These are SSH TCP forwards, not VPN; only apps pointed at the bind port use them.
+
+## 3. Quick Connect Sheet
+```text
++-------------- Quick Connect ---------------+
+| Host/IP        [_______________________]   |
+| Port (22)      [__]   Username [______]    |
+| Auth           (*) Password ( ) Identity   |
+|                ( ) Both (identity first)   |
+| Password field or identity picker          |
+| Forwarded Port [saved forward dropdown]    |
+| Optional Script [inline editor + file btn] |
+| Toggles: [ ] Mosh   [ ] Pin to Favorites   |
+| Last used host/user chips                  |
+| [Cancel]                    [Connect]      |
++--------------------------------------------+
+```
+
+## 4. Snippet Manager
+- List shows snippet title/description/command with Run / Edit / Delete actions.
+- Snippets are grouped in collapsible sections.
+- Run stays visible on the card; Edit and Delete live in the overflow menu.
+- Add/import actions live in the top app bar.
+
+## 4. New Connection Flow
+- Modal or dedicated screen with tabs **Basic** / **Advanced**.
+- **Basic**: Name, Host, Port, Username. Directly below Username: auth selector, password controls, and identity picker. Group and notes follow after the authentication block.
+- **Advanced**:
+  - Forwarded port selector (dropdown of configured forwards).
+  - Optional script editor (multi-line text field) + "Choose file" button.
+  - Checkbox for Mosh fallback.
+  - Background behavior toggle (inherit global / always allow / never allow).
+  - Info panel preset link ("Edit Info Commands").
+- Footer buttons: Cancel / Save / Connect Now.
+
+## 5. Info Panel & Editor
+### Info Panel Modal
+```text
++---------------- Host Info -----------------+
+| Command label   [Run on demand ->]         |
+| Output (monospace box, collapsible)        |
+| ... (one block per command)                |
+| [Edit Commands]                            |
++--------------------------------------------+
+```
+### Editor Sheet
+- Reorderable list of cards, each containing:
+  - Label text field.
+  - Command textarea.
+  - Switch: Auto-run on open.
+  - Drag handle (`=`) and delete icon.
+- Buttons: `+ Add Command`, `Reset to defaults`, `Preview`.
+
+## 6. Identities Screen
+- Toolbar with search.
+- Rows show key alias, short fingerprint (truncate SHA-256 to 8-10 chars or colon-separated hex), last used, favorite, and share action.
+- Add/import actions live in the top app bar.
+- Identities are grouped in collapsible sections.
+- Edit/delete live in the overflow menu.
+
+## 7. Snippet Manager
+- Accessible from drawer and from session toolbar.
+- Main view:
+  - Filter chips for tags (Diagnostics, Deploy, Maintenance, etc.).
+  - Snippet cards show title, short description, favorite icon, edit/delete buttons, and quick "Insert" action.
+  - Toggle "Auto-run on connect" per snippet; indicator showing attached hosts/groups.
+- Editor view:
+  - Fields: Name, Description, Command (multi-line with syntax highlighting), Tags, Variables (placeholder chips like `{host}`, `{user}`, `{custom}`).
+  - Options: "Require confirmation before run," "Auto-run when host connects," "Share via QR."
+  - Buttons: Save, Run Now (select target session), Share.
+- In-session UI:
+  - "Snippets" button in toolbar opens bottom sheet listing favorites + recents with search, variable prompts, and quick run buttons.
+  - Auto-run snippets display inline confirmation chips when triggered.
+
+## 8. Port Forwards Screen
+- Mirrors JuiceSSH Pro behavior.
+- Local forwarding list only (no Remote/Dynamic tabs).
+- Each forward entry includes:
+  - Title (e.g., "Local 9000 -> 10.0.0.5:5432").
+  - Bind address input (default 127.0.0.1 for local/dynamic, remote host for remote).
+  - Associated host dropdown (multi-select) to auto-start when specified hosts connect.
+  - Manual enable/disable toggle (works even when not connected).
+  - Favorite/share controls plus overflow edit/delete.
+- Entries are grouped in collapsible sections.
+- Top app bar icons open add/import actions. The old edit mode is gone.
+- "Add Port Forward" sheet fields:
+  - Type selector fixed to Local (`-L`).
+  - Source port + bind address.
+  - Destination host/port.
+  - Host association multi-select.
+  - Notes/description field.
+- During sessions, toolbar indicator shows active forwards with toggles/status badges; disabling stops the tunnel but keeps SSH session alive. Toast/notification confirms success/failure.
+
+## 9. Keyboard Editor
+```text
++----------- Key Palette (scrollable) -----------+
+| Row 1: ESC, TAB, CTRL, ALT, SHIFT,             |
+|        Swipe->Arrow, Swipe->Scroll             |
+| Groups: [Fn v] [a v] [A v] [1 v] [# v]         |
+| F1-F12, lowercase, uppercase, numbers, symbols |
+| Drag items from the palette onto rows          |
++------------------------------------------------+
+
++-------- Row Controls --------+   +------- Row 1 -------+
+| Row 1  [ + Add Row ]         |   | ESC TAB CTRL ...    |
+| Compact keys [ ]             |   +---------------------+
++------------------------------+   (drag destinations)
+```
+- Users drag from palette to any row; keys behave like movable blocks within each row (free placement along the row's width, no strict grid).
+- Sticky swipe-to-arrow toggle is always present (cannot remove, but can reposition).
+- Keyboard Editor shortcut key available in palette.
+
+## 10. QR Share / Export UI
+- **Share Host**: bottom sheet shows QR preview with pagination dots, "Frame X/Y," checksum badge, `Pause`, `Resume`, `Save as PNG`.
+- **Export All**: similar but includes progress bar and "Include identities / settings" checkboxes. Scanner UI for import shows live feed with progress counter and error recovery panel.
+
+## 11. Security & Background Settings
+- Section includes:
+  - Toggle: "Allow shells to run in background."
+  - Dropdown: "Default per-connection behavior" (Inherit / Always allow / Always stop).
+  - Toggle: "Require biometric unlock" with timeout selector (Immediate, 1 min, 5 min, 15 min, Custom). Shows preview of biometric prompt + fallback PIN flow.
+  - Info copy about battery/network usage and privacy.
+- Connection-specific override (background behavior) appears in Advanced tab as described above.
+
+## 12. App Lock Screen
+```text
++---------------- SSHPeaches Lock ----------------+
+|                  (Peach logo)                  |
+|              SSHPeaches is locked              |
+|              Last unlocked: 2m ago             |
+|                                                |
+|        [Fingerprint icon] Touch to unlock      |
+|             [PIN fallback button]              |
+|                                                |
+|       "Use different account" / "Switch        |
+|                    identity"                   |
++------------------------------------------------+
+```
+- Triggered after inactivity timeout or manual lock.
+- Shows branding, last-unlocked timestamp, and optional message if a session is running in background.
+- Primary action: biometric prompt (fingerprint/face). If unavailable/fails, fallback button opens PIN/password entry sheet.
+- Device's back button exits app (sessions paused until unlock). If background sessions allowed, notification indicates "Locked - session running".
+- Settings link (gear icon) appears if user needs to adjust timeout once authenticated.
+
+---
+
+### Next Steps
+- Create Figma frames for each screen with the black-and-orange palette.
+- Define shared components (cards, buttons, toggles) as reusable variants.
+- Link frames to blueprint requirements and note interactions (group collapse, overflow actions, info editor, QR scanner).
+
+
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/user-wiki/Getting-Started.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# SSHPeaches Getting Started
+
+This guide is for users installing SSHPeaches from F-Droid or Google Play.
+
+## What SSHPeaches does
+
+SSHPeaches is an Android SSH client with support for:
+
+- SSH terminal sessions
+- SFTP browsing/transfers
+- SCP transfers
+- Identity key management
+- Local port forwarding (`-L`)
+- QR-based import/export for hosts, identities, and forwards
+
+Minimum Android version: Android 8.0 (API 26).
+
+## First launch checklist (5 minutes)
+
+1. Open SSHPeaches.
+2. If the app is empty, **Home** shows a welcome screen with buttons for adding your first resource.
+3. Open the drawer and tap **Quick Connect**.
+4. Enter `Host / IP`, `Port`, `Username`, and authentication settings.
+5. Tap **Connect**.
+6. If prompted about a server key, review the fingerprint before trusting it.
+7. After success, return to **Hosts** and save the server for one-tap reuse.
+
+## Add your first saved host
+
+1. Open **Hosts**.
+2. Tap the **Add** icon in the top app bar.
+3. Fill in name, host/IP, port, and username.
+4. Right under `Username`, choose the authentication method and any related password or identity settings.
+5. Set optional extras:
+   - transport (`SSH` or `Mosh`)
+   - group
+   - notes
+   - startup snippet
+   - default local forward
+   - terminal theme profile
+6. Tap **Add**.
+
+From each host card you can launch `SSH`, `SFTP`, or `SCP`.
+
+## Set up key authentication
+
+1. Open **Identities**.
+2. Tap the **Add** icon in the top app bar.
+3. Add a private key (paste or import file), then confirm the generated fingerprint.
+4. Save.
+5. Go back to **Hosts** and assign that identity to the host.
+
+Note: if the app is locked, key import is blocked until you unlock it.
+
+## Recommended security settings
+
+Open **Settings** and configure:
+
+- Set a PIN (`Set PIN`)
+- Enable biometric unlock (after PIN is set)
+- Set **Lock timeout**
+- Keep **Host key prompts** enabled
+- Disable **Automatically trust host key** if you want manual trust decisions
+
+## Transfer data and SSH configs
+
+- **Hosts**: open host card -> QR icon
+- **Identities**: identity row -> QR icon
+- **Port Forwards**: forward row -> QR icon
+- **Import**: use the import icon in the top app bar on each management screen
+- **OpenSSH config**: from **Hosts**, choose import -> **OpenSSH config** to import `~/.ssh/config` hosts and local forwards
+- **Export all (single QR payload)**: **Settings** -> **Transfer Data** -> **Export via QR**
+
+If a host password or private key is included, you will be prompted for an export passphrase.
+
+## Where to get help
+
+- In-app drawer -> **Help**
+- Support page: <https://majordaftapps.com/sshpeaches-support>
+- GitHub issues for bugs/feature requests in this repository
+
+codex
+I’ve separated current README/user-guide claims from roadmap/design claims. One more pass over the committed changelog and committed plan will cover the remaining developer-note style docs.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'git show HEAD:CHANGELOG.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+# Changelog
+
+All notable SSHPeaches release notes should be tracked here.
+
+## 0.9.5 (beta)
+
+Release date: 2026-03-14
+
+- Added release-only diagnostics, Crashlytics, Analytics, and App Check wiring with opt-in controls.
+- Wired release signing/configuration for local AAB generation and Play publishing prep.
+- Rebuilt and uploaded a signed release AAB for internal Play testing with the current 0.9.5 beta line.
+- Updated the About dialog to append `(debug)` automatically in debug builds.
+- Tightened Play policy readiness by removing ad-related permissions and keeping the foreground service scoped to `dataSync`.
+- Rotated the exposed Firebase API key, removed `google-services.json` from tracked source, and kept Firebase config local-only.
+- Bundled GPLv3 license text and continued documenting Play publishing readiness locally.
+- Verified instrumented smoke coverage on emulators:
+  - `SmokeNavigationTest` passed on `Pixel_9` and `Nexus_9`
+  - `QrImportUiSmokeTest` passed on `Pixel_9` and `Nexus_9`
+  - `HostsCrudTest` passed on `Nexus_9`; on `Pixel_9` the tests ran but instrumentation crashed during teardown
+  - `SettingsSmokeTest` is currently failing on both `Pixel_9` and `Nexus_9` because the background-session switch stays `On`
+
+exec
+/usr/bin/zsh -lc 'git ls-files README.md docs/README.md docs/user-wiki/Home.md docs/user-wiki/Getting-Started.md docs/user-wiki/User-Guide.md docs/user-wiki/Troubleshooting.md docs/user-wiki/developer/Developer-Home.md docs/user-wiki/developer/Product-Blueprint.md docs/user-wiki/developer/UI-Design-Notes.md docs/plans/chromebook-tier2-adaptive-design.md CHANGELOG.md docs/task-2-summary.json docs/task-3-summary.json' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 0ms:
+CHANGELOG.md
+README.md
+docs/README.md
+docs/plans/chromebook-tier2-adaptive-design.md
+docs/user-wiki/Getting-Started.md
+docs/user-wiki/Home.md
+docs/user-wiki/Troubleshooting.md
+docs/user-wiki/User-Guide.md
+docs/user-wiki/developer/Developer-Home.md
+docs/user-wiki/developer/Product-Blueprint.md
+docs/user-wiki/developer/UI-Design-Notes.md
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:docs/plans/chromebook-tier2-adaptive-design.md' in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 107ms:
+# Chromebook Tier 2 Adaptive Design Plan
+
+## Summary
+
+Implement a Tier 2 large-screen design for the management surfaces of the app without redesigning the session/workbench flow in this phase.
+
+The large-screen model is fixed as:
+- Wide screens use a permanently expanded left navigation sidebar.
+- There is no hamburger button, no rail-only mode, and no minimized sidebar state on wide screens.
+- Each vertical has a primary pane that is always visible.
+- A secondary pane opens only from explicit user actions such as `Details` or `Edit`.
+- The secondary pane is closed by default and never auto-opens on initial load.
+- Security-sensitive and blocking flows remain modal even on wide screens.
+- Compact screens keep the current single-pane and modal-heavy behavior.
+- `Connecting / Session` remains structurally unchanged in this phase.
+- `Uptime` is phase-1 single-pane with improved spacing and sizing; no required detail pane in this phase.
+
+## Key Changes
+
+### Adaptive shell
+
+Replace the current wide-screen drawer behavior with an adaptive shell that has:
+- A permanent expanded sidebar on wide screens.
+- A top bar with global actions only: search, quick connect, active session affordance, settings/context actions.
+- No navigation reveal control on wide screens.
+- A content area that supports a primary pane plus optional secondary pane.
+
+Use the official adaptive Compose stack as the default implementation direction:
+- `androidx.compose.material3.adaptive`
+- `androidx.compose.material3.adaptive.navigation`
+- `androidx.compose.material3.adaptive.layout`
+
+Do not add a session-tab redesign, terminal-tab model, or utility-pane session refactor in this phase.
+
+### Screen behaviors
+
+Apply the following large-screen behavior by vertical:
+
+- `Home`
+  Primary pane shows dashboard content.
+  Secondary pane may show item detail when opened from the dashboard.
+  Keep QR share, passphrase, and destructive confirmation flows modal.
+
+- `Hosts`
+  Primary pane shows search, sort, grouped list, and selection state.
+  Secondary pane shows host details and host editing.
+  Password entry, QR scan/import decryption, and destructive confirmations stay modal.
+
+- `Identities`
+  Primary pane shows list and search.
+  Secondary pane shows identity details and editing.
+  Private key import prompts, passphrases, QR prompts, and destructive confirmations stay modal.
+
+- `Port Forwards`
+  Primary pane shows list and filters.
+  Secondary pane shows forward details and editing.
+  QR flows and destructive confirmations stay modal.
+
+- `Snippets`
+  Primary pane shows snippet list and search.
+  Secondary pane shows snippet details and editing.
+  QR flows and destructive confirmations stay modal.
+
+- `Keyboard Editor`
+  Primary pane shows keyboard layout overview and slot map.
+  Secondary pane replaces the current `Modify key` modal/editor on wide screens.
+  Reset and destructive confirmations stay modal.
+
+- `Theme Editor`
+  Primary pane shows theme/profile list and entry points.
+  Secondary pane replaces the current `new/edit theme` and terminal profile editing flow on wide screens.
+  Keep delete confirmations modal.
+
+- `Settings`
+  Primary pane shows grouped settings categories or sections.
+  Secondary pane shows selected settings sub-editors where appropriate.
+  PIN, password, biometric, restore-defaults, and QR-related flows remain modal.
+
+- `Uptime`
+  Keep single-pane in this phase.
+  Improve wide-screen width, spacing, and content density only.
+  Do not introduce a required detail pane unless a later phase specifically expands uptime editing.
+
+- `Connecting / Session`
+  Keep the current structure and interaction model unchanged in this phase.
+
+- `Quick Connect`
+  On wide screens, use a centered dialog rather than a bottom sheet.
+  On compact screens, keep the current bottom-sheet or dialog behavior.
+
+### Public interfaces and state changes
+
+Introduce an explicit adaptive shell contract so the implementation does not improvise per screen:
+- A shell-level layout mode: `compact` vs `wide`.
+- A shell-level pane model: `secondary pane closed` vs `secondary pane open`.
+- Per-screen pane targets for details/editors, for example `host detail`, `host edit`, `identity edit`, `theme edit`, `keyboard key edit`.
+- A uniform unsaved-changes policy for pane editors: closing the pane or switching selection must require explicit save/discard handling when dirty.
+- A uniform compact fallback policy: any wide-screen pane editor must map to an existing full-screen route or dialog on compact layouts.
+
+Do not change persisted data schemas for this phase.
+Do not add new backend/service interfaces for SSH, SFTP, SCP, or Mosh in this phase.
+
+### Input and Chromebook Tier 2 polish
+
+Plan for these Tier 2 input improvements after the adaptive shell and pane model are in place:
+- App-level keyboard navigation outside the terminal.
+- Standard keyboard shortcuts where applicable.
+- Right-click context menus for list items and actionable cards.
+- Hover states and pointer affordances for clickable/editable items.
+- Drag-and-drop file ingress from ChromeOS Files where feasible.
+
+These are part of the Tier 2 target, but the first implementation milestone should prioritize the shell and pane architecture before broad input polish.
+
+## Test Plan
+
+Validate both compact and wide-screen behavior using a Chromebook-class emulator profile, with `Resizable_Experimental` as the default primary review target.
+
+Required scenarios:
+- Wide-screen shell shows a permanent expanded sidebar with no hamburger control.
+- Sidebar remains visible across all in-scope verticals.
+- Primary pane state persists when the secondary pane opens and closes.
+- Secondary pane is closed on first load for each vertical.
+- Secondary pane opens only from explicit user action.
+- Hosts, Identities, Port Forwards, Snippets, Keyboard Editor, Theme Editor, and Settings follow the pane rules on wide screens.
+- Quick Connect opens as a centered dialog on wide screens.
+- Security-sensitive flows remain modal on wide screens.
+- Compact layouts preserve current behavior and remain functionally equivalent.
+- Session screen behavior is unchanged from the current implementation.
+- Unsaved changes in a pane editor require explicit discard/save resolution before pane close or selection change.
+
+Review artifacts expected from the implementing host:
+- One screenshot of the wide-screen shell with sidebar only.
+- One screenshot with a secondary pane open.
+- One compact-layout screenshot for fallback comparison.
+- One short emulator recording demonstrating sidebar persistence and pane open/close behavior.
+
+## Assumptions and defaults
+
+- Wide-screen means a layout class large enough to justify a permanent sidebar and optional secondary pane; the implementation should use the adaptive Compose libraries to determine this rather than hard-coded ad hoc breakpoints.
+- The wide-screen navigation pattern is a permanent expanded sidebar, not a rail and not a collapsible sidebar.
+- `Uptime` is intentionally deferred from mandatory pane treatment in phase 1.
+- `Connecting / Session` is explicitly out of scope for structural redesign in this plan.
+- Passwords, passphrases, biometric prompts, delete confirmations, QR scan/import prompts, and similar blocking/security-sensitive interactions stay modal on wide screens.
+
+codex
+{
+  "status": "completed",
+  "summary": "Collected committed documentation signals from HEAD. Committed docs identified: README.md, docs/README.md, docs/user-wiki/Home.md, docs/user-wiki/Getting-Started.md, docs/user-wiki/User-Guide.md, docs/user-wiki/Troubleshooting.md, docs/user-wiki/developer/Developer-Home.md, docs/user-wiki/developer/Product-Blueprint.md, docs/user-wiki/developer/UI-Design-Notes.md, docs/plans/chromebook-tier2-adaptive-design.md, and CHANGELOG.md. Untracked documentation summaries identified: docs/task-2-summary.json and docs/task-3-summary.json; these were not treated as authoritative committed state. README-backed repository description: \"SSHPeaches is an Android SSH client for connecting to servers, managing saved hosts and keys, transferring files, and reusing common connection settings from one place.\" README-documented capabilities: open SSH terminal sessions, browse and transfer files with SFTP, copy files with SCP, save hosts for one-tap reuse, manage SSH identities and private keys, set up local port forwards, share or import hosts/identities/forwards with QR codes, save snippets for repeated commands, Android 8.0/API 26 minimum, grouped/collapsible management screens, Home/Hosts/Identities/Port Forwards/Snippets/Settings app areas, host key fingerprint review, PIN/biometric unlock, passphrase-protected QR export for private-key/password data. Other committed documentation claims add: Quick Connect, OpenSSH config import, terminal modes for SSH/SFTP/SCP, background session notifications, Keyboard Editor, Theme Editor, diagnostics/privacy toggles, local-device QR transfer rather than cloud sync, current local-only port forwarding, snippet execution against first active session, developer roadmap/design claims for SSH/Mosh, offline QR sync, Material You/accessibility, adaptive Chromebook Tier 2 layout, and beta changelog items for release diagnostics, Play prep, Firebase key rotation, GPL text bundling, and emulator smoke test status. Noted doc consistency issue: docs/README.md links to developer/Home.md and Google-Play-Publish-Checklist.md, but committed files present under developer/ are Developer-Home.md, Product-Blueprint.md, and UI-Design-Notes.md.",
+  "files_changed": [],
+  "commands_run": [
+    "git status --short",
+    "rg --files -g 'README*' -g 'docs/**' -g '*wiki*' -g '*notes*' -g '*.md'",
+    "git ls-files",
+    "git show HEAD:README.md",
+    "git show HEAD:docs/README.md",
+    "git show HEAD:docs/user-wiki/Home.md",
+    "git show HEAD:docs/user-wiki/User-Guide.md",
+    "git show HEAD:docs/user-wiki/Getting-Started.md",
+    "git show HEAD:docs/user-wiki/Troubleshooting.md",
+    "git show HEAD:docs/user-wiki/developer/Developer-Home.md",
+    "git show HEAD:docs/user-wiki/developer/Product-Blueprint.md",
+    "git show HEAD:docs/user-wiki/developer/UI-Design-Notes.md",
+    "git show HEAD:CHANGELOG.md",
+    "git show HEAD:docs/plans/chromebook-tier2-adaptive-design.md",
+    "git ls-files README.md docs/README.md docs/user-wiki/Home.md docs/user-wiki/Getting-Started.md docs/user-wiki/User-Guide.md docs/user-wiki/Troubleshooting.md docs/user-wiki/developer/Developer-Home.md docs/user-wiki/developer/Product-Blueprint.md docs/user-wiki/developer/UI-Design-Notes.md docs/plans/chromebook-tier2-adaptive-design.md CHANGELOG.md docs/task-2-summary.json docs/task-3-summary.json"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "CHANGELOG.md is tracked but locally modified; claims above used committed HEAD content only.",
+    "docs/task-2-summary.json and docs/task-3-summary.json are untracked generated summaries and were excluded from authoritative committed documentation claims."
+  ]
+}
+tokens used
+25,112

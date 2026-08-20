@@ -1,0 +1,30 @@
+{
+  "status": "completed",
+  "summary": "Implemented/verified task-2 and task-4 test coverage in ConnectingScreenTest.kt. Added/kept focused Copy/Paste focus contracts, IME context-action tests, deterministic clipboard seeding, waitUntil-based selection/focus assertions, and exact Ctrl-A/plain-a byte assertions. Renamed the Paste focus contract to explicitly identify terminal ActionMode Paste.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "commands_run": [
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "./gradlew :app:testDebugUnitTest --tests 'com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouterTest'"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "failed: app and androidTest APKs compiled, but execution stopped with DeviceException: No connected devices"
+    },
+    {
+      "command": "./gradlew :app:testDebugUnitTest --tests 'com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouterTest'",
+      "result": "passed"
+    }
+  ],
+  "remaining_issues": [
+    "Instrumentation tests could not be executed in this environment because no Android device/emulator is connected."
+  ],
+  "handoff_notes": [
+    "Task count: 2.",
+    "Review rounds: 1.",
+    "No fixed timing sleeps were added; selection inactive and bridge focus restoration use Compose waitUntil-style helpers.",
+    "Hidden-editor sentinel cleanup was not touched."
+  ]
+}

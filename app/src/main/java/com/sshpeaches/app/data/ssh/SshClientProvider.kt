@@ -51,6 +51,8 @@ object SshClientProvider {
     private val knownHostsWriteLock = Any()
     private val providerInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
+    private const val SSH_CHANNEL_WINDOW_SIZE_BYTES = 16L * 1024L * 1024L
+    private const val SSH_CHANNEL_MAX_PACKET_SIZE_BYTES = 256 * 1024
     @Volatile
     private var testingUnavailableKeyExchangeAlgorithms: Set<String> = emptySet()
     @Volatile
@@ -199,6 +201,10 @@ object SshClientProvider {
         knownHostsFile.parentFile?.mkdirs()
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
+            // A larger receive window and packet allowance keep file transfers from
+            // becoming round-trip-bound on fast, higher-latency connections.
+            connection.setWindowSize(SSH_CHANNEL_WINDOW_SIZE_BYTES)
+            connection.setMaxPacketSize(SSH_CHANNEL_MAX_PACKET_SIZE_BYTES)
             addHostKeyVerifier(
                 InteractiveKnownHosts(
                     file = knownHostsFile,

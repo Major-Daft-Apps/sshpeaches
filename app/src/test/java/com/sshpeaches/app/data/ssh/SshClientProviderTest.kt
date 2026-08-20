@@ -48,6 +48,28 @@ class SshClientProviderTest {
     val temp = TemporaryFolder()
 
     @Test
+    fun configuredClientUsesTransferOptimizedChannelFlowControl() {
+        val host = HostConnection(
+            id = "flow-control-test",
+            name = "Flow control test",
+            host = "127.0.0.1",
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_flow_control"),
+            host = host
+        )
+
+        try {
+            assertEquals(16L * 1024L * 1024L, client.connection.windowSize)
+            assertEquals(256 * 1024, client.connection.maxPacketSize)
+        } finally {
+            runCatching { client.close() }
+        }
+    }
+
+    @Test
     fun compatibleHostKeyProviderKeepsSshjDefaultProviderUnset() {
         val originalBcProvider = Security.getProvider("BC")
         try {

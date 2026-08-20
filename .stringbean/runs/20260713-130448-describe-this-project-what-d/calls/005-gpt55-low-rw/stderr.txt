@@ -1,0 +1,462 @@
+Reading prompt from stdin...
+OpenAI Codex v0.144.0
+--------
+workdir: /home/zenulabidin/Documents/sshpeaches
+model: gpt-5.5
+provider: openai
+approval: on-request
+sandbox: danger-full-access
+reasoning effort: low
+reasoning summaries: none
+session id: 019f5ba4-0e6d-78e0-b3f1-a6bb5949a66f
+--------
+user
+Stringbean execution policy:
+- Execution profile: rw. Agents with read_write permission may modify files in service of the task. Agents with read_only permission must not modify files; Stringbean will treat modifications as a policy violation.
+- Effective permission for this call: read_write.
+- Do not run these denied commands: rm, rmdir, sudo, su, dd, mkfs, mount, umount, shutdown, reboot, poweroff, halt, systemctl, service, kill, killall, pkill, chown, chgrp, setfacl, shred, wipefs.
+- Do not run these denied git operations: git reset, git clean, git checkout, git restore, git switch, git rebase, git merge, git commit, git push, git pull.
+- If a denied operation appears necessary, stop and report it instead of running it.
+
+You are an implementer.
+Implement only the listed task and avoid unrelated changes.
+
+Task:
+describe this project (what does it do?)
+
+Objective:
+task-3 - Inspect test coverage signals
+
+Plan task:
+{
+  "id": "task-3",
+  "title": "Inspect test coverage signals",
+  "description": "Review unit and Android test names to describe which behaviors the project appears to validate, especially connection screens, live transport, SSH client provider, keyboard defaults, terminal input routing, and bounded mosh input queue behavior.",
+  "dependencies": [
+    "task-2"
+  ],
+  "recommended_role": "implementer",
+  "permissions": "read_only",
+  "verification": [
+    "Confirm test files exist for core SSH/session, UI, keyboard, and terminal input concerns.",
+    "Avoid drawing conclusions about passing status unless tests are actually run."
+  ]
+}
+
+Required verification:
+Confirm test files exist for core SSH/session, UI, keyboard, and terminal input concerns.
+Avoid drawing conclusions about passing status unless tests are actually run.
+
+Known constraints:
+Confirm test files exist for core SSH/session, UI, keyboard, and terminal input concerns.
+Avoid drawing conclusions about passing status unless tests are actually run.
+
+Prior constraints/advisor notes:
+implementer
+
+Allowed file scope:
+task-2
+
+Return JSON:
+{
+  "status": "completed",
+  "summary": "...",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": []
+}
+
+codex
+I’ll inspect the repository’s test files and names only, then summarize the coverage signals without claiming pass/fail status.
+hook: PreToolUse
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "pwd && rg --files | rg '("'^|/)(test|androidTest|src/test|src/androidTest)|Test'"\\.(kt|java)"'$|Tests'"\\.(kt|java)"'$'"'" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 243ms:
+app/src/androidTest/AndroidManifest.xml
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsDialogRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/HostsSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/lifecycle/ManagerSearchRecreateTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/ThemeEditorTest.kt
+app/src/androidTest/java/com/sshpeaches/app/themes/TerminalThemeApplicationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/identities/IdentityCrudTest.kt
+app/src/test/java/com/sshpeaches/app/ui/TransferPayloadCodecTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsPreferencesTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SettingsRestoreDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/settings/SecuritySettingsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetter.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LifecycleTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/NotificationPermissionHelper.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/TestSuites.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateResetRule.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/KnownHostsSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/LiveBackendConfig.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ActivityLaunchHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/AppStateSeeder.kt
+app/src/androidTest/java/com/sshpeaches/app/testutil/ComposeTestHelpers.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityLockRuntimeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/security/SecurityManagerVaultTest.kt
+app/src/test/java/com/sshpeaches/app/data/repository/InMemoryUptimeRepositoryTest.kt
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt
+app/src/test/java/com/sshpeaches/app/data/importer/OpenSshConfigImporterTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/AccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/VisualSmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/QuickConnectAccessibilitySmokeTest.kt
+app/src/androidTest/java/com/sshpeaches/app/release/RtlSmokeTest.kt
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt
+app/src/androidTest/java/com/sshpeaches/app/permissions/NotificationPermissionStateTest.kt
+app/src/test/java/com/sshpeaches/app/data/local/ConvertersTest.kt
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/favorites/FavoritesScreenTest.kt
+app/src/test/java/com/sshpeaches/app/util/PortForwardsTest.kt
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt
+third_party/termux-playstore/terminal-emulator/src/test/java/android/util/Base64.java
+app/src/androidTest/java/com/sshpeaches/app/uptime/UptimeScreenTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardBrowserTest.kt
+app/src/androidTest/java/com/sshpeaches/app/forwards/PortForwardCrudTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/ExternalLinksNavigationTest.kt
+app/src/androidTest/java/com/sshpeaches/app/navigation/AppInfoNavigationTest.kt
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/RectangularAreasTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScrollRegionTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/CursorAndScreenTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/HistoryTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/WcWidthTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTestCase.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/KeyHandlerTest.java
+app/src/androidTest/java/com/sshpeaches/app/snippets/SnippetCrudTest.kt
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/UnicodeInputTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/OperatingSystemControlTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TerminalRowTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DeviceControlStringTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/DecSetTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ScreenBufferTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/VtCompatibilityTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ApcTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ControlSequenceIntroducerTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/TextStyleTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ResizeTest.java
+third_party/termux-playstore/terminal-emulator/src/test/java/com/termux/terminal/ByteQueueTest.java
+app/src/test/java/com/sshpeaches/app/uptime/UptimeMonitorRunnerTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeNotificationsTest.kt
+app/src/test/java/com/sshpeaches/app/uptime/UptimeSummaryCalculatorTest.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/ReleaseTestHostActivity.kt
+app/src/main/java/com/sshpeaches/app/ui/testing/UiTestTags.kt
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt
+app/src/test/java/com/sshpeaches/app/service/FileTransferProgressTest.kt
+
+codex
+The tree has both JVM unit tests and Android instrumentation tests for the areas named in the task. I’m reading the relevant test declarations now so the description is grounded in actual test names rather than file names alone.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc 'rg -n "fun `|fun [A-Za-z0-9_]+|class " app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt app/src/test/java/com/sshpeaches/app/ui/components app/src/test/java/com/sshpeaches/app/ui/qr app/src/androidTest/java/com/sshpeaches/app/qr' in /home/zenulabidin/Documents/sshpeaches
+ exited 1 in 0ms:
+zsh:1: unmatched "
+
+exec
+/usr/bin/zsh -lc 'rg -n "fun `|fun [A-Za-z0-9_]+|class " app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt' in /home/zenulabidin/Documents/sshpeaches
+ exited 1 in 0ms:
+zsh:1: unmatched "
+
+exec
+/usr/bin/zsh -lc 'rg -n "fun `|fun [A-Za-z0-9_]+|class " app/src/androidTest/java/com/sshpeaches/app/ui app/src/androidTest/java/com/sshpeaches/app/hosts app/src/androidTest/java/com/sshpeaches/app/startup app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt' in /home/zenulabidin/Documents/sshpeaches
+ exited 1 in 0ms:
+zsh:1: unmatched "
+
+codex
+The first declaration search had a shell quoting issue, so I’m rerunning it with a simpler quoted pattern.
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+hook: PreToolUse Completed
+exec
+/usr/bin/zsh -lc "rg -n 'fun "'`|fun [A-Za-z0-9_]+|class '"' app/src/androidTest/java/com/sshpeaches/app/ui app/src/androidTest/java/com/sshpeaches/app/hosts app/src/androidTest/java/com/sshpeaches/app/startup app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt" in /home/zenulabidin/Documents/sshpeaches
+exec
+/usr/bin/zsh -lc "rg -n 'fun "'`|fun [A-Za-z0-9_]+|class '"' app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt" in /home/zenulabidin/Documents/sshpeaches
+exec
+/usr/bin/zsh -lc "rg -n 'fun "'`|fun [A-Za-z0-9_]+|class '"' app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt app/src/test/java/com/sshpeaches/app/ui/components app/src/test/java/com/sshpeaches/app/ui/qr app/src/androidTest/java/com/sshpeaches/app/qr" in /home/zenulabidin/Documents/sshpeaches
+ succeeded in 148ms:
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt:6:class KeyboardIconPackTest {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt:9:    fun byId_containsDedicatedFnIcons() {
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt:23:class KeyboardEditorTest {
+app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt:36:    fun keyboardSlotPersistsAcrossRecreate() {
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt:28:class QrRoundTripTest {
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt:31:    fun hostPayloadRoundTripPreservesConnectionFields() {
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt:79:    fun identityPayloadRoundTripRequestsOverwriteForExistingFingerprint() {
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt:113:    fun portForwardPayloadRoundTripProducesImportableLocalForward() {
+app/src/androidTest/java/com/sshpeaches/app/qr/QrRoundTripTest.kt:139:    fun snippetPayloadRoundTripProducesRunnableSnippet() {
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt:7:class QrScanOptionsTest {
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt:10:    fun wideOptionsUseAdaptiveCaptureWithoutPortraitLock() {
+app/src/test/java/com/sshpeaches/app/ui/qr/QrScanOptionsTest.kt:21:    fun compactOptionsPreservePortraitCaptureLock() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:17:class QrImportHandlersTest {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:20:    fun hostImport_invalidPayload_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:27:    fun hostImport_duplicateName_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:38:    fun hostImport_missingId_assignsGeneratedTargetId() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:58:    fun identityImport_invalidPayload_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:65:    fun identityImport_matchingFingerprint_requestsOverwrite() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:97:    fun identityImport_ready_setsFallbackLabelIdAndTimestamp() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:124:    fun portForwardImport_invalidPayload_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:131:    fun portForwardImport_validPayload_returnsReady() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:151:    fun portForwardImport_nonLocalPayload_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:172:    fun snippetImport_blankCommand_returnsError() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:189:    fun snippetImport_blankTitle_usesFallback() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrImportHandlersTest.kt:208:    private fun sampleHost(id: String, name: String = "prod"): HostConnection =
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:16:class QrPayloadRoundTripTest {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:19:    fun host_roundTrip_withEncryptedPasswordPayload() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:48:    fun identity_roundTrip_withEncryptedKeyPayload() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:71:    fun portForward_roundTrip() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:96:    fun snippet_roundTrip() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:115:    fun decode_invalidPayload_returnsNull() {
+app/src/test/java/com/sshpeaches/app/ui/components/QrPayloadRoundTripTest.kt:122:    private fun sampleHost(id: String): HostConnection =
+
+ succeeded in 202ms:
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:35:class OpenSessionIntentLaunchTest {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:48:    fun openSessionIntentColdLaunch_restoresExistingLiveTerminal() {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:90:    fun launcherRelaunchShowsOpenSessionAndResumesItFromHome() {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:126:    private fun openDrawer() {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:132:    private fun waitForTag(tag: String, timeoutMillis: Long = 30_000) {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:138:    private fun waitForSessionId(expectedTitle: String, timeoutMillis: Long = 15_000): String {
+app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt:150:    private fun seedPasswordHost(name: String): HostConnection {
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt:30:class ExternalHostProbeTest {
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt:43:    fun probeElasticTalksearchHost() {
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt:72:    private fun waitForOutcome(timeoutMillis: Long = 45_000): String {
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt:84:    private fun hasTag(tag: String): Boolean =
+app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt:90:    private fun canReachExternalHost(timeoutMillis: Int = 5_000): Boolean =
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt:21:class UptimeRouteLaunchTest {
+app/src/androidTest/java/com/sshpeaches/app/startup/UptimeRouteLaunchTest.kt:34:    fun startupRouteNavigatesToUptimeScreen() {
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt:29:class SettingsSmokeTest {
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt:42:    fun setUp() {
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt:49:    fun toggleSettingsAndDropdowns_reflectsChanges() {
+app/src/androidTest/java/com/sshpeaches/app/ui/SettingsSmokeTest.kt:94:    fun exportQrDialogShowsPassphraseFieldsWhenSecretsEnabled() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:33:class HostsBrowserTest {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:46:    fun setUp() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:53:    fun hostSearchFiltersByName() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:68:    fun hostSortSwitchesFromLastUsedToAlphabetical() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:107:    fun favoriteToggleAndHostActionsAreVisible() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:130:    fun passwordProtectedQrRequiresPassphraseAndThenShowsQrDialog() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:162:    fun sshActionNavigatesToConnectingScreenWithoutCrashing() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:175:    fun scpActionNavigatesToConnectingScreenWithoutCrashing() {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:187:    private fun waitForHost(name: String) {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:193:    private fun waitForTag(tag: String) {
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:199:    private fun topOf(text: String): Float =
+app/src/androidTest/java/com/sshpeaches/app/hosts/HostsBrowserTest.kt:202:    private fun host(
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt:20:class SmokeNavigationTest {
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt:33:    fun setUp() {
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt:38:    fun drawerNavigation_showsAllCoreScreens() {
+app/src/androidTest/java/com/sshpeaches/app/ui/SmokeNavigationTest.kt:61:    fun drawerNavigation_canReturnHomeFromHosts() {
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt:30:class HostsCrudTest {
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt:43:    fun setUp() {
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt:50:    fun addEditDeleteHost_updatesList() {
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt:101:    fun addHost_invalidHostAndPort_showsValidationErrors() {
+app/src/androidTest/java/com/sshpeaches/app/ui/HostsCrudTest.kt:131:    private fun selectPasswordAuth() {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:25:class IntentLaunchTest {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:35:    fun widgetConnectIntentStartsSessionLaunchPath() {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:57:    fun forgedWidgetConnectIntentWithoutTokenDoesNotStartSessionLaunchPath() {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:76:    fun widgetConnectLaunchPathStillPublishesSessionAfterRecreate() {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:100:    fun widgetConnectLaunchPathStillPublishesSessionAfterImmediateRecreate() {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:122:    private fun seedWidgetHost(name: String): HostConnection {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:137:    private fun widgetConnectIntent(
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:156:    private fun waitForWidgetSession(targetContext: android.content.Context, hostName: String) {
+app/src/androidTest/java/com/sshpeaches/app/startup/IntentLaunchTest.kt:167:    private fun waitForScenarioState(
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt:44:class QrImportUiSmokeTest {
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt:57:    fun setUp() {
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt:63:    fun invalidHostQrPayload_returnsError_andUiRemainsUsable() {
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt:77:    fun invalidSnippetQrPayload_returnsError() {
+app/src/androidTest/java/com/sshpeaches/app/ui/QrImportUiSmokeTest.kt:84:    fun validQrImportsBecomeVisibleAcrossManagersAfterRecreate() {
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt:25:class QuickConnectLaunchTest {
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt:30:    private fun setQuickConnectContent(
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt:49:    fun quickConnectRequiresHostPortAndUsername() {
+app/src/androidTest/java/com/sshpeaches/app/startup/QuickConnectLaunchTest.kt:58:    fun quickConnectRejectsInvalidPort() {
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt:23:class SessionLaunchWithoutNotificationPermissionTest {
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt:29:    fun widgetConnectIntentDoesNotCrashWhenNotificationsAreRevoked() {
+app/src/androidTest/java/com/sshpeaches/app/startup/SessionLaunchWithoutNotificationPermissionTest.kt:75:    private fun waitForScenarioState(
+
+ succeeded in 199ms:
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:8:class KeyboardLayoutDefaultsTest {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:11:    fun defaultLayout_matchesCurrentDefaultRows() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:25:    fun comboPreset_containsCtrlAandCtrlB() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:32:    fun builtInCompactLayout_replacesFunctionKeysAndKeepsAllModifiersReachable() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:53:    fun builtInCompactLayout_reservesFnAndShiftSlots() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:64:    fun normalizeSlots_assignsFnIconIdWhenMissing() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:73:    fun normalizeSlots_assignsFnActiveIconIdWhenMissing() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:82:    fun builtInFnLayout_containsFunctionRowAndShift() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:98:    fun customFnLayout_replacesOnlyFirstLayerAndPreservesCustomControls() {
+app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt:113:    fun builtInFnLayout_preservesConfiguredSecondLayerControls() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:55:class LiveTransportSuiteTest {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:68:    fun passwordQuickConnect_opensLiveTerminalSession() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:85:    fun manualHostKeyPrompt_canBeAccepted() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:110:    fun acceptAlwaysStoresHostTrustForLaterConnections() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:147:    fun identityAuth_andTransferModesReachLivePanels() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:198:    fun wrongPasswordShowsPasswordPromptForRetry() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:224:    fun wrongPasswordShowsPasswordPromptForRetryWhenDhKeyPairGeneratorUnavailable() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:252:    fun rejectingHostKeyShowsRetryState() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:274:    fun changedHostKeyShowsWarningPromptAndCanBeAccepted() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:299:    fun snippetCommandOutputIsSearchableInTerminalTranscript() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:333:    fun customKeyboardSequenceKeyWritesToLiveShellTranscript() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:363:    fun backgroundAndForegroundWhileTerminalSessionIsOpen_keepsConnectingRoute() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:384:    fun recreateWhileTerminalSessionIsOpen_restoresConnectingRoute() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:404:    fun localPortForward_canFetchHttpResponseTwice() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:455:    fun sftpUploadAndDownloadStayInsideSandbox() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:494:    fun sftpRenameAndDeleteStayInsideSandbox() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:553:    fun scpBrowserCanNavigateAndSelectFiles() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:582:    fun identityAuthWithWrongUsernameShowsRetryState() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:616:    fun identityAuthWithInvalidPrivateKeyShowsRetryState() {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:649:    private fun waitForTag(tag: String, timeoutMillis: Long = 30_000) {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:655:    private fun waitForEnabledTag(tag: String, timeoutMillis: Long = 30_000) {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:664:    private fun seedPasswordHost(name: String): HostConnection {
+app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt:678:    private fun waitForForwardedHttpResponse(forwardedPort: Int, timeoutMillis: Long = 20_000): String {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:12:class BoundedMoshInputQueueTest {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:15:    fun enqueue_chunksPayloadAndPreservesFifo() {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:28:    fun tryEnqueue_rejectsWholePayloadWithoutBlockingOrPartialWrites() {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:39:    fun close_unblocksConsumerAndRejectsFurtherInput() {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:57:    fun reservedCapacity_remainsAvailableForInteractiveInput() {
+app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt:68:    fun concurrentCallsDoNotInterleaveChunks() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:17:class TerminalInputRouterTest {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:20:    fun isPasteShortcut_acceptsCtrlShiftV() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:38:    fun isPasteShortcut_rejectsPlainCtrlV() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:56:    fun pasteFromClipboard_returnsFalseWhenClipboardIsEmpty() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:70:    fun pasteFromClipboard_writesBracketedPasteFriendlyTerminalSequence() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:85:    fun pasteFromClipboard_wrapsPasteWhenBracketedPasteModeIsEnabled() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:102:    fun pasteFromClipboard_fakeEmulatorAndStandardSpeedMockSshServerReturnsBeforeDrain() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:122:    fun sendVirtualKey_printableKeysUseDeviceIndependentTextFallback() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:139:    fun sendVirtualKey_printableFallbackAppliesCtrlAltAndShift() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:158:    fun sendVirtualKey_explicitFallbackPrecedesPrintableFallback() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:177:    fun sendVirtualKey_virtualNumpadAlwaysEnablesNumLockSemantics() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:194:    fun sendVirtualKey_virtualNumpadStaysLiteralInApplicationKeypadMode() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:214:    fun sendText_shiftTransformsPrintableTextActions() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:228:    fun sendVirtualKey_unknownKeyWithoutFallbackReturnsFalse() {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:240:    private fun testEmulator(writes: MutableList<ByteArray>): TerminalEmulator =
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:243:                override fun write(data: ByteArray, offset: Int, count: Int) {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:247:                override fun titleChanged(oldTitle: String?, newTitle: String?) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:249:                override fun onCopyTextToClipboard(text: String?) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:251:                override fun onPasteTextFromClipboard() = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:253:                override fun onBell() = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:255:                override fun onColorsChanged() = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:263:                override fun onTextChanged(changedSession: com.termux.terminal.TerminalSession) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:264:                override fun onTitleChanged(changedSession: com.termux.terminal.TerminalSession) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:265:                override fun onSessionFinished(finishedSession: com.termux.terminal.TerminalSession) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:266:                override fun onCopyTextToClipboard(session: com.termux.terminal.TerminalSession, text: String?) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:267:                override fun onPasteTextFromClipboard(session: com.termux.terminal.TerminalSession?) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:268:                override fun onBell(session: com.termux.terminal.TerminalSession) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:269:                override fun onColorsChanged(session: com.termux.terminal.TerminalSession) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:270:                override fun onTerminalCursorStateChange(state: Boolean) = Unit
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:274:    private fun List<ByteArray>.joinToByteArray(): ByteArray =
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:277:    private class StandardSpeedMockSshServer(
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:302:        fun enqueue(payload: ByteArray) {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:306:        fun awaitBytes(count: Int): ByteArray {
+app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt:315:        override fun close() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:45:class SshClientProviderTest {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:51:    fun compatibleHostKeyProviderKeepsSshjDefaultProviderUnset() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:78:    fun compatibleKexRemovesDiffieHellmanWhenDhKeyPairGeneratorIsUnavailable() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:88:    fun regression_cannotConnectWhenDhOnlyServerIsUnavailableForCaseInsensitiveInput() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:97:    fun regression_cannotConnectWhenDhOnlyServerIsUnavailableAndUnavailableToClient() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:129:    fun compatibleKexPrefersEcdhBeforeDiffieHellmanForOpenSshOverlap() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:142:    fun connectsToOpenSshLikeEcdhServerWithEcdsaHostKey() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:174:    fun connectsToLocalEcdhServerWhenDhKeyPairGeneratorIsUnavailable() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:207:    fun retriesPasswordAfterInitialFailureWhenDhKeyPairGeneratorIsUnavailable() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:247:    fun connectsToOpenSshServerWithEd25519HostKeyWhenAvailable() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:276:    fun ed25519Pkcs8IdentityLoadsDirectKeyProvider() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:336:    fun ed25519SignatureVerifiesPublicKeyWhenEncodedThrows() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:355:    fun knownHostsTrustsEd25519PublicKeyWhenEncodedThrows() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:391:    private fun generatedEd25519KeyProvider(): net.schmizz.sshj.userauth.keyprovider.KeyProvider {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:415:    private fun startLocalSshServer(
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:435:    private fun startOpenSshEd25519Server(): OpenSshServer {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:514:    private fun findExecutable(vararg candidates: String): String? {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:520:    private fun reserveLocalPort(): Int {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:526:    private fun waitForPort(host: String, port: Int, process: Process): Boolean {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:541:    private fun Process.waitForSuccess(timeoutSeconds: Long = 10): Boolean {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:549:    private fun File.readIfPresent(): String {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:553:    private fun skipTest(reason: String): Nothing {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:558:    private class OpenSshServer(
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:562:        override fun close() {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:570:    private class ThrowingEncodedEd25519PublicKey(
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:573:        override fun getAlgorithm(): String = "EdDSA"
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:575:        override fun getFormat(): String = "X.509"
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:577:        override fun getEncoded(): ByteArray {
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:581:        override fun getParams(): NamedParameterSpec = NamedParameterSpec.ED25519
+app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt:583:        override fun getPoint(): EdECPoint {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:64:private fun View.findEditTextDescendant(): EditText? {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:75:class ConnectingScreenTest {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:84:    fun terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:158:    fun terminalInput_actionMultipleRepeatsKnownHardwareKeys() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:185:    fun terminalIme_composingTextIsSentOnceOnlyWhenCommitted() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:213:    fun terminalIme_composingRegionReplacementHonorsCursorEdits() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:233:    fun terminalIme_reportsShadowSelectionAndSupportsForwardDelete() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:258:    fun terminalInput_usesLatestSendCallbackAfterSameSessionRecomposition() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:293:    fun terminalSession_supportsFindDialogAndSnippetPicker() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:353:    fun terminalKeyboardButtonAndDoubleTap_showSoftKeyboard() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:400:    fun compactKeyboard_dispatchesModifierSequenceAliasAndPasswordActions() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:471:    fun compactModifierWorksAfterTerminalSelectionCopyAndPaste() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:560:    fun builtInKeyboard_keepsModifiersWorkingAcrossFnLayer() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:611:    fun customKeyboard_fnLayerIsNotASilentNoOp() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:665:    fun passwordInjectUsesSavedHostPasswordAfterVaultMigration() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:722:    fun errorState_showsLogsPaneAndInvokesRetry() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:779:    fun sftpPanel_runsCommandsAgainstUiCallbacks() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:838:    fun sftpPanel_invalidTypedPathShowsErrorToast() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:903:    fun sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:985:    fun scpPanel_usesSelectionModelAndOverflowActions() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1073:    fun scpUploadPanel_promotesUploadActionToToolbar() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1122:    fun scpUploadAction_isDisabledWhileDirectoryListingIsPending() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1171:    fun scpForwardNavigation_isReachableFromOverflowOnNarrowScreens() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1251:    fun scpPanel_remoteActionsInvokeManagementCallbacks() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1335:    fun scpPanel_homeButtonUsesCanonicalHomePath() {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1407:    private fun setSshTerminalContent(onSendShellBytes: (ByteArray) -> Unit) {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1416:    private fun SshTerminalForInputTest(onSendShellBytes: (ByteArray) -> Unit) {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1445:    private fun terminalInputConnection(): InputConnection {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1453:    private fun View.findTerminalViewDescendant(): TerminalView? {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1463:    private fun TerminalView.performSelectionAction(copy: Boolean) {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1475:    private fun requestFor(mode: ConnectionMode) = QuickConnectRequest(
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1485:    private fun UiDevice.isSoftKeyboardShown(): Boolean {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1492:    private fun hideTerminalKeyboardForTest(device: UiDevice) {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1501:    private fun assertTerminalKeyboardRequested(device: UiDevice) {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1513:    private fun isTerminalKeyboardRequested(): Boolean {
+app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt:1525:    private fun doubleTapTerminalPanelWithDevice(device: UiDevice) {
+
+codex
+{
+  "status": "completed",
+  "summary": "sshpeaches appears to be an Android SSH client/terminal app. Test coverage signals show validation around saved hosts, quick connect/session launch, live SSH terminal transport, host key trust prompts, password and identity authentication, SFTP/SCP panels, local port forwarding, snippets, QR import/export, settings, security/vault behavior, keyboard layouts, terminal input routing, and uptime monitoring. Confirmed test files exist for core SSH/session concerns (`SshClientProviderTest`, `LiveTransportTest`, `ConnectingScreenTest`), UI/navigation/host concerns (`HostsCrudTest`, `HostsBrowserTest`, `SmokeNavigationTest`, startup launch tests), keyboard defaults/editor concerns (`KeyboardLayoutDefaultsTest`, `KeyboardIconPackTest`, `KeyboardEditorTest`), terminal input routing (`TerminalInputRouterTest`), and bounded mosh input queue behavior (`BoundedMoshInputQueueTest`). I did not run tests, so this is only a coverage-signal review, not a pass/fail statement.",
+  "files_changed": [],
+  "commands_run": [
+    "pwd && rg --files | rg '(^|/)(test|androidTest|src/test|src/androidTest)|Test\\.(kt|java)$|Tests\\.(kt|java)$'",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/test/java/com/sshpeaches/app/data/ssh/SshClientProviderTest.kt app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt app/src/androidTest/java/com/sshpeaches/app/live/LiveTransportTest.kt app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardLayoutDefaultsTest.kt app/src/test/java/com/sshpeaches/app/ui/terminal/TerminalInputRouterTest.kt app/src/test/java/com/sshpeaches/app/service/BoundedMoshInputQueueTest.kt",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/androidTest/java/com/sshpeaches/app/ui app/src/androidTest/java/com/sshpeaches/app/hosts app/src/androidTest/java/com/sshpeaches/app/startup app/src/androidTest/java/com/sshpeaches/app/live/OpenSessionIntentLaunchTest.kt app/src/androidTest/java/com/sshpeaches/app/live/ExternalHostProbeTest.kt",
+    "rg -n 'fun `|fun [A-Za-z0-9_]+|class ' app/src/test/java/com/sshpeaches/app/ui/keyboard/KeyboardIconPackTest.kt app/src/androidTest/java/com/sshpeaches/app/keyboard/KeyboardEditorTest.kt app/src/test/java/com/sshpeaches/app/ui/components app/src/test/java/com/sshpeaches/app/ui/qr app/src/androidTest/java/com/sshpeaches/app/qr"
+  ],
+  "tests": [],
+  "remaining_issues": [],
+  "handoff_notes": [
+    "No tests were executed; avoid making claims about current passing status.",
+    "The initial declaration-search command failed due to shell quoting and was rerun successfully with single-quoted rg patterns."
+  ]
+}
+tokens used
+26,241

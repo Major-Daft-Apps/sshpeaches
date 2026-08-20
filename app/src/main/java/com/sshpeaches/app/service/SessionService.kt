@@ -76,7 +76,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -85,17 +84,16 @@ import net.schmizz.sshj.connection.channel.Channel
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.sftp.FileAttributes
-import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.xfer.LocalDestFile
+import net.schmizz.sshj.xfer.FileSystemFile
 import net.schmizz.sshj.xfer.FileTransfer
-import net.schmizz.sshj.xfer.FilePermission
 import net.schmizz.sshj.xfer.LocalFileFilter
 import net.schmizz.sshj.xfer.LocalSourceFile
 import net.schmizz.sshj.xfer.TransferListener
 import net.schmizz.sshj.xfer.scp.SCPFileTransfer
+import net.schmizz.sshj.xfer.scp.ScpCommandLine.EscapeMode
 import kotlin.math.min
 
 /**
@@ -117,6 +115,7 @@ class SessionService : Service() {
     private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
     private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
     private val fileTransferProgress = MutableStateFlow<Map<String, FileTransferProgress>>(emptyMap())
+    private val activeFileTransfers = ConcurrentHashMap<String, ActiveFileTransfer>()
     private val sessionSnapshotsState = sessionSnapshots.asStateFlow()
     private val hostKeyPromptsState = hostKeyPrompts.asStateFlow()
     private val passwordPromptsState = passwordPrompts.asStateFlow()
@@ -136,6 +135,7 @@ class SessionService : Service() {
     private val networkHandler = Handler(Looper.getMainLooper())
     private val sessionStateLock = Any()
     private val notificationStateLock = Any()
+    private val fileTransferStateLock = Any()
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallbackRegistered = false
     @Volatile
@@ -363,6 +363,7 @@ class SessionService : Service() {
             null
         }
         val job = serviceScope.launch(start = CoroutineStart.LAZY) {
+            val connectionTranscriptEnabled = AtomicBoolean(true)
             var client: SSHClient? = null
             var shellBinding: ShellBinding? = null
             var moshBinding: MoshBinding? = null
@@ -378,6 +379,7 @@ class SessionService : Service() {
                     sessionHost,
                     SessionLoggerFactory(
                         hostId = sessionId,
+                        connectionTranscriptEnabled = connectionTranscriptEnabled::get,
                         diagnosticsEnabled = { diagnosticsEnabled }
                     ),
                     autoTrustUnknownHostKey = autoTrustUnknownHostKey,
@@ -436,16 +438,18 @@ class SessionService : Service() {
                         }
                     }
                 }
-                detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
-                    if (sessionHost.osMetadata != detected) {
-                        sessionHost = sessionHost.copy(osMetadata = detected)
-                        SessionLogBus.emit(
-                            SessionLogBus.Entry(
-                                hostId = sessionId,
-                                level = SessionLogBus.LogLevel.INFO,
-                                message = "Detected remote OS: ${detected.toSummaryLabel()}"
+                if (mode == ConnectionMode.SSH) {
+                    detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
+                        if (sessionHost.osMetadata != detected) {
+                            sessionHost = sessionHost.copy(osMetadata = detected)
+                            SessionLogBus.emit(
+                                SessionLogBus.Entry(
+                                    hostId = sessionId,
+                                    level = SessionLogBus.LogLevel.INFO,
+                                    message = "Detected remote OS: ${detected.toSummaryLabel()}"
+                                )
                             )
-                        )
+                        }
                     }
                 }
                 when (mode) {
@@ -469,13 +473,23 @@ class SessionService : Service() {
                     ConnectionMode.SFTP -> {
                         updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SFTP subsystem...")
                         sftpBinding = SftpBinding(client!!.newSFTPClient())
-                        refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
+                        refreshSftpDirectoryListing(
+                            hostId = sessionId,
+                            sftp = sftpBinding!!.client,
+                            path = ".",
+                            resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode)
+                        )
                     }
                     ConnectionMode.SCP -> {
                         updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing file browser...")
                         sftpBinding = SftpBinding(client!!.newSFTPClient())
                         scpBinding = ScpBinding(client!!.newSCPFileTransfer())
-                        refreshSftpDirectoryListing(sessionId, sftpBinding!!.client, ".")
+                        refreshSftpDirectoryListing(
+                            hostId = sessionId,
+                            sftp = sftpBinding!!.client,
+                            path = ".",
+                            resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode)
+                        )
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
                                 hostId = sessionId,
@@ -553,7 +567,46 @@ class SessionService : Service() {
                     ConnectionMode.SCP -> "File transfer ready"
                 }
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
+                connectionTranscriptEnabled.set(false)
                 UiDebugLog.result("startSession", true, "sessionId=$sessionId, mode=$mode")
+                if (mode != ConnectionMode.SSH && currentCoroutineContext().isActive) {
+                    detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
+                        val activeConnection = activeConnections[sessionId]
+                        if (
+                            sessionHost.osMetadata != detected &&
+                            activeConnection?.client === client &&
+                            currentCoroutineContext().isActive
+                        ) {
+                            sessionHost = sessionHost.copy(osMetadata = detected)
+                            var connectionUpdated = false
+                            activeConnections.computeIfPresent(sessionId) { _, current ->
+                                if (current.client === client) {
+                                    connectionUpdated = true
+                                    current.copy(host = sessionHost)
+                                } else {
+                                    current
+                                }
+                            }
+                            if (!connectionUpdated || !currentCoroutineContext().isActive) {
+                                return@let
+                            }
+                            updateSessionSnapshot(
+                                sessionId,
+                                sessionHost,
+                                mode,
+                                SessionStatus.ACTIVE,
+                                modeLabel
+                            )
+                            SessionLogBus.emit(
+                                SessionLogBus.Entry(
+                                    hostId = sessionId,
+                                    level = SessionLogBus.LogLevel.INFO,
+                                    message = "Detected remote OS: ${detected.toSummaryLabel()}"
+                                )
+                            )
+                        }
+                    }
+                }
 
                 // Keep the connection alive until user stops it.
                 while (currentCoroutineContext().isActive) {
@@ -564,11 +617,19 @@ class SessionService : Service() {
                     clearHostKeyPromptsForHost(sessionId, trust = false)
                     clearPasswordPromptsForHost(sessionId, password = null)
                     val statusMessage = e.message ?: "Connection failed"
-                    updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ERROR, statusMessage)
+                    updateSessionSnapshot(
+                        sessionId = sessionId,
+                        host = sessionHost,
+                        mode = mode,
+                        status = SessionStatus.ERROR,
+                        message = statusMessage,
+                        failureKind = e.connectionFailureKind()
+                    )
                     UiDebugLog.error("startSession", e, "sessionId=$sessionId, mode=$mode")
                     UiDebugLog.result("startSession", false, "sessionId=$sessionId, mode=$mode")
                 }
             }
+            cancelFileTransfer(sessionId, restoreSftpAfterCancellation = false)
             runCatching { shellBinding?.resizeQueue?.close() }
             runCatching { shellBinding?.inputQueue?.close() }
             runCatching { shellBinding?.resizeWriterJob?.cancel() }
@@ -613,6 +674,7 @@ class SessionService : Service() {
 
     fun stopSession(hostId: String) {
         UiDebugLog.action("stopSession", "hostId=$hostId")
+        cancelFileTransfer(hostId, restoreSftpAfterCancellation = false)
         clearHostKeyPromptsForHost(hostId, trust = false)
         clearPasswordPromptsForHost(hostId, password = null)
         clearRuntimeSessionPassword(hostId)
@@ -857,9 +919,16 @@ class SessionService : Service() {
 
     fun listSftpDirectory(hostId: String, path: String) {
         val targetPath = path.trim().ifBlank { "." }
+        val resolveSymbolicLinks =
+            shouldResolveSftpLinkMetadata(activeConnections[hostId]?.mode)
         serviceScope.launch {
             val listed = runWithSftpClient(hostId) { sftp ->
-                refreshSftpDirectoryListing(hostId, sftp, targetPath)
+                refreshSftpDirectoryListing(
+                    hostId = hostId,
+                    sftp = sftp,
+                    path = targetPath,
+                    resolveSymbolicLinks = resolveSymbolicLinks
+                )
             }
             if (!listed) {
                 SessionLogBus.emit(
@@ -881,8 +950,10 @@ class SessionService : Service() {
         fileName: String,
         sourceLabel: String,
         destinationLabel: String,
-        totalBytes: Long? = null
-    ): FileTransferProgress {
+        totalBytes: Long? = null,
+        sftpClientToAbort: SFTPClient? = null
+    ): ActiveFileTransfer? {
+        val operationId = UUID.randomUUID().toString()
         val progress = FileTransferProgress(
             sessionId = hostId,
             mode = mode,
@@ -890,39 +961,101 @@ class SessionService : Service() {
             fileName = fileName.ifBlank { "file" },
             sourceLabel = sourceLabel,
             destinationLabel = destinationLabel,
+            operationId = operationId,
             totalBytes = totalBytes?.takeIf { it >= 0L }
         )
+        val transfer = ActiveFileTransfer(
+            sessionId = hostId,
+            operationId = operationId,
+            operationLabel = "${mode.name} ${direction.name.lowercase()}",
+            initialProgress = progress,
+            sftpClientToAbort = sftpClientToAbort
+        )
+        val existing = activeFileTransfers.putIfAbsent(hostId, transfer)
+        if (existing != null) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "File transfer rejected: another transfer is already active."
+                )
+            )
+            UiDebugLog.result(
+                "beginFileTransfer",
+                false,
+                "already-active hostId=$hostId operationId=${existing.operationId}"
+            )
+            return null
+        }
         setFileTransferProgress(hostId, progress)
-        return progress
+        return transfer
+    }
+
+    private fun publishFileTransferFailure(
+        hostId: String,
+        mode: ConnectionMode,
+        direction: FileTransferDirection,
+        fileName: String,
+        sourceLabel: String,
+        destinationLabel: String,
+        errorMessage: String
+    ) {
+        val transfer = beginFileTransfer(
+            hostId = hostId,
+            mode = mode,
+            direction = direction,
+            fileName = fileName,
+            sourceLabel = sourceLabel,
+            destinationLabel = destinationLabel
+        ) ?: return
+        if (finishFileTransfer(transfer, FileTransferStatus.FAILED, errorMessage)) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = "${transfer.operationLabel} failed: $errorMessage"
+                )
+            )
+        }
     }
 
     private fun buildTransferListener(
-        hostId: String,
-        initial: FileTransferProgress
+        transfer: ActiveFileTransfer
     ): TransferListener = object : TransferListener {
-        override fun directory(name: String): TransferListener = this
+        override fun directory(name: String): TransferListener {
+            throwIfFileTransferCancelled(transfer)
+            return this
+        }
 
         override fun file(name: String, size: Long): net.schmizz.sshj.common.StreamCopier.Listener {
-            val resolvedName = name.takeIf { it.isNotBlank() } ?: initial.fileName
-            val resolvedTotal = size.takeIf { it >= 0L } ?: initial.totalBytes
-            setFileTransferProgress(
-                hostId,
-                (fileTransferProgress.value[hostId] ?: initial).copy(
+            throwIfFileTransferCancelled(transfer)
+            val current = fileTransferProgress.value[transfer.sessionId]
+                ?.takeIf { it.operationId == transfer.operationId }
+                ?: transfer.initialProgress
+            val resolvedName = name.takeIf { it.isNotBlank() } ?: current.fileName
+            val resolvedTotal = size.takeIf { it >= 0L } ?: current.totalBytes
+            val progressThrottle = FileTransferProgressThrottle(
+                updateIntervalNanos = FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS
+            )
+            updateActiveFileTransfer(transfer) {
+                it.copy(
                     fileName = resolvedName,
                     totalBytes = resolvedTotal
                 )
-            )
+            }
             return net.schmizz.sshj.common.StreamCopier.Listener { transferred ->
-                val latest = fileTransferProgress.value[hostId] ?: initial
-                setFileTransferProgress(
-                    hostId,
-                    latest.copy(
-                        fileName = resolvedName,
-                        totalBytes = resolvedTotal,
-                        bytesTransferred = transferred.coerceAtLeast(0L),
-                        hasStarted = true
-                    )
-                )
+                throwIfFileTransferCancelled(transfer)
+                val transferredBytes = transferred.coerceAtLeast(0L)
+                if (progressThrottle.shouldPublish(transferredBytes, resolvedTotal)) {
+                    updateActiveFileTransfer(transfer) {
+                        it.copy(
+                            fileName = resolvedName,
+                            totalBytes = resolvedTotal,
+                            bytesTransferred = transferredBytes,
+                            hasStarted = true
+                        )
+                    }
+                }
             }
         }
     }
@@ -944,292 +1077,518 @@ class SessionService : Service() {
     private fun inferTransferFileName(path: String, fallback: String = "file"): String =
         path.substringAfterLast('/').substringAfterLast('\\').ifBlank { fallback }
 
-    fun sftpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
-        val connection = activeConnections[hostId]
-        val sftp = connection?.sftpBinding?.client
-        if (sftp == null) {
-            UiDebugLog.result("sftpDownloadFile", false, "sftp-not-active hostId=$hostId")
-            return
+    private fun updateActiveFileTransfer(
+        transfer: ActiveFileTransfer,
+        transform: (FileTransferProgress) -> FileTransferProgress
+    ) {
+        val current = fileTransferProgress.value[transfer.sessionId] ?: return
+        if (current.operationId != transfer.operationId || !current.isActive) return
+        setFileTransferProgress(
+            hostId = transfer.sessionId,
+            progress = transform(current),
+            expectedOperationId = transfer.operationId,
+            requireActive = true
+        )
+    }
+
+    private fun throwIfFileTransferCancelled(transfer: ActiveFileTransfer) {
+        if (transfer.cancellationRequested.get() || Thread.currentThread().isInterrupted) {
+            throw FileTransferCancelledException()
         }
-        val source = remotePath.trim()
-        if (source.isBlank()) {
-            UiDebugLog.result("sftpDownloadFile", false, "blank-remote-path hostId=$hostId")
-            return
-        }
-        serviceScope.launch {
-            runCatching {
-                measureOperation("sftpDownloadFile", hostId) {
-                    val destinationUri = localPath.toContentUriOrNull()
-                    val destinationFile = destinationUri?.let { null } ?: resolveDestinationFile(hostId, source, localPath)
-                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
-                    val progress = beginFileTransfer(
-                        hostId = hostId,
-                        mode = ConnectionMode.SFTP,
-                        direction = FileTransferDirection.DOWNLOAD,
-                        fileName = inferTransferFileName(source, fallback = "download.bin"),
-                        sourceLabel = source,
-                        destinationLabel = destinationLabel,
-                        totalBytes = runCatching { sftp.stat(source).size }.getOrNull()
-                    )
-                    withTransferListener(sftp.fileTransfer, buildTransferListener(hostId, progress)) {
-                        if (destinationUri != null) {
-                            val target = ContentUriDestFile(destinationUri)
-                            sftp.get(source, target)
-                        } else {
-                            destinationFile.parentFile?.mkdirs()
-                            sftp.get(source, destinationFile.absolutePath)
-                        }
-                    }
-                    clearFileTransferProgress(hostId)
+    }
+
+    private fun finishFileTransfer(
+        transfer: ActiveFileTransfer,
+        status: FileTransferStatus,
+        errorMessage: String? = null
+    ): Boolean {
+        val current = fileTransferProgress.value[transfer.sessionId]
+            ?.takeIf { it.operationId == transfer.operationId }
+            ?: transfer.initialProgress
+        if (!current.isActive) return false
+        val terminal = current.copy(
+            bytesTransferred = if (status == FileTransferStatus.SUCCEEDED) {
+                current.totalBytes ?: current.bytesTransferred
+            } else {
+                current.bytesTransferred
+            },
+            hasStarted = current.hasStarted || status == FileTransferStatus.SUCCEEDED,
+            status = status,
+            errorMessage = errorMessage?.takeIf { it.isNotBlank() },
+            completedAtEpochMillis = System.currentTimeMillis()
+        )
+        // The transfer block has returned (or unwound) before this method is
+        // called, so release admission before exposing a terminal state. That
+        // keeps UI controls and service admission in agreement.
+        activeFileTransfers.remove(transfer.sessionId, transfer)
+        return setFileTransferProgress(
+            hostId = transfer.sessionId,
+            progress = terminal,
+            expectedOperationId = transfer.operationId,
+            requireActive = true
+        )
+    }
+
+    private fun launchFileTransfer(
+        transfer: ActiveFileTransfer,
+        operationName: String,
+        block: () -> String
+    ) {
+        val job = serviceScope.launch(start = CoroutineStart.LAZY) {
+            transfer.workerThread = Thread.currentThread()
+            try {
+                throwIfFileTransferCancelled(transfer)
+                val successMessage = measureOperation(operationName, transfer.sessionId) {
+                    block()
+                }
+                throwIfFileTransferCancelled(transfer)
+                if (finishFileTransfer(transfer, FileTransferStatus.SUCCEEDED)) {
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
-                            hostId = hostId,
+                            hostId = transfer.sessionId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "SFTP download complete: $source -> $destinationLabel"
+                            message = successMessage
                         )
                     )
                 }
-            }.onFailure { err ->
-                clearFileTransferProgress(hostId)
+            } catch (error: Throwable) {
+                val cancelled = transfer.cancellationRequested.get() ||
+                    error is CancellationException ||
+                    error is FileTransferCancelledException
+                val cancellationNeedsSftpRecovery =
+                    cancelled && transfer.sftpClientToAbort != null
+                val terminalStatus = if (cancelled) {
+                    FileTransferStatus.CANCELLED
+                } else {
+                    FileTransferStatus.FAILED
+                }
+                if (!cancellationNeedsSftpRecovery &&
+                    finishFileTransfer(transfer, terminalStatus, error.message)
+                ) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = transfer.sessionId,
+                            level = if (cancelled) {
+                                SessionLogBus.LogLevel.WARN
+                            } else {
+                                SessionLogBus.LogLevel.ERROR
+                            },
+                            message = if (cancelled) {
+                                "${transfer.operationLabel} cancelled."
+                            } else {
+                                "${transfer.operationLabel} failed: ${error.message ?: "unknown error"}"
+                            }
+                        )
+                    )
+                }
+            } finally {
+                transfer.workerThread = null
+                // A manually interrupted pooled worker must not carry its interrupt
+                // flag into an unrelated coroutine.
+                Thread.interrupted()
+                if (!transfer.cancellationRequested.get() ||
+                    transfer.sftpClientToAbort == null
+                ) {
+                    activeFileTransfers.remove(transfer.sessionId, transfer)
+                }
+            }
+        }
+        transfer.job = job
+        job.invokeOnCompletion {
+            val cancellationNeedsSftpRecovery =
+                transfer.cancellationRequested.get() && transfer.sftpClientToAbort != null
+            if (transfer.cancellationRequested.get() &&
+                !cancellationNeedsSftpRecovery &&
+                finishFileTransfer(transfer, FileTransferStatus.CANCELLED)
+            ) {
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SFTP download failed for $source: ${err.message ?: "unknown error"}"
+                        hostId = transfer.sessionId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "${transfer.operationLabel} cancelled."
                     )
                 )
             }
+            if (!cancellationNeedsSftpRecovery) {
+                activeFileTransfers.remove(transfer.sessionId, transfer)
+            }
+        }
+        if (transfer.cancellationRequested.get()) {
+            job.cancel(FileTransferCancelledException())
+        }
+        job.start()
+    }
+
+    fun cancelFileTransfer(sessionId: String): Boolean =
+        cancelFileTransfer(sessionId, restoreSftpAfterCancellation = true)
+
+    private fun cancelFileTransfer(
+        sessionId: String,
+        restoreSftpAfterCancellation: Boolean
+    ): Boolean {
+        val transfer = activeFileTransfers[sessionId] ?: return false
+        if (!transfer.cancellationRequested.compareAndSet(false, true)) return true
+
+        // Keep the operation active until SSHJ has actually unwound. Publishing
+        // CANCELLED early would enable another transfer against the same
+        // mutable SSHJ listener while the old I/O was still running.
+        transfer.job?.cancel(FileTransferCancelledException())
+        transfer.workerThread?.interrupt()
+        transfer.sftpClientToAbort?.let { sftp ->
+            serviceScope.launch {
+                runCatching { sftp.close() }
+                transfer.job?.join()
+                if (restoreSftpAfterCancellation && activeConnections.containsKey(sessionId)) {
+                    restoreSftpBindingAfterCancellation(sessionId, sftp)
+                }
+                if (finishFileTransfer(transfer, FileTransferStatus.CANCELLED)) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = sessionId,
+                            level = SessionLogBus.LogLevel.WARN,
+                            message = "${transfer.operationLabel} cancelled."
+                        )
+                    )
+                }
+                activeFileTransfers.remove(sessionId, transfer)
+            }
+        }
+        return true
+    }
+
+    fun sftpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
+        val source = remotePath.trim()
+        val destinationLabel = localPath?.trim().orEmpty().ifBlank { "Downloads" }
+        if (source.isBlank()) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SFTP,
+                direction = FileTransferDirection.DOWNLOAD,
+                fileName = "download.bin",
+                sourceLabel = source,
+                destinationLabel = destinationLabel,
+                errorMessage = "Remote path is required."
+            )
+            UiDebugLog.result("sftpDownloadFile", false, "blank-remote-path hostId=$hostId")
+            return
+        }
+        val connection = activeConnections[hostId]
+        val sftp = connection?.sftpBinding?.client
+        if (sftp == null) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SFTP,
+                direction = FileTransferDirection.DOWNLOAD,
+                fileName = inferTransferFileName(source, fallback = "download.bin"),
+                sourceLabel = source,
+                destinationLabel = destinationLabel,
+                errorMessage = "SFTP session is not connected."
+            )
+            UiDebugLog.result("sftpDownloadFile", false, "sftp-not-active hostId=$hostId")
+            return
+        }
+        val transfer = beginFileTransfer(
+            hostId = hostId,
+            mode = ConnectionMode.SFTP,
+            direction = FileTransferDirection.DOWNLOAD,
+            fileName = inferTransferFileName(source, fallback = "download.bin"),
+            sourceLabel = source,
+            destinationLabel = destinationLabel,
+            sftpClientToAbort = sftp
+        ) ?: return
+        launchFileTransfer(transfer, "sftpDownloadFile") {
+            val destinationUri = localPath.toContentUriOrNull()
+            val destinationFile = destinationUri?.let { null }
+                ?: resolveDestinationFile(hostId, source, localPath)
+            val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
+            val totalBytes = runCatching { sftp.stat(source).size }.getOrNull()
+            updateActiveFileTransfer(transfer) {
+                it.copy(destinationLabel = destinationLabel, totalBytes = totalBytes)
+            }
+            withTransferListener(sftp.fileTransfer, buildTransferListener(transfer)) {
+                if (destinationUri != null) {
+                    sftp.get(source, ContentUriDestFile(destinationUri))
+                } else {
+                    destinationFile.parentFile?.mkdirs()
+                    sftp.get(source, destinationFile.absolutePath)
+                }
+            }
+            "SFTP download complete: $source -> $destinationLabel"
         }
     }
 
     fun sftpUploadFile(hostId: String, localPath: String, remotePath: String) {
-        val connection = activeConnections[hostId]
-        val sftp = connection?.sftpBinding?.client
-        if (sftp == null) {
-            UiDebugLog.result("sftpUploadFile", false, "sftp-not-active hostId=$hostId")
-            return
-        }
         val source = localPath.trim()
         val destination = remotePath.trim()
         if (source.isBlank() || destination.isBlank()) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SFTP,
+                direction = FileTransferDirection.UPLOAD,
+                fileName = inferTransferFileName(source, fallback = "upload.bin"),
+                sourceLabel = source,
+                destinationLabel = destination,
+                errorMessage = "Local source and remote destination are required."
+            )
             UiDebugLog.result("sftpUploadFile", false, "invalid-paths hostId=$hostId")
             return
         }
-        serviceScope.launch {
-            runCatching {
-                measureOperation("sftpUploadFile", hostId) {
-                    val sourceUri = source.toContentUriOrNull()
-                    val initialSourceLabel = sourceUri?.let(::describeUri) ?: source
-                    var progress = beginFileTransfer(
-                        hostId = hostId,
-                        mode = ConnectionMode.SFTP,
-                        direction = FileTransferDirection.UPLOAD,
-                        fileName = inferTransferFileName(initialSourceLabel, fallback = "upload.bin"),
-                        sourceLabel = initialSourceLabel,
-                        destinationLabel = destination,
-                        totalBytes = sourceUri?.let(::queryUriSize)
-                    )
-                    val sourceLabel = if (sourceUri != null) {
-                        val sourceFile = ContentUriSourceFile(sourceUri)
-                        try {
-                            val resolvedTotal = progress.totalBytes ?: runCatching { sourceFile.length }.getOrNull()
-                            if (resolvedTotal != progress.totalBytes) {
-                                progress = progress.copy(totalBytes = resolvedTotal)
-                                setFileTransferProgress(hostId, progress)
-                            }
-                            withTransferListener(sftp.fileTransfer, buildTransferListener(hostId, progress)) {
-                                sftp.put(sourceFile, destination)
-                            }
-                        } finally {
-                            sourceFile.cleanup()
-                        }
-                        describeUri(sourceUri)
-                    } else {
-                        val sourceFile = File(source)
-                        require(sourceFile.exists()) { "Local file does not exist: $source" }
-                        require(sourceFile.isFile) { "Local path is not a file: $source" }
-                        progress = progress.copy(totalBytes = sourceFile.length())
-                        setFileTransferProgress(hostId, progress)
-                        withTransferListener(sftp.fileTransfer, buildTransferListener(hostId, progress)) {
-                            sftp.put(sourceFile.absolutePath, destination)
-                        }
-                        sourceFile.absolutePath
-                    }
-                    clearFileTransferProgress(hostId)
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = hostId,
-                            level = SessionLogBus.LogLevel.INFO,
-                            message = "SFTP upload complete: $sourceLabel -> $destination"
+        val connection = activeConnections[hostId]
+        val sftp = connection?.sftpBinding?.client
+        if (sftp == null) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SFTP,
+                direction = FileTransferDirection.UPLOAD,
+                fileName = inferTransferFileName(source, fallback = "upload.bin"),
+                sourceLabel = source,
+                destinationLabel = destination,
+                errorMessage = "SFTP session is not connected."
+            )
+            UiDebugLog.result("sftpUploadFile", false, "sftp-not-active hostId=$hostId")
+            return
+        }
+        val transfer = beginFileTransfer(
+            hostId = hostId,
+            mode = ConnectionMode.SFTP,
+            direction = FileTransferDirection.UPLOAD,
+            fileName = inferTransferFileName(source, fallback = "upload.bin"),
+            sourceLabel = source,
+            destinationLabel = destination,
+            sftpClientToAbort = sftp
+        ) ?: return
+        launchFileTransfer(transfer, "sftpUploadFile") {
+            val sourceUri = source.toContentUriOrNull()
+            val sourceLabel = if (sourceUri != null) {
+                val resolvedSourceLabel = describeUri(sourceUri)
+                val sourceFile = ContentUriSourceFile(sourceUri)
+                try {
+                    val resolvedTotal = queryUriSize(sourceUri)
+                        ?: runCatching { sourceFile.length }.getOrNull()
+                    updateActiveFileTransfer(transfer) {
+                        it.copy(
+                            fileName = inferTransferFileName(resolvedSourceLabel, fallback = "upload.bin"),
+                            sourceLabel = resolvedSourceLabel,
+                            totalBytes = resolvedTotal
                         )
+                    }
+                    withTransferListener(sftp.fileTransfer, buildTransferListener(transfer)) {
+                        sftp.put(sourceFile, destination)
+                    }
+                } finally {
+                    sourceFile.cleanup()
+                }
+                resolvedSourceLabel
+            } else {
+                val sourceFile = File(source)
+                require(sourceFile.exists()) { "Local file does not exist: $source" }
+                require(sourceFile.isFile) { "Local path is not a file: $source" }
+                updateActiveFileTransfer(transfer) {
+                    it.copy(
+                        sourceLabel = sourceFile.absolutePath,
+                        totalBytes = sourceFile.length()
                     )
                 }
-            }.onFailure { err ->
-                clearFileTransferProgress(hostId)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SFTP upload failed to $destination: ${err.message ?: "unknown error"}"
-                    )
-                )
+                withTransferListener(sftp.fileTransfer, buildTransferListener(transfer)) {
+                    sftp.put(sourceFile.absolutePath, destination)
+                }
+                sourceFile.absolutePath
             }
+            "SFTP upload complete: $sourceLabel -> $destination"
         }
     }
 
     fun scpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
-        val connection = activeConnections[hostId]
-        val scp = connection?.scpBinding?.transfer
-        if (scp == null) {
-            UiDebugLog.result("scpDownloadFile", false, "scp-not-active hostId=$hostId")
-            return
-        }
         val source = remotePath.trim()
+        val destinationLabel = localPath?.trim().orEmpty().ifBlank { "Downloads" }
         if (source.isBlank()) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SCP,
+                direction = FileTransferDirection.DOWNLOAD,
+                fileName = "download.bin",
+                sourceLabel = source,
+                destinationLabel = destinationLabel,
+                errorMessage = "Remote path is required."
+            )
             UiDebugLog.result("scpDownloadFile", false, "blank-remote-path hostId=$hostId")
             return
         }
-        serviceScope.launch {
-            runCatching {
-                measureOperation("scpDownloadFile", hostId) {
-                    val destinationUri = localPath.toContentUriOrNull()
-                    val destinationFile = destinationUri?.let { null } ?: resolveDestinationFile(hostId, source, localPath)
-                    val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
-                    val progress = beginFileTransfer(
-                        hostId = hostId,
-                        mode = ConnectionMode.SCP,
-                        direction = FileTransferDirection.DOWNLOAD,
-                        fileName = inferTransferFileName(source, fallback = "download.bin"),
-                        sourceLabel = source,
-                        destinationLabel = destinationLabel
-                    )
-                    withTransferListener(scp, buildTransferListener(hostId, progress)) {
-                        if (destinationUri != null) {
-                            val target = ContentUriDestFile(destinationUri)
-                            scp.download(source, target)
-                        } else {
-                            destinationFile.parentFile?.mkdirs()
-                            scp.download(source, destinationFile.absolutePath)
-                        }
-                    }
-                    clearFileTransferProgress(hostId)
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = hostId,
-                            level = SessionLogBus.LogLevel.INFO,
-                            message = "SCP download complete: $source -> $destinationLabel"
-                        )
+        val connection = activeConnections[hostId]
+        val scp = connection?.scpBinding?.transfer
+        if (scp == null) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SCP,
+                direction = FileTransferDirection.DOWNLOAD,
+                fileName = inferTransferFileName(source, fallback = "download.bin"),
+                sourceLabel = source,
+                destinationLabel = destinationLabel,
+                errorMessage = "SCP session is not connected."
+            )
+            UiDebugLog.result("scpDownloadFile", false, "scp-not-active hostId=$hostId")
+            return
+        }
+        val transfer = beginFileTransfer(
+            hostId = hostId,
+            mode = ConnectionMode.SCP,
+            direction = FileTransferDirection.DOWNLOAD,
+            fileName = inferTransferFileName(source, fallback = "download.bin"),
+            sourceLabel = source,
+            destinationLabel = destinationLabel
+        ) ?: return
+        launchFileTransfer(transfer, "scpDownloadFile") {
+            val destinationUri = localPath.toContentUriOrNull()
+            val destinationFile = destinationUri?.let { null }
+                ?: resolveDestinationFile(hostId, source, localPath)
+            val destinationLabel = destinationUri?.let(::describeUri) ?: destinationFile.absolutePath
+            updateActiveFileTransfer(transfer) {
+                it.copy(destinationLabel = destinationLabel)
+            }
+            withTransferListener(scp, buildTransferListener(transfer)) {
+                val downloadClient = scp.newSCPDownloadClient()
+                if (destinationUri != null) {
+                    downloadClient.copy(source, ContentUriDestFile(destinationUri), EscapeMode.SingleQuote)
+                } else {
+                    destinationFile.parentFile?.mkdirs()
+                    downloadClient.copy(
+                        source,
+                        FileSystemFile(destinationFile),
+                        EscapeMode.SingleQuote
                     )
                 }
-            }.onFailure { err ->
-                clearFileTransferProgress(hostId)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SCP download failed for $source: ${err.message ?: "unknown error"}"
-                    )
-                )
             }
+            "SCP download complete: $source -> $destinationLabel"
         }
     }
 
     fun scpUploadFile(hostId: String, localPath: String, remotePath: String) {
-        val connection = activeConnections[hostId]
-        val scp = connection?.scpBinding?.transfer
-        if (scp == null) {
-            UiDebugLog.result("scpUploadFile", false, "scp-not-active hostId=$hostId")
-            return
-        }
         val source = localPath.trim()
         val destination = remotePath.trim()
         if (source.isBlank() || destination.isBlank()) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SCP,
+                direction = FileTransferDirection.UPLOAD,
+                fileName = inferTransferFileName(source, fallback = "upload.bin"),
+                sourceLabel = source,
+                destinationLabel = destination,
+                errorMessage = "Local source and remote destination are required."
+            )
             UiDebugLog.result("scpUploadFile", false, "invalid-paths hostId=$hostId")
             return
         }
-        serviceScope.launch {
-            runCatching {
-                measureOperation("scpUploadFile", hostId) {
-                    val sourceUri = source.toContentUriOrNull()
-                    val initialSourceLabel = sourceUri?.let(::describeUri) ?: source
-                    var progress = beginFileTransfer(
-                        hostId = hostId,
-                        mode = ConnectionMode.SCP,
-                        direction = FileTransferDirection.UPLOAD,
-                        fileName = inferTransferFileName(initialSourceLabel, fallback = "upload.bin"),
-                        sourceLabel = initialSourceLabel,
-                        destinationLabel = destination,
-                        totalBytes = sourceUri?.let(::queryUriSize)
-                    )
-                    val sourceLabel = if (sourceUri != null) {
-                        val sourceFile = ContentUriSourceFile(sourceUri)
-                        try {
-                            val resolvedTotal = progress.totalBytes ?: runCatching { sourceFile.length }.getOrNull()
-                            if (resolvedTotal != progress.totalBytes) {
-                                progress = progress.copy(totalBytes = resolvedTotal)
-                                setFileTransferProgress(hostId, progress)
-                            }
-                            withTransferListener(scp, buildTransferListener(hostId, progress)) {
-                                scp.upload(sourceFile, destination)
-                            }
-                        } finally {
-                            sourceFile.cleanup()
-                        }
-                        describeUri(sourceUri)
-                    } else {
-                        val sourceFile = File(source)
-                        require(sourceFile.exists()) { "Local file does not exist: $source" }
-                        require(sourceFile.isFile) { "Local path is not a file: $source" }
-                        progress = progress.copy(totalBytes = sourceFile.length())
-                        setFileTransferProgress(hostId, progress)
-                        withTransferListener(scp, buildTransferListener(hostId, progress)) {
-                            scp.upload(sourceFile.absolutePath, destination)
-                        }
-                        sourceFile.absolutePath
-                    }
-                    clearFileTransferProgress(hostId)
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = hostId,
-                            level = SessionLogBus.LogLevel.INFO,
-                            message = "SCP upload complete: $sourceLabel -> $destination"
+        val connection = activeConnections[hostId]
+        val scp = connection?.scpBinding?.transfer
+        if (scp == null) {
+            publishFileTransferFailure(
+                hostId = hostId,
+                mode = ConnectionMode.SCP,
+                direction = FileTransferDirection.UPLOAD,
+                fileName = inferTransferFileName(source, fallback = "upload.bin"),
+                sourceLabel = source,
+                destinationLabel = destination,
+                errorMessage = "SCP session is not connected."
+            )
+            UiDebugLog.result("scpUploadFile", false, "scp-not-active hostId=$hostId")
+            return
+        }
+        val transfer = beginFileTransfer(
+            hostId = hostId,
+            mode = ConnectionMode.SCP,
+            direction = FileTransferDirection.UPLOAD,
+            fileName = inferTransferFileName(source, fallback = "upload.bin"),
+            sourceLabel = source,
+            destinationLabel = destination
+        ) ?: return
+        launchFileTransfer(transfer, "scpUploadFile") {
+            val sourceUri = source.toContentUriOrNull()
+            val sourceLabel = if (sourceUri != null) {
+                val resolvedSourceLabel = describeUri(sourceUri)
+                val sourceFile = ContentUriSourceFile(sourceUri)
+                try {
+                    val resolvedTotal = queryUriSize(sourceUri)
+                        ?: runCatching { sourceFile.length }.getOrNull()
+                    updateActiveFileTransfer(transfer) {
+                        it.copy(
+                            fileName = inferTransferFileName(resolvedSourceLabel, fallback = "upload.bin"),
+                            sourceLabel = resolvedSourceLabel,
+                            totalBytes = resolvedTotal
                         )
+                    }
+                    withTransferListener(scp, buildTransferListener(transfer)) {
+                        scp.upload(sourceFile, destination)
+                    }
+                } finally {
+                    sourceFile.cleanup()
+                }
+                resolvedSourceLabel
+            } else {
+                val sourceFile = File(source)
+                require(sourceFile.exists()) { "Local file does not exist: $source" }
+                require(sourceFile.isFile) { "Local path is not a file: $source" }
+                updateActiveFileTransfer(transfer) {
+                    it.copy(
+                        sourceLabel = sourceFile.absolutePath,
+                        totalBytes = sourceFile.length()
                     )
                 }
-            }.onFailure { err ->
-                clearFileTransferProgress(hostId)
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SCP upload failed to $destination: ${err.message ?: "unknown error"}"
-                    )
-                )
+                withTransferListener(scp, buildTransferListener(transfer)) {
+                    scp.upload(sourceFile.absolutePath, destination)
+                }
+                sourceFile.absolutePath
             }
+            "SCP upload complete: $sourceLabel -> $destination"
         }
     }
 
     fun manageRemotePath(hostId: String, operation: String, sourcePath: String, destinationPath: String? = null) {
         val src = sourcePath.trim()
         if (src.isBlank()) return
+        val normalizedOperation = operation.trim().lowercase()
+        val destination = destinationPath?.trim()
+        runCatching {
+            validateRemotePathMutation(
+                operation = normalizedOperation,
+                sourcePath = src,
+                destinationPath = destination
+            )
+        }.onFailure { error ->
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.ERROR,
+                    message = error.message ?: "Remote path operation was rejected."
+                )
+            )
+            UiDebugLog.result(
+                "manageRemotePath",
+                false,
+                "path-policy-rejected hostId=$hostId operation=$normalizedOperation"
+            )
+            return
+        }
         serviceScope.launch {
             val ok = runWithSftpClient(hostId) { sftp ->
-                measureOperation("manageRemotePath:$operation", hostId) {
-                    when (operation.lowercase()) {
+                measureOperation("manageRemotePath:$normalizedOperation", hostId) {
+                    when (normalizedOperation) {
                         "mkdir" -> sftp.mkdir(src)
-                        "delete" -> deleteRemotePathRecursively(sftp, src)
-                        "move" -> {
-                            val dest = destinationPath?.trim().orEmpty()
+                        "delete_file", "delete_non_recursive", "rm" ->
+                            deleteRemotePathNonRecursively(sftp, src)
+                        "delete", "delete_recursive", "rm_recursive" ->
+                            deleteRemotePathRecursively(sftp, src)
+                        "move", "rename" -> {
+                            val dest = destination.orEmpty()
                             require(dest.isNotBlank()) { "Destination is required." }
                             sftp.rename(src, dest)
                         }
-                        else -> error("Unsupported operation: $operation")
+                        else -> error("Unsupported operation: $normalizedOperation")
                     }
                     SessionLogBus.emit(
                         SessionLogBus.Entry(
                             hostId = hostId,
                             level = SessionLogBus.LogLevel.INFO,
-                            message = "Remote $operation completed: $src${destinationPath?.let { " -> $it" } ?: ""}"
+                            message = "Remote $normalizedOperation completed: $src${destination?.let { " -> $it" } ?: ""}"
                         )
                     )
                 }
@@ -1240,48 +1599,25 @@ class SessionService : Service() {
         }
     }
 
-    private fun refreshSftpDirectoryListing(hostId: String, sftp: SFTPClient, path: String) {
+    private fun refreshSftpDirectoryListing(
+        hostId: String,
+        sftp: SFTPClient,
+        path: String,
+        resolveSymbolicLinks: Boolean
+    ) {
         measureOperation("sftpListDirectory", hostId, thresholdMs = 200L) {
-            val listingPath = path.trim().ifBlank { "." }
-            val canonicalPath = runCatching { sftp.canonicalize(listingPath) }.getOrDefault(listingPath)
-            val listing = sftp.ls(canonicalPath)
-                .filterNot { it.name == "." || it.name == ".." }
-                .sortedWith(
-                    compareByDescending<RemoteResourceInfo> { it.isDirectory() }
-                        .thenBy { it.name.lowercase() }
-                )
-            val entries = listing.map { item ->
-                val attributes = item.attributes
-                val isSymbolicLink = attributes.type == net.schmizz.sshj.sftp.FileMode.Type.SYMLINK
-                val linkTargetPath = if (isSymbolicLink) {
-                    runCatching { sftp.canonicalize(item.path) }.getOrNull()
-                } else {
-                    null
-                }
-                val linkTargetAttributes = linkTargetPath?.let { targetPath ->
-                    runCatching { sftp.stat(targetPath) }.getOrNull()
-                }
-                RemoteDirectoryEntry(
-                    name = item.name,
-                    isDirectory = item.isDirectory(),
-                    sizeBytes = attributes.size,
-                    absolutePath = item.path,
-                    modifiedAtEpochMillis = attributes
-                        .takeIf { it.has(FileAttributes.Flag.ACMODTIME) }
-                        ?.mtime
-                        ?.times(1000L),
-                    permissionSummary = buildPermissionSummary(attributes),
-                    isSymbolicLink = isSymbolicLink,
-                    linkTargetPath = linkTargetPath,
-                    linkTargetIsDirectory = linkTargetAttributes?.type == net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY,
-                    isBrokenLink = isSymbolicLink && linkTargetPath == null
-                )
-            }
+            val directory = loadSftpDirectory(
+                requestedPath = path,
+                resolveSymbolicLinks = resolveSymbolicLinks,
+                canonicalize = sftp::canonicalize,
+                listDirectory = { resolvedPath -> sftp.ls(resolvedPath) },
+                stat = sftp::stat
+            )
             setRemoteDirectorySnapshot(
                 hostId,
                 RemoteDirectorySnapshot(
-                    path = canonicalPath,
-                    entries = entries,
+                    path = directory.path,
+                    entries = directory.entries,
                     refreshToken = SystemClock.elapsedRealtimeNanos()
                 )
             )
@@ -1289,7 +1625,7 @@ class SessionService : Service() {
                 SessionLogBus.Entry(
                     hostId = hostId,
                     level = SessionLogBus.LogLevel.INFO,
-                    message = "Listed ${listing.size} item(s) in $canonicalPath"
+                    message = "Listed ${directory.entries.size} item(s) in ${directory.path}"
                 )
             )
         }
@@ -1456,27 +1792,54 @@ class SessionService : Service() {
         }.getOrDefault(false)
     }
 
+    private fun deleteRemotePathNonRecursively(sftp: SFTPClient, path: String) {
+        val attributes = sftp.lstat(path)
+        require(attributes.type != net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY) {
+            "Remote path is a directory; use recursive delete: $path"
+        }
+        sftp.rm(path)
+    }
+
     private fun deleteRemotePathRecursively(sftp: SFTPClient, path: String) {
-        val canonical = runCatching { sftp.canonicalize(path) }.getOrDefault(path)
-        val listing = runCatching { sftp.ls(canonical) }.getOrNull()
-        if (listing == null) {
-            sftp.rm(canonical)
+        val attributes = sftp.lstat(path)
+        if (attributes.type != net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY) {
+            // lstat deliberately inspects the link itself. Never canonicalize here:
+            // canonicalization would turn a request to unlink a symlink into deletion
+            // of the symlink's target.
+            sftp.rm(path)
             return
         }
-        val children = listing.filterNot { it.name == "." || it.name == ".." }
-        if (children.isEmpty()) {
-            runCatching { sftp.rmdir(canonical) }.getOrElse { sftp.rm(canonical) }
-            return
-        }
-        children.forEach { child ->
-            val childPath = if (canonical.endsWith("/")) "$canonical${child.name}" else "$canonical/${child.name}"
-            if (child.isDirectory()) {
+
+        sftp.ls(path)
+            .filterNot { it.name == "." || it.name == ".." }
+            .forEach { child ->
+                val childPath = if (path.endsWith("/")) "$path${child.name}" else "$path/${child.name}"
                 deleteRemotePathRecursively(sftp, childPath)
-            } else {
-                sftp.rm(childPath)
             }
+        sftp.rmdir(path)
+    }
+
+    private fun restoreSftpBindingAfterCancellation(hostId: String, closedClient: SFTPClient) {
+        val connection = activeConnections[hostId] ?: return
+        if (connection.sftpBinding?.client !== closedClient) return
+        val sshClient = connection.client ?: return
+        val replacement = runCatching { sshClient.newSFTPClient() }
+            .onFailure { error ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.ERROR,
+                        message = "SFTP transfer stopped, but the file browser could not be restored: " +
+                            (error.message ?: "unknown error")
+                    )
+                )
+            }
+            .getOrNull()
+            ?: return
+        val restored = connection.copy(sftpBinding = SftpBinding(replacement))
+        if (!activeConnections.replace(hostId, connection, restored)) {
+            runCatching { replacement.close() }
         }
-        runCatching { sftp.rmdir(canonical) }.getOrElse { sftp.rm(canonical) }
     }
 
     private fun activatePortForwards(
@@ -2733,24 +3096,35 @@ class SessionService : Service() {
         remoteDirectories.update { current -> current - hostId }
     }
 
-    private fun setFileTransferProgress(hostId: String, progress: FileTransferProgress?) {
-        val previous = fileTransferProgress.getAndUpdate { current ->
-            if (current[hostId] == progress) {
-                current
-            } else if (progress == null) {
+    private fun setFileTransferProgress(
+        hostId: String,
+        progress: FileTransferProgress?,
+        expectedOperationId: String? = null,
+        requireActive: Boolean = false
+    ): Boolean {
+        var previous: FileTransferProgress? = null
+        synchronized(fileTransferStateLock) {
+            val current = fileTransferProgress.value
+            val existing = current[hostId]
+            previous = existing
+            if (expectedOperationId != null) {
+                if (existing?.operationId != expectedOperationId) return false
+                if (requireActive && existing.isActive != true) return false
+            }
+            if (existing == progress) return false
+            fileTransferProgress.value = if (progress == null) {
                 current - hostId
             } else {
                 current + (hostId to progress)
             }
         }
-        val current = previous[hostId]
-        if (current == progress) return
-        if (progress == null || current == null || !progress.hasStarted) {
+        if (progress == null || previous == null || !progress.hasStarted || !progress.isActive) {
             transferNotificationRefreshJobs.remove(hostId)?.cancel()
             updateSessionNotifications()
         } else {
             scheduleTransferNotificationRefresh(hostId)
         }
+        return true
     }
 
     private fun clearFileTransferProgress(hostId: String) {
@@ -2768,7 +3142,7 @@ class SessionService : Service() {
         transferNotificationRefreshJobs[hostId] = serviceScope.launch {
             delay(TRANSFER_NOTIFICATION_UPDATE_INTERVAL_MS)
             transferNotificationRefreshJobs.remove(hostId)
-            if (fileTransferProgress.value.containsKey(hostId)) {
+            if (fileTransferProgress.value[hostId]?.isActive == true) {
                 updateSessionNotifications()
             }
         }
@@ -2890,14 +3264,16 @@ class SessionService : Service() {
         host: HostConnection,
         mode: ConnectionMode,
         status: SessionStatus,
-        message: String?
+        message: String?,
+        failureKind: ConnectionFailureKind? = null
     ) {
         val snapshot = SessionSnapshot(
             hostId = sessionId,
             host = host,
             mode = mode,
             status = status,
-            statusMessage = message
+            statusMessage = message,
+            failureKind = failureKind
         )
         synchronized(sessionStateLock) {
             if (!activeJobs.containsKey(sessionId)) {
@@ -3065,6 +3441,7 @@ class SessionService : Service() {
         identity: SessionNotificationIdentity
     ): Notification {
         val activeTransfer = fileTransferProgress.value[snapshot.hostId]
+            ?.takeIf { it.isActive }
         val text = sessionNotificationText(snapshot)
         val openIntent = Intent(this, MainActivity::class.java).apply {
             action = ACTION_OPEN_SESSION
@@ -3116,7 +3493,10 @@ class SessionService : Service() {
     }
 
     private fun sessionNotificationText(snapshot: SessionSnapshot): String =
-        fileTransferProgress.value[snapshot.hostId]?.statusMessage() ?: when (snapshot.status) {
+        fileTransferProgress.value[snapshot.hostId]
+            ?.takeIf { it.isActive }
+            ?.statusMessage()
+            ?: when (snapshot.status) {
             SessionStatus.ACTIVE -> snapshot.statusMessage ?: "Connected"
             SessionStatus.CONNECTING -> snapshot.statusMessage ?: "Connecting"
             SessionStatus.ERROR -> snapshot.statusMessage ?: "Connection error"
@@ -3210,6 +3590,7 @@ class SessionService : Service() {
         private const val SHELL_OUTPUT_PUBLISH_INTERVAL_MS = 40L
         private const val MOSH_SNAPSHOT_PUBLISH_INTERVAL_MS = 40L
         private const val TRANSFER_NOTIFICATION_UPDATE_INTERVAL_MS = 250L
+        private const val FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS = 100_000_000L
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
@@ -3235,6 +3616,25 @@ class SessionService : Service() {
         val notificationId: Int,
         val displayNumber: Int
     )
+
+    private class FileTransferCancelledException :
+        CancellationException("File transfer cancelled")
+
+    private class ActiveFileTransfer(
+        val sessionId: String,
+        val operationId: String,
+        val operationLabel: String,
+        val initialProgress: FileTransferProgress,
+        val sftpClientToAbort: SFTPClient?
+    ) {
+        val cancellationRequested = AtomicBoolean(false)
+
+        @Volatile
+        var job: Job? = null
+
+        @Volatile
+        var workerThread: Thread? = null
+    }
 
     private data class ActiveConnection(
         val host: HostConnection,
@@ -3295,7 +3695,8 @@ class SessionService : Service() {
         val host: HostConnection,
         val mode: ConnectionMode,
         val status: SessionStatus,
-        val statusMessage: String?
+        val statusMessage: String?,
+        val failureKind: ConnectionFailureKind? = null
     )
 
     data class RemoteDirectorySnapshot(
@@ -3338,51 +3739,4 @@ class SessionService : Service() {
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }
 
-    private fun buildPermissionSummary(attributes: FileAttributes): String {
-        if (!attributes.has(FileAttributes.Flag.MODE)) return ""
-        val permissions = attributes.permissions
-        fun has(permission: FilePermission): Boolean = permissions.contains(permission)
-        val type = when (attributes.type) {
-            net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY -> 'd'
-            net.schmizz.sshj.sftp.FileMode.Type.SYMLINK -> 'l'
-            net.schmizz.sshj.sftp.FileMode.Type.BLOCK_SPECIAL -> 'b'
-            net.schmizz.sshj.sftp.FileMode.Type.CHAR_SPECIAL -> 'c'
-            net.schmizz.sshj.sftp.FileMode.Type.FIFO_SPECIAL -> 'p'
-            net.schmizz.sshj.sftp.FileMode.Type.SOCKET_SPECIAL -> 's'
-            else -> '-'
-        }
-        return buildString(10) {
-            append(type)
-            append(if (has(FilePermission.USR_R)) 'r' else '-')
-            append(if (has(FilePermission.USR_W)) 'w' else '-')
-            append(
-                when {
-                    has(FilePermission.SUID) && has(FilePermission.USR_X) -> 's'
-                    has(FilePermission.SUID) -> 'S'
-                    has(FilePermission.USR_X) -> 'x'
-                    else -> '-'
-                }
-            )
-            append(if (has(FilePermission.GRP_R)) 'r' else '-')
-            append(if (has(FilePermission.GRP_W)) 'w' else '-')
-            append(
-                when {
-                    has(FilePermission.SGID) && has(FilePermission.GRP_X) -> 's'
-                    has(FilePermission.SGID) -> 'S'
-                    has(FilePermission.GRP_X) -> 'x'
-                    else -> '-'
-                }
-            )
-            append(if (has(FilePermission.OTH_R)) 'r' else '-')
-            append(if (has(FilePermission.OTH_W)) 'w' else '-')
-            append(
-                when {
-                    has(FilePermission.STICKY) && has(FilePermission.OTH_X) -> 't'
-                    has(FilePermission.STICKY) -> 'T'
-                    has(FilePermission.OTH_X) -> 'x'
-                    else -> '-'
-                }
-            )
-        }
-    }
 }

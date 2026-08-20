@@ -1,0 +1,40 @@
+{
+  "status": "completed",
+  "summary": "Implemented task-2 test refinements in ConnectingScreenTest.kt. IME paste, paste-as-plain-text, and copy context-action tests now show/request the terminal keyboard, assert TerminalImeBridgeEditText focus, preserve keyboardVisibleRequested semantics, and reuse the same focused InputConnection so selected shadow text is actually copied. Hidden-editor sentinel cleanup was not included. Task count: 2 requested tasks addressed (task-2 implementation, task-8 report). Review rounds: 1 self-review/validation pass.",
+  "files_changed": [
+    "app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "commands_run": [
+    "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+    "./gradlew :app:compileDebugAndroidTestKotlin",
+    "adb devices",
+    "rg -n \"sleep|Thread\\.sleep|SystemClock\\.sleep|delay\\(\" app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt"
+  ],
+  "tests": [
+    {
+      "command": "./gradlew :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest'",
+      "result": "FAILED before execution: app and androidTest APK compiled, then Gradle failed with DeviceException: No connected devices."
+    },
+    {
+      "command": "./gradlew :app:compileDebugAndroidTestKotlin",
+      "result": "PASSED"
+    },
+    {
+      "command": "adb devices",
+      "result": "No attached devices listed."
+    },
+    {
+      "command": "rg -n \"sleep|Thread\\.sleep|SystemClock\\.sleep|delay\\(\" app/src/androidTest/java/com/sshpeaches/app/session_ui/ConnectingScreenTest.kt",
+      "result": "No matches; focused assertions avoid fixed timing sleeps."
+    }
+  ],
+  "remaining_issues": [
+    "Required connected instrumentation validation could not complete because no Android device/emulator is attached in this environment.",
+    "No claim is made that connectedDebugAndroidTest passed."
+  ],
+  "handoff_notes": [
+    "ConnectingScreenTest.kt contains the focus restoration tests for terminal ActionMode Copy/Paste and IME context-action tests for paste, paste-as-plain-text, and copy.",
+    "The paste-as-plain-text test keeps the existing optional handling path for platforms where the action is unsupported.",
+    "Existing dirty-worktree changes outside the touched test file were preserved."
+  ]
+}
