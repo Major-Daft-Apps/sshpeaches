@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.widget
 
 import android.app.Application
 import android.content.Context
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import com.majordaftapps.sshpeaches.app.R
@@ -114,16 +115,16 @@ class HostWidgetsTest {
     fun hostRowUsesDistinctDirectionalLabelsAndFortyEightDpTargets() {
         val applied = HostWidgets.buildHostRow(context, host())
             .apply(context, FrameLayout(context))
-        val upload = applied.findViewById<TextView>(R.id.widget_btn_upload)
-        val download = applied.findViewById<TextView>(R.id.widget_btn_download)
+        val upload = applied.findViewById<View>(R.id.widget_btn_upload)
+        val download = applied.findViewById<View>(R.id.widget_btn_download)
         val expectedTargetHeight =
             (48 * context.resources.displayMetrics.density).toInt()
 
-        assertEquals("Upload", upload.text.toString())
-        assertEquals("Download", download.text.toString())
         assertTrue(upload.contentDescription.toString().startsWith("Upload files to"))
         assertTrue(download.contentDescription.toString().startsWith("Download files from"))
+        assertEquals(expectedTargetHeight, upload.layoutParams.width)
         assertEquals(expectedTargetHeight, upload.layoutParams.height)
+        assertEquals(expectedTargetHeight, download.layoutParams.width)
         assertEquals(expectedTargetHeight, download.layoutParams.height)
     }
 
@@ -167,15 +168,17 @@ class HostWidgetsTest {
         val applied = HostWidgets.buildOpenSessionRow(context, session)
             .apply(context, FrameLayout(context))
         val subtitle = applied.findViewById<TextView>(R.id.widget_open_session_subtitle)
-        val open = applied.findViewById<TextView>(R.id.widget_btn_open)
-        val disconnect = applied.findViewById<TextView>(R.id.widget_btn_disconnect)
+        val open = applied.findViewById<View>(R.id.widget_btn_open)
+        val disconnect = applied.findViewById<View>(R.id.widget_btn_disconnect)
         val expectedTargetHeight =
             (48 * context.resources.displayMetrics.density).toInt()
 
         assertEquals(session.subtitle, subtitle.text.toString())
         assertTrue(open.contentDescription.toString().contains(session.subtitle))
         assertTrue(disconnect.contentDescription.toString().contains(session.subtitle))
+        assertEquals(expectedTargetHeight, open.layoutParams.width)
         assertEquals(expectedTargetHeight, open.layoutParams.height)
+        assertEquals(expectedTargetHeight, disconnect.layoutParams.width)
         assertEquals(expectedTargetHeight, disconnect.layoutParams.height)
     }
 

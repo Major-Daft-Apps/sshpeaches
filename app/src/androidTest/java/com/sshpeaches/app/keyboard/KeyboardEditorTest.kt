@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -29,6 +31,34 @@ class KeyboardEditorTest {
 
     @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor() {
+        composeRule.navigateDrawer(Routes.KEYBOARD)
+
+        composeRule.onNodeWithText("Fn").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0)).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(13)).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(14)).assertDoesNotExist()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(1))
+            .assertContentDescriptionEquals("Fn")
+            .performClick()
+
+        composeRule.onNodeWithText("Edit Key Action").assertIsDisplayed()
+        composeRule.onNodeWithText("Current: Fn").assertIsDisplayed()
+    }
+
+    @Test
+    fun keyboardEditor_canAssignFnToAnotherMainRowSlot() {
+        composeRule.navigateDrawer(Routes.KEYBOARD)
+
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0)).performClick()
+        composeRule.onNodeWithText("Fn Layer").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.KEYBOARD_EDITOR_FN_BUTTON).assertIsDisplayed().performClick()
+
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0))
+            .assertContentDescriptionEquals("Fn")
+    }
 
     @Test
     fun keyboardSlotPersistsAcrossRecreate() {

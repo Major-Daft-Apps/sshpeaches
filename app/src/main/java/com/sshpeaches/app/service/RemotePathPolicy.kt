@@ -35,6 +35,9 @@ internal fun remoteDeleteMode(operation: String): RemoteDeleteMode? = when (oper
     else -> null
 }
 
+internal fun preserveRemoteTransferPath(path: String): String =
+    path.takeUnless { it.isBlank() }.orEmpty()
+
 internal fun validateRemotePathMutation(
     operation: String,
     sourcePath: String,

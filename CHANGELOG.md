@@ -4,6 +4,16 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.10.16 (1016)
+
+Release date: 2026-08-21
+
+- Improved SSH, terminal, and SFTP session reliability during concurrent activity, rotation, background/foreground transitions, and connection churn.
+- Fixed SFTP transfers for remote filenames containing leading spaces, Unicode, emoji, and punctuation.
+- Added hidden-file controls to the remote file browser and safer transfer cancellation and retry behavior.
+- Simplified terminal special keys to two rows, replacing Alt with a remappable Fn key that opens fixed Back, Shift, and F1-F12 rows.
+- Improved active-session handling, connection and authentication feedback, and Android home-screen widgets.
+
 ## 0.10.14 (1014)
 
 Release date: 2026-07-28

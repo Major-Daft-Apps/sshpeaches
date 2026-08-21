@@ -111,7 +111,7 @@ fun KeyboardEditorScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-            Text("Tap a slot to open the full key-action editor.")
+            Text("Tap a main-row slot to edit it. Fn layer Back, Shift, and F1-F12 keys are fixed.")
 
             BoxWithConstraints(
                 modifier = Modifier
@@ -301,7 +301,7 @@ private fun RowScope.KeySlot(
         if (icon != null) {
             Icon(
                 imageVector = icon.icon,
-                contentDescription = icon.label,
+                contentDescription = null,
                 tint = if (active) Color(0xFFEDEDED) else Color(0xFF7B7B7B),
                 modifier = Modifier.size(14.dp)
             )
@@ -373,6 +373,18 @@ private fun KeyActionEditorVertical(
             "Current: ${fullActionLabel(current)}",
             style = MaterialTheme.typography.bodySmall
         )
+
+        SectionTitle("Fn Layer")
+        Text(
+            "Assign Fn to any main-row slot. Its Back, Shift, and F1-F12 keys stay fixed.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        TextButton(
+            onClick = { onApply(KeyboardLayoutDefaults.fnKeyAction()) },
+            modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_FN_BUTTON)
+        ) {
+            Text("Fn")
+        }
 
         SectionTitle("Icon Aliases")
         Text(

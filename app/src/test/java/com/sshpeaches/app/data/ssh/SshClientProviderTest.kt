@@ -19,6 +19,7 @@ import java.security.interfaces.EdECPublicKey
 import java.security.spec.EdECPoint
 import java.security.spec.NamedParameterSpec
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
@@ -30,6 +31,8 @@ import org.apache.sshd.server.ServerBuilder
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
+import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
+import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -143,6 +146,66 @@ class SshClientProviderTest {
             assertFalse(client.isAuthenticated)
         } finally {
             runCatching { client.disconnect() }
+            runCatching { server.stop(true) }
+        }
+    }
+
+    @Test
+    fun existingTerminalAndSftpSessionsSurviveAdditionalConnections() {
+        val sandbox = temp.newFolder("sftp-survival")
+        File(sandbox, "survive.txt").writeText("still-open")
+        val server = startLocalSshServer(
+            hostKeyAlgorithm = "EC",
+            keyExchanges = listOf(BuiltinDHFactories.ecdhp256),
+            sftpRoot = sandbox
+        )
+        val host = HostConnection(
+            id = "session-survival",
+            name = "Session survival",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val primary = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_survival"),
+            host = host,
+            autoTrustUnknownHostKey = true
+        )
+        val probes = Executors.newFixedThreadPool(4)
+        try {
+            primary.connect(host.host, host.port)
+            primary.authPassword(TEST_USERNAME, TEST_PASSWORD)
+            val terminal = primary.startSession().apply { allocateDefaultPTY() }
+            val sftp = primary.newSFTPClient()
+            val probeResults = (0 until 12).map { index ->
+                probes.submit {
+                    val probe = SshClientProvider.createClientForTesting(
+                        knownHostsFile = temp.newFile("known_hosts_probe_$index"),
+                        host = host,
+                        autoTrustUnknownHostKey = true
+                    )
+                    try {
+                        probe.connect(host.host, host.port)
+                        probe.authPassword(TEST_USERNAME, TEST_PASSWORD)
+                        probe.startSession().close()
+                    } finally {
+                        runCatching { probe.disconnect() }
+                    }
+                }
+            }
+            probeResults.forEach { it.get(10, TimeUnit.SECONDS) }
+            assertTrue("The primary SSH transport closed after probe connections", primary.isConnected)
+            assertTrue("The primary PTY session closed after probe connections", terminal.isOpen)
+            assertTrue(
+                "The primary SFTP session closed after probe connections",
+                sftp.ls("/").any { it.name == "survive.txt" }
+            )
+            sftp.close()
+            terminal.close()
+        } finally {
+            probes.shutdownNow()
+            runCatching { primary.disconnect() }
             runCatching { server.stop(true) }
         }
     }
@@ -436,7 +499,8 @@ class SshClientProviderTest {
 
     private fun startLocalSshServer(
         hostKeyAlgorithm: String,
-        keyExchanges: List<BuiltinDHFactories>
+        keyExchanges: List<BuiltinDHFactories>,
+        sftpRoot: File? = null
     ): SshServer {
         return SshServer.setUpDefaultServer().apply {
             host = "127.0.0.1"
@@ -449,6 +513,10 @@ class SshClientProviderTest {
             keyExchangeFactories = keyExchanges.map { ServerBuilder.DH2KEX.apply(it) }
             passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
                 username == TEST_USERNAME && password == TEST_PASSWORD
+            }
+            if (sftpRoot != null) {
+                fileSystemFactory = VirtualFileSystemFactory(sftpRoot.toPath())
+                subsystemFactories = listOf(SftpSubsystemFactory.Builder().build())
             }
             start()
         }

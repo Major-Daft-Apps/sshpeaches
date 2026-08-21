@@ -49,8 +49,8 @@
 
     <LinearLayout
         android:id="@+id/widget_btn_open"
-        android:layout_width="44dp"
-        android:layout_height="46dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_action_primary_background"
         android:contentDescription="@string/widget_action_open_session"
@@ -66,8 +66,8 @@
 
     <LinearLayout
         android:id="@+id/widget_btn_disconnect"
-        android:layout_width="44dp"
-        android:layout_height="46dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_action_danger_background"
         android:contentDescription="@string/widget_action_disconnect_session"

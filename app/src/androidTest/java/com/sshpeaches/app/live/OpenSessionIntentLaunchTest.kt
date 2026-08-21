@@ -469,7 +469,16 @@ class OpenSessionIntentLaunchTest {
     }
 
     private fun openDrawer() {
-        composeRule.onNodeWithContentDescription("Menu").assertIsDisplayed().performClick()
+        val wideDrawerVisible = runCatching {
+            composeRule.onNodeWithTag(
+                UiTestTags.DRAWER_SCROLL_CONTAINER,
+                useUnmergedTree = true
+            ).assertIsDisplayed()
+        }.isSuccess
+        if (!wideDrawerVisible) {
+            composeRule.onNodeWithContentDescription("Menu").assertIsDisplayed().performClick()
+            composeRule.waitForIdle()
+        }
         composeRule.onNodeWithTag(UiTestTags.DRAWER_SCROLL_CONTAINER, useUnmergedTree = true)
             .assertIsDisplayed()
     }

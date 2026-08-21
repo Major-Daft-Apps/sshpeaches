@@ -1,0 +1,5 @@
+Improved SSH, terminal, and SFTP reliability during concurrent activity, rotation, and app lifecycle changes.
+Fixed SFTP transfers for filenames containing leading spaces, Unicode, emoji, and punctuation.
+Added hidden-file controls and safer transfer cancellation and retry.
+Simplified terminal special keys to two rows, with a remappable Fn key and fixed Back, Shift, and F1-F12 layer.
+Improved session widgets, connection errors, and active-session handling.

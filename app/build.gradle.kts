@@ -80,8 +80,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1014
-        versionName = "0.10.14"
+        versionCode = 1016
+        versionName = "0.10.16"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -199,6 +199,15 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all { test ->
+                // Robolectric resolves its Android framework jar through its own
+                // Maven resolver. Keep that lookup local and deterministic.
+                test.systemProperty(
+                    "maven.repo.local",
+                    System.getProperty("maven.repo.local")
+                        ?: "${System.getProperty("user.home")}${File.separator}.m2${File.separator}repository",
+                )
+            }
         }
         managedDevices {
             localDevices {
@@ -270,6 +279,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.apache.sshd:sshd-core:2.12.1")
+    testImplementation("org.apache.sshd:sshd-sftp:2.12.1")
     testImplementation("org.robolectric:robolectric:4.11.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")

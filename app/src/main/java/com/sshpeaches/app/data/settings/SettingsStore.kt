@@ -501,12 +501,12 @@ object SettingsStore {
                 val first = array.opt(0)
                 val parsed = when (first) {
                     is JSONObject -> {
-                        List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+                        List(minOf(array.length(), KeyboardLayoutDefaults.MAX_PERSISTED_SLOT_COUNT)) { index ->
                             decodeKeyboardSlotObject(array.optJSONObject(index))
                         }
                     }
                     else -> {
-                        List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+                        List(minOf(array.length(), KeyboardLayoutDefaults.MAX_PERSISTED_SLOT_COUNT)) { index ->
                             KeyboardLayoutDefaults.legacyStringToAction(array.optString(index, ""))
                         }
                     }

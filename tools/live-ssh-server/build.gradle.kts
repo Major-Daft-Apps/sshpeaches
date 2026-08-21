@@ -12,4 +12,6 @@ dependencies {
     implementation("org.apache.sshd:sshd-scp:2.12.1")
     implementation("org.apache.sshd:sshd-sftp:2.12.1")
     implementation("org.slf4j:slf4j-nop:2.0.17")
+    testImplementation("com.hierynomus:sshj:0.40.0")
+    testImplementation("junit:junit:4.13.2")
 }

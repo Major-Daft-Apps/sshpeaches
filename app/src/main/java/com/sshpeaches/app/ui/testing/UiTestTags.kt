@@ -157,6 +157,7 @@ object UiTestTags {
     const val KEYBOARD_RESET_BUTTON = "keyboard_reset_button"
     fun keyboardSlot(index: Int): String = "keyboard_slot_$index"
     const val KEYBOARD_EDITOR_BACK_BUTTON = "keyboard_editor_back_button"
+    const val KEYBOARD_EDITOR_FN_BUTTON = "keyboard_editor_fn_button"
     const val KEYBOARD_EDITOR_TEXT_INPUT = "keyboard_editor_text_input"
     const val KEYBOARD_EDITOR_USE_TEXT_BUTTON = "keyboard_editor_use_text_button"
     const val KEYBOARD_EDITOR_ADVANCED_BUTTON = "keyboard_editor_advanced_button"

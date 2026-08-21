@@ -3547,7 +3547,7 @@ private fun keyboardLayoutToJson(slots: List<KeyboardSlotAction>): JSONArray = J
 
 private fun keyboardLayoutFromJson(array: JSONArray?): List<KeyboardSlotAction> {
     if (array == null) return KeyboardLayoutDefaults.DEFAULT_SLOTS
-    val parsed = List(minOf(array.length(), KeyboardLayoutDefaults.SLOT_COUNT)) { index ->
+    val parsed = List(minOf(array.length(), KeyboardLayoutDefaults.MAX_PERSISTED_SLOT_COUNT)) { index ->
         val item = array.optJSONObject(index)
         KeyboardSlotAction(
             type = runCatching {

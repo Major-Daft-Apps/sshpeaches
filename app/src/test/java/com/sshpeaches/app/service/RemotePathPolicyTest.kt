@@ -33,6 +33,12 @@ class RemotePathPolicyTest {
     }
 
     @Test
+    fun `transfer paths preserve meaningful whitespace`() {
+        assertEquals(" /reports/final copy .txt ", preserveRemoteTransferPath(" /reports/final copy .txt "))
+        assertEquals("", preserveRemoteTransferPath("   "))
+    }
+
+    @Test
     fun `console and browser deletion operations have distinct semantics`() {
         assertEquals(RemoteDeleteMode.NON_RECURSIVE, remoteDeleteMode("delete_file"))
         assertEquals(RemoteDeleteMode.RECURSIVE, remoteDeleteMode("delete"))

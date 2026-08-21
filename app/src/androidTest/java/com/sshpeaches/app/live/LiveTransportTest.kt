@@ -1,6 +1,12 @@
 package com.majordaftapps.sshpeaches.app.live
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
+import android.content.pm.ActivityInfo
+import android.os.IBinder
+import android.os.SystemClock
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -18,6 +24,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -38,11 +45,15 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import java.io.File
+import java.io.RandomAccessFile
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
@@ -79,6 +90,378 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
     }
 
+    @Test
+    fun terminalAndSftpRemainUsableAcrossRotation() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            terminalSelectionMode = TerminalSelectionMode.NATURAL
+        )
+        val baseHost = seedPasswordHost("Live Rotation Host")
+        val terminalSessionId = "device-terminal-rotation-${UUID.randomUUID()}"
+        startLiveSession(terminalSessionId, baseHost, ConnectionMode.SSH)
+        openLiveSession(terminalSessionId)
+        waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+        rotateAndAssert(UiTestTags.CONNECTING_TERMINAL_PANEL, terminalSessionId)
+        assertSessionActive(terminalSessionId)
+        withBoundSessionService { it.stopSession(terminalSessionId) }
+
+        val sftpHost = baseHost.copy(
+            id = "live-sftp-rotation-${UUID.randomUUID()}",
+            name = "Live Rotation SFTP",
+            defaultMode = ConnectionMode.SFTP
+        )
+        val sftpSessionId = "device-sftp-rotation-${UUID.randomUUID()}"
+        startLiveSession(sftpSessionId, sftpHost, ConnectionMode.SFTP)
+        openLiveSession(sftpSessionId)
+        waitForTag(UiTestTags.CONNECTING_SFTP_PANEL)
+        assertLiveSftpListing()
+        rotateAndAssert(UiTestTags.CONNECTING_SFTP_PANEL, sftpSessionId)
+        assertLiveSftpListing()
+        assertSessionActive(sftpSessionId)
+    }
+
+    @Test
+    fun terminalAndSftpSurviveConcurrentTrafficResizeLifecycleAndConnectionChurn() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            allowBackgroundSessions = true,
+            terminalSelectionMode = TerminalSelectionMode.NATURAL
+        )
+        val baseHost = seedPasswordHost("Live Combined Stress Host")
+        val terminalSessionId = "device-terminal-stress-${UUID.randomUUID()}"
+        val sftpSessionIds = (0 until 4).map { "device-sftp-stress-$it-${UUID.randomUUID()}" }
+        val churnSessionIds = (0 until 8).map { "device-ssh-churn-$it-${UUID.randomUUID()}" }
+        val ptySizes = listOf(80 to 24, 200 to 60, 40 to 12, 132 to 43, 320 to 100, 20 to 8)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val stressRoot = File(context.cacheDir, "live-transport-stress-${UUID.randomUUID()}").apply { mkdirs() }
+        val remoteNames = listOf(
+            " leading-space.txt",
+            "multiple   internal   spaces.txt",
+            "unicode-雪-🍑.txt",
+            "punctuation-[]#%+=,;'().bin"
+        )
+        val payloadSizes = listOf(0, 65_537, 2 * 1024 * 1024, 4 * 1024 * 1024)
+        val sourceFiles = payloadSizes.mapIndexed { index, size ->
+            File(stressRoot, "source-$index.bin").apply {
+                outputStream().buffered().use { output ->
+                    val block = ByteArray(8192) { offset -> ((offset + index * 37) and 0xff).toByte() }
+                    var remaining = size
+                    while (remaining > 0) {
+                        val count = minOf(remaining, block.size)
+                        output.write(block, 0, count)
+                        remaining -= count
+                    }
+                }
+            }
+        }
+
+        try {
+            startLiveSession(terminalSessionId, baseHost, ConnectionMode.SSH)
+            openLiveSession(terminalSessionId)
+            waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+            sftpSessionIds.forEachIndexed { index, sessionId ->
+                startLiveSession(
+                    sessionId,
+                    baseHost.copy(
+                        id = "live-sftp-stress-host-$index-${UUID.randomUUID()}",
+                        name = "Live SFTP Stress $index",
+                        defaultMode = ConnectionMode.SFTP
+                    ),
+                    ConnectionMode.SFTP
+                )
+            }
+            withBoundSessionService { service ->
+                checkNotNull(service.resolveTerminalEmulator(terminalSessionId)) {
+                    "Terminal emulator was unavailable before stress started"
+                }
+                repeat(60) { round ->
+                    service.sendShellInput(terminalSessionId, "echo PRE-STRESS-$round\r")
+                    val (columns, rows) = ptySizes[round % ptySizes.size]
+                    service.resizeShell(terminalSessionId, columns, rows)
+                }
+                waitForShellMarker(service, terminalSessionId, "PRE-STRESS-59")
+                sourceFiles.indices.forEach { index ->
+                    service.sftpUploadFile(
+                        sftpSessionIds[index],
+                        sourceFiles[index].absolutePath,
+                        "/uploads/${remoteNames[index]}"
+                    )
+                }
+                repeat(40) { round ->
+                    service.sendShellInput(terminalSessionId, "echo DURING-UPLOAD-$round\r")
+                    val (columns, rows) = ptySizes[(round + 1) % ptySizes.size]
+                    service.resizeShell(terminalSessionId, columns, rows)
+                }
+            }
+
+            rotateAndAssert(UiTestTags.CONNECTING_TERMINAL_PANEL, terminalSessionId)
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+            composeRule.activityRule.scenario.recreate()
+            waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+
+            withBoundSessionService { service ->
+                waitForTransfers(service, sftpSessionIds, "upload")
+                churnSessionIds.forEachIndexed { index, sessionId ->
+                    service.startSession(
+                        requestedSessionId = sessionId,
+                        host = baseHost.copy(
+                            id = "live-ssh-churn-host-$index-${UUID.randomUUID()}",
+                            name = "Live SSH Churn $index"
+                        ),
+                        mode = ConnectionMode.SSH,
+                        passwordOverride = LiveBackendConfig.password,
+                        autoTrustUnknownHostKey = true,
+                        hostKeyPromptEnabled = false
+                    )
+                }
+                composeRule.waitUntil(45_000) {
+                    val activeIds = service.sessionsFlow().value
+                        .filter { it.status == SessionService.SessionStatus.ACTIVE }
+                        .map { it.hostId }
+                        .toSet()
+                    churnSessionIds.all(activeIds::contains)
+                }
+                churnSessionIds.forEach(service::stopSession)
+                sourceFiles.indices.forEach { index ->
+                    service.sftpDownloadFile(
+                        sftpSessionIds[index],
+                        "/uploads/${remoteNames[index]}",
+                        File(stressRoot, "download-$index.bin").absolutePath
+                    )
+                }
+                repeat(60) { round ->
+                    service.sendShellInput(terminalSessionId, "echo DURING-DOWNLOAD-$round\r")
+                    val (columns, rows) = ptySizes[(round + 2) % ptySizes.size]
+                    service.resizeShell(terminalSessionId, columns, rows)
+                }
+                waitForTransfers(service, sftpSessionIds, "download")
+                service.sendShellInput(terminalSessionId, "echo TERMINAL-STILL-ALIVE\r")
+                waitForShellMarker(service, terminalSessionId, "TERMINAL-STILL-ALIVE")
+                checkNotNull(service.resolveTerminalEmulator(terminalSessionId)) {
+                    "Terminal emulator disappeared during combined stress"
+                }
+            }
+            sourceFiles.indices.forEach { index ->
+                val downloaded = File(stressRoot, "download-$index.bin")
+                check(downloaded.exists()) { "Missing SFTP download for ${remoteNames[index]}" }
+                check(sourceFiles[index].readBytes().contentEquals(downloaded.readBytes())) {
+                    "SFTP round-trip mismatch for ${remoteNames[index]}"
+                }
+            }
+            assertSessionActive(terminalSessionId)
+            sftpSessionIds.forEach(::assertSessionActive)
+        } finally {
+            withBoundSessionService { service ->
+                (listOf(terminalSessionId) + sftpSessionIds + churnSessionIds).forEach(service::stopSession)
+            }
+            stressRoot.deleteRecursively()
+        }
+    }
+    @Test
+    fun sftpAndScpCancellationRestoreSessionsAndAllowImmediateRetry() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            allowBackgroundSessions = true
+        )
+        val baseHost = seedPasswordHost("Live Cancellation Host")
+        val sftpSessionId = "device-sftp-cancel-${UUID.randomUUID()}"
+        val scpSessionId = "device-scp-cancel-${UUID.randomUUID()}"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "live-cancel-${UUID.randomUUID()}").apply { mkdirs() }
+        val largeSource = File(root, "large-sparse.bin").also { file ->
+            RandomAccessFile(file, "rw").use { it.setLength(192L * 1024L * 1024L) }
+        }
+        val retrySource = File(root, "retry-雪-🍑.txt").apply {
+            writeText("transfer session recovered\n")
+        }
+        val sftpRemote = "/uploads/sftp-retry-${UUID.randomUUID()}.txt"
+        val scpRemote = "/uploads/scp-retry-${UUID.randomUUID()}.txt"
+
+        try {
+            startLiveSession(
+                sftpSessionId,
+                baseHost.copy(
+                    id = "live-sftp-cancel-host-${UUID.randomUUID()}",
+                    name = "Live SFTP Cancellation",
+                    defaultMode = ConnectionMode.SFTP
+                ),
+                ConnectionMode.SFTP
+            )
+            startLiveSession(
+                scpSessionId,
+                baseHost.copy(
+                    id = "live-scp-cancel-host-${UUID.randomUUID()}",
+                    name = "Live SCP Cancellation",
+                    defaultMode = ConnectionMode.SCP
+                ),
+                ConnectionMode.SCP
+            )
+
+            withBoundSessionService { service ->
+                service.sftpUploadFile(
+                    sftpSessionId,
+                    largeSource.absolutePath,
+                    "/uploads/cancel-sftp-${UUID.randomUUID()}.bin"
+                )
+                service.scpUploadFile(
+                    scpSessionId,
+                    largeSource.absolutePath,
+                    "/uploads/cancel-scp-${UUID.randomUUID()}.bin"
+                )
+                composeRule.waitUntil(30_000) {
+                    listOf(sftpSessionId, scpSessionId).all { sessionId ->
+                        service.fileTransferProgressFlow().value[sessionId]?.let {
+                            it.isActive && it.hasStarted && it.bytesTransferred > 0L
+                        } == true
+                    }
+                }
+                check(service.cancelFileTransfer(sftpSessionId)) {
+                    "SFTP cancellation was rejected after transfer started"
+                }
+                check(service.cancelFileTransfer(scpSessionId)) {
+                    "SCP cancellation was rejected after transfer started"
+                }
+                waitForTransferStatus(service, sftpSessionId, FileTransferStatus.CANCELLED)
+                waitForTransferStatus(service, scpSessionId, FileTransferStatus.CANCELLED)
+                assertServiceSessionActive(service, sftpSessionId, "SFTP cancellation")
+                assertServiceSessionActive(service, scpSessionId, "SCP cancellation")
+
+                service.listSftpDirectory(sftpSessionId, "/docs")
+                composeRule.waitUntil(30_000) {
+                    service.remoteDirectoryFlow().value[sftpSessionId]?.let { snapshot ->
+                        snapshot.path == "/docs" && snapshot.entries.any { it.name == "welcome.txt" }
+                    } == true
+                }
+
+                service.sftpUploadFile(sftpSessionId, retrySource.absolutePath, sftpRemote)
+                service.scpUploadFile(scpSessionId, retrySource.absolutePath, scpRemote)
+                waitForTransfers(service, listOf(sftpSessionId, scpSessionId), "retry upload")
+
+                service.sftpDownloadFile(
+                    sftpSessionId,
+                    sftpRemote,
+                    File(root, "sftp-retry-download.txt").absolutePath
+                )
+                service.scpDownloadFile(
+                    scpSessionId,
+                    scpRemote,
+                    File(root, "scp-retry-download.txt").absolutePath
+                )
+                waitForTransfers(service, listOf(sftpSessionId, scpSessionId), "retry download")
+            }
+
+            check(
+                retrySource.readBytes().contentEquals(
+                    File(root, "sftp-retry-download.txt").readBytes()
+                )
+            ) { "SFTP retry after cancellation corrupted the file" }
+            check(
+                retrySource.readBytes().contentEquals(
+                    File(root, "scp-retry-download.txt").readBytes()
+                )
+            ) { "SCP retry after cancellation corrupted the file" }
+            assertSessionActive(sftpSessionId)
+            assertSessionActive(scpSessionId)
+        } finally {
+            withBoundSessionService { service ->
+                service.stopSession(sftpSessionId)
+                service.stopSession(scpSessionId)
+            }
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun terminalSurvivesAnsiUnicodeAlternateScreenAndDeviceSleepWake() {
+        AppStateSeeder.configureSettings(
+            hostKeyPrompt = false,
+            autoTrustHostKey = true,
+            allowBackgroundSessions = true,
+            terminalSelectionMode = TerminalSelectionMode.NATURAL
+        )
+        val host = seedPasswordHost("Live Terminal Rendering Stress")
+        val sessionId = "device-terminal-render-${UUID.randomUUID()}"
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
+
+        try {
+            startLiveSession(sessionId, host, ConnectionMode.SSH)
+
+            withBoundSessionService { service ->
+                val emulator = checkNotNull(service.resolveTerminalEmulator(sessionId))
+                service.sendShellInput(
+                    sessionId,
+                    "echo \u001B[?1049h\u001B[2J\u001B[1;1H\u001B[38;5;208mALT-SCREEN-雪-🍑\u001B[0m\r"
+                )
+                composeRule.waitUntil(20_000) {
+                    emulator.isAlternateBufferActive &&
+                        emulator.screen.transcriptText.contains("ALT-SCREEN-雪-🍑")
+                }
+                repeat(300) { line ->
+                    service.sendShellInput(
+                        sessionId,
+                        "echo \u001B[3${line % 8}mANSI-$line-界-é-\u001B[0m\r"
+                    )
+                    val columns = listOf(20, 40, 80, 132, 200, 320)[line % 6]
+                    val rows = listOf(8, 12, 24, 43, 60, 100)[line % 6]
+                    service.resizeShell(sessionId, columns, rows)
+                }
+                service.sendShellInput(
+                    sessionId,
+                    "echo \u001B[38;2;255;128;0mALT-FINAL-雪-🍑\u001B[0m\r"
+                )
+                composeRule.waitUntil(30_000) {
+                    emulator.screen.transcriptText.contains("ALT-FINAL-雪-🍑")
+                }
+                service.sendShellInput(sessionId, "echo \u001B[?1049lMAIN-BUFFER-RESTORED\r")
+                composeRule.waitUntil(20_000) {
+                    !emulator.isAlternateBufferActive &&
+                        emulator.screen.transcriptText.contains("MAIN-BUFFER-RESTORED")
+                }
+                assertServiceSessionActive(service, sessionId, "alternate-screen stress")
+            }
+
+            check(device.pressHome()) { "Could not background the app before sleep/wake stress" }
+            SystemClock.sleep(1_000)
+            device.sleep()
+            SystemClock.sleep(4_000)
+            device.wakeUp()
+            device.executeShellCommand("wm dismiss-keyguard")
+            device.pressMenu()
+
+
+            withBoundSessionService { service ->
+                service.sendShellInput(sessionId, "echo POST-SLEEP-TERMINAL-ALIVE\r")
+                waitForShellMarker(service, sessionId, "POST-SLEEP-TERMINAL-ALIVE")
+                check(
+                    service.resolveTerminalEmulator(sessionId)
+                        ?.screen
+                        ?.transcriptText
+                        ?.contains("POST-SLEEP-TERMINAL-ALIVE") == true
+                ) { "Terminal emulator did not render output after device sleep/wake" }
+            }
+            assertSessionActive(sessionId)
+        } finally {
+            runCatching {
+                device.wakeUp()
+                device.executeShellCommand("wm dismiss-keyguard")
+            }
+            withBoundSessionService { it.stopSession(sessionId) }
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            context.startActivity(
+                Intent(context, MainActivity::class.java).addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+            )
+            SystemClock.sleep(500)
+        }
+    }
     @Test
     fun manualHostKeyPrompt_canBeAccepted() {
         AppStateSeeder.configureSettings(
@@ -214,7 +597,10 @@ class LiveTransportSuiteTest {
 
         waitForTag(UiTestTags.PASSWORD_PROMPT_DIALOG)
         composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_DIALOG).assertIsDisplayed()
-        composeRule.onAllNodesWithText("Authentication failed. Enter password and try again.")[0].assertIsDisplayed()
+        check(
+            composeRule.onAllNodesWithText("Authentication failed. Enter password and try again.", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        ) { "Retry explanation was missing from the password dialog semantics." }
         composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_INPUT).assertIsDisplayed()
     }
 
@@ -241,7 +627,10 @@ class LiveTransportSuiteTest {
 
             waitForTag(UiTestTags.PASSWORD_PROMPT_DIALOG)
             composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_DIALOG).assertIsDisplayed()
-            composeRule.onAllNodesWithText("Authentication failed. Enter password and try again.")[0].assertIsDisplayed()
+            check(
+            composeRule.onAllNodesWithText("Authentication failed. Enter password and try again.", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        ) { "Retry explanation was missing from the password dialog semantics." }
             composeRule.onNodeWithTag(UiTestTags.PASSWORD_PROMPT_INPUT).assertIsDisplayed()
         }
     }
@@ -309,6 +698,11 @@ class LiveTransportSuiteTest {
             )
         )
 
+        AppStateSeeder.seedKeyboardLayout(
+            KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+                this[12] = KeyboardLayoutDefaults.snippetPickerAction()
+            }
+        )
         composeRule.navigateDrawer(Routes.HOSTS)
         composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "ssh")).performClick()
 
@@ -395,7 +789,12 @@ class LiveTransportSuiteTest {
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
 
-        waitForTag(UiTestTags.SCREEN_HOME)
+        composeRule.waitUntil(30_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.SCREEN_HOME, useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag(UiTestTags.SCREEN_HOSTS, useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+        }
         check(
             composeRule.onAllNodesWithTag(UiTestTags.SCREEN_CONNECTING, useUnmergedTree = true)
                 .fetchSemanticsNodes()
@@ -595,16 +994,27 @@ class LiveTransportSuiteTest {
         }
 
         composeRule.waitUntil(15_000) {
-            composeRule.onAllNodesWithTag(UiTestTags.connectingScpRemoteRow("/uploads"))
+            composeRule.onAllNodesWithTag(UiTestTags.connectingScpRemoteRow("/docs"))
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads")).performClick()
-        composeRule.onNodeWithText("Selected: /uploads", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/uploads")).performClick()
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT).assertTextContains("/uploads")
-    }
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/docs")).performClick()
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.connectingScpRemoteRow("/docs/welcome.txt"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT)
+            .assertTextContains("/docs")
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/docs/welcome.txt"))
+            .performClick()
+        check(
+            composeRule.onAllNodesWithText(
+                "Selected: /docs/welcome.txt",
+                substring = true,
+                useUnmergedTree = true
+            ).fetchSemanticsNodes().isNotEmpty()
+        ) { "SCP file selection state was missing after selecting /docs/welcome.txt." }    }
 
     @Test
     fun identityAuthWithWrongUsernameShowsRetryState() {
@@ -674,6 +1084,162 @@ class LiveTransportSuiteTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_RETRY_BUTTON).assertIsDisplayed()
     }
 
+    private fun startLiveSession(sessionId: String, host: HostConnection, mode: ConnectionMode) {
+        withBoundSessionService { service ->
+            service.startSession(
+                requestedSessionId = sessionId,
+                host = host,
+                mode = mode,
+                passwordOverride = LiveBackendConfig.password,
+                autoTrustUnknownHostKey = true,
+                hostKeyPromptEnabled = false
+            )
+            composeRule.waitUntil(30_000) {
+                service.sessionsFlow().value.any {
+                    it.hostId == sessionId && it.status == SessionService.SessionStatus.ACTIVE
+                }
+            }
+        }
+    }
+
+
+    private fun openLiveSession(sessionId: String) {
+        composeRule.activityRule.scenario.onActivity { activity ->
+            activity.startActivity(
+                Intent(activity, MainActivity::class.java).apply {
+                    action = SessionService.ACTION_OPEN_SESSION
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra(SessionService.EXTRA_HOST_ID, sessionId)
+                }
+            )
+        }
+    }
+
+    private fun assertSessionActive(sessionId: String) {
+        withBoundSessionService { service ->
+            check(
+                service.sessionsFlow().value.any {
+                    it.hostId == sessionId && it.status == SessionService.SessionStatus.ACTIVE
+                }
+            ) { "Session $sessionId was not active after rotation" }
+        }
+    }
+
+    private fun rotateAndAssert(tag: String, sessionId: String) {
+        composeRule.activityRule.scenario.onActivity {
+            it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+        waitForTag(tag)
+        assertSessionActive(sessionId)
+        composeRule.activityRule.scenario.onActivity {
+            it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        waitForTag(tag)
+        assertSessionActive(sessionId)
+    }
+
+    private fun assertLiveSftpListing() {
+        waitForEnabledTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_COMMAND_INPUT)
+            .performTextReplacement("ls /docs")
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SFTP_RUN_BUTTON).performClick()
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithText("welcome.txt", substring = true, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onAllNodesWithText("welcome.txt", substring = true)[0].assertIsDisplayed()
+    }
+
+    private fun waitForTransferStatus(
+        service: SessionService,
+        sessionId: String,
+        status: FileTransferStatus,
+        timeoutMillis: Long = 45_000
+    ) {
+        composeRule.waitUntil(timeoutMillis) {
+            service.fileTransferProgressFlow().value[sessionId]?.status == status
+        }
+        val progress = checkNotNull(service.fileTransferProgressFlow().value[sessionId])
+        check(progress.status == status) {
+            "Expected $status for $sessionId, got ${progress.status}: ${progress.errorMessage}"
+        }
+    }
+
+    private fun assertServiceSessionActive(
+        service: SessionService,
+        sessionId: String,
+        operation: String
+    ) {
+        check(
+            service.sessionsFlow().value.any {
+                it.hostId == sessionId && it.status == SessionService.SessionStatus.ACTIVE
+            }
+        ) { "Session $sessionId died during $operation" }
+    }
+    private fun waitForShellMarker(
+        service: SessionService,
+        sessionId: String,
+        marker: String,
+        timeoutMillis: Long = 30_000
+    ) {
+        composeRule.waitUntil(timeoutMillis) {
+            service.shellOutputFlow().value[sessionId]?.contains(marker) == true
+        }
+        check(
+            service.sessionsFlow().value.any {
+                it.hostId == sessionId && it.status == SessionService.SessionStatus.ACTIVE
+            }
+        ) { "Terminal session $sessionId died before marker $marker" }
+    }
+
+    private fun waitForTransfers(
+        service: SessionService,
+        sessionIds: List<String>,
+        operation: String,
+        timeoutMillis: Long = 90_000
+    ) {
+        composeRule.waitUntil(timeoutMillis) {
+            sessionIds.all { service.fileTransferProgressFlow().value[it]?.isTerminal == true }
+        }
+        sessionIds.forEach { sessionId ->
+            val progress = checkNotNull(service.fileTransferProgressFlow().value[sessionId]) {
+                "Missing $operation progress for $sessionId"
+            }
+            check(progress.status == FileTransferStatus.SUCCEEDED) {
+                "$operation failed for ${progress.fileName}: ${progress.errorMessage ?: progress.status}"
+            }
+            check(
+                service.sessionsFlow().value.any {
+                    it.hostId == sessionId && it.status == SessionService.SessionStatus.ACTIVE
+                }
+            ) { "SFTP session $sessionId died after $operation" }
+        }
+    }
+    private fun withBoundSessionService(block: (SessionService) -> Unit) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val connected = CountDownLatch(1)
+        var service: SessionService? = null
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                service = (binder as SessionService.SessionBinder).getService()
+                connected.countDown()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                service = null
+            }
+        }
+        check(context.bindService(Intent(context, SessionService::class.java), connection, Context.BIND_AUTO_CREATE)) {
+            "Could not bind SessionService"
+        }
+        try {
+            check(connected.await(10, TimeUnit.SECONDS)) { "Timed out binding SessionService" }
+            block(checkNotNull(service))
+        } finally {
+            context.unbindService(connection)
+        }
+    }
     private fun waitForTag(tag: String, timeoutMillis: Long = 30_000) {
         composeRule.waitUntil(timeoutMillis) {
             composeRule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()

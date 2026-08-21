@@ -1414,7 +1414,7 @@ fun ConnectingScreen(
                 showFindDialog = true
                 true
             }
-            "fn", "fn_active" -> {
+            "fn", "fn_active", "fn_back" -> {
                 isFnRowVisible = !isFnRowVisible
                 true
             }

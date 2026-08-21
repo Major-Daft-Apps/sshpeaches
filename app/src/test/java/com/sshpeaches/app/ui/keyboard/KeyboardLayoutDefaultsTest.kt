@@ -8,17 +8,19 @@ import org.junit.Test
 class KeyboardLayoutDefaultsTest {
 
     @Test
-    fun defaultLayout_matchesCurrentDefaultRows() {
+    fun defaultLayout_keepsOnlyFormerBottomRowsAndReplacesAltWithFn() {
         val labels = KeyboardLayoutDefaults.DEFAULT_SLOTS.map { it.label }
-        assertEquals(28, labels.size)
 
-        val expected = listOf(
-            "F1", "F2", "F3", "F4", "F5", "F6", "F7",
-            "F8", "F9", "F10", "F11", "F12", "Snippets", "Password",
-            "Esc", "Alt", "Home", "Up", "End", "PgUp", "Swipe Nav",
-            "Tab", "Ctrl", "Left", "Down", "Right", "PgDn", "Keyboard"
+        assertEquals(14, labels.size)
+        assertEquals(
+            listOf(
+                "Esc", "Fn", "Home", "Up", "End", "PgUp", "Swipe Nav",
+                "Tab", "Ctrl", "Left", "Down", "Right", "PgDn", "Keyboard"
+            ),
+            labels
         )
-        assertEquals(expected, labels)
+        assertEquals("fn", KeyboardLayoutDefaults.DEFAULT_SLOTS[1].iconId)
+        assertFalse(KeyboardLayoutDefaults.DEFAULT_SLOTS.any { it.modifier == KeyboardModifier.ALT })
     }
 
     @Test
@@ -29,35 +31,13 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
-    fun builtInCompactLayout_replacesFunctionKeysAndKeepsAllModifiersReachable() {
+    fun builtInCompactLayout_usesTheSameTwoRemappableRows() {
         val compact = KeyboardLayoutDefaults.builtInCompactLayout(KeyboardLayoutDefaults.DEFAULT_SLOTS)
+
         assertEquals(KeyboardLayoutDefaults.BUILTIN_SLOT_COUNT, compact.size)
-
-        assertEquals("Num0", compact[0].label)
-        assertEquals("Num1", compact[1].label)
-        assertEquals("Num2", compact[2].label)
-        assertEquals("Num9", compact[9].label)
-        assertEquals("Num-", compact[11].label)
-
-        val fnAction = compact[13]
-        assertEquals("Fn", fnAction.label)
-        assertEquals("fn", fnAction.iconId)
-        assertFalse(fnAction.isEmpty())
-
+        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, compact)
+        assertEquals("Fn", compact[1].label)
         assertTrue(compact.any { it.modifier == KeyboardModifier.CTRL })
-        assertTrue(compact.any { it.modifier == KeyboardModifier.ALT })
-        assertTrue(compact.any { it.modifier == KeyboardModifier.SHIFT })
-    }
-
-    @Test
-    fun builtInCompactLayout_reservesFnAndShiftSlots() {
-        val custom = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[12] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.SHIFT, "Shift")
-        }
-        val compact = KeyboardLayoutDefaults.builtInCompactLayout(custom)
-        assertEquals("Fn", compact[13].label)
-        assertEquals("fn", compact[13].iconId)
-        assertEquals(KeyboardModifier.SHIFT, compact[27].modifier)
     }
 
     @Test
@@ -79,45 +59,71 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
-    fun builtInFnLayout_containsFunctionRowAndShift() {
+    fun normalizeSlots_migratesOldTwentyEightSlotDefaultToNewDefault() {
+        val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[1] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.ALT, "Alt")
+        }
+        val oldTopRows = List(14) { index ->
+            KeyboardLayoutDefaults.textAction("legacy-$index", "Legacy")
+        }
+
+        val compact = KeyboardLayoutDefaults.normalizeSlots(oldTopRows + oldBottomRows)
+
+        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, compact)
+    }
+
+    @Test
+    fun normalizeSlots_keepsCustomizedOldBottomRows() {
+        val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[1] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.ALT, "Alt")
+            this[2] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+        }
+        val oldTopRows = List(14) { KeyboardLayoutDefaults.emptyAction() }
+
+        val compact = KeyboardLayoutDefaults.normalizeSlots(oldTopRows + oldBottomRows)
+
+        assertEquals(14, compact.size)
+        assertEquals("Alt", compact[1].label)
+        assertEquals("Custom", compact[2].label)
+    }
+
+    @Test
+    fun fnLayout_isTwoFixedRowsOrderedBackShiftThenF1ThroughF12() {
         val fnLayout = KeyboardLayoutDefaults.builtInFnLayout()
-        assertEquals(KeyboardLayoutDefaults.BUILTIN_SLOT_COUNT, fnLayout.size)
 
-        assertEquals("Fn*", fnLayout[0].label)
-        assertEquals("fn_active", fnLayout[0].iconId)
-        assertEquals("F1", fnLayout[1].label)
-        assertEquals("F12", fnLayout[12].label)
-        assertEquals("Shift", fnLayout[13].label)
-        assertEquals(KeyboardActionType.MODIFIER, fnLayout[13].type)
-        assertEquals(KeyboardModifier.SHIFT, fnLayout[13].modifier)
-        assertTrue(fnLayout.drop(14).any { it.modifier == KeyboardModifier.CTRL })
-        assertTrue(fnLayout.drop(14).any { it.modifier == KeyboardModifier.ALT })
+        assertEquals(14, fnLayout.size)
+        assertEquals(
+            listOf(
+                "Back", "Shift", "F1", "F2", "F3", "F4", "F5",
+                "F6", "F7", "F8", "F9", "F10", "F11", "F12"
+            ),
+            fnLayout.map { it.label }
+        )
+        assertEquals("fn_back", fnLayout[0].iconId)
+        assertEquals(KeyboardActionType.MODIFIER, fnLayout[1].type)
+        assertEquals(KeyboardModifier.SHIFT, fnLayout[1].modifier)
     }
 
     @Test
-    fun customFnLayout_replacesOnlyFirstLayerAndPreservesCustomControls() {
+    fun fnLayout_ignoresCustomizedMainRows() {
         val custom = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[20] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+            this[13] = KeyboardLayoutDefaults.textAction("custom", "Custom")
         }
 
-        val fnLayout = KeyboardLayoutDefaults.customFnLayout(custom)
+        val builtInFn = KeyboardLayoutDefaults.builtInFnLayout(custom)
+        val customFn = KeyboardLayoutDefaults.customFnLayout(custom)
 
-        assertEquals(KeyboardLayoutDefaults.SLOT_COUNT, fnLayout.size)
-        assertEquals("Fn*", fnLayout[0].label)
-        assertEquals("F1", fnLayout[1].label)
-        assertEquals("F12", fnLayout[12].label)
-        assertEquals("Custom", fnLayout[20].label)
+        assertEquals(builtInFn, customFn)
+        assertFalse(customFn.any { it.label == "Custom" })
+        assertEquals("F12", customFn.last().label)
     }
 
     @Test
-    fun builtInFnLayout_preservesConfiguredSecondLayerControls() {
-        val custom = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[20] = KeyboardLayoutDefaults.textAction("custom", "Custom")
-        }
+    fun fnAction_usesTextLabelAndInternalRoutingId() {
+        val fn = KeyboardLayoutDefaults.fnKeyAction()
 
-        val fnLayout = KeyboardLayoutDefaults.builtInFnLayout(custom)
-
-        assertEquals("F1", fnLayout[1].label)
-        assertEquals("Custom", fnLayout[20].label)
+        assertEquals("Fn", fn.label)
+        assertEquals("fn", fn.iconId)
+        assertFalse(KeyboardLayoutDefaults.iconAliasPresets.any { it.iconId == "fn" })
     }
 }

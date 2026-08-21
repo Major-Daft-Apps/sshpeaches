@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.rules.ActivityScenarioRule
@@ -40,15 +41,16 @@ fun MainActivityComposeRule.clickNodeWithTag(tag: String, useUnmergedTree: Boole
 }
 
 fun MainActivityComposeRule.openDrawer() {
-    val drawerMatcher = hasTestTag(UiTestTags.DRAWER_SCROLL_CONTAINER)
-    if (runCatching {
-            onNode(drawerMatcher, useUnmergedTree = true).assertIsDisplayed()
-        }.isSuccess
-    ) {
+    val menuVisible = runCatching {
+        onNodeWithContentDescription("Menu").assertIsDisplayed()
+    }.isSuccess
+    if (menuVisible) {
+        onNodeWithContentDescription("Menu").performClick()
+        waitForIdle()
         return
     }
-    onNodeWithContentDescription("Menu").assertIsDisplayed().performClick()
-    waitForIdle()
+    onNode(hasTestTag(UiTestTags.DRAWER_SCROLL_CONTAINER), useUnmergedTree = true)
+        .assertIsDisplayed()
 }
 
 fun MainActivityComposeRule.navigateDrawer(route: String) {
@@ -122,7 +124,19 @@ private fun MainActivityComposeRule.revealDrawerNode(tag: String) {
         target.assertIsDisplayed()
         return
     }
-    repeat(5) {
+    repeat(8) {
+        val shown = runCatching {
+            target.assertIsDisplayed()
+            true
+        }.getOrDefault(false)
+        if (shown) {
+            return
+        }
+        onNodeWithTag(UiTestTags.DRAWER_SCROLL_CONTAINER, useUnmergedTree = true)
+            .performTouchInput { swipeDown() }
+        waitForIdle()
+    }
+    repeat(8) {
         val shown = runCatching {
             target.assertIsDisplayed()
             true

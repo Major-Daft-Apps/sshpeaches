@@ -1064,10 +1064,10 @@ class SessionService : Service() {
         fileTransfer: FileTransfer,
         listener: TransferListener,
         block: () -> T
-    ): T {
+    ): T = synchronized(fileTransfer) {
         val previous = fileTransfer.transferListener
         fileTransfer.transferListener = listener
-        return try {
+        try {
             block()
         } finally {
             fileTransfer.transferListener = previous
@@ -1257,7 +1257,7 @@ class SessionService : Service() {
     }
 
     fun sftpDownloadFile(hostId: String, remotePath: String, localPath: String?) {
-        val source = remotePath.trim()
+        val source = preserveRemoteTransferPath(remotePath)
         val destinationLabel = localPath?.trim().orEmpty().ifBlank { "Downloads" }
         if (source.isBlank()) {
             publishFileTransferFailure(
@@ -1319,7 +1319,7 @@ class SessionService : Service() {
 
     fun sftpUploadFile(hostId: String, localPath: String, remotePath: String) {
         val source = localPath.trim()
-        val destination = remotePath.trim()
+        val destination = preserveRemoteTransferPath(remotePath)
         if (source.isBlank() || destination.isBlank()) {
             publishFileTransferFailure(
                 hostId = hostId,
