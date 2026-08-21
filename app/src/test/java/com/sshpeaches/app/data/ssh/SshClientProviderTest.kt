@@ -10,6 +10,7 @@ import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.nio.file.Files
 import java.security.Key
 import java.security.KeyFactory
 import java.security.PublicKey
@@ -27,11 +28,11 @@ import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.userauth.UserAuthException
 import org.apache.sshd.common.kex.BuiltinDHFactories
+import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
 import org.apache.sshd.server.ServerBuilder
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
-import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.Assert.assertEquals
@@ -66,9 +67,53 @@ class SshClientProviderTest {
 
         try {
             assertEquals(16L * 1024L * 1024L, client.connection.windowSize)
-            assertEquals(256 * 1024, client.connection.maxPacketSize)
+            assertEquals(32 * 1024, client.connection.maxPacketSize)
         } finally {
             runCatching { client.close() }
+        }
+    }
+
+    @Test
+    fun regression_largeSftpUploadAndDownloadStayBelowSshjTransportPacketLimit() {
+        val sandbox = temp.newFolder("large-sftp-sandbox")
+        val server = SshServer.setUpDefaultServer().apply {
+            host = "127.0.0.1"
+            port = 0
+            keyPairProvider = SimpleGeneratorHostKeyProvider(temp.newFile("large-sftp-hostkey").toPath())
+            fileSystemFactory = VirtualFileSystemFactory(sandbox.toPath())
+            passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
+                username == TEST_USERNAME && password == TEST_PASSWORD
+            }
+            subsystemFactories = listOf(SftpSubsystemFactory.Builder().build())
+            start()
+        }
+        val payload = ByteArray(3 * 1024 * 1024) { index -> (index % 251).toByte() }
+        val upload = temp.newFile("large-video.mp4").apply { writeBytes(payload) }
+        val download = temp.newFile("large-video-downloaded.mp4")
+        val host = HostConnection(
+            id = "large-sftp-test",
+            name = "Large SFTP test",
+            host = "127.0.0.1",
+            port = server.port,
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_large_sftp"),
+            host = host
+        )
+
+        try {
+            client.connect(host.host, host.port)
+            client.authPassword(TEST_USERNAME, TEST_PASSWORD)
+            client.newSFTPClient().use { sftp ->
+                sftp.put(upload.absolutePath, "/large-video.mp4")
+                sftp.get("/large-video.mp4", download.absolutePath)
+            }
+            assertTrue(Files.mismatch(upload.toPath(), download.toPath()) == -1L)
+        } finally {
+            runCatching { client.close() }
+            runCatching { server.stop(true) }
         }
     }
 

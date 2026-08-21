@@ -9,10 +9,37 @@ import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.connection.ConnectionException
 import net.schmizz.sshj.transport.TransportException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConnectionFailureKindTest {
+
+    @Test
+    fun transportExceptionIsFatalForSftpSession() {
+        assertTrue(
+            TransportException(
+                DisconnectReason.PROTOCOL_ERROR,
+                "invalid packet length: 262172"
+            ).isFatalSftpTransportFailure()
+        )
+    }
+
+    @Test
+    fun wrappedTransportExceptionIsFatalForSftpSession() {
+        assertTrue(
+            IllegalStateException(
+                "SFTP transfer failed",
+                TransportException(DisconnectReason.CONNECTION_LOST, "connection lost")
+            ).isFatalSftpTransportFailure()
+        )
+    }
+
+    @Test
+    fun ordinarySftpOperationErrorIsNotFatalForSftpSession() {
+        assertFalse(IllegalArgumentException("permission denied").isFatalSftpTransportFailure())
+    }
 
     @Test
     fun classifiesSocketAndDnsFailuresAsNetworkErrors() {
