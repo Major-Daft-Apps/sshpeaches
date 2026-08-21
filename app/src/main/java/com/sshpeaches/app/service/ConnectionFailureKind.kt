@@ -6,6 +6,7 @@ import java.net.UnknownHostException
 import java.nio.channels.UnresolvedAddressException
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.common.SSHException
+import net.schmizz.sshj.transport.TransportException
 
 enum class ConnectionFailureKind {
     NETWORK
@@ -28,6 +29,21 @@ internal fun Throwable.connectionFailureKind(): ConnectionFailureKind? {
         current = cause.cause
     }
     return null
+}
+
+/**
+ * A transport failure means SSHJ can no longer safely use the underlying SSH
+ * connection. Retrying an SFTP operation on that connection can corrupt the
+ * protocol stream, so the SFTP session must be closed instead.
+ */
+internal fun Throwable.isFatalSftpTransportFailure(): Boolean {
+    var current: Throwable? = this
+    repeat(MAX_CAUSE_DEPTH) {
+        val cause = current ?: return false
+        if (cause is TransportException) return true
+        current = cause.cause
+    }
+    return false
 }
 
 private fun Throwable.isNetworkFailure(): Boolean = when (this) {

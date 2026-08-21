@@ -1181,6 +1181,9 @@ class SessionService : Service() {
                         )
                     )
                 }
+                if (!cancelled && transfer.sftpClientToAbort != null) {
+                    closeSftpSessionForTransportFailure(transfer.sessionId, error)
+                }
             } finally {
                 transfer.workerThread = null
                 // A manually interrupted pooled worker must not carry its interrupt
@@ -1764,13 +1767,7 @@ class SessionService : Service() {
                     true
                 }
             }.onFailure { err ->
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.ERROR,
-                        message = "SFTP operation failed: ${err.message ?: "unknown error"}"
-                    )
-                )
+                reportSftpOperationFailure(hostId, err)
             }.getOrDefault(false)
         }
         val client = connection.client ?: return false
@@ -1782,14 +1779,35 @@ class SessionService : Service() {
             }
             true
         }.onFailure { err ->
-            SessionLogBus.emit(
-                SessionLogBus.Entry(
-                    hostId = hostId,
-                    level = SessionLogBus.LogLevel.ERROR,
-                    message = "SFTP operation failed: ${err.message ?: "unknown error"}"
-                )
-            )
+            reportSftpOperationFailure(hostId, err)
         }.getOrDefault(false)
+    }
+
+    private fun reportSftpOperationFailure(hostId: String, error: Throwable) {
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.ERROR,
+                message = "SFTP operation failed: ${error.message ?: "unknown error"}"
+            )
+        )
+        closeSftpSessionForTransportFailure(hostId, error)
+    }
+
+    private fun closeSftpSessionForTransportFailure(hostId: String, error: Throwable) {
+        if (!error.isFatalSftpTransportFailure() ||
+            activeConnections[hostId]?.mode != ConnectionMode.SFTP
+        ) {
+            return
+        }
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = hostId,
+                level = SessionLogBus.LogLevel.ERROR,
+                message = "SFTP transport failed; session disconnected."
+            )
+        )
+        stopSession(hostId)
     }
 
     private fun deleteRemotePathNonRecursively(sftp: SFTPClient, path: String) {
