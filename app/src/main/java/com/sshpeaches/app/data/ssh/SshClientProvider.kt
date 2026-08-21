@@ -52,7 +52,12 @@ object SshClientProvider {
     private val providerInstallLock = Any()
     private const val KEEPALIVE_INTERVAL_SECONDS = 30
     private const val SSH_CHANNEL_WINDOW_SIZE_BYTES = 16L * 1024L * 1024L
-    private const val SSH_CHANNEL_MAX_PACKET_SIZE_BYTES = 256 * 1024
+    // SSHJ rejects transport packets above 256 KiB. A channel-data payload at
+    // that same size becomes larger after SSH/SFTP framing (for example,
+    // 262,172 bytes) and tears down the transport during large transfers.
+    // Keep the large window for throughput, but advertise a packet size that
+    // leaves ample room for protocol framing.
+    private const val SSH_CHANNEL_MAX_PACKET_SIZE_BYTES = 32 * 1024
     @Volatile
     private var testingUnavailableKeyExchangeAlgorithms: Set<String> = emptySet()
     @Volatile
@@ -201,8 +206,9 @@ object SshClientProvider {
         knownHostsFile.parentFile?.mkdirs()
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
         return SSHClient(config).apply {
-            // A larger receive window and packet allowance keep file transfers from
-            // becoming round-trip-bound on fast, higher-latency connections.
+            // A larger receive window keeps file transfers from becoming
+            // round-trip-bound on fast, higher-latency connections. The packet
+            // allowance stays safely below SSHJ's transport packet ceiling.
             connection.setWindowSize(SSH_CHANNEL_WINDOW_SIZE_BYTES)
             connection.setMaxPacketSize(SSH_CHANNEL_MAX_PACKET_SIZE_BYTES)
             addHostKeyVerifier(
