@@ -1,0 +1,4 @@
+What's new in 0.10.18
+
+- Fixed SSH terminals reverting to the default system monospace font after returning to the app.
+- Added lifecycle regression coverage to keep selected bundled terminal fonts stable across background and foreground transitions.

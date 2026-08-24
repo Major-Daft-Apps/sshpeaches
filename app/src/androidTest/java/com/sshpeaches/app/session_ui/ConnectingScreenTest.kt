@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.session_ui
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.graphics.Typeface
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,6 +31,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.Intents.intended
@@ -54,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
+import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
+import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.service.ConnectionFailureKind
@@ -96,6 +100,41 @@ class ConnectingScreenTest {
 
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun terminalTypeface_isRestoredWhenAppReturnsToForeground() {
+        val profile =
+            TerminalProfileDefaults.builtInProfiles.first().copy(font = TerminalFont.CASCADIA_CODE_MONO)
+        composeRule.setContent {
+            MaterialTheme {
+                SshTerminalForInputTest(onSendShellBytes = {}, terminalProfile = profile)
+            }
+        }
+        composeRule.waitForIdle()
+
+        lateinit var expectedTypeface: Typeface
+        composeRule.runOnIdle {
+            val terminalView = terminalViewForTest()
+            expectedTypeface = terminalView.rendererTypefaceForTest()
+            check(expectedTypeface !== Typeface.MONOSPACE) {
+                "Bundled terminal typeface was not applied before backgrounding"
+            }
+            terminalView.setTypeface(Typeface.MONOSPACE)
+            check(terminalView.rendererTypefaceForTest() == Typeface.MONOSPACE) {
+                "Test did not simulate the renderer typeface reset"
+            }
+        }
+
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            check(terminalViewForTest().rendererTypefaceForTest() === expectedTypeface) {
+                "Terminal typeface was not restored after returning to the foreground"
+            }
+        }
+    }
 
     @Test
     fun terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes() {
@@ -2273,7 +2312,10 @@ class ConnectingScreenTest {
     }
 
     @Composable
-    private fun SshTerminalForInputTest(onSendShellBytes: (ByteArray) -> Unit) {
+    private fun SshTerminalForInputTest(
+        onSendShellBytes: (ByteArray) -> Unit,
+        terminalProfile: TerminalProfile = TerminalProfileDefaults.builtInProfiles.first()
+    ) {
         ConnectingScreen(
             request = requestFor(ConnectionMode.SSH),
             state = QuickConnectUiState(
@@ -2283,7 +2325,7 @@ class ConnectingScreenTest {
             logs = emptyList(),
             shellOutput = "",
             remoteDirectory = null,
-            terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+            terminalProfile = terminalProfile,
             terminalSelectionMode = TerminalSelectionMode.NATURAL,
             keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
             snippets = emptyList(),
@@ -2333,6 +2375,18 @@ class ConnectingScreenTest {
             if (match != null) return match
         }
         return null
+    }
+
+    private fun TerminalView.rendererTypefaceForTest(): Typeface {
+        val rendererField = TerminalView::class.java.getDeclaredField("mRenderer").apply {
+            isAccessible = true
+        }
+        val renderer = rendererField.get(this)
+            ?: error("Terminal renderer was not initialized")
+        val typefaceField = renderer.javaClass.getDeclaredField("mTypeface").apply {
+            isAccessible = true
+        }
+        return typefaceField.get(renderer) as Typeface
     }
 
     private fun TerminalView.performSelectionAction(copy: Boolean) {

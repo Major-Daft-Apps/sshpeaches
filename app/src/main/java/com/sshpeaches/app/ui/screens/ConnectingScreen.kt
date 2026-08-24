@@ -360,6 +360,8 @@ fun ConnectingScreen(
     var terminalFontSizeSp by rememberSaveable(request?.sessionId) {
         mutableStateOf(terminalProfile.fontSizeSp.toFloat())
     }
+    val currentTerminalProfile = rememberUpdatedState(terminalProfile)
+    val currentTerminalFontSizeSp = rememberUpdatedState(terminalFontSizeSp)
     var lastAppliedProfileFontSizeSp by remember(request?.sessionId) { mutableStateOf<Float?>(null) }
     var lastResize by remember(request?.sessionId) { mutableStateOf<Pair<Int, Int>?>(null) }
     var sftpPath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
@@ -939,6 +941,23 @@ fun ConnectingScreen(
     DisposableEffect(lifecycleOwner, request?.sessionId) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    val profile = currentTerminalProfile.value
+                    terminalEngine.applyProfile(profile)
+                    terminalViewRef?.let { view ->
+                        view.mEmulator?.let { emulator ->
+                            TermuxTerminalEngine.applyProfileToEmulator(emulator, profile)
+                        }
+                        applyTerminalTypeface(view, profile.font)
+                        view.setTextSize(
+                            with(density) {
+                                currentTerminalFontSizeSp.value.sp.toPx().toInt().coerceAtLeast(6)
+                            }
+                        )
+                        view.onScreenUpdated()
+                    }
+                }
+
                 Lifecycle.Event.ON_PAUSE,
                 Lifecycle.Event.ON_STOP -> {
                     hideSystemKeyboard()

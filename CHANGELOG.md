@@ -4,6 +4,20 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.10.18 (1018)
+
+Release date: 2026-08-22
+
+- Fixed SSH terminals reverting to the system monospace font after the app returned to the foreground.
+- Added Android lifecycle regression coverage to verify the selected bundled terminal font is restored after background and foreground transitions.
+
+## 0.10.17 (1017)
+
+Release date: 2026-08-21
+
+- Fixed large SFTP transfers failing when packet lengths were decoded incorrectly.
+- Closed unusable SFTP sessions after transport failures so later operations can reconnect cleanly.
+
 ## 0.10.16 (1016)
 
 Release date: 2026-08-21
