@@ -1286,6 +1286,20 @@ class ConnectingScreenTest {
         val oneLineBounds = composeRule.onNodeWithTag(UiTestTags.CONNECTING_LOG_PANEL)
             .fetchSemanticsNode()
             .boundsInRoot
+        val oneLineTextBounds = composeRule.onNodeWithText(rawMessage)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val shortPaneDensity = composeRule.activity.resources.displayMetrics.density
+        check(
+            kotlin.math.abs(oneLineTextBounds.top - oneLineBounds.top) <= shortPaneDensity * 2f
+        ) {
+            "A single log line should print from the top of the pane like a shell " +
+                "(text top=${oneLineTextBounds.top}, pane top=${oneLineBounds.top})"
+        }
+        check(oneLineBounds.height <= shortPaneDensity * 40f) {
+            "The pane should shrink to fit a single line instead of reserving its max " +
+                "height with the text pushed to the bottom: ${oneLineBounds.height}px"
+        }
 
         composeRule.runOnIdle {
             currentLogs = (1..40).map { index ->

@@ -4156,7 +4156,7 @@ private fun ConnectionLogsPane(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.Bottom
+            verticalArrangement = Arrangement.Top
         ) {
             items(renderedLogs) { log ->
                 Text(
