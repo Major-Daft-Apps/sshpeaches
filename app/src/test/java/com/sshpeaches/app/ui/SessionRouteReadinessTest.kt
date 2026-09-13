@@ -86,6 +86,14 @@ class SessionRouteReadinessTest {
     }
 
     @Test
+    fun advancedSettingsRouteIsAValidSessionRecoveryTarget() {
+        assertEquals(
+            Routes.ADVANCED_SETTINGS,
+            validatedSessionRecoveryRoute(Routes.ADVANCED_SETTINGS)
+        )
+    }
+
+    @Test
     fun serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute() {
         val decision = decideStaleSessionRoute(
             sessionServiceReady = true,

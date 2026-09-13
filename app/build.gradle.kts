@@ -10,6 +10,9 @@ plugins {
 import java.util.Properties
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.api.tasks.bundling.Zip
 
@@ -80,8 +83,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1018
-        versionName = "0.10.18"
+        versionCode = 1020
+        versionName = "0.10.20"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -145,7 +148,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
+                debugSymbolLevel = "FULL"
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -207,6 +210,12 @@ android {
                     System.getProperty("maven.repo.local")
                         ?: "${System.getProperty("user.home")}${File.separator}.m2${File.separator}repository",
                 )
+                // Prefer a memory-backed tmpdir when available; Robolectric temp
+                // cleanup races with async app I/O on loaded disks.
+                val shm = File("/dev/shm")
+                if (shm.isDirectory && shm.canWrite()) {
+                    test.systemProperty("java.io.tmpdir", shm.absolutePath)
+                }
             }
         }
         managedDevices {
@@ -336,14 +345,15 @@ fun adbCommand(vararg args: String): List<String> = buildList {
 }
 
 fun Project.captureCommandOutput(command: List<String>, ignoreExitValue: Boolean = false): String {
-    val output = ByteArrayOutputStream()
-    exec {
-        isIgnoreExitValue = ignoreExitValue
-        commandLine(command)
-        standardOutput = output
-        errorOutput = output
+    val process = ProcessBuilder(command)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().use { it.readText() }
+    val exitCode = process.waitFor()
+    if (exitCode != 0 && !ignoreExitValue) {
+        throw GradleException("Command failed with exit code $exitCode: ${command.joinToString(" ")}\n$output")
     }
-    return output.toString(Charsets.UTF_8).trim()
+    return output.trim()
 }
 
 tasks.register("startLiveSshServer") {
@@ -423,9 +433,7 @@ tasks.register("startLiveSshServer") {
                 add("tcp:$liveServerPort")
                 add("tcp:$liveServerPort")
             }
-            exec {
-                commandLine(adbArgs)
-            }
+            captureCommandOutput(adbArgs)
         }
     }
 }
@@ -443,10 +451,7 @@ tasks.register("stopLiveSshServer") {
                 add("--remove")
                 add("tcp:$liveServerPort")
             }
-            exec {
-                isIgnoreExitValue = true
-                commandLine(adbArgs)
-            }
+            captureCommandOutput(adbArgs, ignoreExitValue = true)
         }
 
         val markerFile = liveServerMarkerFile.get().asFile
@@ -519,18 +524,9 @@ tasks.register("connectedReleaseLaunchCheck") {
         val packageName = "com.majordaftapps.sshpeaches"
         val launcherComponent = "$packageName/com.majordaftapps.sshpeaches.app.MainActivity"
 
-        exec {
-            isIgnoreExitValue = true
-            commandLine(adbCommand("logcat", "-c"))
-        }
-        exec {
-            isIgnoreExitValue = true
-            commandLine(adbCommand("shell", "am", "force-stop", packageName))
-        }
-        exec {
-            isIgnoreExitValue = true
-            commandLine(adbCommand("shell", "pm", "clear", packageName))
-        }
+        captureCommandOutput(adbCommand("logcat", "-c"), ignoreExitValue = true)
+        captureCommandOutput(adbCommand("shell", "am", "force-stop", packageName), ignoreExitValue = true)
+        captureCommandOutput(adbCommand("shell", "pm", "clear", packageName), ignoreExitValue = true)
 
         val launchOutput = captureCommandOutput(
             adbCommand("shell", "am", "start", "-n", launcherComponent)
@@ -568,9 +564,90 @@ tasks.register("connectedReleaseLaunchCheck") {
 
 tasks.matching { it.name == "installBenchmark" }.configureEach {
     doFirst {
-        exec {
-            isIgnoreExitValue = true
-            commandLine(adbCommand("uninstall", "com.majordaftapps.sshpeaches"))
+        captureCommandOutput(adbCommand("uninstall", "com.majordaftapps.sshpeaches"), ignoreExitValue = true)
+    }
+}
+
+// Embed native debug symbols inside the release AAB at the location Play
+// Console expects (BNDL/native-debug-symbols/<abi>/*.so) and re-sign the
+// bundle. R8 mapping data is already embedded by AGP as
+// BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map.
+tasks.register("embedReleaseNativeSymbols") {
+    group = "build"
+    description = "Embeds native debug symbols into the signed release AAB."
+    dependsOn("bundleRelease", "packageReleaseNativeDebugSymbols")
+    doLast {
+        val aab = layout.buildDirectory.file("outputs/bundle/release/app-release.aab").get().asFile
+        val symbolsZip = layout.buildDirectory
+            .file("outputs/native-debug-symbols/release/native-debug-symbols.zip")
+            .get()
+            .asFile
+        if (!aab.exists() || !symbolsZip.exists()) {
+            throw GradleException("Missing bundle or native debug symbols; run bundleRelease first.")
         }
+
+        val propsFile = rootProject.file(".keystore/keystore.properties")
+        val props = Properties().apply { propsFile.inputStream().use { load(it) } }
+        fun prop(vararg names: String): String? = names.firstNotNullOfOrNull { props[it] as? String }
+        val storeFile = rootProject.file(".keystore/sshpeaches")
+        val storePassword = prop("SSHPEACHES_STORE_PASSWORD", "storePassword", "STORE_PASSWORD")
+        val keyAlias = prop("SSHPEACHES_KEY_ALIAS", "keyAlias", "KEY_ALIAS")
+        val keyPassword = prop("SSHPEACHES_KEY_PASSWORD", "keyPassword", "KEY_PASSWORD")
+        if (!storeFile.exists() || storePassword == null || keyAlias == null || keyPassword == null) {
+            throw GradleException("Release keystore properties are missing; cannot re-sign the bundle.")
+        }
+
+        val unsigned = File(aab.parentFile, "app-release-unsigned.aab")
+        val embedded = File(aab.parentFile, "app-release-embedded.aab")
+        ZipInputStream(aab.inputStream().buffered()).use { input ->
+            ZipOutputStream(embedded.outputStream().buffered()).use { output ->
+                var entry = input.nextEntry
+                while (entry != null) {
+                    if (entry.name.startsWith("META-INF/") &&
+                        (entry.name.endsWith(".SF") || entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA"))
+                    ) {
+                        entry = input.nextEntry
+                        continue
+                    }
+                    output.putNextEntry(ZipEntry(entry.name))
+                    input.copyTo(output)
+                    output.closeEntry()
+                    entry = input.nextEntry
+                }
+                ZipInputStream(symbolsZip.inputStream().buffered()).use { symbols ->
+                    var symbolEntry = symbols.nextEntry
+                    while (symbolEntry != null) {
+                        if (!symbolEntry.isDirectory) {
+                            output.putNextEntry(
+                                ZipEntry("BNDL/native-debug-symbols/${symbolEntry.name}")
+                            )
+                            symbols.copyTo(output)
+                            output.closeEntry()
+                        }
+                        symbolEntry = symbols.nextEntry
+                    }
+                }
+            }
+        }
+
+        val signing = ProcessBuilder(
+            "jarsigner",
+            "-keystore", storeFile.absolutePath,
+            "-storepass", storePassword,
+            "-keypass", keyPassword,
+            "-signedjar", aab.absolutePath,
+            embedded.absolutePath,
+            keyAlias
+        )
+            .redirectErrorStream(true)
+            .directory(rootProject.projectDir)
+            .start()
+        val signOutput = signing.inputStream.bufferedReader().readText()
+        if (signing.waitFor() != 0) {
+            throw GradleException("jarsigner failed:\n$signOutput")
+        }
+        unsigned.delete()
+        embedded.delete()
+        logger.lifecycle("Embedded native debug symbols into ${aab.absolutePath}")
     }
 }

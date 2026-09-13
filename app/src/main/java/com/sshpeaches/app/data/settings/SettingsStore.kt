@@ -16,6 +16,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
+import com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings
 import com.majordaftapps.sshpeaches.app.ui.state.LockTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
@@ -72,6 +73,9 @@ object SettingsStore {
     private val autoTrustHostKey = booleanPreferencesKey("auto_trust_host_key")
     private val usageReportsKey = booleanPreferencesKey("usage_reports")
     private val snippetRunTimeoutSecondsKey = intPreferencesKey("snippet_run_timeout_seconds")
+    private val sftpReadSizeKey = intPreferencesKey("sftp_read_size")
+    private val sftpMaxRequestsKey = intPreferencesKey("sftp_max_requests")
+    private val parallelDownloadsKey = intPreferencesKey("parallel_downloads")
 
     val defaultCrashReportsEnabled: Boolean = true
     val defaultAnalyticsEnabled: Boolean = true
@@ -279,6 +283,16 @@ object SettingsStore {
         dataStore.data.map { prefs -> (prefs[snippetRunTimeoutSecondsKey] ?: 10).coerceIn(1, 60) }
     }
 
+    val sftpTransferSettings: Flow<SftpTransferSettings> by lazy {
+        dataStore.data.map { prefs ->
+            SftpTransferSettings(
+                sftpReadSize = prefs[sftpReadSizeKey] ?: SftpTransferSettings.DEFAULT_SFTP_READ_SIZE,
+                sftpMaxRequests = prefs[sftpMaxRequestsKey] ?: SftpTransferSettings.DEFAULT_SFTP_MAX_REQUESTS,
+                parallelDownloads = prefs[parallelDownloadsKey] ?: SftpTransferSettings.DEFAULT_PARALLEL_DOWNLOADS
+            ).sanitized()
+        }
+    }
+
     suspend fun setAllowBackgroundSessions(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[allowBackgroundSessionsKey] = enabled
@@ -457,6 +471,42 @@ object SettingsStore {
     suspend fun setSnippetRunTimeoutSeconds(seconds: Int) {
         dataStore.edit { prefs ->
             prefs[snippetRunTimeoutSecondsKey] = seconds.coerceIn(1, 60)
+        }
+    }
+
+    suspend fun setSftpReadSize(bytes: Int) {
+        dataStore.edit { prefs ->
+            prefs[sftpReadSizeKey] = bytes.coerceIn(
+                SftpTransferSettings.MIN_SFTP_READ_SIZE,
+                SftpTransferSettings.MAX_SFTP_READ_SIZE
+            )
+        }
+    }
+
+    suspend fun setSftpMaxRequests(count: Int) {
+        dataStore.edit { prefs ->
+            prefs[sftpMaxRequestsKey] = count.coerceIn(
+                SftpTransferSettings.MIN_SFTP_MAX_REQUESTS,
+                SftpTransferSettings.MAX_SFTP_MAX_REQUESTS
+            )
+        }
+    }
+
+    suspend fun setParallelDownloads(count: Int) {
+        dataStore.edit { prefs ->
+            prefs[parallelDownloadsKey] = count.coerceIn(
+                SftpTransferSettings.MIN_PARALLEL_DOWNLOADS,
+                SftpTransferSettings.MAX_PARALLEL_DOWNLOADS
+            )
+        }
+    }
+
+    suspend fun applySftpFastPreset() {
+        val preset = SftpTransferSettings.fastPreset()
+        dataStore.edit { prefs ->
+            prefs[sftpReadSizeKey] = preset.sftpReadSize
+            prefs[sftpMaxRequestsKey] = preset.sftpMaxRequests
+            prefs[parallelDownloadsKey] = preset.parallelDownloads
         }
     }
 

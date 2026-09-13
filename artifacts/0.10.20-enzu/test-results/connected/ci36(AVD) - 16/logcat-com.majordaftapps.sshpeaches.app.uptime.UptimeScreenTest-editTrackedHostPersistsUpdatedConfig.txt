@@ -1,0 +1,515 @@
+08-30 13:06:46.809 10415 10431 I TestRunner: started: editTrackedHostPersistsUpdatedConfig(com.majordaftapps.sshpeaches.app.uptime.UptimeScreenTest)
+08-30 13:06:46.827   679   706 I ImeTracker: system_server:7335479c: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:46.838  1414  1414 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:46.839  1414  1414 I ImeTracker: com.google.android.apps.nexuslauncher:f2f3132e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:46.869  1414  1414 D RecentsView: onTaskRemoved: 581, not handling task stack changes
+08-30 13:06:46.869  1414  1414 D RecentsView: onTaskRemoved: 581, not handling task stack changes
+08-30 13:06:46.992   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:46.992   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.018  1414  1414 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+08-30 13:06:47.025 10476 10476 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+08-30 13:06:47.028 10415 10431 I UiAutomationPermGranter: Permission: android.permission.POST_NOTIFICATIONS is already granted!
+08-30 13:06:47.031 10415 10415 D SSHPeachesUI: ACTION SessionService.onDestroy | activeSessions=0
+08-30 13:06:47.038 10415 10415 D SSHPeachesUI: ACTION stopAllSessions | count=0
+08-30 13:06:47.039 10415 10415 D SSHPeachesUI: RESULT stopAllSessions -> OK
+08-30 13:06:47.039 10415 10415 D SSHPeachesUI: RESULT SessionService.onDestroy -> OK
+08-30 13:06:47.045 10476 10476 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@2ca7374
+08-30 13:06:47.050 10476 10476 D ViewRootImpl: Skipping stats log for color mode
+08-30 13:06:47.050 10415 10431 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@a229bf6]
+08-30 13:06:47.059 10415 10431 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+08-30 13:06:47.090   679  1331 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10232, packageName = null, attributionTag = null, token = android.os.Binder@2aabd5d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+08-30 13:06:47.103   544  1497 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:06:47.111  1111  1253 D SplashScreenView: Build android.window.SplashScreenView{8b56192 V.E...... ......ID 0,0-0,0}
+08-30 13:06:47.111  1111  1253 D SplashScreenView: Icon: view: null drawable: null size: 0
+08-30 13:06:47.111  1111  1253 D SplashScreenView: Branding: view: android.view.View{1e13763 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+08-30 13:06:47.123   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.126   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.130  1414  1414 W SplitSelectStateCtor: Missing session instanceIds
+08-30 13:06:47.130  1414  1414 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+08-30 13:06:47.141   544   544 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:06:47.152  1414  1414 D RecentsView: onTaskRemoved: 582, not handling task stack changes
+08-30 13:06:47.153  1414  1414 D RecentsView: onTaskRemoved: 582, not handling task stack changes
+08-30 13:06:47.154 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: PRE_ON_CREATE
+08-30 13:06:47.154 10415 10415 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+08-30 13:06:47.192 10415 10415 D SSHPeachesUI: ACTION MainActivity.onCreate
+08-30 13:06:47.193 10415 10415 D SSHPeachesUI: RESULT MainActivity.onCreate -> OK
+08-30 13:06:47.193 10415 10415 D SSHPeachesUI: ACTION setupBiometricPrompt
+08-30 13:06:47.195   468   506 I netd    : tetherGetStats() -> {[]} <6.64ms>
+08-30 13:06:47.196 10415 10415 D SSHPeachesUI: RESULT setupBiometricPrompt -> FAIL | biometricUnavailable
+08-30 13:06:47.219 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: CREATED
+08-30 13:06:47.219 10415 10415 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@4213001
+08-30 13:06:47.223 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: STARTED
+08-30 13:06:47.224 10415 10415 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@4213001
+08-30 13:06:47.226 10415 10415 D AutofillManager: Fill dialog is enabled:false, hints=[]
+08-30 13:06:47.227 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: RESUMED
+08-30 13:06:47.227 10415 10415 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@4213001
+08-30 13:06:47.233 10415 11225 D SSHPeachesUI: STATE AppViewModel.uiState | resourcesLoaded=false, hosts=0, identities=0, forwards=0, snippets=0, sort=LAST_USED, theme=SYSTEM, locked=false, pinConfigured=false, background=true, biometric=false, diagnostics=true, keyboardFilled=14/14
+08-30 13:06:47.321 10415 10415 W HWUI    : Image decoding logging dropped!
+08-30 13:06:47.334 10415 10415 D SSHPeachesUI: ACTION onAppForegrounded | locked=false
+08-30 13:06:47.335 10415 10415 D SSHPeachesUI: RESULT onAppForegrounded -> OK
+08-30 13:06:47.377   679  1015 D WifiClientModeImpl[69521:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+08-30 13:06:47.378   679  1015 D WifiDataStall: tx tput in kbps: 11000
+08-30 13:06:47.378   679  1015 D WifiDataStall: rx tput in kbps: 11000
+08-30 13:06:47.378   679  1015 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+08-30 13:06:47.378   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:47.378   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:47.378   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:47.378   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:47.379   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:47.380   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:47.380   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:47.380   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:47.380   679  1015 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 178219727 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+08-30 13:06:47.381   679  1015 D WifiScoreCard: txRate: 1 txSpeed: 1
+08-30 13:06:47.381   679  1015 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 664973517 RSSI -50 txSpeed -1
+08-30 13:06:47.383   679  1015 D WifiClientModeImpl[69521:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.7, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3010] from screen [on:0 period:1388812247] score=60
+08-30 13:06:47.478   679   703 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug/com.majordaftapps.sshpeaches.app.MainActivity for user 0: +387ms
+08-30 13:06:47.480 10415 10415 D SSHPeachesUI: RESULT MainActivity.ensureSessionServiceConnection -> OK | requestedServiceStart=true, bindRequested=true
+08-30 13:06:47.482 10415 11226 D SSHPeachesUI: STATE AppViewModel.uiState | resourcesLoaded=true, hosts=0, identities=0, forwards=0, snippets=0, sort=LAST_USED, theme=SYSTEM, locked=false, pinConfigured=false, background=true, biometric=false, diagnostics=true, keyboardFilled=14/14
+08-30 13:06:47.484 10415 10415 D WindowLayoutComponentImpl: Register WindowLayoutInfoListener on Context=com.majordaftapps.sshpeaches.app.MainActivity@4213001, of which baseContext=android.app.ContextImpl@7fbb0d2
+08-30 13:06:47.488 10415 10415 D SSHPeachesUI: ACTION SessionService.onCreate
+08-30 13:06:47.493   679   696 D ConnectivityService: requestNetwork for uid/pid:10232/10415 activeRequest: null callbackRequest: 550 [NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOSING|LOST|NC
+08-30 13:06:47.493 10415 10415 D SSHPeachesUI: RESULT SessionService.onCreate -> OK
+08-30 13:06:47.494 10415 10415 D SSHPeachesUI: ACTION SessionService.onStartCommand | action=null, startId=1
+08-30 13:06:47.494 10415 10415 D SSHPeachesUI: RESULT SessionService.onStartCommand -> OK
+08-30 13:06:47.496 10415 10415 D SSHPeachesUI: RESULT SessionService.onServiceConnected -> OK | bound=true, serviceReady=true
+08-30 13:06:47.498   679  1015 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+08-30 13:06:47.498   679  1015 V WifiNetworkFactory: Accepted network request NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.499   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.500   679  1015 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+08-30 13:06:47.500   679  1015 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+08-30 13:06:47.500   679  1015 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=551, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10232 RequestorUid: 10232 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+08-30 13:06:47.501   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.503   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.503   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.503   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.503   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.503   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.504   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.505   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.506   679  1023 D ConnectivityService: NetReassign [551 : null → 101] [c 0] [a 4] [i 5]
+08-30 13:06:47.506   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.506   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.506   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.507   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.507   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.546   679   821 I ImeTracker: com.majordaftapps.sshpeaches.debug:bcf86456: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:06:47.551  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:47.553   679  1899 I ImeTracker: system_server:d25acae0: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:47.556   679   706 I ImeTracker: system_server:d25acae0: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:47.569  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:47.570  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:47.575  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:47.576 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:47.578 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:bcf86456: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:47.600  1414  1414 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+08-30 13:06:47.605  1414  1414 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+08-30 13:06:47.643  1414  1414 D BaseDepthController: setSurface:
+08-30 13:06:47.643  1414  1414 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+08-30 13:06:47.643  1414  1414 D BaseDepthController: 	mBaseSurface: null
+08-30 13:06:47.643  1414  1414 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+08-30 13:06:47.644  1414  1414 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+08-30 13:06:47.644  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+08-30 13:06:47.644  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+08-30 13:06:47.644  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+08-30 13:06:47.647  1414  1414 D StatsLog: LAUNCHER_ONSTOP
+08-30 13:06:47.655  1414  1414 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+08-30 13:06:47.769   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.769   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:47.795   679   691 I system_server: NativeAlloc concurrent mark compact GC freed 17MB AllocSpace bytes, 52(1048KB) LOS objects, 41% free, 33MB/57MB, paused 7.383ms,8.484ms total 708.371ms
+08-30 13:06:47.995 10415 11226 D SSHPeachesUI: STATE AppViewModel.uiState | resourcesLoaded=true, hosts=1, identities=0, forwards=0, snippets=0, sort=LAST_USED, theme=SYSTEM, locked=false, pinConfigured=false, background=true, biometric=false, diagnostics=true, keyboardFilled=14/14
+08-30 13:06:47.999 10415 10415 I ActivityThread: Schedule relaunch activity: com.majordaftapps.sshpeaches.app.MainActivity
+08-30 13:06:48.001 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: PAUSED
+08-30 13:06:48.001 10415 10415 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@4213001
+08-30 13:06:48.004 10415 10415 D SSHPeachesUI: ACTION MainActivity.onStop | persistSessions=true (config-change-or-not-ready)
+08-30 13:06:48.004 10415 10415 D SSHPeachesUI: RESULT MainActivity.onStop -> OK | stoppedAllSessions=false
+08-30 13:06:48.004 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: STOPPED
+08-30 13:06:48.004 10415 10415 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@4213001
+08-30 13:06:48.012 10415 10429 W JobInfo : Requested important-while-foreground flag for job8 is ignored and takes no effect
+08-30 13:06:48.019 10415 10415 D SSHPeachesUI: ACTION MainActivity.onDestroy | serviceBound=true
+08-30 13:06:48.020 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@c563473
+08-30 13:06:48.021 10415 10415 D SSHPeachesUI: RESULT MainActivity.onDestroy -> OK
+08-30 13:06:48.021 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@4213001 in: DESTROYED
+08-30 13:06:48.021 10415 10415 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+08-30 13:06:48.026 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: PRE_ON_CREATE
+08-30 13:06:48.027 10415 10415 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was DESTROYED
+08-30 13:06:48.032 10415 10415 D SSHPeachesUI: ACTION MainActivity.onCreate
+08-30 13:06:48.032 10415 10415 D SSHPeachesUI: RESULT MainActivity.onCreate -> OK
+08-30 13:06:48.032 10415 10415 D SSHPeachesUI: ACTION setupBiometricPrompt
+08-30 13:06:48.034 10415 10415 D SSHPeachesUI: RESULT setupBiometricPrompt -> FAIL | biometricUnavailable
+08-30 13:06:48.039 10415 10415 D AutofillManager: Fill dialog is enabled:false, hints=[]
+08-30 13:06:48.064 10415 10415 D SSHPeachesUI: ACTION onAppForegrounded | locked=false
+08-30 13:06:48.065 10415 10415 D SSHPeachesUI: RESULT onAppForegrounded -> OK
+08-30 13:06:48.076 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: CREATED
+08-30 13:06:48.076 10415 10415 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@f578183
+08-30 13:06:48.078 10415 10415 D SSHPeachesUI: ACTION onAppForegrounded | locked=false
+08-30 13:06:48.078 10415 10415 D SSHPeachesUI: RESULT onAppForegrounded -> OK
+08-30 13:06:48.078 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: STARTED
+08-30 13:06:48.079 10415 10415 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@f578183
+08-30 13:06:48.081 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: RESUMED
+08-30 13:06:48.081 10415 10415 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@f578183
+08-30 13:06:48.177 10415 10415 D WindowLayoutComponentImpl: Register WindowLayoutInfoListener on Context=com.majordaftapps.sshpeaches.app.MainActivity@f578183, of which baseContext=android.app.ContextImpl@9ade92b
+08-30 13:06:48.180 10415 10415 D SSHPeachesUI: RESULT MainActivity.ensureSessionServiceConnection -> OK | requestedServiceStart=true, bindRequested=true
+08-30 13:06:48.182 10415 10415 D SSHPeachesUI: ACTION SessionService.onStartCommand | action=null, startId=2
+08-30 13:06:48.182 10415 10415 D SSHPeachesUI: RESULT SessionService.onStartCommand -> OK
+08-30 13:06:48.183 10415 10415 D SSHPeachesUI: RESULT SessionService.onServiceConnected -> OK | bound=true, serviceReady=true
+08-30 13:06:49.105   679   821 I ImeTracker: com.majordaftapps.sshpeaches.debug:c10bc494: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:06:49.109  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:49.110  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:49.111   679  1899 I ImeTracker: system_server:78762ab4: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:49.112  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:49.114  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:49.115   679   706 I ImeTracker: system_server:78762ab4: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:49.138 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:49.138 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:c10bc494: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:49.285  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:49.288  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:49.290  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:49.293  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:49.719 10415 10449 D HWUI    : endAllActiveAnimators on 0x74a1fe79bcd0 (UnprojectedRipple) with handle 0x74a18e7adad0
+08-30 13:06:49.809 10415 10415 D InsetsController: show(ime(), fromIme=false)
+08-30 13:06:49.810 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:91c8b2f2: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+08-30 13:06:49.811  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=28001, inputTypeString=Normal[MultiLine|AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=42000000, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[mParcelledData.dataSize=404], hintText=null, hintLocales=[]}}, true)
+08-30 13:06:49.812  1744  1744 W SessionManager: SessionManager.beginSession():53 Try to begin an already begun session [INPUT_SESSION], end it first
+08-30 13:06:49.852   468   506 I netd    : tetherGetStats() -> {[]} <0.70ms>
+08-30 13:06:49.906 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:6450d126: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+08-30 13:06:49.907 10415 10415 D InsetsController: show(ime(), fromIme=false)
+08-30 13:06:49.907 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:6450d126: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES
+08-30 13:06:49.909  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:49.911  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInputView():1392 onStartInputView(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=28001, inputTypeString=Normal[MultiLine|AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=42000000, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=null, hintLocales=[]}}, false)
+08-30 13:06:49.913  1744  1744 I StylusEducationPopupDialog: StylusEducationPopupDialog.onEditorTappedWithStylus():71 Schedule to show first time education
+08-30 13:06:49.914  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.getOemKeyboardHeightRatio():161 systemKeyboardHeightRatio:1.000000.
+08-30 13:06:49.919  1744  1744 I AndroidIME: InputBundleManager.loadActiveInputBundleId():483 loadActiveInputBundleId: en-US, ime_english_united_states
+08-30 13:06:49.920  1744  1744 I AndroidIME: AbstractIme.onActivate():90 LatinIme.onActivate() : EditorInfo = EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=28001, inputTypeString=Normal[MultiLine|AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=42000000, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=null, hintLocales=[]}, IncognitoMode = false, DeviceLocked = false
+08-30 13:06:49.920  1744  1744 I InputBundle: InputBundle.consumeEvent():949 Skip consuming an event as keyboard status is 0
+08-30 13:06:49.921  1744  1744 I Delight5Facilitator: Delight5Facilitator.initializeForIme():729 initializeForIme() : Locale = [en_US], layout = qwerty
+08-30 13:06:49.923  1744  1744 I LatinIme: LatinIme.updateEnableInlineSuggestionsOnDecoderSideFlags():1256 inline flag updated to:false
+08-30 13:06:49.924  1744  1744 I LatinIme: LatinIme.updateEnableInlineSuggestionsOnDecoderSideFlags():1256 inline flag updated to:false
+08-30 13:06:49.928  1744  1744 I InputBundle: InputBundle.consumeEvent():949 Skip consuming an event as keyboard status is 0
+08-30 13:06:49.928  1744  1744 I InputBundle: InputBundle.consumeEvent():949 Skip consuming an event as keyboard status is 0
+08-30 13:06:49.930  1744  1744 I KeyboardWrapper: KeyboardWrapper.activateKeyboard():562 activateKeyboard(): type=prime, status=0, imeDef=kyj{stringId=ime_english_united_states, language=en-US, languageTag=en-US, processedConditions={enable_number_row=false, device=phone}, className=com.google.android.libraries.inputmethod.ime.experiment.ExperimentImeWrapper, label=0, keyEventInterpreter=null, inlineComposing=true, autoCapital=true, announceAutoSelectedCandidate=true, statusIcon=0, primeKeyboardType=SOFT, indicatorIcon=0, indicatorLabel=US, displayAppCompletions=true, extraValues=kyb{#0x7f0b021c=TypedValue{t=0x3/d=0x0 "writing_helper_enable_by_word_revert=false"}, #0x7f0b0222=TypedValue{t=0x3/d=0x0 "com.google.android.apps.inputmethod.libs.latin5.LatinIme"}, #0x7f0b0223=TypedValue{t=0x3/d=0x0 "com.google.android.apps.inputmethod.libs.edittracker.EditTrackingImeWrapper"}, #0x7f0b0224=TypedValue{t=0x3/d=0x0 "com.google.android.apps.inputmethod.libs.latin5.LatinIme"}}, processors=lac@9beda95, unacceptableMetaKeys=4098, languageSpecificSettings=0, asciiCapable=true, alwaysShowSuggestions=false, useAsciiPasswordKeyboard=false, secondaryIme=null, keyboardGroupDef=kzl@e08ffbd, phenotypeFlagId=0, localizationLanguageTag=null, supportsInlineSuggestion=true}
+08-30 13:06:49.930  1744  1744 I KeyboardManager: KeyboardManager.requestKeyboard():248 Creating keyboard prime, imeId=ime_english_united_states, cacheKey=theme_!gsf_!pgsans_!pgsf_!use_system_font_BORDER=true_FLAVOR_DPI=XXHDPI_KEYBOARD_WIDTH_CATEGORY=NORMAL_LIGHT_THEME=true_PHYSICAL_DIAGONAL=5.9895906_SCREEN_SHORTEST_WIDTH=411_SCREEN_SHORTEST_WIDTH_NO_SCALE=411_bottom4dp_enable_google_fonts_icons=true_enable_popup_on_keypress=true_keyboard_redesign_google_sans=true_noshadow_overlay_builtin_dynamic_color_light_base.binarypb:gm3-light-fffaf8ff-ff475d92-6dac7c28fa7faa76f8370bbfdbc77981_silkpopup_unify_function_key_color=true
+08-30 13:06:49.932  1744  1744 I KeyboardWrapper: KeyboardWrapper.onKeyboardReady():212 onKeyboardReady(): type=prime(prime), kb=com.google.android.apps.inputmethod.latin.keyboard.LatinPrimeKeyboard@efead03
+08-30 13:06:49.932  1744  1744 I KeyboardWrapper: KeyboardWrapper.doActivateKeyboard():589 doActivateKeyboard(): prime
+08-30 13:06:49.938  1744  1744 I KeyboardViewHelper: KeyboardViewHelper.getView():178 Get view with height ratio:1.000000
+08-30 13:06:49.958  1744  1744 W HWUI    : Image decoding logging dropped!
+08-30 13:06:49.960  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:49.960  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.getKeyboardInitialStates():131
+08-30 13:06:49.962  1744  1744 W Keyboard: Keyboard.getKeyboardViewHelper():597 null helper is returned: keyboardDef=kze{processedConditions={enable_more_candidates_view_for_multilingual=false, layout_9key_split=false, enable_secondary_symbols=false, language=en-US, deprecate_long_press_space_for_ime_picker=false, expressions=normal, enable_flick_symbols=true, variant=qwerty, device=phone, keyboard_mode=normal, show_secondary_digits=true, enable_preemptive_decode=true, rtl_layout=false}, globalConditions={global_theme_key=theme_!gsf_!pgsans_!pgsf_!use_system_font_BORDER=true_FLAVOR_DPI=XXHDPI_KEYBOARD_WIDTH_CATEGORY=NORMAL_LIGHT_THEME=true_PHYSICAL_DIAGONAL=5.9895906_SCREEN_SHORTEST_WIDTH=411_SCREEN_SHORTEST_WIDTH_NO_SCALE=411_bottom4dp_enable_google_fonts_icons=true_enable_popup_on_keypress=true_keyboard_redesign_google_sans=true_noshadow_overlay_builtin_dynamic_color_light_base.binarypb:gm3-light-fffaf8ff-ff475d92-6dac7c28fa7faa76f8370bbfdbc77981_silkpopup_unify_function_key_color=true, global_locale=en_US, global_density_dpi=420, global_orientation=1}, className=.latin.keyboard.LatinPrimeKeyboard, resourceIds=[#0x7f17065e, #0x7f1708dc], initialStates=0, keyboardViewDefs=[kzt{direction=null, id=#0x7f0b0166, isScalable=true, layoutId=#0x7f0e0346, type=BODY, touchable=true, defaultShow=true}, kzt{direction=null, id=#0x7f0b0166, isScalable=false, layoutId=#0x7f0e01db, type=FLOATING_CANDIDATES, touchable=false, defaultShow=false}, kzt{direction=LOCALE, id=#0x7f0b0166, isScalable=false, layoutId=#0x7f0e04da, type=HEADER, touchable=true, defaultShow=true}], persistentStates=0, persistentStatesPrefKey=null, popupBubbleLayoutId=#0x7f0e05ce, recentKeyLayoutId=0, recentKeyPopupLayoutId=0, recentKeyType=null, rememberRecentKey=NONE, sessionStates=17592186044419}, type=WIDGET, helpersCreated=[kkl@4514d9a, kkl@b5f26cb, kkl@1578ea8, null], context.getResources().getConfiguration(): {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.3 s.40 fontWeightAdjustment=0}
+08-30 13:06:49.962  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:49.965  1744  1744 I AndroidIME: InputBundleManager.startInput():361 startInput() with kzp[keyboardType=prime, payload=null]
+08-30 13:06:49.966  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.onActivate():70
+08-30 13:06:49.968  1744  1744 I CrowdsourceExtension: CrowdsourceExtension.checkIfDefaultBrowserIsAllowed():109 Failed to get default browser. The default browser may be deactivated.
+08-30 13:06:49.968  1744  1744 I HardKeyTracker: HardKeyTracker.unregisterKeySequence():182 Unregister key sequence lsr{labelResId=2132020165, callback=cbb@d2f1b18, lastModifier=2, keyCodes=[56], actions=[0]}
+08-30 13:06:49.968  1744  1744 I HardKeyTracker: HardKeyTracker.unregisterKeySequence():182 Unregister key sequence lsr{labelResId=2132020165, callback=cbb@befefd7, lastModifier=0, keyCodes=[317], actions=[0]}
+08-30 13:06:49.968  1744  1744 I HardKeyTracker: HardKeyTracker.registerKeySequence():138 Register key sequence lsr{labelResId=2132020165, callback=cbb@c3726a1, lastModifier=2, keyCodes=[56], actions=[0]}
+08-30 13:06:49.968  1744  1744 I HardKeyTracker: HardKeyTracker.registerKeySequence():138 Register key sequence lsr{labelResId=2132020165, callback=cbb@6fdb3b4, lastModifier=0, keyCodes=[317], actions=[0]}
+08-30 13:06:49.969  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.cancelShutdown():100 cancelShutdown()
+08-30 13:06:49.969  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.syncLanguagePacks():112 syncLanguagePacks()
+08-30 13:06:49.969  1744  1744 I VoiceInputManager: VoiceInputManager.onKeyboardActivated():1023 onKeyboardActivated() [UD]
+08-30 13:06:49.970  1744  1744 I AccessoryInputModeManager: AccessoryInputModeManager.onModeStarted():322 Accessory input mode started: null
+08-30 13:06:49.970  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10160, DEACTIVATE_SUPPLEMENTARY_KEYBOARD, data=accessory_candidates_consumer}
+08-30 13:06:49.970  1744  1744 W SupplementaryKeyboardsWrapper: SupplementaryKeyboardsWrapper.deactivateKeyboard():160 keyboard accessory_candidates_consumer is not activated before!
+08-30 13:06:49.972  1744  5669 I SpeechFactory: SpeechRecognitionFactory.maybeScheduleAutoPackDownloadForFallback():161 maybeScheduleAutoPackDownloadForFallback()
+08-30 13:06:49.973  1744  5669 I FallbackOnDeviceRecognitionProvider: FallbackOnDeviceRecognitionProvider.maybeScheduleAutoPackDownload():198 maybeScheduleAutoPackDownload() for language tag en-US
+08-30 13:06:49.983  1744  1744 I KeyboardModeUtils: KeyboardModeUtils.getKeyboardBottomOffset():437 inch: 0.000000 ydpi: 420.000000 adjustKeyboardBottomByDisplaySize: false currentDensityDpi: 420 defaultDensityDpi: 420 keyboardBottomToScreenPx: 0 keyboardBottomToNavBarPx: -126 navBarHeight: 126
+08-30 13:06:49.983  1744  1744 I ResizableKeyboardModeController: ResizableKeyboardModeController.getKeyboardBottomOffset():182 currentPrimeKeyboardType:SOFT keyboardBottomOffset:0 navBarHeight:126 isInLandscape:false
+08-30 13:06:49.983  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:49.983  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:49.983  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:49.984  1744  1744 W ExtensionWrapper: ExtensionWrapper.setExtensionViewVisibility():801 interface koa is not activate
+08-30 13:06:49.986  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:49.986  1744  1744 I VoiceImeExtension: VoiceImeExtension.shouldStartVoiceInputAutomaticallyInCurrentInputBox():469 No private IME option set to start voice input.
+08-30 13:06:50.001  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.002  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.003  1744  1744 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():166
+08-30 13:06:50.003  1744  1744 I WindowMetricsNotification: WindowMetricsNotification.notify():159 mub[bounds=Rect(0, 128 - 1080, 2400), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=2400, xdpi=420.0, ydpi=420.0, isTrustable=true, displayId=0]; DisplayMetrics{density=2.625, width=1080, height=2400, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+08-30 13:06:50.049  1744  1744 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():312 onKeyboardViewShown: keyboardType=prime, keyboardViewType=HEADER keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{d6082e0 V.E...... ........ 0,0-1080,116}
+08-30 13:06:50.050  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.050  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.050  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.050  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.051  1744  1744 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():312 onKeyboardViewShown: keyboardType=prime, keyboardViewType=BODY keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{142e434 V.E...... ........ 0,0-1080,641}
+08-30 13:06:50.051  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.051  1744  1744 I NewLanguagePromptExtension: NewLanguagePromptExtension$1.onKeyboardViewShown():96 Not show new language banner: no change in enabled input method entries
+08-30 13:06:50.051  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.052  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.052  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.052  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10044, UPDATE_KEYBOARD_LAYOUT, data=# qsn@2355f389}
+08-30 13:06:50.053  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10188, SET_KEYBOARD_LAYOUT, data=# qsn@e819072e}
+08-30 13:06:50.055  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10044, UPDATE_KEYBOARD_LAYOUT, data=# qsn@2355f389}
+08-30 13:06:50.056  1744  2040 I Delight5Decoder: Delight5DecoderWrapper.setKeyboardLayout():521 setKeyboardLayout()
+08-30 13:06:50.058  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10188, SET_KEYBOARD_LAYOUT, data=# qsn@e819072e}
+08-30 13:06:50.060  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.060  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.071  1744  2040 I Delight5Decoder: Delight5DecoderWrapper.setKeyboardLayout():521 setKeyboardLayout()
+08-30 13:06:50.130  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-400000, SPELL_CHECK_SUGGESTIONS, data=null}
+08-30 13:06:50.130  1744  1744 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id spell_check_add_to_dictionary not found in tooltipManager.
+08-30 13:06:50.208 10415 10429 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=7996bd58-4e9c-4cef-9a6d-3ac2be0b2202, tags={ com.majordaftapps.sshpeaches.app.uptime.UptimeWorker } ]
+08-30 13:06:50.214  1744  1744 I StylusEducationPopupDialog: StylusEducationPopupDialog.showFirstTimeEducation():91 First time education not shown for null
+08-30 13:06:50.296  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-20001, ENABLE_GESTURE_TYPING, data=null}
+08-30 13:06:50.298  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10126, INPUT_SELECTION_CHANGED, data=null}
+08-30 13:06:50.329 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:91c8b2f2: onShown
+08-30 13:06:50.381 10415 10415 D SSHPeachesUI: ACTION updateUptimeConfig | hostId=uptime-d6b63063-0497-4617-a1f1-9aafc91f6e38, method=ICMP, port=22, intervalMinutes=45, enabled=false
+08-30 13:06:50.385   679  1015 D WifiClientModeImpl[69521:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+08-30 13:06:50.388   679  1015 D WifiDataStall: tx tput in kbps: 11000
+08-30 13:06:50.388   679  1015 D WifiDataStall: rx tput in kbps: 11000
+08-30 13:06:50.388   679  1015 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+08-30 13:06:50.388   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:50.389   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:50.391   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:50.392   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:50.392   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:50.392   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:50.392   679  1015 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+08-30 13:06:50.392   679  1015 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+08-30 13:06:50.393   679  1015 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 178219727 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+08-30 13:06:50.393   679  1015 D WifiScoreCard: txRate: 1 txSpeed: 1
+08-30 13:06:50.393   679  1015 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 664973517 RSSI -50 txSpeed -1
+08-30 13:06:50.393   679  1015 D WifiClientModeImpl[69521:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.8, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3010] from screen [on:0 period:1388815257] score=60
+08-30 13:06:50.408 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ImeBackAnimationController@6675c53
+08-30 13:06:50.409 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@c6819e8
+08-30 13:06:50.448 10415 10449 D HWUI    : endAllActiveAnimators on 0x74a1fe728540 (UnprojectedRipple) with handle 0x74a18e7e46d0
+08-30 13:06:50.448 10415 10449 D HWUI    : endAllActiveAnimators on 0x74a1fe7c2d40 (UnprojectedRipple) with handle 0x74a18e785600
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059809, 887025, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059838, 1357357, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059867, 1885372, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059895, 1619123, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059924, 2558838, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059953, 6965726, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1059982, 1466789, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060017, 1015482, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060053, 2442426, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060082, 2602834, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.505 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060110, 3214241, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@0@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:50.507 10415 10469 V PerfettoTrigger: Not triggering com.android.telemetry.interaction-jank-monitor-80 - not enough time since last trigger
+08-30 13:06:50.508 10415 10415 I SSHPeachesTelemetry: Debug usage event [updateUptimeConfig]
+08-30 13:06:50.508 10415 10415 D SSHPeachesUI: RESULT updateUptimeConfig -> OK
+08-30 13:06:50.510 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:aadb3ec9: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+08-30 13:06:50.510 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:aadb3ec9: onFailed at PHASE_CLIENT_VIEW_SERVED
+08-30 13:06:50.531   679   707 I ImeTracker: system_server:8742d058: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+08-30 13:06:50.551  1363  1363 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+08-30 13:06:50.551  1363  1363 D wpa_supplicant: nl80211: Beacon loss event
+08-30 13:06:50.551  1363  1363 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+08-30 13:06:50.551  1363  1363 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+08-30 13:06:50.575   679   821 I ImeTracker: com.majordaftapps.sshpeaches.debug:a57301c9: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:06:50.577 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:50.578 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:a57301c9: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:50.578  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInputView():1524
+08-30 13:06:50.579  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.onDeactivate():104
+08-30 13:06:50.580  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.shutdown():122 shutdown()
+08-30 13:06:50.581   679  1899 I ImeTracker: system_server:7444aed6: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:50.582  1744  1744 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id spell_check_add_to_dictionary not found in tooltipManager.
+08-30 13:06:50.584  1744  1744 I InputBundle: InputBundle.consumeEvent():949 Skip consuming an event as keyboard status is 0
+08-30 13:06:50.586  1744  1744 I AndroidIME: AbstractIme.onDeactivate():203 LatinIme.onDeactivate()
+08-30 13:06:50.589  1744  2044 W ModuleManager: ModuleManager.loadModule():547 Module mly is not available
+08-30 13:06:50.590  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:50.593 10415 10415 W RemoteInputConnectionImpl: requestCursorUpdates on inactive InputConnection
+08-30 13:06:50.594  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:50.595  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:50.595 10415 10415 E ImeBackDispatcher: Ime callback not found. Ignoring unregisterReceivedCallback. callbackId: 135315027
+08-30 13:06:50.597  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:50.599  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInputView():1392 onStartInputView(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:50.599  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.getOemKeyboardHeightRatio():161 systemKeyboardHeightRatio:1.000000.
+08-30 13:06:50.609   679   707 I ImeTracker: system_server:6c1d0630: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+08-30 13:06:50.610  1744  1744 I InputContextChangeTracker: InputContextChangeTracker.fixLyingSelectionRangeFromSurroundingText():1665 fixLyingSelectionRangeFromSurroundingText(): [-1, -1]([-1, -1]) -> [0, 0]([0, 0])
+08-30 13:06:50.612  1744  1744 I AndroidIME: InputBundleManager.loadActiveInputBundleId():483 loadActiveInputBundleId: und-Latn-x-password, password
+08-30 13:06:50.612  1744  1744 I AndroidIME: AbstractIme.onActivate():90 PasswordIme.onActivate() : EditorInfo = EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}, IncognitoMode = false, DeviceLocked = false
+08-30 13:06:50.612  1744  1744 I KeyboardWrapper: KeyboardWrapper.activateKeyboard():562 activateKeyboard(): type=prime, status=0, imeDef=kyj{stringId=password, language=und-Latn-x-password, languageTag=und-Latn-x-password, processedConditions={variant=qwerty, enable_access_points_in_password_number=false, enable_number_row=false, device=phone}, className=com.google.android.libraries.inputmethod.ime.password.PasswordIme, label=2132019061, keyEventInterpreter=null, inlineComposing=true, autoCapital=true, announceAutoSelectedCandidate=true, statusIcon=0, primeKeyboardType=SOFT, indicatorIcon=0, indicatorLabel=null, displayAppCompletions=false, extraValues=kyb{}, processors=lac@9beda95, unacceptableMetaKeys=4098, languageSpecificSettings=0, asciiCapable=false, alwaysShowSuggestions=false, useAsciiPasswordKeyboard=false, secondaryIme=null, keyboardGroupDef=kzl@11aa7aa, phenotypeFlagId=0, localizationLanguageTag=null, supportsInlineSuggestion=false}
+08-30 13:06:50.612  1744  1744 I KeyboardManager: KeyboardManager.requestKeyboard():248 Creating keyboard prime, imeId=password, cacheKey=theme_!gsf_!pgsans_!pgsf_!use_system_font_BORDER=true_FLAVOR_DPI=XXHDPI_KEYBOARD_WIDTH_CATEGORY=NORMAL_LIGHT_THEME=true_PHYSICAL_DIAGONAL=5.9895906_SCREEN_SHORTEST_WIDTH=411_SCREEN_SHORTEST_WIDTH_NO_SCALE=411_bottom4dp_enable_google_fonts_icons=true_enable_popup_on_keypress=true_keyboard_redesign_google_sans=true_noshadow_overlay_builtin_dynamic_color_light_base.binarypb:gm3-light-fffaf8ff-ff475d92-6dac7c28fa7faa76f8370bbfdbc77981_silkpopup_unify_function_key_color=true
+08-30 13:06:50.613  1744  1744 I KeyboardWrapper: KeyboardWrapper.onKeyboardReady():212 onKeyboardReady(): type=prime(prime), kb=com.google.android.apps.inputmethod.latin.keyboard.LatinPasswordKeyboard@9b38237
+08-30 13:06:50.614  1744  1744 I KeyboardWrapper: KeyboardWrapper.doActivateKeyboard():589 doActivateKeyboard(): prime
+08-30 13:06:50.617   679  1899 I ImeTracker: system_server:6c1d0630: onCancelled at PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY
+08-30 13:06:50.621  1744  1744 I KeyboardViewHelper: KeyboardViewHelper.getView():178 Get view with height ratio:1.000000
+08-30 13:06:50.638  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.638  1744  1744 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id undo_access_point_promotion_banner not found in tooltipManager.
+08-30 13:06:50.638   679  1899 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10233, packageName = null, attributionTag = null, token = android.os.Binder@2aabd5d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+08-30 13:06:50.640  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.getKeyboardInitialStates():131
+08-30 13:06:50.642  1744  1744 W Keyboard: Keyboard.getKeyboardViewHelper():597 null helper is returned: keyboardDef=kze{processedConditions={enable_more_candidates_view_for_multilingual=false, layout_9key_split=false, enable_secondary_symbols=false, language=en-US, deprecate_long_press_space_for_ime_picker=false, expressions=normal, enable_access_points_in_password_number=false, show_suggestions=true, enable_flick_symbols=true, variant=qwerty, device=phone, keyboard_mode=normal, show_secondary_digits=false, enable_preemptive_decode=true, rtl_layout=false}, globalConditions={global_theme_key=theme_!gsf_!pgsans_!pgsf_!use_system_font_BORDER=true_FLAVOR_DPI=XXHDPI_KEYBOARD_WIDTH_CATEGORY=NORMAL_LIGHT_THEME=true_PHYSICAL_DIAGONAL=5.9895906_SCREEN_SHORTEST_WIDTH=411_SCREEN_SHORTEST_WIDTH_NO_SCALE=411_bottom4dp_enable_google_fonts_icons=true_enable_popup_on_keypress=true_keyboard_redesign_google_sans=true_noshadow_overlay_builtin_dynamic_color_light_base.binarypb:gm3-light-fffaf8ff-ff475d92-6dac7c28fa7faa76f8370bbfdbc77981_silkpopup_unify_function_key_color=true, global_locale=en_US, global_density_dpi=420, global_orientation=1}, className=.latin.keyboard.LatinPasswordKeyboard, resourceIds=[#0x7f17065e, #0x7f1708dc, #0x7f17071c], initialStates=0, keyboardViewDefs=[kzt{direction=null, id=#0x7f0b0166, isScalable=true, layoutId=#0x7f0e0346, type=BODY, touchable=true, defaultShow=true}, kzt{direction=null, id=#0x7f0b0166, isScalable=false, layoutId=#0x7f0e01db, type=FLOATING_CANDIDATES, touchable=false, defaultShow=false}, kzt{direction=LOCALE, id=#0x7f0b0166, isScalable=false, layoutId=#0x7f0e04d8, type=HEADER, touchable=true, defaultShow=true}], persistentStates=0, persistentStatesPrefKey=null, popupBubbleLayoutId=#0x7f0e05ce, recentKeyLayoutId=0, recentKeyPopupLayoutId=0, recentKeyType=null, rememberRecentKey=NONE, sessionStates=17592186044419}, type=WIDGET, helpersCreated=[kkl@97241a0, kkl@764e159, kkl@673411e, null], context.getResources().getConfiguration(): {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger qwerty/v/v -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.3 s.40 fontWeightAdjustment=0}
+08-30 13:06:50.645  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.648  1744  1744 I AndroidIME: InputBundleManager.startInput():361 startInput() with kzp[keyboardType=prime, payload=null]
+08-30 13:06:50.649  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.onActivate():70
+08-30 13:06:50.652  1744  1744 I CrowdsourceExtension: CrowdsourceExtension.checkIfDefaultBrowserIsAllowed():109 Failed to get default browser. The default browser may be deactivated.
+08-30 13:06:50.653  1744  1744 I NewLanguagePromptExtension: NewLanguagePromptExtension.onActivate():186 Not activated NewLanguagePromptExtension: not a normal text input box.
+08-30 13:06:50.653  1744  1744 I HardKeyTracker: HardKeyTracker.unregisterKeySequence():182 Unregister key sequence lsr{labelResId=2132020165, callback=cbb@c3726a1, lastModifier=2, keyCodes=[56], actions=[0]}
+08-30 13:06:50.653  1744  1744 I HardKeyTracker: HardKeyTracker.unregisterKeySequence():182 Unregister key sequence lsr{labelResId=2132020165, callback=cbb@6fdb3b4, lastModifier=0, keyCodes=[317], actions=[0]}
+08-30 13:06:50.653  1744  1744 I HardKeyTracker: HardKeyTracker.registerKeySequence():138 Register key sequence lsr{labelResId=2132020165, callback=cbb@b250f1f, lastModifier=2, keyCodes=[56], actions=[0]}
+08-30 13:06:50.655  1744  1744 I HardKeyTracker: HardKeyTracker.registerKeySequence():138 Register key sequence lsr{labelResId=2132020165, callback=cbb@1759cca, lastModifier=0, keyCodes=[317], actions=[0]}
+08-30 13:06:50.656  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.cancelShutdown():100 cancelShutdown()
+08-30 13:06:50.656  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.syncLanguagePacks():112 syncLanguagePacks()
+08-30 13:06:50.656  1744  1744 I VoiceInputManager: VoiceInputManager.onKeyboardActivated():1023 onKeyboardActivated() [UD]
+08-30 13:06:50.657  1744  1744 I AccessoryInputModeManager: AccessoryInputModeManager.onModeStarted():322 Accessory input mode started: null
+08-30 13:06:50.658  1744  1744 I ProactiveUndoTriggerExtension: ProactiveUndoTriggerExtension.eventConsumer$lambda$0():125 kyp{intention=null, keyCode=-10160, DEACTIVATE_SUPPLEMENTARY_KEYBOARD, data=accessory_candidates_consumer}
+08-30 13:06:50.658  1744  1744 W SupplementaryKeyboardsWrapper: SupplementaryKeyboardsWrapper.deactivateKeyboard():160 keyboard accessory_candidates_consumer is not activated before!
+08-30 13:06:50.663  1111  1253 D SplashScreenView: Build android.window.SplashScreenView{f9db09f V.E...... ......ID 0,0-0,0}
+08-30 13:06:50.663  1111  1253 D SplashScreenView: Icon: view: null drawable: null size: 0
+08-30 13:06:50.663  1111  1253 D SplashScreenView: Branding: view: android.view.View{beed5ec G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+08-30 13:06:50.668 10415 10415 D SSHPeachesUI: ACTION onUserInteraction | locked=false
+08-30 13:06:50.669   544   633 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:06:50.671 10415 10415 D SSHPeachesUI: RESULT onUserInteraction -> OK
+08-30 13:06:50.673  1744  1744 I KeyboardModeUtils: KeyboardModeUtils.getKeyboardBottomOffset():437 inch: 0.000000 ydpi: 420.000000 adjustKeyboardBottomByDisplaySize: false currentDensityDpi: 420 defaultDensityDpi: 420 keyboardBottomToScreenPx: 0 keyboardBottomToNavBarPx: -126 navBarHeight: 126
+08-30 13:06:50.674  1744  1744 I ResizableKeyboardModeController: ResizableKeyboardModeController.getKeyboardBottomOffset():182 currentPrimeKeyboardType:SOFT keyboardBottomOffset:0 navBarHeight:126 isInLandscape:false
+08-30 13:06:50.675  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.677  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.678 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: PAUSED
+08-30 13:06:50.679  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.680 10415 10415 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@f578183
+08-30 13:06:50.681  1744  1744 W ExtensionWrapper: ExtensionWrapper.setExtensionViewVisibility():801 interface koa is not activate
+08-30 13:06:50.688  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:50.689  1744  1744 I VoiceImeExtension: VoiceImeExtension.shouldStartVoiceInputAutomaticallyInCurrentInputBox():469 No private IME option set to start voice input.
+08-30 13:06:50.699   544   544 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:06:50.699 10476 10491 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+08-30 13:06:50.700   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:50.700   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:50.700  1744  5669 I SpeechFactory: SpeechRecognitionFactory.maybeScheduleAutoPackDownloadForFallback():161 maybeScheduleAutoPackDownloadForFallback()
+08-30 13:06:50.700  1744  5669 I FallbackOnDeviceRecognitionProvider: FallbackOnDeviceRecognitionProvider.maybeScheduleAutoPackDownload():198 maybeScheduleAutoPackDownload() for language tag en-US
+08-30 13:06:50.702  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.702  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.702  1744  1744 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():166
+08-30 13:06:50.703 10476 10491 I EGL_emulation: Opening libGLESv2_emulation.so
+08-30 13:06:50.709  1744  1744 I WindowMetricsNotification: WindowMetricsNotification.notify():159 mub[bounds=Rect(0, 128 - 1080, 2400), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=2400, xdpi=420.0, ydpi=420.0, isTrustable=true, displayId=0]; DisplayMetrics{density=2.625, width=1080, height=2400, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+08-30 13:06:50.720  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInputView():1524
+08-30 13:06:50.722  1744  1744 I GlobeKeyExtension: GlobeKeyExtension.onDeactivate():104
+08-30 13:06:50.725  1744  1744 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.shutdown():122 shutdown()
+08-30 13:06:50.725  1744  1744 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id spell_check_add_to_dictionary not found in tooltipManager.
+08-30 13:06:50.726  1744  1744 I AndroidIME: AbstractIme.onDeactivate():203 PasswordIme.onDeactivate()
+08-30 13:06:50.733  1744  1744 I ImeTracker: system_server:7444aed6: onHidden
+08-30 13:06:50.736  1744  1744 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():312 onKeyboardViewShown: keyboardType=prime, keyboardViewType=HEADER keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{e2a812f V.E...... .......D 0,0-1080,116}
+08-30 13:06:50.737  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.738  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.739  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.739  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.740  1744  1744 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():312 onKeyboardViewShown: keyboardType=prime, keyboardViewType=BODY keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{142e434 V.E...... ........ 0,0-1080,641}
+08-30 13:06:50.740  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.741  1744  1744 I NewLanguagePromptExtension: NewLanguagePromptExtension$1.onKeyboardViewShown():86 Not show new language banner: not prime keyboard, or the extension not activated.
+08-30 13:06:50.742  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.744 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ImeBackAnimationController@938ac4d
+08-30 13:06:50.744  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.744  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.757  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.757  1744  1744 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():46 leave 281 height for app when ime window height:2146, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1749
+08-30 13:06:50.758 10476 10491 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+08-30 13:06:50.762 10476 10476 D AutofillManager: Fill dialog is enabled:false, hints=[]
+08-30 13:06:50.836   679   707 I ImeTracker: system_server:89a97e85: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+08-30 13:06:51.040   679   703 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug.test/androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity for user 0: +392ms
+08-30 13:06:51.062   507   531 I RanchuHwc: logCompositionFallbackIfChanged: layer 2441 CompositionType fallback from 3 to 1
+08-30 13:06:51.101   679  1899 I ImeTracker: system_server:6c1d0630: setFinished on previously finished token at PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY with STATUS_CANCEL
+08-30 13:06:51.102   679  1899 I ImeTracker: system_server:6c1d0630: onCancelled at PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY
+08-30 13:06:51.115   679   821 I ImeTracker: com.majordaftapps.sshpeaches.debug.test:575f7c30: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:06:51.138 10415 10415 I ImeTracker: system_server:89a97e85: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+08-30 13:06:51.139  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:51.142   544   633 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:06:51.145 10476 10476 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:51.146 10476 10476 I ImeTracker: com.majordaftapps.sshpeaches.debug.test:575f7c30: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:51.147  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:51.147  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug.test, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:51.149  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:51.152   679  2071 I ImeTracker: system_server:a90cfb18: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:51.153   468   506 I netd    : tetherGetStats() -> {[]} <1.52ms>
+08-30 13:06:51.161  1414  1414 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+08-30 13:06:51.173   679   706 I ImeTracker: system_server:a90cfb18: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:51.198   679   707 I ImeTracker: system_server:da6f2475: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+08-30 13:06:51.214 10476 10476 I ImeTracker: system_server:da6f2475: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+08-30 13:06:51.216  1414  1414 D BaseDepthController: setSurface:
+08-30 13:06:51.216  1414  1414 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+08-30 13:06:51.216  1414  1414 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x656077e
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed App frame:UNKNOWN: 3, 1060612, 22604869, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:UNKNOWN: 3, 1060612, 22604869, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060634, 48144127, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed App frame:UNKNOWN: 3, 1060663, 62590822, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:UNKNOWN: 3, 1060663, 62590822, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060727, 46928042, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060749, 78605164, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.226 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060815, 289636803, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.227 10415 10415 W FrameTracker: Missed SF frame:JANK_COMPOSER, 1060881, 290978408, CUJ=J<IME_INSETS_HIDE_ANIMATION::1@1@com.majordaftapps.sshpeaches.debug>
+08-30 13:06:51.227 10415 10469 V PerfettoTrigger: Not triggering com.android.telemetry.interaction-jank-monitor-81 - not enough time since last trigger
+08-30 13:06:51.245  1744  1744 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id undo_access_point_promotion_banner not found in tooltipManager.
+08-30 13:06:51.264   679  2238 I ImeTracker: system_server:9add1007: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:51.266   679   706 I ImeTracker: system_server:9add1007: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:51.296  1414  1429 I s.nexuslauncher: NativeAlloc concurrent mark compact GC freed 842KB AllocSpace bytes, 10(520KB) LOS objects, 49% free, 6617KB/12MB, paused 536us,2.842ms total 201.067ms
+08-30 13:06:51.301  1414  1431 W System  : A resource failed to call release.
+08-30 13:06:51.302  1414  1431 W System  : A resource failed to call release.
+08-30 13:06:51.302  1414  1431 W System  : A resource failed to call release.
+08-30 13:06:51.317  1414  1414 D StatsLog: LAUNCHER_ONRESUME
+08-30 13:06:51.344  1870  1975 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+08-30 13:06:51.344  1870  1975 I AiAiEcho: EchoTargets:
+08-30 13:06:51.344  1870  1975 I AiAiEcho: Filtered by AiAi flag check:
+08-30 13:06:51.344  1870  1975 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+08-30 13:06:51.344  1870  1975 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+08-30 13:06:51.345  1870  1975 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+08-30 13:06:51.347  1414  1461 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+08-30 13:06:51.357  1414  1414 D SsBaseTemplateCard: No text view can be set up
+08-30 13:06:51.358  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:06:51.358  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:06:51.358  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:06:51.358  1414  1414 I SsBaseTemplateCard: Secondary card pane is null
+08-30 13:06:51.390   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:51.392   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:06:51.422  1414  1414 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+08-30 13:06:51.422  1414  1414 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:22)
+08-30 13:06:51.422  1414  1414 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:11)
+08-30 13:06:51.422  1414  1414 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:339)
+08-30 13:06:51.423  1414  1414 D b/311077782: LauncherAnimationRunner.setAnimation
+08-30 13:06:51.433   679   821 I ImeTracker: com.google.android.apps.nexuslauncher:6f9e53d7: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:06:51.439  1414  1414 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:06:51.439  1414  1414 I ImeTracker: com.google.android.apps.nexuslauncher:6f9e53d7: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:06:51.459 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@5dab9bf
+08-30 13:06:51.479  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:06:51.480  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:06:51.481  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:06:51.481   679  2068 I ImeTracker: system_server:514a158c: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:06:51.481  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:06:51.486 10415 10415 D SSHPeachesUI: ACTION onAppBackgrounded | locked=false
+08-30 13:06:51.487 10415 10415 D SSHPeachesUI: RESULT onAppBackgrounded -> OK | timerActive=true
+08-30 13:06:51.490   507   531 I RanchuHwc: logCompositionFallbackIfChanged: layer 2445 CompositionType fallback from 2 to 1
+08-30 13:06:51.490   507   531 I RanchuHwc: logCompositionFallbackIfChanged: layer 2444 CompositionType fallback from 2 to 1
+08-30 13:06:51.491 10415 10415 D SSHPeachesUI: RESULT MainActivity.backgroundSessionTimeout -> OK | stopNow=never
+08-30 13:06:51.491 10415 10415 D SSHPeachesUI: ACTION MainActivity.onStop | persistSessions=true
+08-30 13:06:51.491 10415 10415 D SSHPeachesUI: RESULT MainActivity.onStop -> OK | stoppedAllSessions=false
+08-30 13:06:51.491 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: STOPPED
+08-30 13:06:51.492 10415 10415 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@f578183
+08-30 13:06:51.499   679   706 I ImeTracker: system_server:514a158c: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:06:51.574 10415 10415 D SSHPeachesUI: ACTION MainActivity.onDestroy | serviceBound=true
+08-30 13:06:51.575 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@6544b2c
+08-30 13:06:51.576 10415 10415 D SSHPeachesUI: RESULT MainActivity.onDestroy -> OK
+08-30 13:06:51.576 10415 10415 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@f578183 in: DESTROYED
+08-30 13:06:51.577 10415 10415 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+08-30 13:06:51.584 10415 10431 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@a229bf6]
+08-30 13:06:51.593 10415 10415 D ViewRootImpl: Skipping stats log for color mode
+08-30 13:06:51.614 10415 10431 I TestRunner: finished: editTrackedHostPersistsUpdatedConfig(com.majordaftapps.sshpeaches.app.uptime.UptimeScreenTest)

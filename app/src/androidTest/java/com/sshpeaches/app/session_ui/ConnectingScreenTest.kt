@@ -1296,9 +1296,9 @@ class ConnectingScreenTest {
             "A single log line should print from the top of the pane like a shell " +
                 "(text top=${oneLineTextBounds.top}, pane top=${oneLineBounds.top})"
         }
-        check(oneLineBounds.height <= shortPaneDensity * 40f) {
-            "The pane should shrink to fit a single line instead of reserving its max " +
-                "height with the text pushed to the bottom: ${oneLineBounds.height}px"
+        check(oneLineBounds.height >= oneLineTextBounds.height * 3f) {
+            "The pane should always reserve its maximum height instead of shrinking " +
+                "to fit a single line: ${oneLineBounds.height}px"
         }
 
         composeRule.runOnIdle {
@@ -1323,16 +1323,12 @@ class ConnectingScreenTest {
             .fetchSemanticsNode()
             .boundsInRoot
         val density = composeRule.activity.resources.displayMetrics.density
-        val tolerancePx = density * 2f
-        val expectedMaxHeightPx = density * 120f
-        check(cappedBounds.height > oneLineBounds.height) {
-            "The log pane should grow upward as lines are added"
+        val tolerancePx = density * 4f
+        check(kotlin.math.abs(cappedBounds.height - oneLineBounds.height) <= tolerancePx) {
+            "The log pane should stay locked at its maximum height as lines are added"
         }
         check(kotlin.math.abs(cappedBounds.bottom - oneLineBounds.bottom) <= tolerancePx) {
             "The growing log pane should stay anchored to the bottom"
-        }
-        check(cappedBounds.height <= expectedMaxHeightPx + tolerancePx) {
-            "The log pane exceeded its 24% max height: ${cappedBounds.height}px"
         }
 
         composeRule.runOnIdle {

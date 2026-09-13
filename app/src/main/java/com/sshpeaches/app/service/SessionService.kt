@@ -32,6 +32,9 @@ import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.sftp.SftpDownloadAdmission
+import com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloader
+import com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings
 import com.majordaftapps.sshpeaches.app.data.ssh.Ed25519IdentityKeyProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt as SshHostKeyPrompt
@@ -61,6 +64,7 @@ import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -115,7 +119,8 @@ class SessionService : Service() {
     private val shellOutput = MutableStateFlow<Map<String, String>>(emptyMap())
     private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
     private val fileTransferProgress = MutableStateFlow<Map<String, FileTransferProgress>>(emptyMap())
-    private val activeFileTransfers = ConcurrentHashMap<String, ActiveFileTransfer>()
+    private val activeFileTransfers = ConcurrentHashMap<String, CopyOnWriteArrayList<ActiveFileTransfer>>()
+    private val sftpDownloadAdmissions = ConcurrentHashMap<String, SftpDownloadAdmission>()
     private val sessionSnapshotsState = sessionSnapshots.asStateFlow()
     private val hostKeyPromptsState = hostKeyPrompts.asStateFlow()
     private val passwordPromptsState = passwordPrompts.asStateFlow()
@@ -146,6 +151,8 @@ class SessionService : Service() {
     private var nextSessionDisplayNumber = 1
     @Volatile
     private var diagnosticsEnabled: Boolean = false
+    @Volatile
+    private var sftpTransferSettings: SftpTransferSettings = SftpTransferSettings()
 
     override fun onCreate() {
         super.onCreate()
@@ -154,6 +161,11 @@ class SessionService : Service() {
         serviceScope.launch {
             SettingsStore.diagnosticsEnabled.collect { enabled ->
                 diagnosticsEnabled = enabled
+            }
+        }
+        serviceScope.launch {
+            SettingsStore.sftpTransferSettings.collect { settings ->
+                sftpTransferSettings = settings
             }
         }
         createChannel()
@@ -644,6 +656,7 @@ class SessionService : Service() {
             runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { client?.disconnect() }
             activeConnections.remove(sessionId)
+            sftpDownloadAdmissions.remove(sessionId)
             clearHostKeyPromptsForHost(sessionId, trust = false)
             clearPasswordPromptsForHost(sessionId, password = null)
             clearRuntimeSessionPassword(sessionId)
@@ -686,6 +699,7 @@ class SessionService : Service() {
             }
         }
         activeJobs.remove(hostId)?.cancel()
+        sftpDownloadAdmissions.remove(hostId)
         updateSessionNotifications()
         removeSessionSnapshot(hostId)
         clearShellOutputForHost(hostId)
@@ -951,7 +965,8 @@ class SessionService : Service() {
         sourceLabel: String,
         destinationLabel: String,
         totalBytes: Long? = null,
-        sftpClientToAbort: SFTPClient? = null
+        sftpClientToAbort: SFTPClient? = null,
+        allowParallel: Boolean = false
     ): ActiveFileTransfer? {
         val operationId = UUID.randomUUID().toString()
         val progress = FileTransferProgress(
@@ -969,10 +984,11 @@ class SessionService : Service() {
             operationId = operationId,
             operationLabel = "${mode.name} ${direction.name.lowercase()}",
             initialProgress = progress,
-            sftpClientToAbort = sftpClientToAbort
+            sftpClientToAbort = sftpClientToAbort,
+            allowParallel = allowParallel
         )
-        val existing = activeFileTransfers.putIfAbsent(hostId, transfer)
-        if (existing != null) {
+        if (!registerActiveTransfer(transfer)) {
+            val existing = activeTransfersFor(hostId).firstOrNull()
             SessionLogBus.emit(
                 SessionLogBus.Entry(
                     hostId = hostId,
@@ -983,12 +999,38 @@ class SessionService : Service() {
             UiDebugLog.result(
                 "beginFileTransfer",
                 false,
-                "already-active hostId=$hostId operationId=${existing.operationId}"
+                "already-active hostId=$hostId operationId=${existing?.operationId}"
             )
             return null
         }
         setFileTransferProgress(hostId, progress)
         return transfer
+    }
+
+    private fun registerActiveTransfer(transfer: ActiveFileTransfer): Boolean {
+        synchronized(fileTransferStateLock) {
+            val list = activeFileTransfers.getOrPut(transfer.sessionId) { CopyOnWriteArrayList() }
+            val hasExclusive = list.any { !it.allowParallel }
+            if (transfer.allowParallel) {
+                if (hasExclusive) return false
+            } else if (list.isNotEmpty()) {
+                return false
+            }
+            list.add(transfer)
+            return true
+        }
+    }
+
+    private fun removeActiveTransfer(transfer: ActiveFileTransfer) {
+        val list = activeFileTransfers[transfer.sessionId] ?: return
+        list.remove(transfer)
+        if (list.isEmpty()) {
+            activeFileTransfers.remove(transfer.sessionId, list)
+        }
+    }
+
+    private fun activeTransfersFor(sessionId: String): List<ActiveFileTransfer> {
+        return activeFileTransfers[sessionId]?.toList().orEmpty()
     }
 
     private fun publishFileTransferFailure(
@@ -1081,13 +1123,18 @@ class SessionService : Service() {
         transfer: ActiveFileTransfer,
         transform: (FileTransferProgress) -> FileTransferProgress
     ) {
-        val current = fileTransferProgress.value[transfer.sessionId] ?: return
-        if (current.operationId != transfer.operationId || !current.isActive) return
+        val displayed = fileTransferProgress.value[transfer.sessionId]
+        val base = if (displayed?.operationId == transfer.operationId && displayed.isActive) {
+            displayed
+        } else {
+            transfer.latestProgress
+        }
+        if (!base.isActive) return
+        val next = transform(base)
+        transfer.latestProgress = next
         setFileTransferProgress(
             hostId = transfer.sessionId,
-            progress = transform(current),
-            expectedOperationId = transfer.operationId,
-            requireActive = true
+            progress = next
         )
     }
 
@@ -1104,7 +1151,7 @@ class SessionService : Service() {
     ): Boolean {
         val current = fileTransferProgress.value[transfer.sessionId]
             ?.takeIf { it.operationId == transfer.operationId }
-            ?: transfer.initialProgress
+            ?: transfer.latestProgress
         if (!current.isActive) return false
         val terminal = current.copy(
             bytesTransferred = if (status == FileTransferStatus.SUCCEEDED) {
@@ -1117,10 +1164,19 @@ class SessionService : Service() {
             errorMessage = errorMessage?.takeIf { it.isNotBlank() },
             completedAtEpochMillis = System.currentTimeMillis()
         )
+        transfer.latestProgress = terminal
         // The transfer block has returned (or unwound) before this method is
         // called, so release admission before exposing a terminal state. That
         // keeps UI controls and service admission in agreement.
-        activeFileTransfers.remove(transfer.sessionId, transfer)
+        removeActiveTransfer(transfer)
+        val remaining = activeTransfersFor(transfer.sessionId).lastOrNull()
+        if (remaining != null) {
+            setFileTransferProgress(
+                hostId = transfer.sessionId,
+                progress = remaining.latestProgress
+            )
+            return true
+        }
         return setFileTransferProgress(
             hostId = transfer.sessionId,
             progress = terminal,
@@ -1192,7 +1248,7 @@ class SessionService : Service() {
                 if (!transfer.cancellationRequested.get() ||
                     transfer.sftpClientToAbort == null
                 ) {
-                    activeFileTransfers.remove(transfer.sessionId, transfer)
+                    removeActiveTransfer(transfer)
                 }
             }
         }
@@ -1213,7 +1269,7 @@ class SessionService : Service() {
                 )
             }
             if (!cancellationNeedsSftpRecovery) {
-                activeFileTransfers.remove(transfer.sessionId, transfer)
+                removeActiveTransfer(transfer)
             }
         }
         if (transfer.cancellationRequested.get()) {
@@ -1229,31 +1285,36 @@ class SessionService : Service() {
         sessionId: String,
         restoreSftpAfterCancellation: Boolean
     ): Boolean {
-        val transfer = activeFileTransfers[sessionId] ?: return false
-        if (!transfer.cancellationRequested.compareAndSet(false, true)) return true
-
-        // Keep the operation active until SSHJ has actually unwound. Publishing
-        // CANCELLED early would enable another transfer against the same
-        // mutable SSHJ listener while the old I/O was still running.
-        transfer.job?.cancel(FileTransferCancelledException())
-        transfer.workerThread?.interrupt()
-        transfer.sftpClientToAbort?.let { sftp ->
+        val transfers = activeTransfersFor(sessionId)
+        if (transfers.isEmpty()) return false
+        transfers.forEach { transfer ->
+            transfer.cancellationRequested.compareAndSet(false, true)
+            // Keep the operation active until SSHJ has actually unwound. Publishing
+            // CANCELLED early would enable another transfer against the same
+            // mutable SSHJ listener while the old I/O was still running.
+            transfer.job?.cancel(FileTransferCancelledException())
+            transfer.workerThread?.interrupt()
+        }
+        val sftpToAbort = transfers.mapNotNull { it.sftpClientToAbort }.firstOrNull()
+        if (sftpToAbort != null) {
             serviceScope.launch {
-                runCatching { sftp.close() }
-                transfer.job?.join()
+                runCatching { sftpToAbort.close() }
+                transfers.forEach { transfer -> transfer.job?.join() }
                 if (restoreSftpAfterCancellation && activeConnections.containsKey(sessionId)) {
-                    restoreSftpBindingAfterCancellation(sessionId, sftp)
+                    restoreSftpBindingAfterCancellation(sessionId, sftpToAbort)
                 }
-                if (finishFileTransfer(transfer, FileTransferStatus.CANCELLED)) {
-                    SessionLogBus.emit(
-                        SessionLogBus.Entry(
-                            hostId = sessionId,
-                            level = SessionLogBus.LogLevel.WARN,
-                            message = "${transfer.operationLabel} cancelled."
+                transfers.forEach { transfer ->
+                    if (finishFileTransfer(transfer, FileTransferStatus.CANCELLED)) {
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = sessionId,
+                                level = SessionLogBus.LogLevel.WARN,
+                                message = "${transfer.operationLabel} cancelled."
+                            )
                         )
-                    )
+                    }
+                    removeActiveTransfer(transfer)
                 }
-                activeFileTransfers.remove(sessionId, transfer)
             }
         }
         return true
@@ -1297,7 +1358,7 @@ class SessionService : Service() {
             fileName = inferTransferFileName(source, fallback = "download.bin"),
             sourceLabel = source,
             destinationLabel = destinationLabel,
-            sftpClientToAbort = sftp
+            allowParallel = true
         ) ?: return
         launchFileTransfer(transfer, "sftpDownloadFile") {
             val destinationUri = localPath.toContentUriOrNull()
@@ -1308,12 +1369,58 @@ class SessionService : Service() {
             updateActiveFileTransfer(transfer) {
                 it.copy(destinationLabel = destinationLabel, totalBytes = totalBytes)
             }
-            withTransferListener(sftp.fileTransfer, buildTransferListener(transfer)) {
+            val settings = sftpTransferSettings
+            val admission = sftpDownloadAdmissions.getOrPut(hostId) {
+                SftpDownloadAdmission.fromSettings(settings)
+            }
+            val progressThrottle = FileTransferProgressThrottle(
+                updateIntervalNanos = FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS
+            )
+            fun publishProgress(transferred: Long) {
+                throwIfFileTransferCancelled(transfer)
+                if (progressThrottle.shouldPublish(transferred, totalBytes)) {
+                    updateActiveFileTransfer(transfer) {
+                        it.copy(
+                            destinationLabel = destinationLabel,
+                            totalBytes = totalBytes ?: it.totalBytes,
+                            bytesTransferred = transferred,
+                            hasStarted = true
+                        )
+                    }
+                }
+            }
+            val cancelled = {
+                transfer.cancellationRequested.get() || Thread.currentThread().isInterrupted
+            }
+            admission.withPermit {
+                throwIfFileTransferCancelled(transfer)
                 if (destinationUri != null) {
-                    sftp.get(source, ContentUriDestFile(destinationUri))
+                    val staged = File.createTempFile("sftp_dl_", ".bin", cacheDir)
+                    try {
+                        SftpPipelinedDownloader.downloadFromSftp(
+                            sftp = sftp,
+                            remotePath = source,
+                            localFile = staged,
+                            settings = settings,
+                            onBytesTransferred = ::publishProgress,
+                            isCancelled = cancelled
+                        )
+                        contentResolver.openOutputStream(destinationUri, "w")?.use { output ->
+                            staged.inputStream().use { input -> input.copyTo(output) }
+                        } ?: throw IOException("Unable to open destination stream for $destinationUri")
+                    } finally {
+                        staged.delete()
+                    }
                 } else {
                     destinationFile.parentFile?.mkdirs()
-                    sftp.get(source, destinationFile.absolutePath)
+                    SftpPipelinedDownloader.downloadFromSftp(
+                        sftp = sftp,
+                        remotePath = source,
+                        localFile = destinationFile,
+                        settings = settings,
+                        onBytesTransferred = ::publishProgress,
+                        isCancelled = cancelled
+                    )
                 }
             }
             "SFTP download complete: $source -> $destinationLabel"
@@ -3643,9 +3750,13 @@ class SessionService : Service() {
         val operationId: String,
         val operationLabel: String,
         val initialProgress: FileTransferProgress,
-        val sftpClientToAbort: SFTPClient?
+        val sftpClientToAbort: SFTPClient?,
+        val allowParallel: Boolean = false
     ) {
         val cancellationRequested = AtomicBoolean(false)
+
+        @Volatile
+        var latestProgress: FileTransferProgress = initialProgress
 
         @Volatile
         var job: Job? = null

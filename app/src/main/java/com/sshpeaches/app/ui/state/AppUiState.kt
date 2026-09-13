@@ -11,6 +11,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 
@@ -48,6 +49,7 @@ data class AppUiState(
     val usageReportsEnabled: Boolean = SettingsStore.defaultUsageReportsEnabled,
     val useBuiltInKeyboard: Boolean = false,
     val snippetRunTimeoutSeconds: Int = 10,
+    val sftpTransferSettings: SftpTransferSettings = SftpTransferSettings(),
     val pinConfigured: Boolean = false,
     val isLocked: Boolean = false,
     val keyboardSlots: List<KeyboardSlotAction> = KeyboardLayoutDefaults.DEFAULT_SLOTS

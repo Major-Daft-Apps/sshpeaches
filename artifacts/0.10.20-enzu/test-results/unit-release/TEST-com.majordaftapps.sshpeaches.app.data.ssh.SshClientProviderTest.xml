@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-08-30T14:38:34.244Z" hostname="358123.200293.sys.ipv4.io" time="3.427">
+  <properties/>
+  <testcase name="regression_largeSftpUploadAndDownloadStayBelowSshjTransportPacketLimit" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="2.231"/>
+  <testcase name="regression_cannotConnectWhenDhOnlyServerIsUnavailableAndUnavailableToClient" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.041"/>
+  <testcase name="connectsToOpenSshLikeEcdhServerWithEcdsaHostKey" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.14"/>
+  <testcase name="compatibleHostKeyProviderKeepsSshjDefaultProviderUnset" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.003"/>
+  <testcase name="configuredClientPrefersFastCiphersAndDisablesCompression" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.024"/>
+  <testcase name="configuredClientUsesTransferOptimizedChannelFlowControl" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.017"/>
+  <testcase name="existingTerminalAndSftpSessionsSurviveAdditionalConnections" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.526"/>
+  <testcase name="compatibleKexRemovesDiffieHellmanWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.004"/>
+  <testcase name="connectsToLocalEcdhServerWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.074"/>
+  <testcase name="ed25519SignatureVerifiesPublicKeyWhenEncodedThrows" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.05"/>
+  <testcase name="connectsToOpenSshServerWithEd25519HostKeyWhenAvailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.189"/>
+  <testcase name="ed25519Pkcs8IdentityLoadsDirectKeyProvider" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.013"/>
+  <testcase name="regression_cannotConnectWhenDhOnlyServerIsUnavailableForCaseInsensitiveInput" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.005"/>
+  <testcase name="retriesPasswordAfterInitialFailureWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.087"/>
+  <testcase name="compatibleKexPrefersEcdhBeforeDiffieHellmanForOpenSshOverlap" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.006"/>
+  <testcase name="knownHostsTrustsEd25519PublicKeyWhenEncodedThrows" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.009"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

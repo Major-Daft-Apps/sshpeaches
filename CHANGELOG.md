@@ -4,6 +4,15 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.10.20 (1020)
+
+Release date: 2026-08-29
+
+- Sped up SFTP downloads with pipelined `SSH_FXP_READ`s, 256 KiB read size, a 128-request window, up to four parallel files, and ranged workers for large files.
+- Prefer fast SSH ciphers (ChaCha20 / AES-GCM) and keep compression disabled for transfer traffic.
+- Moved SFTP transfer knobs into a dedicated Advanced settings screen.
+- Printed connecting-session logs from the top of the pane.
+
 ## 0.10.18 (1018)
 
 Release date: 2026-08-22

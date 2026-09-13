@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
 import com.majordaftapps.sshpeaches.app.ui.navigation.DrawerDestination
+import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
 @Composable
@@ -69,7 +70,8 @@ fun AppDrawer(
         }
         destinations.forEach { dest ->
             val (interactionSource, hovered) = rememberDesktopHoverState(enabled = true)
-            val selected = currentRoute == dest.route
+            val selected = currentRoute == dest.route ||
+                (dest.route == Routes.SETTINGS && currentRoute == Routes.ADVANCED_SETTINGS)
             val background = when {
                 selected -> Color(0xFFFA992A).copy(alpha = 0.18f)
                 hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)

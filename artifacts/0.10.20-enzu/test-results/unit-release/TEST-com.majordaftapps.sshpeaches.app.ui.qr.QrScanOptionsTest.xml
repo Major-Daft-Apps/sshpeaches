@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.qr.QrScanOptionsTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-30T14:38:44.940Z" hostname="358123.200293.sys.ipv4.io" time="0.012">
+  <properties/>
+  <testcase name="compactOptionsPreservePortraitCaptureLock" classname="com.majordaftapps.sshpeaches.app.ui.qr.QrScanOptionsTest" time="0.011"/>
+  <testcase name="wideOptionsUseAdaptiveCaptureWithoutPortraitLock" classname="com.majordaftapps.sshpeaches.app.ui.qr.QrScanOptionsTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

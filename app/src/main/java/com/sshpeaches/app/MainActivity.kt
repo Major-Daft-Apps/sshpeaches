@@ -562,6 +562,10 @@ class MainActivity : FragmentActivity() {
                         onLockTimeoutChange = viewModel::setLockTimeout,
                         onCustomLockTimeoutMinutesChange = viewModel::setCustomLockTimeoutMinutes,
                         onSnippetRunTimeoutSecondsChange = viewModel::setSnippetRunTimeoutSeconds,
+                        onSftpReadSizeChange = viewModel::setSftpReadSize,
+                        onSftpMaxRequestsChange = viewModel::setSftpMaxRequests,
+                        onParallelDownloadsChange = viewModel::setParallelDownloads,
+                        onApplySftpFastPreset = viewModel::applySftpFastPreset,
                         onTerminalEmulationChange = viewModel::setTerminalEmulation,
                         onTerminalSelectionModeChange = viewModel::setTerminalSelectionMode,
                         onTerminalBellModeChange = viewModel::setTerminalBellMode,
@@ -1048,6 +1052,7 @@ class MainActivity : FragmentActivity() {
         Routes.KEYBOARD,
         Routes.THEME_EDITOR,
         Routes.SETTINGS,
+        Routes.ADVANCED_SETTINGS,
         Routes.OPEN_SOURCE_LICENSES
     )
 

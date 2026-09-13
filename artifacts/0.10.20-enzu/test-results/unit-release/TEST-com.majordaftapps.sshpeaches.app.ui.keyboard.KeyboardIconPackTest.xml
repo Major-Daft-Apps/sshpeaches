@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPackTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-30T14:38:44.880Z" hostname="358123.200293.sys.ipv4.io" time="0.045">
+  <properties/>
+  <testcase name="byId_keepsFnTextOnlyAndBackAsAnIcon" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardIconPackTest" time="0.045"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

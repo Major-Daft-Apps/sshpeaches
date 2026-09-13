@@ -25,6 +25,7 @@ import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
+import com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -80,6 +81,7 @@ class AppViewModel(
     private val autoTrustHostKeyFlow = MutableStateFlow(false)
     private val usageReportsFlow = MutableStateFlow(SettingsStore.defaultUsageReportsEnabled)
     private val snippetRunTimeoutSecondsFlow = MutableStateFlow(10)
+    private val sftpTransferSettingsFlow = MutableStateFlow(SftpTransferSettings())
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
@@ -226,6 +228,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.snippetRunTimeoutSeconds.collect { seconds ->
                 snippetRunTimeoutSecondsFlow.value = seconds
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.sftpTransferSettings.collect { settings ->
+                sftpTransferSettingsFlow.value = settings
             }
         }
         viewModelScope.launch {
@@ -508,10 +515,14 @@ class AppViewModel(
     val uiState: StateFlow<AppUiState> = combine(
         uptimeUiState,
         keyboardSlotsFlow,
-        useBuiltInKeyboardFlow
-    ) { state, slots, useBuiltInKeyboard ->
-        state.copy(keyboardSlots = slots)
-            .copy(useBuiltInKeyboard = useBuiltInKeyboard)
+        useBuiltInKeyboardFlow,
+        sftpTransferSettingsFlow
+    ) { state, slots, useBuiltInKeyboard, sftpTransferSettings ->
+        state.copy(
+            keyboardSlots = slots,
+            useBuiltInKeyboard = useBuiltInKeyboard,
+            sftpTransferSettings = sftpTransferSettings
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -796,6 +807,30 @@ class AppViewModel(
     fun setSnippetRunTimeoutSeconds(seconds: Int) {
         launchLogged("setSnippetRunTimeoutSeconds", "seconds=$seconds") {
             SettingsStore.setSnippetRunTimeoutSeconds(seconds)
+        }
+    }
+
+    fun setSftpReadSize(bytes: Int) {
+        launchLogged("setSftpReadSize", "bytes=$bytes") {
+            SettingsStore.setSftpReadSize(bytes)
+        }
+    }
+
+    fun setSftpMaxRequests(count: Int) {
+        launchLogged("setSftpMaxRequests", "count=$count") {
+            SettingsStore.setSftpMaxRequests(count)
+        }
+    }
+
+    fun setParallelDownloads(count: Int) {
+        launchLogged("setParallelDownloads", "count=$count") {
+            SettingsStore.setParallelDownloads(count)
+        }
+    }
+
+    fun applySftpFastPreset() {
+        launchLogged("applySftpFastPreset") {
+            SettingsStore.applySftpFastPreset()
         }
     }
 

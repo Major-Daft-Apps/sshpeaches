@@ -159,6 +159,7 @@ import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
+import com.majordaftapps.sshpeaches.app.ui.screens.AdvancedSettingsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
@@ -227,6 +228,10 @@ data class SSHPeachesRootActions(
     val onLockTimeoutChange: (LockTimeout) -> Unit,
     val onCustomLockTimeoutMinutesChange: (Int) -> Unit,
     val onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
+    val onSftpReadSizeChange: (Int) -> Unit = {},
+    val onSftpMaxRequestsChange: (Int) -> Unit = {},
+    val onParallelDownloadsChange: (Int) -> Unit = {},
+    val onApplySftpFastPreset: () -> Unit = {},
     val onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
     val onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
     val onTerminalBellModeChange: (TerminalBellMode) -> Unit,
@@ -374,6 +379,10 @@ fun SSHPeachesRoot(
     val onLockTimeoutChange = actions.onLockTimeoutChange
     val onCustomLockTimeoutMinutesChange = actions.onCustomLockTimeoutMinutesChange
     val onSnippetRunTimeoutSecondsChange = actions.onSnippetRunTimeoutSecondsChange
+    val onSftpReadSizeChange = actions.onSftpReadSizeChange
+    val onSftpMaxRequestsChange = actions.onSftpMaxRequestsChange
+    val onParallelDownloadsChange = actions.onParallelDownloadsChange
+    val onApplySftpFastPreset = actions.onApplySftpFastPreset
     val onTerminalEmulationChange = actions.onTerminalEmulationChange
     val onTerminalSelectionModeChange = actions.onTerminalSelectionModeChange
     val onTerminalBellModeChange = actions.onTerminalBellModeChange
@@ -690,6 +699,7 @@ fun SSHPeachesRoot(
         Routes.THEME_EDITOR -> "Theme Editor"
         Routes.THEME_EDITOR_EDIT_ROUTE -> "Theme Editor"
         Routes.SETTINGS -> "Settings"
+        Routes.ADVANCED_SETTINGS -> "Advanced settings"
         Routes.OPEN_SOURCE_LICENSES -> "Open Source Licenses"
         else -> "SSHPeaches"
     }
@@ -1291,6 +1301,33 @@ fun SSHPeachesRoot(
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
             )
+            onSftpReadSizeChange(
+                settings.optInt(
+                    "sftpReadSize",
+                    uiState.sftpTransferSettings.sftpReadSize
+                ).coerceIn(
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MIN_SFTP_READ_SIZE,
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MAX_SFTP_READ_SIZE
+                )
+            )
+            onSftpMaxRequestsChange(
+                settings.optInt(
+                    "sftpMaxRequests",
+                    uiState.sftpTransferSettings.sftpMaxRequests
+                ).coerceIn(
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MIN_SFTP_MAX_REQUESTS,
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MAX_SFTP_MAX_REQUESTS
+                )
+            )
+            onParallelDownloadsChange(
+                settings.optInt(
+                    "parallelDownloads",
+                    uiState.sftpTransferSettings.parallelDownloads
+                ).coerceIn(
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MIN_PARALLEL_DOWNLOADS,
+                    com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings.MAX_PARALLEL_DOWNLOADS
+                )
+            )
 
             val importedProfiles = terminalProfilesFromJson(settings.optJSONArray("terminalProfiles"))
             val importedDefaultProfileId = settings.optString("defaultTerminalProfileId").trim().ifBlank { null }
@@ -1654,6 +1691,13 @@ fun SSHPeachesRoot(
                                 navigationIcon = {
                                     if (isSessionVerticalRoute) {
                                         IconButton(onClick = { navigateBackFromConnecting() }) {
+                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                        }
+                                    } else if (chromeRoute == Routes.ADVANCED_SETTINGS) {
+                                        IconButton(
+                                            onClick = { navController.popBackStack() },
+                                            modifier = Modifier.testTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_BACK)
+                                        ) {
                                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                         }
                                     } else if (!showWideSidebar) {
@@ -2295,7 +2339,9 @@ fun SSHPeachesRoot(
                                 onAutoTrustHostKeyToggle = onAutoTrustHostKeyToggle,
                                 usageReportsEnabled = uiState.usageReportsEnabled,
                                 onUsageReportsToggle = onUsageReportsToggle,
-                                onRestoreDefaultSettings = onRestoreDefaultSettings,
+                                onOpenAdvancedSettings = {
+                                    navController.navigate(Routes.ADVANCED_SETTINGS)
+                                },
                                 pinConfigured = uiState.pinConfigured,
                                 isLocked = uiState.isLocked,
                                 biometricAvailable = biometricAvailable,
@@ -2307,6 +2353,17 @@ fun SSHPeachesRoot(
                                 onShowMessage = showMessage,
                                 corePermissions = corePermissions,
                                 onManagePermissions = onOpenAppPermissionSettings
+                            )
+                        }
+                        composable(Routes.ADVANCED_SETTINGS) {
+                            AdvancedSettingsScreen(
+                                sftpTransferSettings = uiState.sftpTransferSettings,
+                                onSftpReadSizeChange = onSftpReadSizeChange,
+                                onSftpMaxRequestsChange = onSftpMaxRequestsChange,
+                                onParallelDownloadsChange = onParallelDownloadsChange,
+                                onApplySftpFastPreset = onApplySftpFastPreset,
+                                onRestoreDefaultSettings = onRestoreDefaultSettings,
+                                onShowMessage = showMessage
                             )
                         }
                         composable(Routes.OPEN_SOURCE_LICENSES) {
@@ -3730,6 +3787,9 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             put("autoTrustHostKey", state.autoTrustHostKey)
             put("usageReportsEnabled", state.usageReportsEnabled)
             put("snippetRunTimeoutSeconds", state.snippetRunTimeoutSeconds)
+            put("sftpReadSize", state.sftpTransferSettings.sftpReadSize)
+            put("sftpMaxRequests", state.sftpTransferSettings.sftpMaxRequests)
+            put("parallelDownloads", state.sftpTransferSettings.parallelDownloads)
             put("keyboardLayout", keyboardLayoutToJson(state.keyboardSlots))
         })
         put("portForwards", JSONArray().apply {

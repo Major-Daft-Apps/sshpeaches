@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:11:03.548Z" hostname="358123.200293.sys.ipv4.io" time="0.722">
+  <properties/>
+  <testcase name="downloadsLargerThanOneChunkTwiceOnTheSameClient" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" time="0.518"/>
+  <testcase name="downloadsSeveralFilesConcurrentlyOnOneConnectedClient" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" time="0.203"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=38741
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[5624657a](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/tmp/junit9785715625808379445/pipeline-hostkey) Failed (StreamCorruptedException) to load: File /tmp/junit9785715625808379445/pipeline-hostkey is not a host key
+[sshd-SshServer[5624657a](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[5624657a](port=0)-nio2-thread-5] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:39306 authenticated
+[Test worker] INFO net.schmizz.sshj.connection.channel.direct.SessionChannel - Will request `sftp` subsystem
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=39771
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[6caf7803](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/tmp/junit13979061153747208289/parallel-hostkey) Failed (StreamCorruptedException) to load: File /tmp/junit13979061153747208289/parallel-hostkey is not a host key
+[sshd-SshServer[6caf7803](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[6caf7803](port=0)-nio2-thread-5] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:58390 authenticated
+[Thread-145] INFO net.schmizz.sshj.connection.channel.direct.SessionChannel - Will request `sftp` subsystem
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+]]></system-err>
+</testsuite>

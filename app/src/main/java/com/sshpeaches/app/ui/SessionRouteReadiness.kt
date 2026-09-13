@@ -132,5 +132,6 @@ private val sessionRecoveryRoutes = setOf(
     Routes.KEYBOARD,
     Routes.THEME_EDITOR,
     Routes.SETTINGS,
+    Routes.ADVANCED_SETTINGS,
     Routes.OPEN_SOURCE_LICENSES
 )

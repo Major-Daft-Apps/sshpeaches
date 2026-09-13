@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:11:04.819Z" hostname="358123.200293.sys.ipv4.io" time="0.03">
+  <properties/>
+  <testcase name="identityImport_ready_setsFallbackLabelIdAndTimestamp" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.014"/>
+  <testcase name="snippetImport_blankTitle_usesFallback" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.003"/>
+  <testcase name="identityImport_invalidPayload_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.001"/>
+  <testcase name="portForwardImport_validPayload_returnsReady" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.002"/>
+  <testcase name="hostImport_duplicateName_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.003"/>
+  <testcase name="identityImport_matchingFingerprint_requestsOverwrite" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.001"/>
+  <testcase name="hostImport_missingId_assignsGeneratedTargetId" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.002"/>
+  <testcase name="snippetImport_blankCommand_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.001"/>
+  <testcase name="hostImport_invalidPayload_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.0"/>
+  <testcase name="portForwardImport_invalidPayload_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.001"/>
+  <testcase name="portForwardImport_nonLocalPayload_returnsError" classname="com.majordaftapps.sshpeaches.app.ui.components.QrImportHandlersTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

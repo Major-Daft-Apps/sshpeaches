@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.data.local.ConvertersTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:10:48.132Z" hostname="358123.200293.sys.ipv4.io" time="0.006">
+  <properties/>
+  <testcase name="toPortType_mapsLegacyRemoteToLocal" classname="com.majordaftapps.sshpeaches.app.data.local.ConvertersTest" time="0.005"/>
+  <testcase name="toPortType_handlesNullAsLocal" classname="com.majordaftapps.sshpeaches.app.data.local.ConvertersTest" time="0.0"/>
+  <testcase name="toPortType_mapsLegacyDynamicToLocal" classname="com.majordaftapps.sshpeaches.app.data.local.ConvertersTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

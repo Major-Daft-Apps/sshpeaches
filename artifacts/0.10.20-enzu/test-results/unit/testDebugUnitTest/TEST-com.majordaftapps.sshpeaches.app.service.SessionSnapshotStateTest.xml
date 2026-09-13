@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.SessionSnapshotStateTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:11:03.448Z" hostname="358123.200293.sys.ipv4.io" time="0.017">
+  <properties/>
+  <testcase name="removeOnlyDropsTheRequestedSession" classname="com.majordaftapps.sshpeaches.app.service.SessionSnapshotStateTest" time="0.002"/>
+  <testcase name="concurrentUpsertsRetainEverySession" classname="com.majordaftapps.sshpeaches.app.service.SessionSnapshotStateTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

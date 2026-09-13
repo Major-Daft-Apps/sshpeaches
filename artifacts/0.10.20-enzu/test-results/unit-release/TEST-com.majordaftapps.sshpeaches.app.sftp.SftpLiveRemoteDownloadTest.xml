@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.sftp.SftpLiveRemoteDownloadTest" tests="1" skipped="1" failures="0" errors="0" timestamp="2026-08-30T14:38:43.583Z" hostname="358123.200293.sys.ipv4.io" time="0.005">
+  <properties/>
+  <testcase name="downloadsRemoteFileTwiceWithPipelinedEngine" classname="com.majordaftapps.sshpeaches.app.sftp.SftpLiveRemoteDownloadTest" time="0.005">
+    <skipped/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

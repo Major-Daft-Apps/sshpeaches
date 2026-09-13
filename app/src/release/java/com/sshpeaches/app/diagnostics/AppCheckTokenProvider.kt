@@ -5,7 +5,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 object AppCheckTokenProvider {
-    suspend fun getToken(): String? =
+    suspend fun getToken(): String? = try {
         suspendCancellableCoroutine { cont ->
             FirebaseAppCheck.getInstance()
                 .getAppCheckToken(false)
@@ -16,4 +16,8 @@ object AppCheckTokenProvider {
                     cont.resume(null)
                 }
         }
+    } catch (e: IllegalStateException) {
+        // Firebase is not initialized in this process (e.g. JVM unit tests).
+        null
+    }
 }

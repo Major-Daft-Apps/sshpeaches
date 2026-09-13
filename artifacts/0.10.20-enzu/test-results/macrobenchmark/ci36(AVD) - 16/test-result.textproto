@@ -1,0 +1,785 @@
+# proto-message: google.testing.platform.proto.api.core.TestSuiteResult
+# 2026-08-30T14:58:41.453174383Z:
+test_suite_meta_data {
+  scheduled_test_case_count: 2
+  device {
+    id: "emulator-5554"
+    friendly_name: "primary"
+  }
+}
+test_status: PASSED
+test_result {
+  test_case {
+    test_class: "StartupAndScrollBenchmark"
+    test_package: "com.majordaftapps.sshpeaches.macrobenchmark"
+    test_method: "coldStartup"
+    start_time {
+      seconds: 1788101820
+      nanos: 623000000
+    }
+    end_time {
+      seconds: 1788101865
+      nanos: 841000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.message"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/additionaltestoutput.benchmark.message_com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark.coldStartup.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark-coldStartup.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_median"
+    value: "1997.24587"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_min"
+    value: "1591.462738"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_stddev"
+    value: "192.8929050642535"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_median"
+    value: "1997.24587"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_min"
+    value: "1591.462738"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_stddev"
+    value: "192.8929050642535"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_median"
+    value: "1997.24587"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_min"
+    value: "1591.462738"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_stddev"
+    value: "192.8929050642535"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_median"
+    value: "1997.24587"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_min"
+    value: "1591.462738"
+  }
+  details {
+    key: "EMULATOR_time_to_initial_display_millis_stddev"
+    value: "192.8929050642535"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_coldStartup\ntimeToInitialDisplayMs   [min 1,591.5](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace),   [median 1,997.2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace),   [max 2,076.4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\nTraces: Iteration [0](file://StartupAndScrollBenchmark_coldStartup_iter000_2026-08-30-14-57-10.perfetto-trace) [1](file://StartupAndScrollBenchmark_coldStartup_iter001_2026-08-30-14-57-17.perfetto-trace) [2](file://StartupAndScrollBenchmark_coldStartup_iter002_2026-08-30-14-57-25.perfetto-trace) [3](file://StartupAndScrollBenchmark_coldStartup_iter003_2026-08-30-14-57-32.perfetto-trace) [4](file://StartupAndScrollBenchmark_coldStartup_iter004_2026-08-30-14-57-40.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+}
+test_result {
+  test_case {
+    test_class: "StartupAndScrollBenchmark"
+    test_package: "com.majordaftapps.sshpeaches.macrobenchmark"
+    test_method: "warmStartupFrameTiming"
+    start_time {
+      seconds: 1788101866
+      nanos: 787000000
+    }
+    end_time {
+      seconds: 1788101917
+      nanos: 408000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.message"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/additionaltestoutput.benchmark.message_com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark.warmStartupFrameTiming.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "additionaltestoutput.benchmark.trace"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+    }
+  }
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark-warmStartupFrameTiming.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_frame_count_median"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_min"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_stddev"
+    value: "0.8944271909999159"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p50"
+    value: "56.22003"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p90"
+    value: "680.8457501999994"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p95"
+    value: "796.2706562"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p99"
+    value: "808.2777288200001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p50"
+    value: "62.588454"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p90"
+    value: "794.7079372000001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p95"
+    value: "854.5898610999996"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p99"
+    value: "967.5179235"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_frame_count_median"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_min"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_stddev"
+    value: "0.8944271909999159"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p50"
+    value: "56.22003"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p90"
+    value: "680.8457501999994"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p95"
+    value: "796.2706562"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p99"
+    value: "808.2777288200001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p50"
+    value: "62.588454"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p90"
+    value: "794.7079372000001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p95"
+    value: "854.5898610999996"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p99"
+    value: "967.5179235"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_frame_count_median"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_min"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_stddev"
+    value: "0.8944271909999159"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p50"
+    value: "56.22003"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p90"
+    value: "680.8457501999994"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p95"
+    value: "796.2706562"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p99"
+    value: "808.2777288200001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p50"
+    value: "62.588454"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p90"
+    value: "794.7079372000001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p95"
+    value: "854.5898610999996"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p99"
+    value: "967.5179235"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace"
+  }
+  details {
+    key: "additionalTestOutputFile_StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace"
+  }
+  details {
+    key: "EMULATOR_frame_count_median"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_min"
+    value: "24.0"
+  }
+  details {
+    key: "EMULATOR_frame_count_stddev"
+    value: "0.8944271909999159"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p50"
+    value: "56.22003"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p90"
+    value: "680.8457501999994"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p95"
+    value: "796.2706562"
+  }
+  details {
+    key: "EMULATOR_frame_duration_cpu_millis_p99"
+    value: "808.2777288200001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p50"
+    value: "62.588454"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p90"
+    value: "794.7079372000001"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p95"
+    value: "854.5898610999996"
+  }
+  details {
+    key: "EMULATOR_frame_overrun_millis_p99"
+    value: "967.5179235"
+  }
+  details {
+    key: "android.studio.display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v2display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+  details {
+    key: "android.studio.v3display.benchmark"
+    value: "WARNING: Running on Emulator\nBenchmark is running on an emulator, which is not representative of\nreal user devices. Use a physical device to benchmark. Emulator\nbenchmark improvements might not carry over to a real user\'s\nexperience (or even regress real device performance).\n\nStartupAndScrollBenchmark_warmStartupFrameTiming\nframeCount           [min    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace),   [median    24.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace),   [max    26.0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace)\nframeDurationCpuMs   P50     56.2,   P90    680.8,   P95    796.3,   P99    808.3\nframeOverrunMs       P50     62.6,   P90    794.7,   P95    854.6,   P99    967.5\nTraces: Iteration [0](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-08-30-14-58-00.perfetto-trace) [1](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-08-30-14-58-08.perfetto-trace) [2](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-08-30-14-58-17.perfetto-trace) [3](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-08-30-14-58-25.perfetto-trace) [4](file://StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-08-30-14-58-34.perfetto-trace)\n"
+  }
+  details {
+    key: "android.studio.v3display.benchmark.outputDirPath"
+    value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+  }
+}
+output_artifact {
+  label {
+    label: "test-results.log"
+    namespace: "com.google.testing.platform.runtime.android.driver.AndroidInstrumentationDriver"
+  }
+  source_path {
+    path: "/root/ci/sshpeaches/macrobenchmark/build/outputs/androidTest-results/connected/benchmark/ci36(AVD) - 16/testlog/test-results.log"
+  }
+  type: TEST_DATA
+  mime_type: "text/plain"
+}

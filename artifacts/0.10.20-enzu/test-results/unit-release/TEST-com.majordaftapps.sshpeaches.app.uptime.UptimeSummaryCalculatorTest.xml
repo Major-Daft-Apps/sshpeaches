@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.uptime.UptimeSummaryCalculatorTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-30T14:38:49.663Z" hostname="358123.200293.sys.ipv4.io" time="0.009">
+  <properties/>
+  <testcase name="buildSummary_usesNoDataBeforeCreation" classname="com.majordaftapps.sshpeaches.app.uptime.UptimeSummaryCalculatorTest" time="0.008"/>
+  <testcase name="synthesizeGapSamples_marksMissedChecksUnverified" classname="com.majordaftapps.sshpeaches.app.uptime.UptimeSummaryCalculatorTest" time="0.001"/>
+  <testcase name="percentageForWindow_excludesUnverifiedChecks" classname="com.majordaftapps.sshpeaches.app.uptime.UptimeSummaryCalculatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

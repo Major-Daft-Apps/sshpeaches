@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:10:48.012Z" hostname="358123.200293.sys.ipv4.io" time="0.116">
+  <properties/>
+  <testcase name="parse_skipsWildcardAndMissingUserEntries" classname="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" time="0.086"/>
+  <testcase name="parse_skipsExistingDuplicates" classname="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" time="0.023"/>
+  <testcase name="parse_importsLocalForwardAndAssociatesHost" classname="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" time="0.002"/>
+  <testcase name="parse_supportsEqualsAndQuotedAliases" classname="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" time="0.0"/>
+  <testcase name="parse_importsConcreteHostWithIdentityNote" classname="com.majordaftapps.sshpeaches.app.data.importer.OpenSshConfigImporterTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

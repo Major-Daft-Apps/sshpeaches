@@ -10,7 +10,6 @@ import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.nio.file.Files
 import java.security.Key
 import java.security.KeyFactory
 import java.security.PublicKey
@@ -74,6 +73,47 @@ class SshClientProviderTest {
     }
 
     @Test
+    fun configuredClientPrefersFastCiphersAndDisablesCompression() {
+        val host = HostConnection(
+            id = "cipher-test",
+            name = "Cipher test",
+            host = "127.0.0.1",
+            username = TEST_USERNAME,
+            preferredAuth = AuthMethod.PASSWORD
+        )
+        val client = SshClientProvider.createClientForTesting(
+            knownHostsFile = temp.newFile("known_hosts_ciphers"),
+            host = host
+        )
+        try {
+            val compression = client.transport.config.compressionFactories.map { it.name }
+            assertTrue("Expected a compression factory list: $compression", compression.isNotEmpty())
+            assertEquals("none", compression.first())
+            assertFalse(
+                "zlib must not be preferred over none: $compression",
+                compression.first().contains("zlib", ignoreCase = true)
+            )
+
+            val ciphers = client.transport.config.cipherFactories.map { it.name }
+            val fastIndex = ciphers.indexOfFirst { name ->
+                name.contains("chacha20-poly1305@openssh.com") ||
+                    name.contains("aes128-gcm@openssh.com") ||
+                    name.contains("aes256-gcm@openssh.com")
+            }
+            val cbcIndex = ciphers.indexOfFirst { it.contains("cbc", ignoreCase = true) }
+            assertTrue("Expected a fast AEAD/CTR cipher in $ciphers", fastIndex >= 0)
+            if (cbcIndex >= 0) {
+                assertTrue(
+                    "Expected a fast cipher before any *-cbc: $ciphers",
+                    fastIndex < cbcIndex
+                )
+            }
+        } finally {
+            runCatching { client.close() }
+        }
+    }
+
+    @Test
     fun regression_largeSftpUploadAndDownloadStayBelowSshjTransportPacketLimit() {
         val sandbox = temp.newFolder("large-sftp-sandbox")
         val server = SshServer.setUpDefaultServer().apply {
@@ -110,7 +150,7 @@ class SshClientProviderTest {
                 sftp.put(upload.absolutePath, "/large-video.mp4")
                 sftp.get("/large-video.mp4", download.absolutePath)
             }
-            assertTrue(Files.mismatch(upload.toPath(), download.toPath()) == -1L)
+            assertTrue(upload.readBytes().contentEquals(download.readBytes()))
         } finally {
             runCatching { client.close() }
             runCatching { server.stop(true) }

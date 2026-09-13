@@ -1,0 +1,188 @@
+08-30 13:02:02.296 10415 10431 I TestRunner: started: terminalInput_actionMultipleRepeatsKnownHardwareKeys(com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest)
+08-30 13:02:02.308 10415 10431 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@4faf64e]
+08-30 13:02:02.312  1414  1414 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:02.313  1414  1414 I ImeTracker: com.google.android.apps.nexuslauncher:e0c6c3c4: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:02.320 10415 10431 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+08-30 13:02:02.330   679  1899 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10232, packageName = null, attributionTag = null, token = android.os.Binder@2aabd5d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+08-30 13:02:02.351  1414  1414 D RecentsView: onTaskRemoved: 445, not handling task stack changes
+08-30 13:02:02.351  1414  1414 D RecentsView: onTaskRemoved: 445, not handling task stack changes
+08-30 13:02:02.378   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.378   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.392  1111  1253 D SplashScreenView: Build android.window.SplashScreenView{83bef8a V.E...... ......ID 0,0-0,0}
+08-30 13:02:02.392  1111  1253 D SplashScreenView: Icon: view: null drawable: null size: 0
+08-30 13:02:02.392  1111  1253 D SplashScreenView: Branding: view: android.view.View{33d39fb G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+08-30 13:02:02.403  1414  1414 W SplitSelectStateCtor: Missing session instanceIds
+08-30 13:02:02.403  1414  1414 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+08-30 13:02:02.411   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.411   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.429 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: PRE_ON_CREATE
+08-30 13:02:02.430 10415 10415 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+08-30 13:02:02.436 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: CREATED
+08-30 13:02:02.437 10415 10415 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@d6e89b2
+08-30 13:02:02.439 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: STARTED
+08-30 13:02:02.439 10415 10415 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@d6e89b2
+08-30 13:02:02.441 10415 10415 D AutofillManager: Fill dialog is enabled:false, hints=[]
+08-30 13:02:02.442 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: RESUMED
+08-30 13:02:02.442 10415 10415 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@d6e89b2
+08-30 13:02:02.445   544   569 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:02:02.523  1414  1414 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+08-30 13:02:02.532 10476 10476 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+08-30 13:02:02.551  1363  1363 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+08-30 13:02:02.551  1363  1363 D wpa_supplicant: nl80211: Beacon loss event
+08-30 13:02:02.551  1363  1363 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+08-30 13:02:02.551  1363  1363 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+08-30 13:02:02.578 10476 10476 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@923ff25
+08-30 13:02:02.600   679   703 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug/androidx.activity.ComponentActivity for user 0: +206ms
+08-30 13:02:02.600 10476 10476 D ViewRootImpl: Skipping stats log for color mode
+08-30 13:02:02.669  1414  1414 D RecentsView: onTaskRemoved: 446, not handling task stack changes
+08-30 13:02:02.672  1414  1414 D RecentsView: onTaskRemoved: 446, not handling task stack changes
+08-30 13:02:02.673   679   821 I ImeTracker: com.majordaftapps.sshpeaches.debug:923629fd: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+08-30 13:02:02.684   679  1152 I ImeTracker: system_server:f75ab06e: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:02:02.685  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+08-30 13:02:02.685  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+08-30 13:02:02.686  1744  1744 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+08-30 13:02:02.686  1744  1744 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+08-30 13:02:02.688 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:02.688 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:923629fd: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:02.698   679   706 I ImeTracker: system_server:f75ab06e: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:02:02.743  1111  1132 I ndroid.systemui: NativeAlloc concurrent mark compact GC freed 6785KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 21MB/43MB, paused 2.575ms,7.201ms total 585.898ms
+08-30 13:02:02.830  1903  2230 I bbax    : (REDACTED) getHotwordActive::active query: %s, watch: %s, devices connected: %s
+08-30 13:02:02.914   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.914   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:02.920   468   505 I netd    : tetherGetStats() -> {[]} <0.86ms>
+08-30 13:02:02.951  1414  1414 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+08-30 13:02:02.991  1414  1414 D BaseDepthController: setSurface:
+08-30 13:02:02.991  1414  1414 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+08-30 13:02:02.991  1414  1414 D BaseDepthController: 	mBaseSurface: null
+08-30 13:02:02.991  1414  1414 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+08-30 13:02:02.992  1414  1414 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+08-30 13:02:02.992  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+08-30 13:02:02.992  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+08-30 13:02:02.992  1414  1414 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+08-30 13:02:02.992  1414  1414 D StatsLog: LAUNCHER_ONSTOP
+08-30 13:02:02.993  1414  1414 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+08-30 13:02:02.993  1414  1414 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+08-30 13:02:02.995   544   572 W TransactionTracing: Could not find layer id 10044
+08-30 13:02:02.995   544   572 W TransactionTracing: Could not find layer id 10039
+08-30 13:02:02.998  1414  1414 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+08-30 13:02:03.328 10415 10415 W HWUI    : Image decoding logging dropped!
+08-30 13:02:03.329 10415 10415 W HWUI    : Image decoding logging dropped!
+08-30 13:02:03.330 10415 10415 W HWUI    : Image decoding logging dropped!
+08-30 13:02:03.344 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:82f179d5: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+08-30 13:02:03.345 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:82f179d5: onFailed at PHASE_CLIENT_VIEW_SERVED
+08-30 13:02:03.353 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:03.354 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:5120cef8: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_BY_INSETS_API fromUser false
+08-30 13:02:03.354 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:5120cef8: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:03.484   679  2071 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10233, packageName = null, attributionTag = null, token = android.os.Binder@2aabd5d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+08-30 13:02:03.489   544  1497 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:02:03.494  1111  1253 D SplashScreenView: Build android.window.SplashScreenView{e7ee167 V.E...... ......ID 0,0-0,0}
+08-30 13:02:03.494  1111  1253 D SplashScreenView: Icon: view: null drawable: null size: 0
+08-30 13:02:03.494  1111  1253 D SplashScreenView: Branding: view: android.view.View{15d8b14 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+08-30 13:02:03.498 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:8770d2f9: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+08-30 13:02:03.499 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:03.500 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:8770d2f9: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:03.501   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.501   614  4572 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.502 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: PAUSED
+08-30 13:02:03.502 10415 10415 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@d6e89b2
+08-30 13:02:03.506   544   544 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:02:03.507 10476 10491 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+08-30 13:02:03.508 10476 10491 I EGL_emulation: Opening libGLESv2_emulation.so
+08-30 13:02:03.514 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:03.515 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:17204343: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_BY_INSETS_API fromUser false
+08-30 13:02:03.515 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:17204343: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:03.527   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.527   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.527   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.527   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.527   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.528   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.529   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.530   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.530 10476 10491 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.531   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.532   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.533   679   706 W IPCThreadState: Sending oneway calls to frozen process.
+08-30 13:02:03.545 10476 10476 D AutofillManager: Fill dialog is enabled:false, hints=[]
+08-30 13:02:03.576  1111  1231 I ndroid.systemui: AssetManager2(0x74a14e766238) locale list changing from [] to [en-US]
+08-30 13:02:03.585  1111  1231 I ndroid.systemui: AssetManager2(0x74a14e7529b8) locale list changing from [] to [en-US]
+08-30 13:02:03.656  1272  1524 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+08-30 13:02:03.674  1414  1431 W System  : A resource failed to call release.
+08-30 13:02:03.674  1414  1431 W System  : A resource failed to call release.
+08-30 13:02:03.674  1414  1431 W System  : A resource failed to call release.
+08-30 13:02:03.780   507   531 I RanchuHwc: logCompositionFallbackIfChanged: layer 1867 CompositionType fallback from 3 to 1
+08-30 13:02:03.788   679   703 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug.test/androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity for user 0: +303ms
+08-30 13:02:03.832   544   633 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+08-30 13:02:03.842  1414  1414 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+08-30 13:02:03.856  1414  1414 D BaseDepthController: setSurface:
+08-30 13:02:03.856  1414  1414 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+08-30 13:02:03.856  1414  1414 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x656077e
+08-30 13:02:03.899  1414  1414 D StatsLog: LAUNCHER_ONRESUME
+08-30 13:02:03.913  1414  1461 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+08-30 13:02:03.919  1870  1975 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+08-30 13:02:03.919  1870  1975 I AiAiEcho: EchoTargets:
+08-30 13:02:03.919  1870  1975 I AiAiEcho: Filtered by AiAi flag check:
+08-30 13:02:03.919  1870  1975 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+08-30 13:02:03.921  1870  1975 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+08-30 13:02:03.923  1870  1975 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+08-30 13:02:03.964  1414  1414 D SsBaseTemplateCard: No text view can be set up
+08-30 13:02:03.964  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:02:03.964  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:02:03.964  1414  1414 D SsBaseTemplateCard: Passed-in item info is null
+08-30 13:02:03.964  1414  1414 I SsBaseTemplateCard: Secondary card pane is null
+08-30 13:02:03.986 10415 10415 D VRI[ComponentActivity]: visibilityChanged oldVisibility=true newVisibility=false
+08-30 13:02:04.015 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:fcded891: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+08-30 13:02:04.016 10415 10415 D InsetsController: hide(ime(), fromIme=false)
+08-30 13:02:04.017 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:fcded891: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+08-30 13:02:04.019 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: STOPPED
+08-30 13:02:04.019 10415 10415 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@d6e89b2
+08-30 13:02:04.029 10415 10415 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@41c7fd6
+08-30 13:02:04.032 10415 10415 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@d6e89b2 in: DESTROYED
+08-30 13:02:04.032 10415 10415 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+08-30 13:02:04.039 10415 10415 D ViewRootImpl: Skipping stats log for color mode
+08-30 13:02:04.040   679  2071 I ImeTracker: system_server:8ffcee7a: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+08-30 13:02:04.041   679   706 I ImeTracker: system_server:8ffcee7a: onCancelled at PHASE_SERVER_SHOULD_HIDE
+08-30 13:02:04.045 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:8c3cd32f: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+08-30 13:02:04.046 10415 10415 I ImeTracker: com.majordaftapps.sshpeaches.debug:8c3cd32f: onFailed at PHASE_CLIENT_VIEW_SERVED
+08-30 13:02:04.052 10415 10431 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@4faf64e]
+08-30 13:02:04.054 10415 10431 I TestRunner: finished: terminalInput_actionMultipleRepeatsKnownHardwareKeys(com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest)

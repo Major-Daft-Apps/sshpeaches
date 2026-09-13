@@ -32,6 +32,13 @@ object TelemetryInitializer {
         if (initialized) return
         initialized = true
 
+        if (android.os.Build.FINGERPRINT?.startsWith("robolectric") == true) {
+            // JVM unit tests have no Firebase runtime; Crashlytics' uncaught
+            // exception handler would kill the test JVM.
+            Log.i(TAG, "Robolectric detected; release telemetry is disabled in tests.")
+            return
+        }
+
         val app = FirebaseApp.initializeApp(application)
         if (app == null) {
             Log.w(TAG, "Firebase config is missing; release telemetry is disabled.")

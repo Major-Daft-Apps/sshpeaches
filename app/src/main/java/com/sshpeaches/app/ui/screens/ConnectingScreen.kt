@@ -43,7 +43,6 @@ import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -51,7 +50,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -273,6 +271,8 @@ private typealias RemoteDirectorySnapshot =
 private typealias RemoteDirectoryEntry =
     com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry
 
+private val sessionTerminalFontSizes = mutableMapOf<String, Float>()
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ConnectingScreen(
@@ -357,8 +357,17 @@ fun ConnectingScreen(
     var terminalViewRef by remember(request?.sessionId) { mutableStateOf<TerminalView?>(null) }
     var terminalImeBridgeRef by remember(request?.sessionId) { mutableStateOf<TerminalImeBridgeEditText?>(null) }
     var keyboardFocused by remember(request?.sessionId) { mutableStateOf(false) }
-    var terminalFontSizeSp by rememberSaveable(request?.sessionId) {
-        mutableStateOf(terminalProfile.fontSizeSp.toFloat())
+    val terminalFontPersistenceKey = request?.let { current ->
+        current.savedHostId ?: current.sessionId.substringBefore('|')
+    }
+    var terminalFontSizeSp by rememberSaveable(terminalFontPersistenceKey) {
+        mutableStateOf(
+            terminalFontPersistenceKey?.let { sessionTerminalFontSizes[it] }
+                ?: terminalProfile.fontSizeSp.toFloat()
+        )
+    }
+    LaunchedEffect(terminalFontPersistenceKey, terminalFontSizeSp) {
+        terminalFontPersistenceKey?.let { sessionTerminalFontSizes[it] = terminalFontSizeSp }
     }
     val currentTerminalProfile = rememberUpdatedState(terminalProfile)
     val currentTerminalFontSizeSp = rememberUpdatedState(terminalFontSizeSp)
@@ -3706,8 +3715,7 @@ private fun ConnectingStatusContent(
                     listState = listState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = logsMaxHeight)
-                        .wrapContentHeight(align = Alignment.Bottom)
+                        .height(logsMaxHeight)
                 )
             }
         }

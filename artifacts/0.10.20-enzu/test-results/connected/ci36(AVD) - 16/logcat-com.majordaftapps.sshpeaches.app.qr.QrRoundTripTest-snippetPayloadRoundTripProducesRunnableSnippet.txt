@@ -1,0 +1,2 @@
+08-30 13:00:45.695 10415 10431 I TestRunner: started: snippetPayloadRoundTripProducesRunnableSnippet(com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest)
+08-30 13:00:45.698 10415 10431 I TestRunner: finished: snippetPayloadRoundTripProducesRunnableSnippet(com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest)

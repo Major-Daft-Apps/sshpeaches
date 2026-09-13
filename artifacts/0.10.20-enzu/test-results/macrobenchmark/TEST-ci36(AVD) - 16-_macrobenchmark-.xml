@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark" tests="2" failures="0" errors="0" skipped="0" time="100.655" timestamp="2026-08-30T14:58:41" hostname="localhost">
+  <properties>
+    <property name="device" value="ci36(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":macrobenchmark" />
+  </properties>
+  <testcase name="coldStartup" classname="com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark" time="46.087" />
+  <testcase name="warmStartupFrameTiming" classname="com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark" time="51.871" />
+</testsuite>

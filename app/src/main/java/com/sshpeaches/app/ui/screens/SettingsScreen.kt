@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Card
@@ -89,7 +90,7 @@ private enum class SettingsCategory(
     AUTOMATION("Automation", "Snippets and port forward defaults"),
     DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
     TRANSFER("Transfer / QR", "Export and import app data"),
-    ADVANCED("Advanced", "Restore default settings")
+    ADVANCED("Advanced", "SFTP transfer tuning and other expert options")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,7 +143,7 @@ fun SettingsScreen(
     onAutoTrustHostKeyToggle: (Boolean) -> Unit,
     usageReportsEnabled: Boolean,
     onUsageReportsToggle: (Boolean) -> Unit,
-    onRestoreDefaultSettings: () -> Unit,
+    onOpenAdvancedSettings: () -> Unit = {},
     pinConfigured: Boolean,
     isLocked: Boolean,
     biometricAvailable: Boolean,
@@ -223,7 +224,6 @@ fun SettingsScreen(
     val confirmPinEntry = remember { mutableStateOf("") }
     val confirmPinRevealIndex = remember { mutableIntStateOf(-1) }
     val showDisablePinDialog = remember { mutableStateOf(false) }
-    val showRestoreDefaultsDialog = remember { mutableStateOf(false) }
     val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
     val snippetTimeoutState = remember(snippetRunTimeoutSeconds) { mutableStateOf(snippetRunTimeoutSeconds.toString()) }
     val terminalMarginState = remember(terminalMarginPx) { mutableStateOf(terminalMarginPx.toString()) }
@@ -844,21 +844,32 @@ fun SettingsScreen(
         }
             }
             if (SettingsCategory.ADVANCED in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Restore Defaults", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Reset app settings to default values. Hosts, identities, snippets, and saved secrets are unchanged.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Button(
-                    onClick = { showRestoreDefaultsDialog.value = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK)
+                .clickable(onClick = onOpenAdvancedSettings),
+            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Restore Default Settings")
+                    Text("Advanced settings", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "SFTP transfer tuning and other expert options.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Open advanced settings"
+                )
             }
         }
             }
@@ -1277,30 +1288,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showRestoreDefaultsDialog.value) {
-        AlertDialog(
-            onDismissRequest = { showRestoreDefaultsDialog.value = false },
-            title = { Text("Restore default settings?") },
-            text = {
-                Text(
-                    "This resets app settings (theme, terminal, lock timeout, host key preferences, diagnostics, and keyboard layout) to defaults."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onRestoreDefaultSettings()
-                        showRestoreDefaultsDialog.value = false
-                        onShowMessage("Settings restored to defaults.")
-                    },
-                    modifier = Modifier.testTag(UiTestTags.SETTINGS_RESTORE_DEFAULTS_CONFIRM)
-                ) { Text("Restore") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRestoreDefaultsDialog.value = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 private data class AppIconChoice(

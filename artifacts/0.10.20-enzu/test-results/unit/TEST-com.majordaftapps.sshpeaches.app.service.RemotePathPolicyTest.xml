@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-08-30T12:10:52.485Z" hostname="358123.200293.sys.ipv4.io" time="0.014">
+  <properties/>
+  <testcase name="transfer paths preserve meaningful whitespace" classname="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" time="0.006"/>
+  <testcase name="rename rejects protected source and destination" classname="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" time="0.005"/>
+  <testcase name="path normalization exposes exact protected roots" classname="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" time="0.0"/>
+  <testcase name="delete rejects protected source but permits descendants" classname="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" time="0.002"/>
+  <testcase name="console and browser deletion operations have distinct semantics" classname="com.majordaftapps.sshpeaches.app.service.RemotePathPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

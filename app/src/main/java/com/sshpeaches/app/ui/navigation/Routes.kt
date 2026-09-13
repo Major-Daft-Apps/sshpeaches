@@ -17,6 +17,7 @@ object Routes {
     const val THEME_EDITOR_EDIT = "theme_editor_edit"
     const val THEME_EDITOR_EDIT_ROUTE = "$THEME_EDITOR_EDIT?profileId={profileId}&duplicate={duplicate}"
     const val SETTINGS = "settings"
+    const val ADVANCED_SETTINGS = "advanced_settings"
     const val OPEN_SOURCE_LICENSES = "open_source_licenses"
     const val HELP = "help"
     const val QUICK_CONNECT = "quick_connect"

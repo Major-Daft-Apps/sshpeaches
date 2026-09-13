@@ -1,0 +1,2 @@
+08-30 13:00:45.683 10415 10431 I TestRunner: started: hostPayloadRoundTripPreservesConnectionFields(com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest)
+08-30 13:00:45.685 10415 10431 I TestRunner: finished: hostPayloadRoundTripPreservesConnectionFields(com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest)

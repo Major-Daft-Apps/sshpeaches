@@ -24,6 +24,8 @@ import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.Factory
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.transport.cipher.Cipher
+import net.schmizz.sshj.transport.compression.NoneCompression
 import net.schmizz.sshj.common.SSHRuntimeException
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.LoggerFactory
@@ -189,6 +191,11 @@ object SshClientProvider {
         ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
+        config.compressionFactories = listOf(NoneCompression.Factory())
+        val fastCiphers = preferFastCiphers(config.cipherFactories)
+        if (fastCiphers.isNotEmpty()) {
+            config.cipherFactories = fastCiphers
+        }
         val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories, keyExchangeAvailability)
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
@@ -262,6 +269,27 @@ object SshClientProvider {
                 keyFactoryAlgorithm = "DH"
             )
             else -> true
+        }
+    }
+
+    private fun preferFastCiphers(
+        factories: List<Factory.Named<Cipher>>
+    ): List<Factory.Named<Cipher>> {
+        if (factories.isEmpty()) return factories
+        return factories.sortedWith(
+            compareBy<Factory.Named<Cipher>> { factory -> cipherPriority(factory.name) }
+                .thenBy { factory -> factories.indexOf(factory) }
+        )
+    }
+
+    private fun cipherPriority(name: String): Int {
+        val lower = name.lowercase()
+        return when {
+            lower.contains("chacha20") -> 0
+            lower.contains("gcm") -> 1
+            lower.contains("ctr") -> 2
+            lower.endsWith("-cbc") || lower.contains("-cbc") -> 10
+            else -> 5
         }
     }
 

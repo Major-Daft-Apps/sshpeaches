@@ -90,8 +90,42 @@ fun MainActivityComposeRule.revealSettingsControl(
     tag: String,
     categoryTitle: String? = settingsCategoryForControl(tag)
 ) {
+    fun settingsScreenExists() = onAllNodesWithTag(UiTestTags.SCREEN_SETTINGS, useUnmergedTree = true)
+        .fetchSemanticsNodes()
+        .isNotEmpty()
+
+    fun advancedScreenExists() = onAllNodesWithTag(UiTestTags.SCREEN_ADVANCED_SETTINGS, useUnmergedTree = true)
+        .fetchSemanticsNodes()
+        .isNotEmpty()
+
+    waitUntil(10_000) { settingsScreenExists() || advancedScreenExists() }
+    if (tag !in advancedSettingsControls && advancedScreenExists()) {
+        runCatching { Espresso.pressBack() }
+        waitUntil(10_000) { settingsScreenExists() }
+    }
     categoryTitle?.let(::openSettingsCategory)
     waitForIdle()
+    if (tag in advancedSettingsControls && !advancedScreenExists()) {
+        run {
+            repeat(16) {
+                val visible = runCatching {
+                    onNodeWithTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK, useUnmergedTree = true)
+                        .assertIsDisplayed()
+                    true
+                }.getOrDefault(false)
+                if (visible) return@run
+                runCatching {
+                    onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER, useUnmergedTree = true)
+                        .performTouchInput { swipeUp() }
+                }
+                waitForIdle()
+            }
+        }
+        onNodeWithTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK, useUnmergedTree = true)
+            .performClick()
+        waitUntil(10_000) { advancedScreenExists() }
+        waitForIdle()
+    }
     repeat(16) {
         val revealed = runCatching {
             onNodeWithTag(tag, useUnmergedTree = true).performScrollTo()
@@ -108,8 +142,10 @@ fun MainActivityComposeRule.revealSettingsControl(
             onNodeWithTag(UiTestTags.SETTINGS_SCROLL_CONTAINER, useUnmergedTree = true)
                 .performTouchInput { swipeUp() }
         }.getOrElse {
-            onNodeWithTag(UiTestTags.SCREEN_SETTINGS, useUnmergedTree = true)
-                .performTouchInput { swipeUp() }
+            runCatching {
+                onNodeWithTag(UiTestTags.SCREEN_SETTINGS, useUnmergedTree = true)
+                    .performTouchInput { swipeUp() }
+            }
         }
         waitForIdle()
     }
@@ -168,6 +204,19 @@ private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH -> "Security"
     UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH -> "Diagnostics"
     UiTestTags.SETTINGS_EXPORT_QR_BUTTON -> "Transfer / QR"
-    UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON -> "Advanced"
+    UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK,
+    UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON,
+    UiTestTags.SETTINGS_SFTP_READ_SIZE_INPUT,
+    UiTestTags.SETTINGS_SFTP_MAX_REQUESTS_INPUT,
+    UiTestTags.SETTINGS_PARALLEL_DOWNLOADS_INPUT,
+    UiTestTags.SETTINGS_SFTP_FAST_SWITCH -> "Advanced"
     else -> null
 }
+
+private val advancedSettingsControls = setOf(
+    UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON,
+    UiTestTags.SETTINGS_SFTP_READ_SIZE_INPUT,
+    UiTestTags.SETTINGS_SFTP_MAX_REQUESTS_INPUT,
+    UiTestTags.SETTINGS_PARALLEL_DOWNLOADS_INPUT,
+    UiTestTags.SETTINGS_SFTP_FAST_SWITCH
+)

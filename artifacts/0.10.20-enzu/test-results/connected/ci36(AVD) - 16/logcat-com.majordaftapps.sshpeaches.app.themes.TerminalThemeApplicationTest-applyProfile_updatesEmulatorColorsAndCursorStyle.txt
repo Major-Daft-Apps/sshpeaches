@@ -1,0 +1,2 @@
+08-30 13:05:08.856 10415 10431 I TestRunner: started: applyProfile_updatesEmulatorColorsAndCursorStyle(com.majordaftapps.sshpeaches.app.themes.TerminalThemeApplicationTest)
+08-30 13:05:08.860 10415 10431 I TestRunner: finished: applyProfile_updatesEmulatorColorsAndCursorStyle(com.majordaftapps.sshpeaches.app.themes.TerminalThemeApplicationTest)
