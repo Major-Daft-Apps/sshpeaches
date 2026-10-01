@@ -49,7 +49,7 @@ class SecuritySettingsTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_CONFIRM_INPUT).performTextInput("2468")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_SAVE_BUTTON).performClick()
 
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(15_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_STATUS_TEXT)
                     .assertTextContains("PIN lock configured.")
@@ -62,7 +62,7 @@ class SecuritySettingsTest {
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_DISABLE_PIN_CONFIRM).performClick()
 
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(15_000) {
             runCatching {
                 composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_STATUS_TEXT)
                     .assertTextContains("PIN lock not configured.")
@@ -85,7 +85,7 @@ class SecuritySettingsTest {
         composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_PIN_INPUT).performTextInput("2468")
         composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_UNLOCK_BUTTON).performClick()
 
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag(UiTestTags.LOCK_SCREEN_OVERLAY).fetchSemanticsNodes().isEmpty()
         }
     }

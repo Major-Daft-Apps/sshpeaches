@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:33.157Z" hostname="362696.200293.sys.ipv4.io" time="0.01">
+  <properties/>
+  <testcase name="normalizeSlots_keepsCustomizedOldBottomRows" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.008"/>
+  <testcase name="builtInCompactLayout_usesTheSameTwoRemappableRows" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="normalizeSlots_assignsFnIconIdWhenMissing" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="fnAction_usesTextLabelAndInternalRoutingId" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="defaultLayout_keepsOnlyFormerBottomRowsAndReplacesAltWithFn" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="normalizeSlots_migratesOldTwentyEightSlotDefaultToNewDefault" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.001"/>
+  <testcase name="normalizeSlots_assignsFnActiveIconIdWhenMissing" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="fnLayout_ignoresCustomizedMainRows" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="comboPreset_containsCtrlAandCtrlB" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <testcase name="fnLayout_isTwoFixedRowsOrderedBackShiftThenF1ThroughF12" classname="com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaultsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,7 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.state
 
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
-import com.majordaftapps.sshpeaches.app.data.model.HostUptimeSummary
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
@@ -19,7 +18,6 @@ data class AppUiState(
     val resourcesLoaded: Boolean = false,
     val home: HomeSection = HomeSection(),
     val hosts: List<HostConnection> = emptyList(),
-    val uptimeSummaries: List<HostUptimeSummary> = emptyList(),
     val identities: List<Identity> = emptyList(),
     val portForwards: List<PortForward> = emptyList(),
     val snippets: List<Snippet> = emptyList(),
@@ -52,6 +50,8 @@ data class AppUiState(
     val sftpTransferSettings: SftpTransferSettings = SftpTransferSettings(),
     val pinConfigured: Boolean = false,
     val isLocked: Boolean = false,
+    val securityNotice: String? = null,
+    val lockScreenMessage: String? = null,
     val keyboardSlots: List<KeyboardSlotAction> = KeyboardLayoutDefaults.DEFAULT_SLOTS
 )
 

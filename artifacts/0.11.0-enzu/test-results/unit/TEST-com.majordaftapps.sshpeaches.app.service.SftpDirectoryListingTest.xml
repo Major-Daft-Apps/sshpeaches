@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:31.732Z" hostname="362696.200293.sys.ipv4.io" time="0.035">
+  <properties/>
+  <testcase name="scp browser can still resolve symbolic link metadata" classname="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" time="0.008"/>
+  <testcase name="new refresh token distinguishes an unchanged listing response" classname="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" time="0.003"/>
+  <testcase name="absolute path keeps one canonicalization request for stable path semantics" classname="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" time="0.001"/>
+  <testcase name="console listing has a constant request budget for many symbolic links" classname="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" time="0.021"/>
+  <testcase name="only scp browser listings resolve link metadata" classname="com.majordaftapps.sshpeaches.app.service.SftpDirectoryListingTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -68,29 +68,31 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -100,6 +102,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -109,7 +112,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -134,6 +140,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
@@ -213,6 +220,8 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.inputmethod.EditorInfoCompat
 import com.majordaftapps.sshpeaches.app.MainActivity
 import androidx.lifecycle.Lifecycle
@@ -392,7 +401,12 @@ fun ConnectingScreen(
     var scpVisibleEntries by remember(request?.sessionId) {
         mutableStateOf<List<com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectoryEntry>>(emptyList())
     }
-    val scpPathHistory = remember(request?.sessionId) { mutableStateListOf(".") }
+    // Saved like its index below, so the two cannot disagree after a rebuild.
+    val scpPathHistory = rememberSaveable(
+        request?.sessionId,
+        saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+    ) { mutableStateListOf(".") }
+    var lastResetSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
     var scpSelectedPath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var pendingScpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
@@ -420,7 +434,7 @@ fun ConnectingScreen(
     var keyboardVisibleRequested by remember(request?.sessionId) { mutableStateOf(false) }
     var sftpCommandRunning by remember(request?.sessionId) { mutableStateOf(false) }
     var sftpAwaitDirectoryRefresh by remember(request?.sessionId) { mutableStateOf(false) }
-    var sftpCommandStartLogCount by remember(request?.sessionId) { mutableStateOf(0) }
+    var sftpCommandStartLogSequence by remember(request?.sessionId) { mutableStateOf(0L) }
     var sftpCommandStartDirectoryKey by remember(request?.sessionId) { mutableStateOf("") }
     var swipeNavigationEnabled by remember(request?.sessionId) { mutableStateOf(false) }
     var swipeStart by remember(request?.sessionId) { mutableStateOf<SwipeGestureStart?>(null) }
@@ -430,21 +444,11 @@ fun ConnectingScreen(
     var isFnRowVisible by rememberSaveable(request?.sessionId, useBuiltInKeyboard) {
         mutableStateOf(false)
     }
-    val supportsSystemKeyboard = !useBuiltInKeyboard
+    val supportsSystemKeyboard = true
     var showFindDialog by remember(request?.sessionId) { mutableStateOf(false) }
     var findQuery by remember(request?.sessionId) { mutableStateOf("") }
     var findCaseSensitive by remember(request?.sessionId) { mutableStateOf(false) }
     var findMatchIndex by remember(request?.sessionId) { mutableStateOf(0) }
-
-    LaunchedEffect(useBuiltInKeyboard) {
-        if (useBuiltInKeyboard) {
-            terminalImeBridgeRef?.hideTerminalKeyboard()
-            keyboardController?.hide()
-            focusManager.clearFocus(force = true)
-            keyboardFocused = false
-            keyboardVisibleRequested = false
-        }
-    }
 
     val compactKeys = remember(keyboardSlots, useBuiltInKeyboard, isFnRowVisible) {
         val source = when {
@@ -619,6 +623,11 @@ fun ConnectingScreen(
     } else {
         findMatches[findMatchIndex.coerceIn(0, findMatches.lastIndex)]
     }
+    // Read the window's insets rather than Compose's animated isImeVisible: they flip as soon as
+    // the keyboard starts showing or hiding, so a press mid-animation acts on the right state.
+    val rootView = LocalView.current
+    fun isImeShowing(): Boolean =
+        ViewCompat.getRootWindowInsets(rootView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
     fun hideSystemKeyboard() {
         if (!supportsSystemKeyboard) {
             keyboardVisibleRequested = false
@@ -647,7 +656,9 @@ fun ConnectingScreen(
             keyboardVisibleRequested = false
             return
         }
-        if (keyboardVisibleRequested) {
+        // Decide from what is on screen, not keyboardVisibleRequested: that flag stays set when the
+        // keyboard is dismissed with Back or the IME's hide button, which made the next press a no-op.
+        if (isImeShowing()) {
             hideSystemKeyboard()
         } else {
             showSystemKeyboard()
@@ -681,7 +692,7 @@ fun ConnectingScreen(
         return handled
     }
 
-    val terminalViewClient = remember(request?.sessionId, supportsSystemKeyboard) {
+    val terminalViewClient = remember(request?.sessionId, useBuiltInKeyboard) {
         object : TerminalViewClient {
             override fun onScale(scale: Float): Float {
                 terminalFontSizeSp = (terminalFontSizeSp * scale).coerceIn(6f, 28f)
@@ -691,15 +702,13 @@ fun ConnectingScreen(
 
             override fun onSingleTapUp(e: MotionEvent) {
                 onToggleConnectedHostBar()
-                if (supportsSystemKeyboard && keyboardVisibleRequested) {
+                if (useBuiltInKeyboard || keyboardVisibleRequested) {
                     showSystemKeyboard()
                 }
             }
 
             override fun onDoubleTap(e: MotionEvent) {
-                if (supportsSystemKeyboard) {
-                    toggleSystemKeyboard()
-                }
+                toggleSystemKeyboard()
             }
 
             override fun shouldBackButtonBeMappedToEscape(): Boolean = false
@@ -783,46 +792,54 @@ fun ConnectingScreen(
         }
     }
     LaunchedEffect(request?.sessionId) {
+        // This effect also runs whenever the screen is composed from scratch (rotation, returning
+        // from Settings), not only when the session changes. Saved UI state (typed input, paths,
+        // open dialogs, SCP history) is only reset for a genuinely different session; resetting it
+        // on every rebuild threw away the saved state and set the wrong SCP home folder.
+        val sessionChanged = lastResetSessionId != request?.sessionId
+        lastResetSessionId = request?.sessionId
         terminalEngine.reset()
         terminalEngine.applyProfile(terminalProfile)
         lastShellSnapshot = ""
         lastAppliedProfileFontSizeSp = terminalProfile.fontSizeSp.toFloat()
         lastResize = null
-        sftpPath = "."
-        sftpCommandInput = ""
-        sftpLocalPath = (context.getExternalFilesDir(null) ?: context.filesDir).absolutePath
         sftpPendingDirectoryEcho = null
         sftpLastRenderedDirectoryKey = ""
-        pendingSftpDownloadRemotePath = null
-        pendingSftpUploadBasePath = null
         sftpConsoleLines.clear()
         sftpConsoleRevision = 0L
         scpActivityLines.clear()
-        scpRemotePath = "."
         scpPendingListPath = null
         scpPendingListBaselineToken = null
-        scpLastListedPath = "."
-        scpHomePath = null
         scpVisibleEntries = emptyList()
-        scpPathHistory.clear()
-        scpPathHistory += "."
-        scpPathHistoryIndex = 0
-        scpSelectedPath = null
-        pendingScpDownloadRemotePath = null
-        scpTransferStatus = null
-        sftpTransferStatus = null
-        scpActionsExpanded = false
-        scpPendingManualPathTarget = null
-        scpPendingManualPathFallback = null
-        scpPendingLinkPathTarget = null
-        scpPendingLinkPathFallback = null
-        showScpRenameDialog = false
-        scpRenameValue = ""
-        showScpMoveDialog = false
-        scpMoveDestination = ""
-        showScpNewFolderDialog = false
-        scpNewFolderValue = ""
-        showScpDeleteDialog = false
+        if (sessionChanged) {
+            sftpPath = "."
+            sftpCommandInput = ""
+            sftpLocalPath = (context.getExternalFilesDir(null) ?: context.filesDir).absolutePath
+            pendingSftpDownloadRemotePath = null
+            pendingSftpUploadBasePath = null
+            scpRemotePath = "."
+            scpLastListedPath = "."
+            scpHomePath = null
+            scpPathHistory.clear()
+            scpPathHistory += "."
+            scpPathHistoryIndex = 0
+            scpSelectedPath = null
+            pendingScpDownloadRemotePath = null
+            scpTransferStatus = null
+            sftpTransferStatus = null
+            scpActionsExpanded = false
+            scpPendingManualPathTarget = null
+            scpPendingManualPathFallback = null
+            scpPendingLinkPathTarget = null
+            scpPendingLinkPathFallback = null
+            showScpRenameDialog = false
+            scpRenameValue = ""
+            showScpMoveDialog = false
+            scpMoveDestination = ""
+            showScpNewFolderDialog = false
+            scpNewFolderValue = ""
+            showScpDeleteDialog = false
+        }
         if (request?.mode == ConnectionMode.SFTP) {
             sftpConsoleLines += "Connected to ${request.host}:${request.port}"
             sftpConsoleLines += "Type 'help' for SFTP commands."
@@ -853,7 +870,7 @@ fun ConnectingScreen(
         findCaseSensitive = false
         sftpCommandRunning = false
         sftpAwaitDirectoryRefresh = false
-        sftpCommandStartLogCount = 0
+        sftpCommandStartLogSequence = 0L
         sftpCommandStartDirectoryKey = ""
         terminalViewRef?.onScreenUpdated()
     }
@@ -942,15 +959,21 @@ fun ConnectingScreen(
         }
     }
     DisposableEffect(activity, request?.sessionId) {
-        activity?.setHardwareKeyHandler { event -> activityHardwareKeyHandler(event) }
+        val handler: (KeyEvent) -> Boolean = { event -> activityHardwareKeyHandler(event) }
+        activity?.setHardwareKeyHandler(handler)
         onDispose {
-            activity?.setHardwareKeyHandler(null)
+            activity?.clearHardwareKeyHandler(handler)
         }
     }
+    val reopenBuiltInKeyboardOnResume = rememberUpdatedState(useBuiltInKeyboard && showTerminalSession)
     DisposableEffect(lifecycleOwner, request?.sessionId) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
+                    // ON_PAUSE hides the keyboard; bring it back in built-in mode.
+                    if (reopenBuiltInKeyboardOnResume.value) {
+                        keyboardVisibleRequested = true
+                    }
                     val profile = currentTerminalProfile.value
                     terminalEngine.applyProfile(profile)
                     terminalViewRef?.let { view ->
@@ -1020,16 +1043,25 @@ fun ConnectingScreen(
         lastShellSnapshot = snapshot
         terminalViewRef?.onScreenUpdated()
     }
-    LaunchedEffect(state.phase, request?.sessionId) {
-        if (showTerminalSession) {
-            hideSystemKeyboard()
+    LaunchedEffect(state.phase, request?.sessionId, useBuiltInKeyboard) {
+        if (showTerminalSession && useBuiltInKeyboard) {
+            // The built-in extra keys sit on top of the system keyboard, so open it as soon as the
+            // terminal is ready; otherwise users only see the extra-key row and cannot type.
+            keyboardVisibleRequested = true
         } else {
             hideSystemKeyboard()
         }
     }
+    // Remember which Find request was handled: the token outlives this screen instance, so
+    // without this every recomposition from scratch (rotation, returning from Settings, session
+    // switch) reopened Find.
+    var handledFindRequestToken by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(findRequestToken, showTerminalSession) {
-        if (findRequestToken > 0 && showTerminalSession) {
+        if (findRequestToken > handledFindRequestToken && showTerminalSession) {
+            handledFindRequestToken = findRequestToken
             showFindDialog = true
+        } else if (findRequestToken < handledFindRequestToken) {
+            handledFindRequestToken = findRequestToken
         }
     }
     LaunchedEffect(findQuery, findCaseSensitive, showFindDialog) {
@@ -1133,7 +1165,7 @@ fun ConnectingScreen(
         scpPendingListPath = null
         scpPendingListBaselineToken = null
     }
-    LaunchedEffect(logs.size, request?.mode, scpPendingListPath) {
+    LaunchedEffect(logs.lastOrNull()?.sequence, request?.mode, scpPendingListPath) {
         if (request?.mode != ConnectionMode.SCP) return@LaunchedEffect
         val failedPendingPath = scpPendingListPath ?: return@LaunchedEffect
         if (logs.isEmpty()) return@LaunchedEffect
@@ -1297,7 +1329,7 @@ fun ConnectingScreen(
         appendSftpConsoleLines(output)
         sftpPendingDirectoryEcho = null
     }
-    LaunchedEffect(logs.size, request?.mode, sftpPendingDirectoryEcho, remoteDirectory?.path) {
+    LaunchedEffect(logs.lastOrNull()?.sequence, request?.mode, sftpPendingDirectoryEcho, remoteDirectory?.path) {
         if (request?.mode != ConnectionMode.SFTP) return@LaunchedEffect
         val failedPendingPath = sftpPendingDirectoryEcho ?: return@LaunchedEffect
         if (logs.isEmpty()) return@LaunchedEffect
@@ -1326,9 +1358,8 @@ fun ConnectingScreen(
     }
 
     fun runSnippetOnCurrentSession(snippet: Snippet) {
-        val command = snippet.command.trim()
-        if (command.isBlank()) return
-        val payload = if (command.endsWith("\n") || command.endsWith("\r")) command else "$command\r"
+        val payload = com.majordaftapps.sshpeaches.app.util.snippetCommandToTerminalPayload(snippet.command)
+        if (payload.isBlank()) return
         terminalInput.sendRawSequence(payload)
     }
 
@@ -1654,7 +1685,6 @@ fun ConnectingScreen(
                 findMatches = findMatches,
                 findMatchIndex = findMatchIndex,
                 onFindMatchIndexChange = { findMatchIndex = it },
-                activeFindMatch = activeFindMatch,
                 onDismissFind = ::dismissFindDialog,
                 compactKeys = compactKeys,
                 pendingModifiers = pendingModifiers,
@@ -1756,8 +1786,8 @@ fun ConnectingScreen(
                 onSftpCommandRunningChange = { sftpCommandRunning = it },
                 sftpAwaitDirectoryRefresh = sftpAwaitDirectoryRefresh,
                 onSftpAwaitDirectoryRefreshChange = { sftpAwaitDirectoryRefresh = it },
-                sftpCommandStartLogCount = sftpCommandStartLogCount,
-                onSftpCommandStartLogCountChange = { sftpCommandStartLogCount = it },
+                sftpCommandStartLogSequence = sftpCommandStartLogSequence,
+                onSftpCommandStartLogSequenceChange = { sftpCommandStartLogSequence = it },
                 sftpCommandStartDirectoryKey = sftpCommandStartDirectoryKey,
                 onSftpCommandStartDirectoryKeyChange = { sftpCommandStartDirectoryKey = it },
                 sftpListShowAll = sftpListShowAll,
@@ -1825,7 +1855,6 @@ private fun ConnectingTerminalContent(
     findMatches: List<TerminalFindMatch>,
     findMatchIndex: Int,
     onFindMatchIndexChange: (Int) -> Unit,
-    activeFindMatch: TerminalFindMatch?,
     onDismissFind: () -> Unit,
     compactKeys: List<CompactTerminalKey>,
     pendingModifiers: Set<KeyboardModifier>,
@@ -1899,7 +1928,6 @@ private fun ConnectingTerminalContent(
                         findMatches = findMatches,
                         findMatchIndex = findMatchIndex,
                         onFindMatchIndexChange = onFindMatchIndexChange,
-                        activeFindMatch = activeFindMatch,
                         onDismiss = onDismissFind
                     )
                 }
@@ -2058,6 +2086,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
     var onCommittedText: ((String) -> Unit)? = null
     var onImeBackspace: (() -> Unit)? = null
     var onImeForwardDelete: (() -> Unit)? = null
+    private var showWhenWindowFocused = false
 
     fun showTerminalKeyboard() {
         fun showNow() {
@@ -2070,6 +2099,9 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 }
             }
         }
+        // A show issued before the window has focus is dropped (or undone when focus arrives),
+        // e.g. when a session screen opens already connected; retry once the window is focused.
+        showWhenWindowFocused = !hasWindowFocus()
         if (isAttachedToWindow) {
             showNow()
         } else {
@@ -2080,8 +2112,16 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
     }
 
     fun hideTerminalKeyboard() {
+        showWhenWindowFocused = false
         inputMethodManager()?.hideSoftInputFromWindow(windowToken, 0)
         clearFocus()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus && showWhenWindowFocused) {
+            showTerminalKeyboard()
+        }
     }
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
@@ -2289,7 +2329,6 @@ private fun TerminalFindPanel(
     findMatches: List<TerminalFindMatch>,
     findMatchIndex: Int,
     onFindMatchIndexChange: (Int) -> Unit,
-    activeFindMatch: TerminalFindMatch?,
     onDismiss: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -2298,15 +2337,13 @@ private fun TerminalFindPanel(
         color = colorScheme.surface,
         shape = RoundedCornerShape(6.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
                 Surface(
                     modifier = Modifier
                         .weight(1f)
@@ -2373,6 +2410,20 @@ private fun TerminalFindPanel(
                         )
                     }
                 }
+                Text(
+                    text = when {
+                        findQuery.isBlank() -> ""
+                        findMatches.isEmpty() -> "0/0"
+                        else -> {
+                            val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
+                            "${activeIndex + 1}/${findMatches.size}"
+                        }
+                    },
+                    style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace),
+                    color = colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
+                )
                 IconButton(
                     onClick = {
                         if (findMatches.isNotEmpty()) {
@@ -2414,30 +2465,11 @@ private fun TerminalFindPanel(
                         tint = colorScheme.onSurfaceVariant
                     )
                 }
-            }
-            Text(
-                text = when {
-                    findQuery.isBlank() -> "Enter search text"
-                    findMatches.isEmpty() -> "No matches"
-                    else -> {
-                        val activeIndex = findMatchIndex.coerceIn(0, findMatches.lastIndex)
-                        if (activeFindMatch != null) {
-                            "${activeIndex + 1}/${findMatches.size} line ${activeFindMatch.line}: ${activeFindMatch.preview}"
-                        } else {
-                            "${activeIndex + 1}/${findMatches.size}"
-                        }
-                    }
-                },
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_STATUS)
-            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConnectingScpContent(
     sessionId: String,
@@ -2493,9 +2525,20 @@ private fun ConnectingScpContent(
     parentPath: (String) -> String
 ) {
     var showHiddenFiles by rememberSaveable(sessionId) { mutableStateOf(false) }
-    val remoteItems = (remoteDirectory?.entries ?: scpVisibleEntries).let { entries ->
-        if (showHiddenFiles) entries else entries.filterNot { it.name.startsWith(".") }
-    }
+    var sortMenuExpanded by rememberSaveable(sessionId) { mutableStateOf(false) }
+    var sortFieldName by rememberSaveable(sessionId) { mutableStateOf(RemoteFileSortField.NAME.name) }
+    var sortAscending by rememberSaveable(sessionId) { mutableStateOf(true) }
+    var foldersFirst by rememberSaveable(sessionId) { mutableStateOf(true) }
+    val sortField = RemoteFileSortField.entries.firstOrNull { it.name == sortFieldName }
+        ?: RemoteFileSortField.NAME
+    val remoteItems = sortRemoteDirectoryEntries(
+        entries = (remoteDirectory?.entries ?: scpVisibleEntries).let { entries ->
+            if (showHiddenFiles) entries else entries.filterNot { it.name.startsWith(".") }
+        },
+        field = sortField,
+        ascending = sortAscending,
+        foldersFirst = foldersFirst
+    )
     val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
     val scpListingInProgress = scpPendingListPath != null
     val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
@@ -2606,139 +2649,167 @@ private fun ConnectingScpContent(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val showRefreshNavigation = maxWidth >= 380.dp
-            val showHomeNavigation = maxWidth >= 430.dp
-            val showForwardNavigation = maxWidth >= 480.dp
+        CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    enabled = canGoBack,
+                FileBrowserToolbarButton(
                     onClick = {
-                        if (!canGoBack) return@IconButton
+                        if (!canGoBack) return@FileBrowserToolbarButton
                         val nextIndex = scpPathHistoryIndex - 1
                         onScpPathHistoryIndexChange(nextIndex)
                         browseScpPath(scpPathHistory[nextIndex], false, true, true)
-                    }
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant)
-                }
-                if (showForwardNavigation) {
-                    IconButton(
-                        enabled = canGoForward,
-                        onClick = {
-                            if (!canGoForward) return@IconButton
-                            val nextIndex = scpPathHistoryIndex + 1
-                            onScpPathHistoryIndexChange(nextIndex)
-                            browseScpPath(scpPathHistory[nextIndex], false, true, true)
-                        }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Forward", tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant)
-                    }
-                }
-                IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) }) {
-                    Icon(Icons.Default.ArrowUpward, "Up", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-                }
-                if (showRefreshNavigation) {
-                    IconButton(enabled = !scpListingInProgress, onClick = { browseScpPath(effectiveRemotePath, false, true, true) }) {
-                        Icon(Icons.Default.Refresh, "Refresh", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-                    }
-                }
-                if (showHomeNavigation) {
-                    IconButton(
-                        enabled = !scpListingInProgress,
-                        onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) },
-                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("home"))
-                    ) {
-                        Icon(Icons.Default.Home, "Home", tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface)
-                    }
-                }
+                    },
+                    enabled = canGoBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = if (canGoBack) colorScheme.onSurface else colorScheme.onSurfaceVariant
+                )
+                FileBrowserToolbarButton(
+                    onClick = {
+                        if (!canGoForward) return@FileBrowserToolbarButton
+                        val nextIndex = scpPathHistoryIndex + 1
+                        onScpPathHistoryIndexChange(nextIndex)
+                        browseScpPath(scpPathHistory[nextIndex], false, true, true)
+                    },
+                    enabled = canGoForward,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Forward",
+                    tint = if (canGoForward) colorScheme.onSurface else colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("forward"))
+                )
+                FileBrowserToolbarButton(
+                    onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) },
+                    enabled = !scpListingInProgress,
+                    imageVector = Icons.Default.ArrowUpward,
+                    contentDescription = "Up",
+                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
+                )
+                FileBrowserToolbarButton(
+                    onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) },
+                    enabled = !scpListingInProgress,
+                    imageVector = Icons.Default.Home,
+                    contentDescription = "Home",
+                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface,
+                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("home"))
+                )
+                FileBrowserToolbarButton(
+                    onClick = { browseScpPath(effectiveRemotePath, false, true, true) },
+                    enabled = !scpListingInProgress,
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface,
+                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("refresh"))
+                )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = { showHiddenFiles = !showHiddenFiles },
-                    modifier = Modifier.testTag(UiTestTags.connectingScpAction("toggle_hidden"))
-                ) {
-                    Icon(
-                        if (showHiddenFiles) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (showHiddenFiles) "Hide hidden files" else "Show hidden files",
-                        tint = if (showHiddenFiles) colorScheme.primary else colorScheme.onSurfaceVariant
+                Box {
+                    FileBrowserToolbarButton(
+                        onClick = { sortMenuExpanded = true },
+                        imageVector = Icons.Default.SwapVert,
+                        contentDescription = "Sort files",
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.testTag(UiTestTags.connectingScpAction("sort"))
                     )
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
+                    ) {
+                        RemoteFileSortField.entries.forEach { field ->
+                            val selected = field == sortField
+                            DropdownMenuItem(
+                                text = { Text(remoteFileSortLabel(field)) },
+                                onClick = {
+                                    if (selected) {
+                                        sortAscending = !sortAscending
+                                    } else {
+                                        sortFieldName = field.name
+                                        sortAscending = field == RemoteFileSortField.NAME
+                                    }
+                                    sortMenuExpanded = false
+                                },
+                                trailingIcon = if (selected) {
+                                    {
+                                        Icon(
+                                            imageVector = if (sortAscending) {
+                                                Icons.Default.KeyboardArrowUp
+                                            } else {
+                                                Icons.Default.KeyboardArrowDown
+                                            },
+                                            contentDescription = if (sortAscending) {
+                                                "Ascending"
+                                            } else {
+                                                "Descending"
+                                            }
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                modifier = Modifier.testTag(
+                                    UiTestTags.connectingScpAction("sort_${field.name.lowercase()}")
+                                )
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Folders first") },
+                            onClick = { foldersFirst = !foldersFirst },
+                            trailingIcon = if (foldersFirst) {
+                                {
+                                    Icon(Icons.Default.Check, contentDescription = "Selected")
+                                }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("folders_first"))
+                        )
+                    }
                 }
-                IconButton(
+                FileBrowserToolbarButton(
                     onClick = ::handleScpUploadAction,
                     enabled = canChooseUploadSource,
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = "Upload file to this folder",
+                    tint = if (canChooseUploadSource) colorScheme.onSurface else colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_UPLOAD_BUTTON)
-                ) {
-                    Icon(
-                        Icons.Default.CloudUpload,
-                        "Upload file to this folder",
-                        tint = if (canChooseUploadSource) colorScheme.onSurface else colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(
+                )
+                FileBrowserToolbarButton(
                     onClick = ::launchScpDownloadPicker,
                     enabled = canDownloadSelected,
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = "Download selected file",
+                    tint = if (canDownloadSelected) colorScheme.onSurface else colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DOWNLOAD_BUTTON)
-                ) {
-                    Icon(
-                        Icons.Default.CloudDownload,
-                        "Download selected file",
-                        tint = if (canDownloadSelected) colorScheme.onSurface else colorScheme.onSurfaceVariant
-                    )
-                }
+                )
                 Box {
-                    IconButton(
+                    FileBrowserToolbarButton(
                         onClick = { onScpActionsExpandedChange(true) },
-                        enabled = !scpTransferActive || (!showForwardNavigation && canGoForward),
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Actions",
+                        tint = colorScheme.onSurface,
                         modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON)
-                    ) {
-                        Icon(Icons.Default.MoreVert, "Actions")
-                    }
+                    )
                     DropdownMenu(
                         expanded = scpActionsExpanded,
                         onDismissRequest = { onScpActionsExpandedChange(false) }
                     ) {
-                        if (!showForwardNavigation) {
-                            DropdownMenuItem(
-                                text = { Text("Forward") },
-                                enabled = canGoForward,
-                                onClick = {
-                                    if (!canGoForward) return@DropdownMenuItem
-                                    val nextIndex = scpPathHistoryIndex + 1
-                                    onScpActionsExpandedChange(false)
-                                    onScpPathHistoryIndexChange(nextIndex)
-                                    browseScpPath(scpPathHistory[nextIndex], false, true, true)
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("forward"))
-                            )
-                        }
-                        if (!showHomeNavigation) {
-                            DropdownMenuItem(
-                                text = { Text("Home") },
-                                enabled = !scpListingInProgress,
-                                onClick = {
-                                    if (scpListingInProgress) return@DropdownMenuItem
-                                    onScpActionsExpandedChange(false)
-                                    browseScpPath(scpHomePath ?: ".", true, true, true)
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("home"))
-                            )
-                        }
-                        if (!showRefreshNavigation) {
-                            DropdownMenuItem(
-                                text = { Text("Refresh") },
-                                enabled = !scpListingInProgress,
-                                onClick = {
-                                    if (scpListingInProgress) return@DropdownMenuItem
-                                    onScpActionsExpandedChange(false)
-                                    browseScpPath(effectiveRemotePath, false, true, true)
-                                },
-                                modifier = Modifier.testTag(UiTestTags.connectingScpAction("refresh"))
-                            )
-                        }
+                        DropdownMenuItem(
+                            text = { Text("Show hidden files") },
+                            onClick = {
+                                showHiddenFiles = !showHiddenFiles
+                                onScpActionsExpandedChange(false)
+                            },
+                            trailingIcon = if (showHiddenFiles) {
+                                {
+                                    Icon(Icons.Default.Check, contentDescription = "Selected")
+                                }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("toggle_hidden"))
+                        )
                         DropdownMenuItem(
                             text = { Text("Rename") },
                             enabled = canMoveSelection,
@@ -2923,19 +2994,23 @@ private fun ConnectingScpContent(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val fileVisual = remoteFileTypeVisual(
+                                    name = item.name,
+                                    isDirectory = item.isDirectory,
+                                    isSymbolicLink = item.isSymbolicLink,
+                                    isBrokenLink = item.isBrokenLink,
+                                    linkTargetIsDirectory = item.linkTargetIsDirectory
+                                )
                                 Icon(
-                                    imageVector = when {
-                                        item.isSymbolicLink -> Icons.Default.Link
-                                        item.isDirectory -> Icons.Default.Folder
-                                        else -> Icons.Default.Description
-                                    },
-                                    contentDescription = null,
-                                    tint = when {
-                                        item.isSymbolicLink && item.isBrokenLink -> colorScheme.error
-                                        item.isSymbolicLink -> colorScheme.primary
-                                        item.isDirectory -> colorScheme.primary
-                                        else -> colorScheme.onSurfaceVariant
-                                    }
+                                    imageVector = fileVisual.icon,
+                                    contentDescription = fileVisual.contentDescription,
+                                    tint = remoteFileKindTint(
+                                        kind = fileVisual.kind,
+                                        isBrokenLink = item.isBrokenLink,
+                                        fallback = colorScheme.onSurfaceVariant,
+                                        primary = colorScheme.primary,
+                                        error = colorScheme.error
+                                    )
                                 )
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
@@ -3234,8 +3309,8 @@ private fun ConnectingSftpContent(
     onSftpCommandRunningChange: (Boolean) -> Unit,
     sftpAwaitDirectoryRefresh: Boolean,
     onSftpAwaitDirectoryRefreshChange: (Boolean) -> Unit,
-    sftpCommandStartLogCount: Int,
-    onSftpCommandStartLogCountChange: (Int) -> Unit,
+    sftpCommandStartLogSequence: Long,
+    onSftpCommandStartLogSequenceChange: (Long) -> Unit,
     sftpCommandStartDirectoryKey: String,
     onSftpCommandStartDirectoryKeyChange: (String) -> Unit,
     sftpListShowAll: Boolean,
@@ -3261,7 +3336,7 @@ private fun ConnectingSftpContent(
     fun beginSftpCommandWait(waitForDirectoryRefresh: Boolean) {
         onSftpCommandRunningChange(true)
         onSftpAwaitDirectoryRefreshChange(waitForDirectoryRefresh)
-        onSftpCommandStartLogCountChange(logs.size)
+        onSftpCommandStartLogSequenceChange(logs.lastOrNull()?.sequence ?: 0L)
         onSftpCommandStartDirectoryKeyChange(currentRemoteSnapshotKey)
     }
 
@@ -3312,7 +3387,7 @@ private fun ConnectingSftpContent(
     fun finishSftpCommandWait() {
         onSftpCommandRunningChange(false)
         onSftpAwaitDirectoryRefreshChange(false)
-        onSftpCommandStartLogCountChange(0)
+        onSftpCommandStartLogSequenceChange(0L)
         onSftpCommandStartDirectoryKeyChange("")
     }
 
@@ -3475,10 +3550,13 @@ private fun ConnectingSftpContent(
         }
     }
 
-    LaunchedEffect(sftpCommandRunning, logs.size, currentRemoteSnapshotKey) {
+    // Keyed on the newest log sequence and filtered by sequence, not by list size/offset: the log
+    // buffer is capped, so once full its size stayed constant, this never re-ran, and every later
+    // command was refused with "A command is already running".
+    LaunchedEffect(sftpCommandRunning, logs.lastOrNull()?.sequence, currentRemoteSnapshotKey) {
         if (!sftpCommandRunning) return@LaunchedEffect
         val commandOutcome = logs
-            .drop(sftpCommandStartLogCount.coerceAtMost(logs.size))
+            .filter { it.sequence > sftpCommandStartLogSequence }
             .map { it.message }
             .lastOrNull { message ->
                 message.startsWith("Remote mkdir completed:") ||
@@ -3501,6 +3579,15 @@ private fun ConnectingSftpContent(
         if (commandOutcome != null || completedByDirectory) {
             finishSftpCommandWait()
         }
+    }
+    // Safety net so a lost or unrecognized server response cannot leave the console refusing
+    // every later command. File transfers report their own completion and may run long.
+    LaunchedEffect(sftpCommandRunning, sftpCommandStartLogSequence, activeFileTransfer?.status) {
+        if (!sftpCommandRunning) return@LaunchedEffect
+        if (activeFileTransfer?.isTerminal == false) return@LaunchedEffect
+        delay(SFTP_COMMAND_RESPONSE_TIMEOUT_MS)
+        appendSftpConsole("No response from the server; the command's result is unknown.")
+        finishSftpCommandWait()
     }
     LaunchedEffect(
         activeFileTransfer?.operationId,
@@ -3933,7 +4020,9 @@ private fun RowScope.CompactKeyButton(
     } else {
         if (key.enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant
     }
-    DisposableEffect(Unit) {
+    // Keyed like repeatJob's remember(key): when the key row changes mid-press (e.g. Fn tapped
+    // while an arrow is held), cancel the old repeat instead of orphaning it.
+    DisposableEffect(key) {
         onDispose {
             repeatJob?.cancel()
             pressed = false
@@ -4544,11 +4633,41 @@ private fun normalizeImeChunk(chunk: String): String {
     return normalized.replace('\n', '\r')
 }
 
+@Composable
+private fun FileBrowserToolbarButton(
+    onClick: () -> Unit,
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(FILE_BROWSER_TOOLBAR_ICON_SIZE)
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+private fun remoteFileSortLabel(field: RemoteFileSortField): String = when (field) {
+    RemoteFileSortField.NAME -> "Name"
+    RemoteFileSortField.SIZE -> "Size"
+    RemoteFileSortField.DATE -> "Date"
+}
+
 private const val TERMINAL_IME_SENTINEL = "\u0001"
 private const val TERMINAL_CLIPBOARD_SENSITIVE_EXTRA = "android.content.extra.IS_SENSITIVE"
 private const val TERMINAL_CLIPBOARD_SUPPRESS_OVERLAY_EXTRA =
     "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
 private const val KEYBOARD_REQUESTED_STATE = "keyboard_requested"
+private const val SFTP_COMMAND_RESPONSE_TIMEOUT_MS = 60_000L
 private const val KEYBOARD_HIDDEN_STATE = "keyboard_hidden"
 private const val TERMINAL_PRIVATE_IME_OPTIONS =
     "com.google.android.inputmethod.latin.noPersonalizedLearning=true;com.google.android.inputmethod.latin.noMicrophoneKey=true"
@@ -4566,6 +4685,7 @@ private val TERMINAL_IME_OPTIONS = EditorInfo.IME_ACTION_NONE or
     EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
 private const val TERMINAL_IME_INLINE_PASTE_MAX_BYTES = 1_048_576
 private const val TERMINAL_IME_CONTENT_READ_BUFFER_BYTES = 8_192
+private val FILE_BROWSER_TOOLBAR_ICON_SIZE = 36.dp
 private const val SFTP_CONSOLE_MAX_LINES = 500
 private const val SFTP_DIRECTORY_ENTRY_OUTPUT_LIMIT = SFTP_CONSOLE_MAX_LINES - 2
 private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L

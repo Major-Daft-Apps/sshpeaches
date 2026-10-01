@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.screens.RemoteFileSortTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:51.523Z" hostname="362696.200293.sys.ipv4.io" time="0.003">
+  <properties/>
+  <testcase name="sizeDescendingWithoutFoldersFirst" classname="com.majordaftapps.sshpeaches.app.ui.screens.RemoteFileSortTest" time="0.002"/>
+  <testcase name="dateAscendingKeepsFoldersFirst" classname="com.majordaftapps.sshpeaches.app.ui.screens.RemoteFileSortTest" time="0.001"/>
+  <testcase name="foldersFirstThenNameAscending" classname="com.majordaftapps.sshpeaches.app.ui.screens.RemoteFileSortTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

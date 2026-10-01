@@ -24,26 +24,25 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CardDefaults.cardElevation
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -71,8 +71,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
-import com.majordaftapps.sshpeaches.app.data.model.Snippet
-import com.majordaftapps.sshpeaches.app.ui.util.toSentenceCaseLabel
+import com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
@@ -83,25 +82,22 @@ import com.majordaftapps.sshpeaches.app.ui.util.ExportPassphraseCache
 import com.majordaftapps.sshpeaches.app.ui.adaptive.desktopHoverable
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberDesktopHoverState
 import com.majordaftapps.sshpeaches.app.ui.adaptive.secondaryClickToOpen
-import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
-import com.majordaftapps.sshpeaches.app.util.snippetReference
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HostCard(
     host: HostConnection,
     modifier: Modifier = Modifier,
-    snippets: List<Snippet> = emptyList(),
     onToggleFavorite: (String) -> Unit = {},
     onAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
-    canRunInfoCommands: Boolean = false,
-    onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
-    onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
+    onFetchSystemInfo: (HostConnection, (HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
     onDetails: ((HostConnection) -> Unit)? = null,
     onEdit: ((HostConnection) -> Unit)? = null,
     onDelete: ((HostConnection) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val showInfo = remember { mutableStateOf(false) }
     val showQr = remember { mutableStateOf(false) }
     val showPassphrasePrompt = remember { mutableStateOf(false) }
@@ -111,12 +107,9 @@ fun HostCard(
     val confirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val passphraseError = remember { mutableStateOf<String?>(null) }
     val qrBitmap = remember { mutableStateOf<Bitmap?>(null) }
-    val infoCommandsState = rememberSaveable(host.id) {
-        mutableStateOf(host.infoCommands)
-    }
     val showOverflow = rememberSaveable(host.id) { mutableStateOf(false) }
-    val infoSnippetExpanded = rememberSaveable(host.id) { mutableStateOf(false) }
-    val infoCommandStatus = rememberSaveable(host.id) { mutableStateOf<String?>(null) }
+    val systemInfo = remember(host.id) { mutableStateOf<HostSystemInfo?>(null) }
+    val systemInfoLoading = remember(host.id) { mutableStateOf(false) }
     val hasDesktopActions = onDetails != null || onEdit != null || onDelete != null
     val (cardInteractionSource, cardHovered) = rememberDesktopHoverState(
         enabled = hasDesktopActions
@@ -124,26 +117,30 @@ fun HostCard(
     AutoHidePasswordReveal(passphraseRevealIndex)
     AutoHidePasswordReveal(confirmPassphraseRevealIndex)
 
-    fun persistInfoCommands(next: List<String>) {
-        val normalized = next.map { it.trim() }.filter { it.isNotBlank() }
-        infoCommandsState.value = normalized
+    fun requestSystemInfo() {
+        systemInfoLoading.value = true
+        onFetchSystemInfo(host) { result ->
+            systemInfo.value = result
+            systemInfoLoading.value = false
+        }
     }
 
-    fun commitInfoCommands() {
-        onInfoCommandsChange(host, infoCommandsState.value)
-    }
-
-    LaunchedEffect(host.id, host.infoCommands) {
+    LaunchedEffect(host.id) {
         showQr.value = false
         showPassphrasePrompt.value = false
         passphraseState.value = ExportPassphraseCache.host.orEmpty()
         confirmPassphraseState.value = ExportPassphraseCache.host.orEmpty()
         passphraseError.value = null
         qrBitmap.value = null
-        infoCommandStatus.value = null
-        infoSnippetExpanded.value = false
-        infoCommandsState.value = host.infoCommands
         showOverflow.value = false
+        systemInfo.value = null
+        systemInfoLoading.value = false
+    }
+
+    LaunchedEffect(showInfo.value, host.id) {
+        if (showInfo.value) {
+            requestSystemInfo()
+        }
     }
 
     Card(
@@ -312,11 +309,13 @@ fun HostCard(
                             if (host.hasPassword) {
                                 showPassphrasePrompt.value = true
                             } else {
-                                qrBitmap.value = generateHostQr(host, passphrase = null)
-                                if (qrBitmap.value != null) {
-                                    showQr.value = true
-                                } else {
-                                    Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
+                                scope.launch {
+                                    qrBitmap.value = generateHostQr(host, passphrase = null)
+                                    if (qrBitmap.value != null) {
+                                        showQr.value = true
+                                    } else {
+                                        Toast.makeText(context, "Unable to generate QR.", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         },
@@ -334,15 +333,17 @@ fun HostCard(
 
     if (showInfo.value) {
         AlertDialog(
-            onDismissRequest = {
-                commitInfoCommands()
-                showInfo.value = false
-            },
+            onDismissRequest = { showInfo.value = false },
+            modifier = Modifier.testTag(UiTestTags.HOST_INFO_DIALOG),
             confirmButton = {
-                TextButton(onClick = {
-                    commitInfoCommands()
-                    showInfo.value = false
-                }) { Text("Close") }
+                TextButton(onClick = { showInfo.value = false }) { Text("Close") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !systemInfoLoading.value,
+                    onClick = { requestSystemInfo() },
+                    modifier = Modifier.testTag(UiTestTags.HOST_INFO_REFRESH_BUTTON)
+                ) { Text("Refresh") }
             },
             title = { Text(host.name) },
             text = {
@@ -350,125 +351,62 @@ fun HostCard(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Address: ${host.host}:${host.port}")
-                    Text("User: ${host.username}")
-                    host.group?.let { Text("Group: $it") }
-                    Text("Auth: ${host.preferredAuth.toSentenceCaseLabel()}")
-                    Text("Transport: ${if (host.useMosh) "Mosh" else "SSH"}")
-                    Text("Info snippets", style = MaterialTheme.typography.titleSmall)
-                    if (snippets.isEmpty()) {
-                        Text(
-                            "No snippets available. Create snippets first.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    } else {
-                        ExposedDropdownMenuBox(
-                            expanded = infoSnippetExpanded.value,
-                            onExpandedChange = { infoSnippetExpanded.value = !infoSnippetExpanded.value }
+                    if (systemInfoLoading.value && systemInfo.value == null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            TextField(
-                                value = "Add snippet",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Snippet") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = infoSnippetExpanded.value)
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text("Collecting live system info…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        val info = systemInfo.value
+                        if (info == null) {
+                            Text(
+                                "Live system info is not available yet.",
+                                style = MaterialTheme.typography.bodySmall
                             )
-                            ExposedDropdownMenu(
-                                expanded = infoSnippetExpanded.value,
-                                onDismissRequest = { infoSnippetExpanded.value = false }
-                            ) {
-                                snippets.forEach { snippet ->
-                                    val token = snippetReference(snippet.id)
-                                    val alreadyAdded = infoCommandsState.value.contains(token)
-                                    DropdownMenuItem(
-                                        text = { Text(snippet.title) },
-                                        enabled = !alreadyAdded,
-                                        onClick = {
-                                            if (!alreadyAdded) {
-                                                persistInfoCommands(infoCommandsState.value + token)
-                                                infoCommandStatus.value = "Added snippet: ${snippet.title}"
-                                            }
-                                            infoSnippetExpanded.value = false
-                                        }
-                                    )
+                        } else {
+                            if (systemInfoLoading.value) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Text("Refreshing…", style = MaterialTheme.typography.bodySmall)
                                 }
                             }
-                        }
-                    }
-                    if (infoCommandsState.value.isEmpty()) {
-                        Text(
-                            "No info snippets selected.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    } else {
-                        infoCommandsState.value.forEachIndexed { index, entry ->
-                            val snippetId = parseSnippetReference(entry)
-                            val snippet = snippets.firstOrNull { it.id == snippetId }
-                            val runCommand = snippet?.command ?: if (snippetId == null) entry.trim() else ""
-                            val displayTitle = when {
-                                snippet != null -> snippet.title
-                                snippetId != null -> "Missing snippet"
-                                else -> "Legacy command"
+                            info.error?.takeIf { it.isNotBlank() }?.let { error ->
+                                Text(
+                                    error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.testTag(UiTestTags.HOST_INFO_STATUS)
+                                )
                             }
-                            val displayBody = when {
-                                snippet != null -> snippet.command
-                                snippetId != null -> "Snippet no longer exists. Remove this entry."
-                                else -> entry
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(displayTitle, style = MaterialTheme.typography.labelLarge)
-                                Text(displayBody, style = MaterialTheme.typography.bodySmall)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(
-                                        enabled = canRunInfoCommands && runCommand.isNotBlank(),
-                                        onClick = {
-                                            val dispatched = onRunInfoCommand(host, runCommand)
-                                            infoCommandStatus.value = if (dispatched) {
-                                                "Queued command."
-                                            } else {
-                                                "No active SSH session for this host."
-                                            }
-                                        }
-                                    ) {
-                                        Text("Run")
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            val current = infoCommandsState.value.toMutableList()
-                                            current.removeAt(index)
-                                            persistInfoCommands(current)
-                                            if (current.isEmpty()) {
-                                                infoCommandStatus.value = "No info snippets selected."
-                                            }
-                                        }
-                                    ) {
-                                        Text("Remove")
-                                    }
+                            HostInfoRow("OS", info.osName)
+                            HostInfoRow("Version", info.osVersion)
+                            HostInfoRow("Hostname", info.hostname)
+                            HostInfoRow("Kernel", info.kernel)
+                            HostInfoRow("Arch", info.architecture)
+                            HostInfoRow(
+                                "CPU",
+                                when {
+                                    !info.cpu.isNullOrBlank() && !info.cpuCores.isNullOrBlank() ->
+                                        "${info.cpu} (${info.cpuCores} cores)"
+                                    else -> info.cpu ?: info.cpuCores?.let { "$it cores" }
                                 }
+                            )
+                            HostInfoBlock("Memory (free -h)", info.freeOutput)
+                            if (info.freeOutput.isNullOrBlank()) {
+                                HostInfoRow("Memory", info.memory)
                             }
-                        }
-                        TextButton(
-                            onClick = {
-                                persistInfoCommands(emptyList())
-                                infoCommandStatus.value = "Cleared info snippets."
+                            HostInfoBlock("Disk (df -h)", info.dfOutput)
+                            if (info.dfOutput.isNullOrBlank()) {
+                                HostInfoRow("Disk /", info.disk)
                             }
-                        ) {
-                            Text("Clear all")
+                            HostInfoRow("Uptime", info.uptime)
                         }
-                    }
-                    if (!canRunInfoCommands) {
-                        Text(
-                            "Start an SSH session to run commands.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    infoCommandStatus.value?.let { status ->
-                        Text(status, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -567,17 +505,19 @@ fun HostCard(
                             passphraseError.value = "Passphrases do not match."
                         }
                         else -> {
-                            val bitmap = generateHostQr(host, passphrase)
-                            if (bitmap != null) {
-                                qrBitmap.value = bitmap
-                                showPassphrasePrompt.value = false
-                                showQr.value = true
-                                ExportPassphraseCache.host = passphrase
-                                passphraseState.value = passphrase
-                                confirmPassphraseState.value = passphrase
-                                passphraseError.value = null
-                            } else {
-                                passphraseError.value = "Unable to export password. Unlock the app and try again."
+                            scope.launch {
+                                val bitmap = generateHostQr(host, passphrase)
+                                if (bitmap != null) {
+                                    qrBitmap.value = bitmap
+                                    showPassphrasePrompt.value = false
+                                    showQr.value = true
+                                    ExportPassphraseCache.host = passphrase
+                                    passphraseState.value = passphrase
+                                    confirmPassphraseState.value = passphrase
+                                    passphraseError.value = null
+                                } else {
+                                    passphraseError.value = "Unable to export password. Unlock the app and try again."
+                                }
                             }
                         }
                     }
@@ -591,6 +531,27 @@ fun HostCard(
                     passphraseError.value = null
                 }) { Text("Cancel") }
             }
+        )
+    }
+}
+
+@Composable
+private fun HostInfoRow(label: String, value: String?) {
+    val display = value?.trim()?.takeIf { it.isNotBlank() } ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(display, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun HostInfoBlock(label: String, value: String?) {
+    val display = value?.trim()?.takeIf { it.isNotBlank() } ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            display,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
         )
     }
 }

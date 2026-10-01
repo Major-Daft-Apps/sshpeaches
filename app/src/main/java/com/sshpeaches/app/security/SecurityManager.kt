@@ -3,24 +3,33 @@ package com.majordaftapps.sshpeaches.app.security
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import android.os.SystemClock
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.nio.charset.StandardCharsets
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.PublicKey
 import java.security.SecureRandom
+import java.security.spec.MGF1ParameterSpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import javax.crypto.AEADBadTagException
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +60,15 @@ object SecurityManager {
     private const val STORAGE_VERSION_VAULT = 1
     private const val CURRENT_EXPORT_KDF_ITERATIONS = 210_000
     private const val CURRENT_PIN_KDF_ITERATIONS = 210_000
+    private const val KEY_PIN_FAILED_ATTEMPTS = "pin_failed_attempts"
+    private const val KEY_PIN_LOCKOUT_UNTIL = "pin_lockout_until"
+    private const val PIN_FREE_ATTEMPTS = 5
+    private const val PIN_LOCKOUT_BASE_MS = 30_000L
+    private const val PIN_LOCKOUT_MAX_MS = 15 * 60_000L
+    // Plain (unencrypted) prefs holding only whether a PIN is set, so the app can start locked
+    // before the encrypted store finishes opening. It holds no secret.
+    private const val STATE_PREF_NAME = "security_state"
+    private const val STATE_KEY_PIN_CONFIGURED = "pin_configured"
     const val MIN_SECRET_PASSPHRASE_LENGTH = 12
 
     @Volatile
@@ -70,9 +88,20 @@ object SecurityManager {
     private var initCompleteLatch = CountDownLatch(1)
     private val lockState = MutableStateFlow(false)
     private val pinConfiguredState = MutableStateFlow(false)
+    private val secureStorageResetState = MutableStateFlow(false)
+    @Volatile
+    private var backgroundedAtElapsedMs = 0L
+    @Volatile
+    private var backgroundLockAfterMs = -1L
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        if (prefs == null && !initStarted && readPinConfiguredMarker()) {
+            // Start locked until the encrypted store confirms, instead of briefly showing an
+            // unlocked, interactive UI on cold start.
+            pinConfiguredState.value = true
+            lockState.value = true
+        }
         startInitializationIfNeeded(async = true)
     }
 
@@ -84,11 +113,22 @@ object SecurityManager {
             initCompleteLatch = CountDownLatch(1)
             pinConfiguredState.value = false
             lockState.value = false
+            secureStorageResetState.value = false
+            backgroundedAtElapsedMs = 0L
+            backgroundLockAfterMs = -1L
+            writePinConfiguredMarker(false)
             clearUnlockedVaultKey()
         }
     }
 
     fun isInitialized() = prefs != null
+
+    /** True once the encrypted store had to be discarded because it could no longer be decrypted. */
+    fun secureStorageResetState(): StateFlow<Boolean> = secureStorageResetState.asStateFlow()
+
+    fun acknowledgeSecureStorageReset() {
+        secureStorageResetState.value = false
+    }
 
     fun isPinSet(): Boolean = pinConfiguredState.value
 
@@ -104,32 +144,54 @@ object SecurityManager {
     }
 
     fun unlock() {
-        check(!isPinSet() || !isVaultBackedStorage() || currentUnlockedVaultKey() != null) {
-            "Cannot unlock vault-backed storage without restoring the vault key."
+        if (isPinSet() && isVaultBackedStorage() && currentUnlockedVaultKey() == null) {
+            lockState.value = true
+            return
         }
         lockState.value = false
     }
 
+    /**
+     * Records that the app left the foreground. [lockAfterMs] is the configured lock timeout, or
+     * null for never. Kept here (process scope) rather than in a ViewModel so it survives the
+     * task being swiped away while a session service keeps the process alive.
+     */
+    fun markBackgrounded(lockAfterMs: Long?) {
+        backgroundLockAfterMs = lockAfterMs ?: -1L
+        backgroundedAtElapsedMs = SystemClock.elapsedRealtime()
+    }
+
+    /**
+     * Locks if the app spent at least the lock timeout in the background. Uses elapsedRealtime,
+     * which keeps counting in deep sleep, unlike coroutine delays. Returns whether it locked.
+     */
+    fun lockIfBackgroundTimeoutElapsed(): Boolean {
+        val backgroundedAt = backgroundedAtElapsedMs
+        val lockAfter = backgroundLockAfterMs
+        backgroundedAtElapsedMs = 0L
+        if (backgroundedAt == 0L || lockAfter < 0L) return false
+        if (SystemClock.elapsedRealtime() - backgroundedAt < lockAfter) return false
+        lock()
+        return isLocked()
+    }
+
+    /** Milliseconds until another PIN attempt is allowed after repeated wrong PINs, or 0. */
+    fun pinLockoutRemainingMillis(): Long = prefs?.let { pinLockoutRemainingMillis(it) } ?: 0L
+
     fun setPin(pin: String) {
         val securePrefs = awaitPrefs()
         ensureUnlocked("set PIN")
-        val pinSalt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val pinHash = hashPin(pin, pinSalt)
-        val vaultKey = if (isVaultBackedStorage(securePrefs)) {
+        val vaultBacked = isVaultBackedStorage(securePrefs)
+        val vaultKey = if (vaultBacked) {
             requireUnlockedVaultKey("change PIN")
         } else {
-            migrateLegacySecretsToVault(securePrefs, pin)
+            ByteArray(32).also { SecureRandom().nextBytes(it) }
         }
-        writePinMetadata(
-            securePrefs = securePrefs,
-            pin = pin,
-            pinSalt = pinSalt,
-            pinHash = pinHash,
-            vaultKey = vaultKey
-        )
+        val legacySecrets = if (vaultBacked) emptyMap() else collectLegacySecrets(securePrefs)
+        writeVault(securePrefs, pin, vaultKey, legacySecrets)
         storeUnlockedVaultKey(vaultKey)
-        pinConfiguredState.value = true
-        unlock()
+        setPinConfigured(true)
+        lockState.value = false
     }
 
     fun clearPin() {
@@ -141,28 +203,43 @@ object SecurityManager {
         removePinAndVaultMetadata(securePrefs)
         deleteBiometricKey()
         clearUnlockedVaultKey()
-        pinConfiguredState.value = false
+        setPinConfigured(false)
         lockState.value = false
     }
 
     fun verifyPin(pin: String): Boolean {
         val securePrefs = awaitPrefs()
-        val saltEncoded = securePrefs.getString(KEY_PIN_SALT, null) ?: return false
-        val hashEncoded = securePrefs.getString(KEY_PIN_HASH, null) ?: return false
-        val salt = Base64.decode(saltEncoded, Base64.NO_WRAP)
-        val expected = Base64.decode(hashEncoded, Base64.NO_WRAP)
-        val actual = hashPin(pin, salt)
-        val success = expected.contentEquals(actual)
-        if (!success) return false
-
+        if (pinLockoutRemainingMillis(securePrefs) > 0L) return false
         val vaultKey = if (isVaultBackedStorage(securePrefs)) {
-            unwrapVaultKeyWithPin(securePrefs, pin)
+            // The GCM tag check on the PIN-wrapped vault key is the verifier, so every guess costs
+            // a full PBKDF2 derivation. Only a tag mismatch means a wrong PIN; other failures
+            // (missing or corrupt metadata) propagate so they are not counted as wrong guesses.
+            try {
+                unwrapVaultKeyWithPin(securePrefs, pin)
+            } catch (_: AEADBadTagException) {
+                null
+            }
+        } else if (legacyPinHashMatches(securePrefs, pin)) {
+            ByteArray(32).also { SecureRandom().nextBytes(it) }.also { vaultKey ->
+                writeVault(securePrefs, pin, vaultKey, collectLegacySecrets(securePrefs))
+            }
         } else {
-            migrateLegacySecretsToVault(securePrefs, pin)
+            null
+        }
+        if (vaultKey == null) {
+            recordFailedPinAttempt(securePrefs)
+            return false
+        }
+        securePrefs.edit(commit = true) {
+            remove(KEY_PIN_FAILED_ATTEMPTS)
+            remove(KEY_PIN_LOCKOUT_UNTIL)
+            // Drop the fast legacy hash once the slow vault check works; it was an offline oracle.
+            remove(KEY_PIN_HASH)
+            remove(KEY_PIN_SALT)
         }
         storeUnlockedVaultKey(vaultKey)
         ensureBiometricWrappedVaultKey(securePrefs, vaultKey)
-        unlock()
+        lockState.value = false
         return true
     }
 
@@ -174,7 +251,7 @@ object SecurityManager {
             val keyStore = loadKeyStore()
             val privateKey = keyStore.getKey(BIOMETRIC_KEY_ALIAS, null) ?: return null
             Cipher.getInstance(BIOMETRIC_TRANSFORMATION).apply {
-                init(Cipher.DECRYPT_MODE, privateKey)
+                init(Cipher.DECRYPT_MODE, privateKey, biometricOaepSpec())
             }
         }.onFailure {
             handleBiometricWrapFailure(securePrefs)
@@ -393,25 +470,34 @@ object SecurityManager {
         }
     }
 
-    private fun migrateLegacySecretsToVault(securePrefs: SharedPreferences, pin: String): ByteArray {
-        val legacySecrets = collectLegacySecrets(securePrefs)
-        val vaultKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val pinSalt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val pinHash = hashPin(pin, pinSalt)
-        val wrappedWithPin = wrapVaultKeyWithPin(vaultKey, pin)
-        val wrappedWithBiometric = wrapVaultKeyWithBiometric(vaultKey)
+    /**
+     * Encrypts [legacySecrets] under [vaultKey] and writes them together with the PIN metadata in a
+     * single commit, so a crash can never leave secrets encrypted under a key that was not saved.
+     */
+    private fun writeVault(
+        securePrefs: SharedPreferences,
+        pin: String,
+        vaultKey: ByteArray,
+        legacySecrets: Map<String, String>
+    ) {
         val encryptedSecrets = legacySecrets.mapValues { (_, value) ->
             encryptVaultPayload(value, vaultKey)
         }
         encryptedSecrets.forEach { (_, payload) ->
             decryptVaultPayload(payload, vaultKey)
         }
+        val wrappedWithPin = wrapVaultKeyWithPin(vaultKey, pin)
+        val wrappedWithBiometric = wrapVaultKeyWithBiometric(vaultKey)
         securePrefs.edit(commit = true) {
             encryptedSecrets.forEach { (key, payload) ->
                 putString(key, payload)
             }
-            putString(KEY_PIN_SALT, Base64.encodeToString(pinSalt, Base64.NO_WRAP))
-            putString(KEY_PIN_HASH, Base64.encodeToString(pinHash, Base64.NO_WRAP))
+            // No separate PIN hash: the PIN-wrapped vault key is the verifier (see verifyPin).
+            remove(KEY_PIN_SALT)
+            remove(KEY_PIN_HASH)
+            remove(KEY_PIN_FAILED_ATTEMPTS)
+            remove(KEY_PIN_LOCKOUT_UNTIL)
+            putInt(KEY_STORAGE_VERSION, STORAGE_VERSION_VAULT)
             putString(KEY_VAULT_PIN_SALT, wrappedWithPin.salt)
             putInt(KEY_VAULT_PIN_ITERATIONS, wrappedWithPin.iterations)
             putString(KEY_VAULT_PIN_WRAPPED, wrappedWithPin.payload)
@@ -420,16 +506,10 @@ object SecurityManager {
             } else {
                 remove(KEY_VAULT_BIOMETRIC_WRAPPED)
             }
-        }
-        securePrefs.edit(commit = true) {
-            putInt(KEY_STORAGE_VERSION, STORAGE_VERSION_VAULT)
-        }
-        securePrefs.edit(commit = true) {
-            legacySecrets.keys.forEach { legacyKey ->
-                remove(toLegacySecretKey(legacyKey))
+            legacySecrets.keys.forEach { vaultKeyName ->
+                remove(toLegacySecretKey(vaultKeyName))
             }
         }
-        return vaultKey
     }
 
     private fun revertVaultSecretsToLegacy(securePrefs: SharedPreferences) {
@@ -471,35 +551,13 @@ object SecurityManager {
         securePrefs.edit(commit = true) {
             remove(KEY_PIN_HASH)
             remove(KEY_PIN_SALT)
+            remove(KEY_PIN_FAILED_ATTEMPTS)
+            remove(KEY_PIN_LOCKOUT_UNTIL)
             remove(KEY_STORAGE_VERSION)
             remove(KEY_VAULT_PIN_SALT)
             remove(KEY_VAULT_PIN_ITERATIONS)
             remove(KEY_VAULT_PIN_WRAPPED)
             remove(KEY_VAULT_BIOMETRIC_WRAPPED)
-        }
-    }
-
-    private fun writePinMetadata(
-        securePrefs: SharedPreferences,
-        pin: String,
-        pinSalt: ByteArray,
-        pinHash: ByteArray,
-        vaultKey: ByteArray
-    ) {
-        val wrappedWithPin = wrapVaultKeyWithPin(vaultKey, pin)
-        val wrappedWithBiometric = wrapVaultKeyWithBiometric(vaultKey)
-        securePrefs.edit(commit = true) {
-            putString(KEY_PIN_SALT, Base64.encodeToString(pinSalt, Base64.NO_WRAP))
-            putString(KEY_PIN_HASH, Base64.encodeToString(pinHash, Base64.NO_WRAP))
-            putInt(KEY_STORAGE_VERSION, STORAGE_VERSION_VAULT)
-            putString(KEY_VAULT_PIN_SALT, wrappedWithPin.salt)
-            putInt(KEY_VAULT_PIN_ITERATIONS, wrappedWithPin.iterations)
-            putString(KEY_VAULT_PIN_WRAPPED, wrappedWithPin.payload)
-            if (wrappedWithBiometric != null) {
-                putString(KEY_VAULT_BIOMETRIC_WRAPPED, wrappedWithBiometric)
-            } else {
-                remove(KEY_VAULT_BIOMETRIC_WRAPPED)
-            }
         }
     }
 
@@ -628,9 +686,13 @@ object SecurityManager {
 
     private fun wrapVaultKeyWithBiometric(vaultKey: ByteArray): String? {
         return runCatching {
-            val publicKey = getOrCreateBiometricPublicKey()
+            // Encrypt with a software copy of the public key and explicit OAEP parameters so the
+            // MGF1 digest matches what Android Keystore uses when decrypting (SHA-1).
+            val keystorePublicKey = getOrCreateBiometricPublicKey()
+            val publicKey = KeyFactory.getInstance(keystorePublicKey.algorithm)
+                .generatePublic(X509EncodedKeySpec(keystorePublicKey.encoded))
             val cipher = Cipher.getInstance(BIOMETRIC_TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, publicKey)
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey, biometricOaepSpec())
             Base64.encodeToString(cipher.doFinal(vaultKey), Base64.NO_WRAP)
         }.getOrNull()
     }
@@ -670,10 +732,14 @@ object SecurityManager {
     }
 
     private fun deleteBiometricKey() {
+        deleteKeystoreEntry(BIOMETRIC_KEY_ALIAS)
+    }
+
+    private fun deleteKeystoreEntry(alias: String) {
         runCatching {
             val keyStore = loadKeyStore()
-            if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
-                keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS)
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias)
             }
         }
     }
@@ -707,6 +773,51 @@ object SecurityManager {
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(vaultKey, "AES"), GCMParameterSpec(128, iv))
         return String(cipher.doFinal(cipherBytes), StandardCharsets.UTF_8)
     }
+
+    private fun legacyPinHashMatches(securePrefs: SharedPreferences, pin: String): Boolean {
+        val saltEncoded = securePrefs.getString(KEY_PIN_SALT, null) ?: return false
+        val hashEncoded = securePrefs.getString(KEY_PIN_HASH, null) ?: return false
+        val expected = Base64.decode(hashEncoded, Base64.NO_WRAP)
+        val actual = hashPin(pin, Base64.decode(saltEncoded, Base64.NO_WRAP))
+        return MessageDigest.isEqual(expected, actual)
+    }
+
+    private fun pinLockoutRemainingMillis(securePrefs: SharedPreferences): Long {
+        val until = securePrefs.getLong(KEY_PIN_LOCKOUT_UNTIL, 0L)
+        if (until <= 0L) return 0L
+        // Capped so moving the clock backwards cannot extend a lockout indefinitely.
+        return (until - System.currentTimeMillis()).coerceIn(0L, PIN_LOCKOUT_MAX_MS)
+    }
+
+    private fun recordFailedPinAttempt(securePrefs: SharedPreferences) {
+        val failures = securePrefs.getInt(KEY_PIN_FAILED_ATTEMPTS, 0) + 1
+        securePrefs.edit(commit = true) {
+            putInt(KEY_PIN_FAILED_ATTEMPTS, failures)
+            if (failures >= PIN_FREE_ATTEMPTS) {
+                val doublings = (failures - PIN_FREE_ATTEMPTS).coerceAtMost(10)
+                val delay = (PIN_LOCKOUT_BASE_MS shl doublings).coerceAtMost(PIN_LOCKOUT_MAX_MS)
+                putLong(KEY_PIN_LOCKOUT_UNTIL, System.currentTimeMillis() + delay)
+            }
+        }
+    }
+
+    private fun setPinConfigured(configured: Boolean) {
+        pinConfiguredState.value = configured
+        writePinConfiguredMarker(configured)
+    }
+
+    private fun readPinConfiguredMarker(): Boolean =
+        appContext?.getSharedPreferences(STATE_PREF_NAME, Context.MODE_PRIVATE)
+            ?.getBoolean(STATE_KEY_PIN_CONFIGURED, false) == true
+
+    private fun writePinConfiguredMarker(configured: Boolean) {
+        appContext?.getSharedPreferences(STATE_PREF_NAME, Context.MODE_PRIVATE)?.edit {
+            putBoolean(STATE_KEY_PIN_CONFIGURED, configured)
+        }
+    }
+
+    private fun biometricOaepSpec(): OAEPParameterSpec =
+        OAEPParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT)
 
     private fun hashPin(pin: String, salt: ByteArray): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -795,31 +906,28 @@ object SecurityManager {
     private fun startInitializationIfNeeded(async: Boolean) {
         if (prefs != null) return
         synchronized(initLock) {
-            if (prefs != null || initStarted) return
+            if (prefs != null) return
+            // A failed attempt may be retried; an attempt still in flight is awaited instead.
+            if (initStarted && initError == null) return
             initStarted = true
+            initError = null
+            initCompleteLatch = CountDownLatch(1)
+            val latch = initCompleteLatch
             val initializer = Runnable {
                 try {
                     val context = appContext
                         ?: error("SecurityManager.init must be called with context before use")
-                    val masterKey = MasterKey.Builder(context)
-                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                        .build()
-                    val securePrefs = EncryptedSharedPreferences.create(
-                        context,
-                        PREF_NAME,
-                        masterKey,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    )
+                    val securePrefs = openSecurePrefs(context)
                     prefs = securePrefs
-                    val configured = securePrefs.contains(KEY_PIN_HASH)
-                    pinConfiguredState.value = configured
+                    val configured = securePrefs.contains(KEY_VAULT_PIN_WRAPPED) ||
+                        securePrefs.contains(KEY_PIN_HASH)
+                    setPinConfigured(configured)
                     lockState.value = configured
                     clearUnlockedVaultKey()
                 } catch (t: Throwable) {
                     initError = t
                 } finally {
-                    initCompleteLatch.countDown()
+                    latch.countDown()
                 }
             }
             if (async) {
@@ -829,6 +937,52 @@ object SecurityManager {
             } else {
                 initializer.run()
             }
+        }
+    }
+
+    private fun openSecurePrefs(context: Context): SharedPreferences {
+        return try {
+            createEncryptedPrefs(context)
+        } catch (t: Throwable) {
+            if (!isUnrecoverableStoreFailure(t)) throw t
+            // The store's keyset can no longer be decrypted (its Keystore master key was lost or
+            // replaced, or the file is corrupt), so nothing in it is readable. Start over empty
+            // rather than leaving PIN lock and credential storage permanently broken.
+            context.deleteSharedPreferences(PREF_NAME)
+            deleteBiometricKey()
+            secureStorageResetState.value = true
+            try {
+                createEncryptedPrefs(context)
+            } catch (retry: Throwable) {
+                if (!isUnrecoverableStoreFailure(retry)) throw retry
+                context.deleteSharedPreferences(PREF_NAME)
+                deleteKeystoreEntry(MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+                createEncryptedPrefs(context)
+            }
+        }
+    }
+
+    private fun createEncryptedPrefs(context: Context): SharedPreferences {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        return EncryptedSharedPreferences.create(
+            context,
+            PREF_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    private fun isUnrecoverableStoreFailure(t: Throwable): Boolean {
+        return generateSequence(t) { it.cause }.take(16).any { cause ->
+            // Only failures that mean the stored data can never be decrypted again. Keystore errors
+            // that can be transient on some devices (e.g. UnrecoverableKeyException) are retried
+            // on the next access instead of wiping the store.
+            cause is BadPaddingException ||
+                cause is KeyPermanentlyInvalidatedException ||
+                cause.javaClass.simpleName == "InvalidProtocolBufferException"
         }
     }
 

@@ -53,7 +53,8 @@ class ExternalLinksNavigationTest {
                 onOpenWebsite = { lastAction.set("website") },
                 onOpenSupport = { lastAction.set("support") },
                 onOpenPrivacy = { lastAction.set("privacy") },
-                onOpenSourceLicenses = { lastAction.set("licenses") }
+                onOpenSourceLicenses = { lastAction.set("licenses") },
+                onOpenSourceCode = { lastAction.set("source") }
             )
         }
 
@@ -70,6 +71,9 @@ class ExternalLinksNavigationTest {
 
         composeRule.onNodeWithTag(UiTestTags.ABOUT_LICENSES_LINK).performClick()
         composeRule.runOnIdle { check(lastAction.get() == "licenses") }
+
+        composeRule.onNodeWithTag(UiTestTags.ABOUT_SOURCE_LINK).performClick()
+        composeRule.runOnIdle { check(lastAction.get() == "source") }
     }
 
     @Test

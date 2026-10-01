@@ -32,6 +32,14 @@ public final class TerminalRenderer {
     final int mFontLineSpacingAndAscent;
 
     private final float[] asciiMeasures = new float[127];
+    private final Paint mFindOutlinePaint = new Paint();
+
+    /** Highlighter fill used only for Find, independent of terminal reverse-video. */
+    private static final int FIND_BACKGROUND_COLOR = 0xFFFFFF00;
+    /** Text on the Find highlighter. */
+    private static final int FIND_FOREGROUND_COLOR = 0xFF000000;
+    /** Magenta stroke so the match stays obvious on tmux reverse-video and yellow themes. */
+    private static final int FIND_OUTLINE_COLOR = 0xFFFF00AA;
 
     public TerminalRenderer(int textSize, Typeface typeface) {
         mTextSize = textSize;
@@ -40,6 +48,10 @@ public final class TerminalRenderer {
         mTextPaint.setTypeface(typeface);
         mTextPaint.setAntiAlias(true);
         mTextPaint.setTextSize(textSize);
+        mFindOutlinePaint.setStyle(Paint.Style.STROKE);
+        mFindOutlinePaint.setAntiAlias(true);
+        mFindOutlinePaint.setColor(FIND_OUTLINE_COLOR);
+        mFindOutlinePaint.setStrokeWidth(Math.max(3f, mTextSize * 0.12f));
 
         mFontLineSpacing = (int) Math.ceil(mTextPaint.getFontSpacing());
         mFontAscent = (int) Math.ceil(mTextPaint.ascent());
@@ -56,6 +68,16 @@ public final class TerminalRenderer {
     /** Render the terminal to a canvas with at a specified row scroll, and an optional rectangular selection. */
     public void render(TerminalEmulator mEmulator, Canvas canvas, int topRow,
                              int selectionY1, int selectionY2, int selectionX1, int selectionX2) {
+        render(mEmulator, canvas, topRow, selectionY1, selectionY2, selectionX1, selectionX2, false);
+    }
+
+    /**
+     * @param searchHighlight when true, the selection rectangle is the Find match and is drawn with
+     *                        a dedicated highlighter instead of reverse video.
+     */
+    public void render(TerminalEmulator mEmulator, Canvas canvas, int topRow,
+                             int selectionY1, int selectionY2, int selectionX1, int selectionX2,
+                             boolean searchHighlight) {
         final boolean reverseVideo = mEmulator.isReverseVideo();
         final int endRow = topRow + mEmulator.mRows;
         final int columns = mEmulator.mColumns;
@@ -139,7 +161,9 @@ public final class TerminalRenderer {
                         boolean invertCursorTextColor = lastRunInsideCursor && cursorShape == TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK;
                         drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun,
                             lastRunStartIndex, charsSinceLastRun, measuredWidthForRun,
-                            cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
+                            cursorColor, cursorShape, lastRunStyle,
+                            reverseVideo || invertCursorTextColor || (lastRunInsideSelection && !searchHighlight),
+                            lastRunInsideSelection && searchHighlight);
                     }
                     measuredWidthForRun = 0.f;
                     lastRunStyle = style;
@@ -164,7 +188,17 @@ public final class TerminalRenderer {
             int cursorColor = lastRunInsideCursor ? mEmulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] : 0;
             boolean invertCursorTextColor = lastRunInsideCursor && cursorShape == TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK;
             drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun, lastRunStartIndex, charsSinceLastRun,
-                measuredWidthForRun, cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
+                measuredWidthForRun, cursorColor, cursorShape, lastRunStyle,
+                reverseVideo || invertCursorTextColor || (lastRunInsideSelection && !searchHighlight),
+                lastRunInsideSelection && searchHighlight);
+            if (searchHighlight && selx1 >= 0 && selx2 >= selx1) {
+                int highlightEndExclusive = Math.min(selx2, columns - 1) + 1;
+                float left = selx1 * mFontWidth;
+                float right = highlightEndExclusive * mFontWidth;
+                float top = heightOffset - mFontLineSpacingAndAscent + mFontAscent;
+                float pad = Math.max(1.5f, mFontWidth * 0.08f);
+                canvas.drawRect(left - pad, top - pad, right + pad, heightOffset + pad, mFindOutlinePaint);
+            }
         }
 
         if (scaledToCanvas) canvas.restore();
@@ -172,7 +206,7 @@ public final class TerminalRenderer {
 
     private void drawTextRun(Canvas canvas, char[] text, int[] palette, float y, int startColumn, int runWidthColumns,
                              int startCharIndex, int runWidthChars, float mes, int cursor, int cursorStyle,
-                             long textStyle, boolean reverseVideo) {
+                             long textStyle, boolean reverseVideo, boolean findHighlight) {
         int foreColor = TextStyle.decodeForeColor(textStyle);
         final int effect = TextStyle.decodeEffect(textStyle);
         int backColor = TextStyle.decodeBackColor(textStyle);
@@ -193,11 +227,16 @@ public final class TerminalRenderer {
         }
 
         // Reverse video here if _one and only one_ of the reverse flags are set:
-        final boolean reverseVideoHere = reverseVideo ^ (effect & (TextStyle.CHARACTER_ATTRIBUTE_INVERSE)) != 0;
+        final boolean reverseVideoHere = !findHighlight &&
+            (reverseVideo ^ (effect & (TextStyle.CHARACTER_ATTRIBUTE_INVERSE)) != 0);
         if (reverseVideoHere) {
             int tmp = foreColor;
             foreColor = backColor;
             backColor = tmp;
+        }
+        if (findHighlight) {
+            foreColor = FIND_FOREGROUND_COLOR;
+            backColor = FIND_BACKGROUND_COLOR;
         }
 
         float left = startColumn * mFontWidth;
@@ -213,8 +252,7 @@ public final class TerminalRenderer {
             savedMatrix = true;
         }
 
-        if (backColor != palette[TextStyle.COLOR_INDEX_BACKGROUND]) {
-            // Only draw non-default background.
+        if (findHighlight || backColor != palette[TextStyle.COLOR_INDEX_BACKGROUND]) {
             mTextPaint.setColor(backColor);
             canvas.drawRect(left, y - mFontLineSpacingAndAscent + mFontAscent, right, y, mTextPaint);
         }
@@ -245,8 +283,8 @@ public final class TerminalRenderer {
             // keep SSH output readable. SGR "invisible" text remains intentionally hidden above.
             foreColor = ensureReadableForeground(foreColor, backColor);
 
-            mTextPaint.setFakeBoldText(bold);
-            mTextPaint.setUnderlineText(underline);
+            mTextPaint.setFakeBoldText(findHighlight || bold);
+            mTextPaint.setUnderlineText(findHighlight || underline);
             mTextPaint.setTextSkewX(italic ? -0.35f : 0.f);
             mTextPaint.setStrikeThruText(strikeThrough);
             mTextPaint.setColor(foreColor);

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:24.184Z" hostname="362696.200293.sys.ipv4.io" time="0.181">
+  <properties/>
+  <testcase name="highFrequencyTransportLogsAreSampledAcrossSessionLoggers" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.002"/>
+  <testcase name="realSshjHandshakeProducesDenseSafeConnectionTranscriptInReleaseLikeMode" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.166"/>
+  <testcase name="highFrequencyTransportLogsArePublishedWithDiagnosticsEnabled" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.001"/>
+  <testcase name="connectionTranscriptDoesNotSampleProtocolMessages" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.0"/>
+  <testcase name="releaseLikeLoggerPublishesSemanticConnectionEvents" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.011"/>
+  <testcase name="debugLogsAreVisibleInConnectionTranscriptWithoutSessionDiagnostics" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.0"/>
+  <testcase name="userRelevantLevelsAreNeverSuppressed" classname="com.majordaftapps.sshpeaches.app.service.SessionLogBusTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[Test worker @coroutine#1] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=45989
+[sshd-SshServer[4d774249](port=0)-nio2-thread-2] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[4d774249](port=0)-nio2-thread-5] INFO org.apache.sshd.server.session.ServerSessionImpl - Session transcript-user@/127.0.0.1:42220 authenticated
+]]></system-err>
+</testsuite>

@@ -59,7 +59,8 @@ class VisualSmokeTest {
                     onOpenWebsite = {},
                     onOpenSupport = {},
                     onOpenPrivacy = {},
-                    onOpenSourceLicenses = {}
+                    onOpenSourceLicenses = {},
+                    onOpenSourceCode = {}
                 )
             }
         }

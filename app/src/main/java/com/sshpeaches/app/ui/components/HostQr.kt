@@ -8,6 +8,8 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Base64
 
@@ -40,7 +42,14 @@ fun encodeHostPayload(
     return Base64.getEncoder().encodeToString(json.toString().toByteArray(Charsets.UTF_8))
 }
 
-fun generateHostQr(host: HostConnection, passphrase: String?): Bitmap? {
+/**
+ * Builds the share QR off the main thread: with a passphrase it runs a 210k-iteration PBKDF2,
+ * and rendering the bitmap touches every pixel.
+ */
+suspend fun generateHostQr(host: HostConnection, passphrase: String?): Bitmap? =
+    withContext(Dispatchers.Default) { generateHostQrBlocking(host, passphrase) }
+
+private fun generateHostQrBlocking(host: HostConnection, passphrase: String?): Bitmap? {
     val encrypted = if (host.hasPassword && !passphrase.isNullOrBlank()) {
         SecurityManager.exportHostPasswordPayload(host.id, passphrase) ?: return null
     } else {

@@ -39,9 +39,6 @@ class SmokeNavigationTest {
         composeRule.navigateDrawer(Routes.HOSTS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_HOSTS).assertIsDisplayed()
 
-        composeRule.navigateDrawer(Routes.UPTIME)
-        composeRule.onNodeWithTag(UiTestTags.SCREEN_UPTIME).assertIsDisplayed()
-
         composeRule.navigateDrawer(Routes.IDENTITIES)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_IDENTITIES).assertIsDisplayed()
 

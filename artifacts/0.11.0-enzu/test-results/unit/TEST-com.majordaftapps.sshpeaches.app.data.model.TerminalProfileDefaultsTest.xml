@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaultsTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:20.676Z" hostname="362696.200293.sys.ipv4.io" time="0.014">
+  <properties/>
+  <testcase name="defaultDarkProfile_doesNotMapAnsiBlackToItsBlackBackground" classname="com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaultsTest" time="0.013"/>
+  <testcase name="builtInProfiles_haveCompleteDistinctAnsiPalettes" classname="com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaultsTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

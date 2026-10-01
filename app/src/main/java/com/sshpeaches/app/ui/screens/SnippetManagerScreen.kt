@@ -82,6 +82,7 @@ fun SnippetManagerScreen(
     val overflowSnippetId = remember { mutableStateOf<String?>(null) }
     val handledAddRequestKey = rememberSaveable { mutableStateOf(0) }
     val handledEditRequestKey = rememberSaveable { mutableStateOf(0) }
+    val handledImportRequestKey = rememberSaveable { mutableStateOf(0) }
     var paneDetailSnippetId by rememberSaveable { mutableStateOf<String?>(null) }
     var paneEditorSnippetId by rememberSaveable { mutableStateOf<String?>(null) }
     var paneEditorDirty by remember { mutableStateOf(false) }
@@ -150,7 +151,9 @@ fun SnippetManagerScreen(
     }
 
     LaunchedEffect(importRequestKey) {
-        if (importRequestKey > 0) {
+        // Handled check like add/edit: without it the scanner reopened on every rotation.
+        if (importRequestKey > handledImportRequestKey.value) {
+            handledImportRequestKey.value = importRequestKey
             scanLauncher.launch(
                 buildQrScanOptions(shellLayoutMode, "Scan snippet QR")
             )

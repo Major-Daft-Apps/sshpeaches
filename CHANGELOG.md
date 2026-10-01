@@ -4,6 +4,57 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.2 (1102)
+
+Release date: 2026-10-01
+
+- Fixed "Couldn't save PIN" (PBKDF2WithHmacSHA256 not available) in release builds after any SSH connection. The bundled Bouncy Castle provider that SSH connections install was missing classes removed by release shrinking, which also broke PIN unlock and encrypted export, import, and QR sharing in that state.
+- The About dialog now links to the source code on GitHub.
+
+## 0.11.1 (1101)
+
+Release date: 2026-10-01
+
+- Host Info shows live `free -h` and physical `df -h` output (no loop/tmpfs clutter), and drops the old address/user/auth/transport fields from that panel.
+- Fixed Set PIN silently doing nothing when the encrypted secure store could no longer be decrypted (for example after its Keystore key was lost). The unreadable store is now reset with a notice so a PIN can be set again, and PIN save, disable, and unlock errors are shown instead of swallowed.
+- The Set PIN dialog now says when the PIN is too short or the two entries don't match.
+- Built-in keyboard mode opens the system keyboard under the extra keys when a terminal session starts and when you return to the app.
+- The terminal keyboard key now reopens the keyboard with one press after it was dismissed with Back, instead of needing two presses.
+- PIN lock now locks based on real time spent in the background, including after the app is swiped away or the phone sleeps, and no longer briefly shows unlocked content on launch.
+- The lock screen now covers dialogs and prompts that were open when the app locked, and Back sends the app to the background instead of reaching the content underneath.
+- Repeated wrong PINs now add an increasing delay, and PINs are checked with the slow key derivation only (no fast PIN hash is stored).
+- With a PIN set, app contents are hidden from screenshots and the recent-apps view.
+- Editing an identity no longer erases its saved key passphrase.
+- Export, import, key generation, and QR sharing no longer freeze the app while encrypting.
+- Re-importing a backup no longer overwrites newer local host edits or startup scripts, and saved-password flags stay accurate after imports, the connect prompt's "save password", and storage resets.
+- Deleting an identity, forward, or host now removes references to it from other items.
+- The SFTP console no longer gets stuck on "A command is already running", and rejected remote operations now report an error.
+- Find, Add, and QR-scan dialogs no longer reopen by themselves, and session screens keep typed input and open dialogs across rotation.
+- Background-session timeouts now also apply after the app is swiped away or the phone sleeps.
+- "Copy key to host" and import errors now say what went wrong.
+
+## 0.11.0 (1100)
+
+Release date: 2026-09-28
+
+- Fixed the built-in terminal keyboard so tapping the keyboard key or the terminal shows the typing keyboard.
+- Removed the Uptime section, drawer entry, monitors, and background checks.
+- Simplified Find status to a match counter such as `1/2`, and highlighted matches with a dedicated yellow fill and magenta outline instead of reverse video.
+- Fixed setting a PIN lock crashing the app and leaving it stuck locked. PIN crypto now runs off the UI thread, vault metadata is written in one commit, and a successful set keeps the app unlocked.
+- Added file export and import for all connections, alongside the existing QR transfer buttons.
+- Removed the top-bar back arrow that jumped from other screens into the active terminal.
+- Removed the Advanced VT100/xterm sequence picker from the Keyboard Editor.
+- Removed the Actions section (Snippet Picker and Inject Password) from the Keyboard Editor.
+- Replaced the host Info panel snippet list with live system details: distro, kernel, CPU, memory, disk, and uptime.
+- Fixed snippets so Run sends the command into the active SSH terminal with Enter and opens that session.
+- Fixed Home in the sidebar/drawer so it returns from Hosts and other screens.
+- Added a color-profile button next to Find in the terminal so you can switch themes for the current session.
+- Shortened in-app Help to a few short steps per topic.
+- File browser toolbar keeps Forward, Home, and Refresh on one row, moves hidden files into the actions menu, and adds a sort menu with a folders-first toggle.
+- File browser rows use distinct icons for images, video, audio, documents, archives, code, and other types.
+- Home keeps the previous screen's editor state, so add dialogs stay closed after you leave and come back.
+- Session notifications label file-transfer connections as SFTP.
+
 ## 0.10.20 (1020)
 
 Release date: 2026-08-29

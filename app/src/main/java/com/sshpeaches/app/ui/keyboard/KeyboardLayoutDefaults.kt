@@ -198,36 +198,6 @@ object KeyboardLayoutDefaults {
         textAction(label = "Settings", text = "").copy(iconId = "build")
     )
 
-    val advancedSequencePresets: List<KeyboardSlotAction> = listOf(
-        sequenceAction("Clear", "\u001B[2J\u001B[H"),
-        sequenceAction("Clr+Sb", "\u001B[3J\u001B[H\u001B[2J"),
-        sequenceAction("CurHome", "\u001B[H"),
-        sequenceAction("SaveCur", "\u001B7"),
-        sequenceAction("RestCur", "\u001B8"),
-        sequenceAction("CurHide", "\u001B[?25l"),
-        sequenceAction("CurShow", "\u001B[?25h"),
-        sequenceAction("AltOn", "\u001B[?1049h"),
-        sequenceAction("AltOff", "\u001B[?1049l"),
-        sequenceAction("BP On", "\u001B[?2004h"),
-        sequenceAction("BP Off", "\u001B[?2004l"),
-        sequenceAction("BP Start", "\u001B[200~"),
-        sequenceAction("BP End", "\u001B[201~"),
-        sequenceAction("Title", "\u001B]0;SSHPeaches\u0007"),
-        sequenceAction("OSC8 On", "\u001B]8;;https://majordaftapps.com\u001B\\"),
-        sequenceAction("OSC8 Off", "\u001B]8;;\u001B\\"),
-        sequenceAction("BoldOn", "\u001B[1m"),
-        sequenceAction("BoldOff", "\u001B[22m"),
-        sequenceAction("RevOn", "\u001B[7m"),
-        sequenceAction("RevOff", "\u001B[27m"),
-        sequenceAction("Reset", "\u001B[0m"),
-        sequenceAction("DSR", "\u001B[6n"),
-        sequenceAction("DECSTR", "\u001B[!p"),
-        sequenceAction("RIS", "\u001Bc"),
-        sequenceAction("C-C", "\u0003"),
-        sequenceAction("C-D", "\u0004"),
-        sequenceAction("C-Z", "\u001A")
-    )
-
     val comboPresets: List<KeyboardSlotAction> = listOfNotNull(
         combinationAction("A", ctrl = true),
         combinationAction("B", ctrl = true),

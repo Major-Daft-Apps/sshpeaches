@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:45.260Z" hostname="362696.200293.sys.ipv4.io" time="0.005">
+  <properties/>
+  <testcase name="reservedCapacity_remainsAvailableForInteractiveInput" classname="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" time="0.001"/>
+  <testcase name="close_unblocksConsumerAndRejectsFurtherInput" classname="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" time="0.001"/>
+  <testcase name="enqueue_chunksPayloadAndPreservesFifo" classname="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" time="0.001"/>
+  <testcase name="concurrentCallsDoNotInterleaveChunks" classname="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" time="0.001"/>
+  <testcase name="tryEnqueue_rejectsWholePayloadWithoutBlockingOrPartialWrites" classname="com.majordaftapps.sshpeaches.app.service.BoundedMoshInputQueueTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

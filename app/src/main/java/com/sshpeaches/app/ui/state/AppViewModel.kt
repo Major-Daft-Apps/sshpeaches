@@ -20,8 +20,6 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.data.repository.AppRepository
-import com.majordaftapps.sshpeaches.app.data.repository.InMemoryUptimeRepository
-import com.majordaftapps.sshpeaches.app.data.repository.UptimeRepository
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
@@ -32,10 +30,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.util.normalizeAssociatedHostIds
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
-import com.majordaftapps.sshpeaches.app.uptime.NoOpUptimeMonitorRunner
-import com.majordaftapps.sshpeaches.app.uptime.UptimeMonitorRunnerDelegate
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
-import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -47,13 +42,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.crypto.Cipher
 
 class AppViewModel(
-    private val repository: AppRepository,
-    private val uptimeRepository: UptimeRepository = InMemoryUptimeRepository(),
-    private val uptimeMonitorRunner: UptimeMonitorRunnerDelegate = NoOpUptimeMonitorRunner()
+    private val repository: AppRepository
 ) : ViewModel() {
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
@@ -84,9 +80,11 @@ class AppViewModel(
     private val sftpTransferSettingsFlow = MutableStateFlow(SftpTransferSettings())
     private val pinConfiguredFlow = MutableStateFlow(SecurityManager.isPinSet())
     private val lockedFlow = MutableStateFlow(SecurityManager.isLocked())
+    private val securityNoticeFlow = MutableStateFlow<String?>(null)
+    private val lockScreenMessageFlow = MutableStateFlow<String?>(null)
+    private val writeQueue = Mutex()
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
     private val useBuiltInKeyboardFlow = MutableStateFlow(false)
-    private var uptimeTickerJob: Job? = null
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
 
@@ -97,14 +95,25 @@ class AppViewModel(
             }
         }
         viewModelScope.launch {
+            SecurityManager.secureStorageResetState().collect { wasReset ->
+                if (wasReset) {
+                    securityNoticeFlow.value =
+                        "Secure storage could not be decrypted and was reset. " +
+                            "Set your PIN again and re-enter saved passwords and keys."
+                    SecurityManager.acknowledgeSecureStorageReset()
+                    launchLogged("clearAllSecretFlags", "reason=secure-storage-reset") {
+                        repository.clearAllSecretFlags()
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             SecurityManager.lockState().collect { locked ->
                 lockedFlow.value = locked
                 if (locked) {
                     lockTimerJob?.cancel()
                     lockTimerJob = null
-                } else if (appInBackground) {
-                    scheduleLockTimer(lockTimeoutFlow.value)
-                } else {
+                } else if (!appInBackground) {
                     lockTimerJob?.cancel()
                     lockTimerJob = null
                 }
@@ -497,31 +506,28 @@ class AppViewModel(
     private val coreUiState = combine(
         coreUiStateBase,
         snippetRunTimeoutSecondsFlow,
-        appIconFlow
-    ) { state, snippetTimeout, appIcon ->
+        appIconFlow,
+        lockScreenMessageFlow
+    ) { state, snippetTimeout, appIcon, lockScreenMessage ->
         state.copy(
             snippetRunTimeoutSeconds = snippetTimeout,
-            appIcon = appIcon
+            appIcon = appIcon,
+            lockScreenMessage = lockScreenMessage
         )
     }
 
-    private val uptimeUiState = combine(
-        coreUiState,
-        uptimeRepository.summaries
-    ) { state, uptimeSummaries ->
-        state.copy(uptimeSummaries = uptimeSummaries)
-    }
-
     val uiState: StateFlow<AppUiState> = combine(
-        uptimeUiState,
+        coreUiState,
         keyboardSlotsFlow,
         useBuiltInKeyboardFlow,
-        sftpTransferSettingsFlow
-    ) { state, slots, useBuiltInKeyboard, sftpTransferSettings ->
+        sftpTransferSettingsFlow,
+        securityNoticeFlow
+    ) { state, slots, useBuiltInKeyboard, sftpTransferSettings, securityNotice ->
         state.copy(
             keyboardSlots = slots,
             useBuiltInKeyboard = useBuiltInKeyboard,
-            sftpTransferSettings = sftpTransferSettings
+            sftpTransferSettings = sftpTransferSettings,
+            securityNotice = securityNotice
         )
     }.stateIn(
         scope = viewModelScope,
@@ -554,7 +560,9 @@ class AppViewModel(
         logAction(action, details)
         viewModelScope.launch {
             try {
-                work()
+                // Run writes one at a time in call order (the Mutex is fair), so e.g. a flag update
+                // issued after an import cannot land before, or be overwritten by, that import.
+                writeQueue.withLock { work() }
                 TelemetryInitializer.logUsageEvent(action)
                 logResult(action, true)
             } catch (t: Throwable) {
@@ -974,55 +982,9 @@ class AppViewModel(
             return
         }
         launchLogged("deleteHost", "hostId=$id, hadPassword=${existing.hasPassword}") {
-            if (existing.hasPassword) {
-                SecurityManager.clearHostPassword(id)
-            }
+            // Unconditional: the flag can be stale, and clearing a missing secret is harmless.
+            SecurityManager.clearHostPassword(id)
             repository.deleteHost(existing)
-        }
-    }
-
-    fun addHostToUptime(hostId: String) {
-        launchLogged("addHostToUptime", "hostId=$hostId") {
-            uptimeRepository.addHost(hostId)
-        }
-    }
-
-    fun updateUptimeConfig(
-        hostId: String,
-        method: UptimeCheckMethod,
-        port: Int,
-        intervalMinutes: Int,
-        enabled: Boolean
-    ) {
-        launchLogged(
-            "updateUptimeConfig",
-            "hostId=$hostId, method=$method, port=$port, intervalMinutes=$intervalMinutes, enabled=$enabled"
-        ) {
-            uptimeRepository.updateConfig(
-                hostId = hostId,
-                method = method,
-                port = port.coerceIn(1, 65_535),
-                intervalMinutes = intervalMinutes.coerceIn(1, 60),
-                enabled = enabled
-            )
-        }
-    }
-
-    fun setUptimeEnabled(hostId: String, enabled: Boolean) {
-        launchLogged("setUptimeEnabled", "hostId=$hostId, enabled=$enabled") {
-            uptimeRepository.setEnabled(hostId, enabled)
-        }
-    }
-
-    fun removeHostFromUptime(hostId: String) {
-        launchLogged("removeHostFromUptime", "hostId=$hostId") {
-            uptimeRepository.removeHost(hostId)
-        }
-    }
-
-    fun refreshUptime(hostId: String? = null) {
-        launchLogged("refreshUptime", "hostId=${hostId.orEmpty()}") {
-            uptimeMonitorRunner.runDueChecks(hostId = hostId)
         }
     }
 
@@ -1062,7 +1024,7 @@ class AppViewModel(
             infoCommands = host.infoCommands.map { it.trim() }.filter { it.isNotBlank() }
         )
         launchLogged("importHost", "hostId=${normalized.id}") {
-            repository.addHost(normalized)
+            repository.importHost(normalized)
         }
     }
 
@@ -1094,45 +1056,10 @@ class AppViewModel(
     }
 
     private fun markHostHasPasswordWithRetry(id: String, hasPassword: Boolean) {
-        val current = uiState.value.hosts.find { it.id == id }
-        if (current != null) {
-            if (current.hasPassword == hasPassword) {
-                logResult("markHostHasPasswordWithRetry", true, "hostId=$id, no-change")
-                return
-            }
-            launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
-                repository.updateHost(
-                    current.copy(
-                        hasPassword = hasPassword,
-                        updatedEpochMillis = System.currentTimeMillis()
-                    )
-                )
-            }
-            return
-        }
-        viewModelScope.launch {
-            repeat(12) {
-                delay(75)
-                val host = uiState.value.hosts.find { it.id == id }
-                if (host != null) {
-                    if (host.hasPassword != hasPassword) {
-                        launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
-                            repository.updateHost(
-                                host.copy(
-                                    hasPassword = hasPassword,
-                                    updatedEpochMillis = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                    }
-                    return@launch
-                }
-            }
-            logResult(
-                "markHostHasPasswordWithRetry",
-                false,
-                "hostId=$id, hasPassword=$hasPassword, not-found-after-retry"
-            )
+        // A targeted UPDATE queued behind any pending write of this host (such as an import), so
+        // it neither misses a host that is not in the UI state yet nor gets overwritten by it.
+        launchLogged("markHostHasPassword", "hostId=$id, hasPassword=$hasPassword") {
+            repository.setHostHasPassword(id, hasPassword)
         }
     }
 
@@ -1407,25 +1334,51 @@ class AppViewModel(
 
     fun setPin(pin: String) {
         logAction("setPin", "pinLength=${pin.length}")
-        SecurityManager.setPin(pin)
-        pinConfiguredFlow.value = true
-        lockedFlow.value = SecurityManager.isLocked()
-        lockTimerJob?.cancel()
-        lockTimerJob = null
-        logResult("setPin", true, "locked=${lockedFlow.value}")
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) {
+                    SecurityManager.setPin(pin)
+                }
+                pinConfiguredFlow.value = true
+                lockedFlow.value = false
+                lockTimerJob?.cancel()
+                lockTimerJob = null
+                TelemetryInitializer.logUsageEvent("setPin")
+                logResult("setPin", true, "locked=false")
+            } catch (t: Throwable) {
+                TelemetryInitializer.recordNonFatal("setPin", t)
+                UiDebugLog.error("setPin", t)
+                pinConfiguredFlow.value = SecurityManager.isPinSet()
+                lockedFlow.value = SecurityManager.isLocked()
+                securityNoticeFlow.value = "Couldn't save PIN: ${t.userFacingReason()}"
+                logResult("setPin", false, t.message ?: "exception")
+            }
+        }
     }
 
     fun clearPin() {
         logAction("clearPin")
-        SecurityManager.clearPin()
-        pinConfiguredFlow.value = SecurityManager.isPinSet()
-        lockedFlow.value = SecurityManager.isLocked()
-        lockTimerJob?.cancel()
-        lockTimerJob = null
         viewModelScope.launch {
-            SettingsStore.setBiometricLockEnabled(false)
+            try {
+                withContext(Dispatchers.Default) {
+                    SecurityManager.clearPin()
+                }
+                pinConfiguredFlow.value = false
+                lockedFlow.value = false
+                lockTimerJob?.cancel()
+                lockTimerJob = null
+                SettingsStore.setBiometricLockEnabled(false)
+                TelemetryInitializer.logUsageEvent("clearPin")
+                logResult("clearPin", true, "pinConfigured=false, locked=false")
+            } catch (t: Throwable) {
+                TelemetryInitializer.recordNonFatal("clearPin", t)
+                UiDebugLog.error("clearPin", t)
+                pinConfiguredFlow.value = SecurityManager.isPinSet()
+                lockedFlow.value = SecurityManager.isLocked()
+                securityNoticeFlow.value = "Couldn't disable PIN: ${t.userFacingReason()}"
+                logResult("clearPin", false, t.message ?: "exception")
+            }
         }
-        logResult("clearPin", true, "pinConfigured=${pinConfiguredFlow.value}, locked=${lockedFlow.value}")
     }
 
     fun lockApp() {
@@ -1437,31 +1390,68 @@ class AppViewModel(
         logResult("lockApp", true, "locked=${lockedFlow.value}")
     }
 
-    fun unlockWithPin(pin: String): Boolean {
+    /** Returns null on success, or the message the lock screen should show. */
+    suspend fun unlockWithPin(pin: String): String? {
         logAction("unlockWithPin", "pinLength=${pin.length}")
-        val ok = SecurityManager.verifyPin(pin)
-        if (ok) {
-            lockedFlow.value = SecurityManager.isLocked()
-            if (!lockedFlow.value && appInBackground) {
-                scheduleLockTimer(lockTimeoutFlow.value)
+        val error: String? = try {
+            val ok = withContext(Dispatchers.Default) {
+                SecurityManager.verifyPin(pin)
             }
+            if (ok) {
+                null
+            } else {
+                val lockoutMs = SecurityManager.pinLockoutRemainingMillis()
+                if (lockoutMs > 0L) {
+                    "Too many attempts. Try again in ${(lockoutMs + 999) / 1000}s."
+                } else {
+                    "Incorrect PIN"
+                }
+            }
+        } catch (t: Throwable) {
+            TelemetryInitializer.recordNonFatal("unlockWithPin", t)
+            UiDebugLog.error("unlockWithPin", t)
+            "Couldn't verify PIN: ${t.userFacingReason()}"
         }
-        logResult("unlockWithPin", ok, "locked=${lockedFlow.value}")
-        return ok
+        if (error == null) {
+            lockedFlow.value = false
+            lockScreenMessageFlow.value = null
+            lockTimerJob?.cancel()
+            lockTimerJob = null
+        }
+        logResult("unlockWithPin", error == null, "locked=${lockedFlow.value}")
+        return error
     }
 
     fun unlockWithBiometric(cipher: Cipher?): Boolean {
         logAction("unlockWithBiometric")
-        val ok = SecurityManager.unlockWithBiometric(cipher)
+        val ok = runCatching { SecurityManager.unlockWithBiometric(cipher) }
+            .onFailure { UiDebugLog.error("unlockWithBiometric", it) }
+            .getOrDefault(false)
         if (ok) {
-            lockedFlow.value = SecurityManager.isLocked()
-            if (!lockedFlow.value && appInBackground) {
-                scheduleLockTimer(lockTimeoutFlow.value)
-            }
+            lockedFlow.value = false
+            lockScreenMessageFlow.value = null
+            lockTimerJob?.cancel()
+            lockTimerJob = null
+        } else {
+            reportBiometricUnavailable()
         }
         logResult("unlockWithBiometric", ok, "locked=${lockedFlow.value}")
         return ok
     }
+
+    /** Shown on the lock screen when biometric unlock cannot be used right now. */
+    fun reportBiometricUnavailable() {
+        lockScreenMessageFlow.value =
+            "Biometric unlock isn't available right now (for example after a fingerprint change). " +
+                "Unlock with your PIN to turn it back on."
+    }
+
+    fun consumeSecurityNotice() {
+        securityNoticeFlow.value = null
+    }
+
+    private fun Throwable.userFacingReason(): String =
+        message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
     fun onUserInteraction() {
         logAction("onUserInteraction", "locked=${lockedFlow.value}")
@@ -1471,9 +1461,8 @@ class AppViewModel(
     fun onAppBackgrounded() {
         logAction("onAppBackgrounded", "locked=${lockedFlow.value}")
         appInBackground = true
-        uptimeTickerJob?.cancel()
-        uptimeTickerJob = null
         if (!lockedFlow.value) {
+            SecurityManager.markBackgrounded(lockTimeoutDuration(lockTimeoutFlow.value))
             scheduleLockTimer(lockTimeoutFlow.value)
         }
         logResult("onAppBackgrounded", true, "timerActive=${lockTimerJob != null}")
@@ -1484,8 +1473,12 @@ class AppViewModel(
         appInBackground = false
         lockTimerJob?.cancel()
         lockTimerJob = null
-        startUptimeTicker()
-        logResult("onAppForegrounded", true)
+        // The timer above can be cancelled with the ViewModel (task swiped away) or stall in deep
+        // sleep, so also check the real time spent in the background.
+        if (SecurityManager.lockIfBackgroundTimeoutElapsed()) {
+            lockedFlow.value = true
+        }
+        logResult("onAppForegrounded", true, "locked=${lockedFlow.value}")
     }
 
     fun addIdentity(
@@ -1632,14 +1625,15 @@ class AppViewModel(
         return ok
     }
 
-    fun storeIdentityKeyPassphrase(id: String, passphrase: String?) {
+    fun storeIdentityKeyPassphrase(id: String, passphrase: String?): Boolean {
         logAction("storeIdentityKeyPassphrase", "identityId=$id, passphraseLength=${passphrase?.length ?: 0}")
-        runCatching {
+        val ok = runCatching {
             SecurityManager.storeIdentityKeyPassphrase(id, passphrase)
         }.onFailure { t ->
             UiDebugLog.error("storeIdentityKeyPassphrase", t, "identityId=$id")
-        }
-        logResult("storeIdentityKeyPassphrase", true, "identityId=$id")
+        }.isSuccess
+        logResult("storeIdentityKeyPassphrase", ok, "identityId=$id")
+        return ok
     }
 
     fun importIdentityKeyPassphrasePayload(id: String, payload: String, passphrase: String): Boolean {
@@ -1677,19 +1671,8 @@ class AppViewModel(
     }
 
     private fun markIdentityHasKeyWithRetry(id: String, hasKey: Boolean) {
-        if (uiState.value.identities.any { it.id == id }) {
-            markIdentityHasKey(id, hasKey)
-            return
-        }
-        viewModelScope.launch {
-            repeat(12) {
-                delay(75)
-                if (uiState.value.identities.any { identity -> identity.id == id }) {
-                    markIdentityHasKey(id, hasKey)
-                    return@launch
-                }
-            }
-            logResult("markIdentityHasKeyWithRetry", false, "identityId=$id, hasKey=$hasKey, not-found-after-retry")
+        launchLogged("markIdentityHasKey", "identityId=$id, hasKey=$hasKey") {
+            repository.setIdentityHasPrivateKey(id, hasKey)
         }
     }
 
@@ -1777,17 +1760,6 @@ class AppViewModel(
         }
     }
 
-    private fun startUptimeTicker() {
-        uptimeTickerJob?.cancel()
-        uptimeTickerJob = viewModelScope.launch {
-            uptimeMonitorRunner.runDueChecks()
-            while (true) {
-                delay(60_000L)
-                uptimeMonitorRunner.runDueChecks()
-            }
-        }
-    }
-
     private fun lockTimeoutDuration(timeout: LockTimeout): Long? = when (timeout) {
         LockTimeout.IMMEDIATE -> 0L
         LockTimeout.ONE_MIN -> 60_000L
@@ -1801,13 +1773,11 @@ class AppViewModel(
         private val byName = compareBy<HostConnection> { it.name.lowercase() }
 
         fun provideFactory(
-            repository: AppRepository,
-            uptimeRepository: UptimeRepository,
-            uptimeMonitorRunner: UptimeMonitorRunnerDelegate
+            repository: AppRepository
         ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
-                    AppViewModel(repository, uptimeRepository, uptimeMonitorRunner)
+                    AppViewModel(repository)
                 }
             }
     }

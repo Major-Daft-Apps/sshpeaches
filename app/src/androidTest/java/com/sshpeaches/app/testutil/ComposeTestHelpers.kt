@@ -203,7 +203,10 @@ private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH,
     UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH -> "Security"
     UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH -> "Diagnostics"
-    UiTestTags.SETTINGS_EXPORT_QR_BUTTON -> "Transfer / QR"
+    UiTestTags.SETTINGS_EXPORT_QR_BUTTON,
+    UiTestTags.SETTINGS_IMPORT_QR_BUTTON,
+    UiTestTags.SETTINGS_EXPORT_FILE_BUTTON,
+    UiTestTags.SETTINGS_IMPORT_FILE_BUTTON -> "Transfer"
     UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK,
     UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON,
     UiTestTags.SETTINGS_SFTP_READ_SIZE_INPUT,

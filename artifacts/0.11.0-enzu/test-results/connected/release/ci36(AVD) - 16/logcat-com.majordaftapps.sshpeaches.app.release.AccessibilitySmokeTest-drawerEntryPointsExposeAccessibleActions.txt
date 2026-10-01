@@ -1,0 +1,234 @@
+09-28 17:46:37.943 17883 17913 I TestRunner: started: drawerEntryPointsExposeAccessibleActions(com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest)
+09-28 17:46:37.966 17883 17913 I UiAutomation: Initialized for user 0 on display 0
+09-28 17:46:37.975  1813  8590 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+09-28 17:46:37.978   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.978   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.979   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.979   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.979 17883 17913 I UiAutomationPermGranter: Attempting to grant android.permission.POST_NOTIFICATIONS to com.majordaftapps.sshpeaches
+09-28 17:46:37.979   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.981  1813  1979 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+09-28 17:46:37.981  1813  1979 I AiAiEcho: EchoTargets:
+09-28 17:46:37.981  1813  1979 I AiAiEcho: Filtered by AiAi flag check:
+09-28 17:46:37.981  1813  1979 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+09-28 17:46:37.982  1813  1979 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+09-28 17:46:37.983  1813  1979 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+09-28 17:46:37.983  1813  1979 I AiAiEcho: EchoTargets:
+09-28 17:46:37.983  1813  1979 I AiAiEcho: Filtered by AiAi flag check:
+09-28 17:46:37.983  1813  1979 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+09-28 17:46:37.983  1813  1979 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+09-28 17:46:37.983   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.983   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.983  1813  1979 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+09-28 17:46:37.983   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.984  1813  1979 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+09-28 17:46:37.984   669   669 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:46:37.985 17883 17913 W FileTestStorage: Output properties is not supported.
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: enableTracing failed. You may need to upgrade your androidx.tracing:tracing version
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: java.lang.NoSuchMethodError: No static method forceEnableAppTracing()V in class Landroidx/tracing/Trace; or its super classes (declaration of 'androidx.tracing.Trace' appears in /data/app/~~tiWLb1Z8YU_rVW61s7yNBQ==/com.majordaftapps.sshpeaches-Ipx8Gz5j4WPUqzQ34ewPVA==/base.apk!classes2.dex)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.platform.tracing.AndroidXTracer.enableTracing(AndroidXTracer.java:57)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.platform.tracing.Tracing.<init>(Tracing.java:53)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.platform.tracing.Tracing.<clinit>(Tracing.java:49)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.BaseLayerModule.providesTracing(BaseLayerModule.java:190)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.BaseLayerModule_ProvidesTracingFactory.providesTracing(BaseLayerModule_ProvidesTracingFactory.java:37)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.BaseLayerModule_ProvidesTracingFactory.get(BaseLayerModule_ProvidesTracingFactory.java:29)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.BaseLayerModule_ProvidesTracingFactory.get(BaseLayerModule_ProvidesTracingFactory.java:11)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.core.internal.deps.dagger.internal.DoubleCheck.get(DoubleCheck.java:47)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.IdlingResourceRegistry_Factory.get(IdlingResourceRegistry_Factory.java:34)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.base.IdlingResourceRegistry_Factory.get(IdlingResourceRegistry_Factory.java:12)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.core.internal.deps.dagger.internal.DoubleCheck.get(DoubleCheck.java:47)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.DaggerBaseLayerComponent$BaseLayerComponentImpl.idlingResourceRegistry(DaggerBaseLayerComponent.java:275)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.espresso.Espresso.<clinit>(Espresso.java:64)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.compose.ui.test.EspressoLink_androidKt.runEspressoOnIdle(EspressoLink.android.kt:92)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.compose.ui.test.EspressoLink.runUntilIdle(EspressoLink.android.kt:79)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment.runTest(ComposeUiTest.android.kt:326)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1.evaluate(AndroidComposeTestRule.android.kt:271)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.rule.GrantPermissionRule$RequestPermissionStatement.evaluate(GrantPermissionRule.java:150)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule$apply$1.evaluate(AppStateResetRule.kt:14)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.ext.junit.runners.AndroidJUnit4.run(AndroidJUnit4.java:162)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.Suite.runChild(Suite.java:128)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.Suite.runChild(Suite.java:27)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.internal.runner.TestExecutor.execute(TestExecutor.java:68)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.internal.runner.TestExecutor.execute(TestExecutor.java:59)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at androidx.test.runner.AndroidJUnitRunner.onStart(AndroidJUnitRunner.java:463)
+09-28 17:46:37.986 17883 17913 E AndroidXTracer: 	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2597)
+09-28 17:46:37.986 17883 17913 I Tracing : Tracer added: class androidx.test.platform.tracing.AndroidXTracer
+09-28 17:46:37.988 17883 17883 D EventInjectionStrategy: Creating injection strategy with input manager.
+09-28 17:46:37.990  1403  1403 D SsBaseTemplateCard: No text view can be set up
+09-28 17:46:37.990  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:46:37.990  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:46:37.990  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:46:37.990  1403  1403 I SsBaseTemplateCard: Secondary card pane is null
+09-28 17:46:37.996 17883 17913 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@97c33f1]
+09-28 17:46:38.003 17883 17913 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+09-28 17:46:38.007  1073  1073 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+09-28 17:46:38.008  7056  7071 I alhi    : NGA disabled since it's running Panthera and at least one a11y feature is on.
+09-28 17:46:38.010  7056  7071 I alhi    : (REDACTED) Nga state changed to %s
+09-28 17:46:38.010   669  1176 I system_server: AssetManager2(0x778035a17218) locale list changing from [] to [en-US]
+09-28 17:46:38.011  7056  7071 I alhi    : (REDACTED) isTngActive=%s
+09-28 17:46:38.012   669  1176 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fbeb1226 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:46:38.018   541   619 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:46:38.023  1403  1403 W SplitSelectStateCtor: Missing session instanceIds
+09-28 17:46:38.023  1403  1403 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+09-28 17:46:38.023  1073  1203 I ndroid.systemui: AssetManager2(0x7780359f2378) locale list changing from [] to [en-US]
+09-28 17:46:38.032   541   541 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:46:38.044 17883 17883 I apps.sshpeaches: AssetManager2(0x778035992b58) locale list changing from [] to [en-US]
+09-28 17:46:38.048  1073  1204 W HWUI    : Image decoding logging dropped!
+09-28 17:46:38.057  1765  2174 I tkr     : (REDACTED) Nga on-device enabled based on TNG:MA active state: %b
+09-28 17:46:38.058  1765  2174 I tkr     : (REDACTED) Nga on-device enabled based on TNG:MA active state: %b
+09-28 17:46:38.112 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: PRE_ON_CREATE
+09-28 17:46:38.113 17883 17883 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+09-28 17:46:38.124  1403  1403 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:46:38.129 17883 17883 D CompatChangeReporter: Compat change id reported: 377864165; UID 10233; state: ENABLED
+09-28 17:46:38.130 17883 17883 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+09-28 17:46:38.132  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+09-28 17:46:38.154 17883 17929 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+09-28 17:46:38.154 17883 17929 I EGL_emulation: Opening libGLESv2_emulation.so
+09-28 17:46:38.174 17883 17929 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-28 17:46:38.178 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: CREATED
+09-28 17:46:38.178 17883 17883 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e
+09-28 17:46:38.181 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: STARTED
+09-28 17:46:38.181 17883 17883 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e
+09-28 17:46:38.183 17883 17897 D SessionLifecycleClient: Sending lifecycle 1 to service
+09-28 17:46:38.184 17883 17921 D SessionLifecycleService: Activity foregrounding at 3108951.
+09-28 17:46:38.184 17883 17921 D SessionLifecycleService: Cold start detected.
+09-28 17:46:38.185 17883 17921 D SessionLifecycleService: Generated new session.
+09-28 17:46:38.185 17883 17921 D SessionLifecycleService: Broadcasting new session
+09-28 17:46:38.190 17883 17908 D SessionFirelogPublisher: Data Collection is enabled for at least one Subscriber
+09-28 17:46:38.191 17883 17924 I FA      : Tag Manager is not found and thus will not be used
+09-28 17:46:38.192 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: RESUMED
+09-28 17:46:38.192 17883 17883 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e
+09-28 17:46:38.202 17883 17896 D EventGDTLogger: Session Event Type: SESSION_START
+09-28 17:46:38.203 17883 17896 D SessionFirelogPublisher: Successfully logged Session Start event.
+09-28 17:46:38.209 17883 17883 W HWUI    : Unknown dataspace 0
+09-28 17:46:38.227 17883 17883 D SessionLifecycleClient: Session update received.
+09-28 17:46:38.227  7415  7415 D BoundBrokerSvc: onRebind: Intent { act=com.google.android.gms.common.telemetry.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentApiService }
+09-28 17:46:38.233 17883 17896 D SessionLifecycleClient: Notified CRASHLYTICS of new session fe53a0735cc144c08a4f9e575f181aff
+09-28 17:46:38.426 17883 17883 W apps.sshpeaches: Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateMap.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.426 17883 17883 W apps.sshpeaches: Common causes for lock verification issues are non-optimized dex code
+09-28 17:46:38.426 17883 17883 W apps.sshpeaches: and incorrect proguard optimizations.
+09-28 17:46:38.426 17883 17883 W apps.sshpeaches: Method void androidx.compose.runtime.snapshots.SnapshotStateMap.update(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.426 17883 17883 W apps.sshpeaches: Method boolean androidx.compose.runtime.snapshots.SnapshotStateMap.removeIf$runtime_release(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.438 17883 17883 I WindowExtensionsImpl: Initializing Window Extensions, vendor API level=9, activity embedding enabled=true
+09-28 17:46:38.451 17883 17883 W apps.sshpeaches: Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.451 17883 17883 W apps.sshpeaches: Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+09-28 17:46:38.451 17883 17883 W apps.sshpeaches: Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.451 17883 17883 W apps.sshpeaches: Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+09-28 17:46:38.451 17883 17883 W apps.sshpeaches: Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+09-28 17:46:38.472 17883 17883 W HWUI    : Image decoding logging dropped!
+09-28 17:46:38.616 17883 17883 W HWUI    : Image decoding logging dropped!
+09-28 17:46:39.454 17883 17883 I Choreographer: Skipped 72 frames!  The application may be doing too much work on its main thread.
+09-28 17:46:39.455 17883 17883 D WindowLayoutComponentImpl: Register WindowLayoutInfoListener on Context=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e, of which baseContext=android.app.ContextImpl@9bd70c9
+09-28 17:46:39.458   669   689 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches/.app.MainActivity for user 0: +1s443ms
+09-28 17:46:39.462  7415  8092 I FontLog : (REDACTED) Received query %s, URI %s
+09-28 17:46:39.463  7415  8092 I FontLog : (REDACTED) Query [%s] resolved to %s
+09-28 17:46:39.465  7415  8092 I FontLog : (REDACTED) Fetch %s end status %s
+09-28 17:46:39.471 17883 17930 I HWUI    : Davey! duration=1233ms; Flags=1, FrameTimelineVsyncId=420262, IntendedVsync=3108982938028, Vsync=3108982938028, InputEventId=0, HandleInputStart=3108996500096, AnimationStart=3108996501070, PerformTraversalsStart=3108996501446, DrawStart=3109474237400, FrameDeadline=3108999604694, FrameStartTime=3108996495383, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=3109497398027, SyncStart=3109497677787, IssueDrawCommandsStart=3109497951244, SwapBuffers=3110015267442, FrameCompleted=3110216973276, DequeueBufferDuration=4742, QueueBufferDuration=372437, GpuCompleted=3110216893621, SwapBuffersCompleted=3110216973276, DisplayPresentTime=0, CommandSubmissionCompleted=3110015267442,
+09-28 17:46:39.473  7415  7434 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+09-28 17:46:39.477   669   754 D ConnectivityService: requestNetwork for uid/pid:10233/17883 activeRequest: null callbackRequest: 796 [NetworkRequest [ REQUEST id=797, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10233 RequestorUid: 10233 RequestorPkg: com.majordaftapps.sshpeaches UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOSING|LOST|NC
+09-28 17:46:39.481  1403  1403 D BaseDepthController: setSurface:
+09-28 17:46:39.481  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:46:39.481  1403  1403 D BaseDepthController: 	mBaseSurface: null
+09-28 17:46:39.483  7415  7434 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+09-28 17:46:39.484  1403  1403 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+09-28 17:46:39.487   669   988 D ConnectivityService: NetReassign [797 : null → 100] [c 0] [a 2] [i 6]
+09-28 17:46:39.487   669   982 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=797, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10233 RequestorUid: 10233 RequestorPkg: com.majordaftapps.sshpeaches UnderlyingNetworks: Null] ]
+09-28 17:46:39.487   669   982 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=797, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10233 RequestorUid: 10233 RequestorPkg: com.majordaftapps.sshpeaches UnderlyingNetworks: Null] ]
+09-28 17:46:39.487   669   982 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=797, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10233 RequestorUid: 10233 RequestorPkg: com.majordaftapps.sshpeaches UnderlyingNetworks: Null] ]
+09-28 17:46:39.487   669   982 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=797, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10233 RequestorUid: 10233 RequestorPkg: com.majordaftapps.sshpeaches UnderlyingNetworks: Null] ]
+09-28 17:46:39.491  1403  1403 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+09-28 17:46:39.491  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:4)
+09-28 17:46:39.491  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:1)
+09-28 17:46:39.491  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:34)
+09-28 17:46:39.496   669   792 I ImeTracker: com.majordaftapps.sshpeaches:227ab83a: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+09-28 17:46:39.496  1403  1403 D StatsLog: LAUNCHER_ONSTOP
+09-28 17:46:39.503  1403  1403 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+09-28 17:46:39.505 17883 17883 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:46:39.506 17883 17883 I ImeTracker: com.majordaftapps.sshpeaches:227ab83a: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:46:39.508  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+09-28 17:46:39.510   669   754 I ImeTracker: system_server:7f9e28fc: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:46:39.510  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+09-28 17:46:39.510  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+09-28 17:46:39.512   669   692 I ImeTracker: system_server:7f9e28fc: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:46:39.512  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+09-28 17:46:39.595  1403  1423 W System  : A resource failed to call release.
+09-28 17:46:39.596  1403  1423 W System  : A resource failed to call release.
+09-28 17:46:39.596  1403  1423 W System  : A resource failed to call release.
+09-28 17:46:40.498 17883 17883 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+09-28 17:46:40.575   669   754 I system_server: AssetManager2(0x778035a17858) locale list changing from [] to [en-US]
+09-28 17:46:40.576   669   754 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fd9feac5 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:46:40.580   541   731 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:46:40.584  1073  1203 I ndroid.systemui: AssetManager2(0x7780359e4ef8) locale list changing from [] to [en-US]
+09-28 17:46:40.587   669   692 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fd9feac5 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:46:40.592 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: PAUSED
+09-28 17:46:40.593 17883 17883 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e
+09-28 17:46:40.594 17883 17897 D SessionLifecycleClient: Sending lifecycle 2 to service
+09-28 17:46:40.594 17883 17921 D SessionLifecycleService: Activity backgrounding at 3111362
+09-28 17:46:40.599   541   541 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:46:40.615   469   469 D Zygote  : Forked child process 17947
+09-28 17:46:40.624   669   793 I system_server: AssetManager2(0x778035a1aa58) locale list changing from [] to [en-US]
+09-28 17:46:40.640 17947 17947 I sshpeaches.test: Using CollectorTypeCMC GC.
+09-28 17:46:40.643 17947 17947 W sshpeaches.test: Unexpected CPU variant for x86: x86_64.
+09-28 17:46:40.643 17947 17947 W sshpeaches.test: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, alderlake, default
+09-28 17:46:40.649   669   793 I system_server: AssetManager2(0x778035a17e98) locale list changing from [] to [en-US]
+09-28 17:46:40.650 17947 17947 E sshpeaches.test: Not starting debugger since process cannot load the jdwp agent.
+09-28 17:46:40.655 17947 17947 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+09-28 17:46:40.657  1073  1173 I ndroid.systemui: AssetManager2(0x7780359fa9d8) locale list changing from [] to [en-US]
+09-28 17:46:40.665   669   793 I system_server: AssetManager2(0x778035a1d938) locale list changing from [] to [en-US]
+09-28 17:46:40.669  1073  1173 I ndroid.systemui: AssetManager2(0x7780359f42b8) locale list changing from [] to [en-US]
+09-28 17:46:40.680 17947 17947 D ApplicationLoaders: Returning zygote-cached class loader: /system/framework/android.test.base.jar
+09-28 17:46:40.684 17947 17947 D nativeloader: Configuring clns-9 for other apk /system/framework/android.test.mock.jar. target_sdk_version=36, uses_libraries=ALL, library_path=/data/app/~~FJelPWGxS6TY0dCc3w948Q==/com.majordaftapps.sshpeaches.test-ZXTXITC7NUsMUnuKbAajkA==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.majordaftapps.sshpeaches.test
+09-28 17:46:40.686 17947 17947 D ApplicationLoaders: Returning zygote-cached class loader: /system/framework/android.test.base.jar
+09-28 17:46:40.687 17883 17883 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:46:40.689 17947 17947 D nativeloader: Configuring clns-10 for other apk /system/framework/android.test.runner.jar. target_sdk_version=36, uses_libraries=ALL, library_path=/data/app/~~FJelPWGxS6TY0dCc3w948Q==/com.majordaftapps.sshpeaches.test-ZXTXITC7NUsMUnuKbAajkA==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.majordaftapps.sshpeaches.test
+09-28 17:46:40.693 17947 17947 D nativeloader: Configuring clns-11 for other apk /data/app/~~FJelPWGxS6TY0dCc3w948Q==/com.majordaftapps.sshpeaches.test-ZXTXITC7NUsMUnuKbAajkA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~FJelPWGxS6TY0dCc3w948Q==/com.majordaftapps.sshpeaches.test-ZXTXITC7NUsMUnuKbAajkA==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.majordaftapps.sshpeaches.test
+09-28 17:46:40.696 17947 17947 I sshpeaches.test: AssetManager2(0x77803598bad8) locale list changing from [] to [en-US]
+09-28 17:46:40.702 17947 17947 V GraphicsEnvironment: Currently set values for:
+09-28 17:46:40.703 17947 17947 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+09-28 17:46:40.703 17947 17947 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+09-28 17:46:40.704 17947 17947 V GraphicsEnvironment: com.majordaftapps.sshpeaches.test is not listed in per-application setting
+09-28 17:46:40.707 17947 17947 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+09-28 17:46:40.707 17947 17947 V GraphicsEnvironment: com.majordaftapps.sshpeaches.test is not listed in ANGLE allowlist or settings, returning default
+09-28 17:46:40.707 17947 17947 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+09-28 17:46:40.725 17947 17947 I sshpeaches.test: AssetManager2(0x77803598a818) locale list changing from [] to [en-US]
+09-28 17:46:40.729 17947 17947 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+09-28 17:46:40.738 17947 17947 D CompatChangeReporter: Compat change id reported: 377864165; UID 10234; state: ENABLED
+09-28 17:46:40.740 17947 17947 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+09-28 17:46:40.756 17883 17883 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@1d60ca7
+09-28 17:46:40.756 17947 17947 W HWUI    : Unknown dataspace 0
+09-28 17:46:40.762 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: STOPPED
+09-28 17:46:40.762 17883 17883 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e
+09-28 17:46:40.773 17947 17960 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+09-28 17:46:40.773 17947 17960 I EGL_emulation: Opening libGLESv2_emulation.so
+09-28 17:46:40.801 17883 17883 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@6bf0330
+09-28 17:46:40.805 17883 17883 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@16f5d0e in: DESTROYED
+09-28 17:46:40.805 17883 17883 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+09-28 17:46:40.814 17883 17913 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@97c33f1]
+09-28 17:46:40.836 17883 17883 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:46:40.841   669  1811 I ImeTracker: system_server:aa1aedb5: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:46:40.841 17947 17960 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-28 17:46:40.842   669   692 I ImeTracker: system_server:aa1aedb5: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:46:40.856  1403  1403 D RecentsView: onTaskRemoved: 787, not handling task stack changes
+09-28 17:46:40.857  1403  1403 D RecentsView: onTaskRemoved: 787, not handling task stack changes
+09-28 17:46:40.860 17883 17913 I TestRunner: finished: drawerEntryPointsExposeAccessibleActions(com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest)

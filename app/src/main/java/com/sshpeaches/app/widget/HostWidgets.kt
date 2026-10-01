@@ -18,6 +18,10 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.ui.state.FileTransferEntryMode
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 
@@ -33,12 +37,25 @@ internal object HostWidgets {
     private const val PREFS_NAME = "sshpeaches_widget_security"
     private const val KEY_ACTION_TOKEN = "widget_action_token"
 
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Refreshes widgets on a background thread. Use from the UI and the session service: the
+     * refresh reads hosts from Room, which blocked the main thread (and the service's session lock).
+     */
+    fun updateAllAsync(context: Context) {
+        val appContext = context.applicationContext
+        backgroundScope.launch { runCatching { updateAll(appContext) } }
+    }
+
+    /** Synchronous refresh, for widget receivers whose process may end once onReceive returns. */
     fun updateAll(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
         val quickComponent = ComponentName(context, QuickConnectWidgetProvider::class.java)
         val sessionsComponent = ComponentName(context, SessionsWidgetProvider::class.java)
         val quickIds = manager.getAppWidgetIds(quickComponent)
         val sessionsIds = manager.getAppWidgetIds(sessionsComponent)
+        if (quickIds.isEmpty() && sessionsIds.isEmpty()) return
         val hosts = loadHosts(context)
         val openSessions = WidgetSessionStore.read(context)
         if (quickIds.isNotEmpty()) {

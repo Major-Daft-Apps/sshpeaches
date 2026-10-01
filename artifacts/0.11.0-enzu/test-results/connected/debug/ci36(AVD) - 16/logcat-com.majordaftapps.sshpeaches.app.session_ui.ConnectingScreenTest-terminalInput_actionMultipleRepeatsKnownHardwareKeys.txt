@@ -1,0 +1,146 @@
+09-28 17:38:55.531 16269 16285 I TestRunner: started: terminalInput_actionMultipleRepeatsKnownHardwareKeys(com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest)
+09-28 17:38:55.538 16269 16285 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@1e89065]
+09-28 17:38:55.540  1403  1403 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:55.541   669   693 I ImeTracker: system_server:567f6084: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+09-28 17:38:55.541  1403  1403 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=false newVisibility=true
+09-28 17:38:55.542  1403  1403 D StatsLog: LAUNCHER_ONRESUME
+09-28 17:38:55.542 16269 16285 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+09-28 17:38:55.545  1403  1453 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+09-28 17:38:55.548  1813  1979 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+09-28 17:38:55.548  1813  1979 I AiAiEcho: EchoTargets:
+09-28 17:38:55.548  1813  1979 I AiAiEcho: Filtered by AiAi flag check:
+09-28 17:38:55.548  1813  1979 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+09-28 17:38:55.548  1813  1979 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+09-28 17:38:55.549  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+09-28 17:38:55.550   669  1774 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@f88160e8 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:38:55.556   669  1545 I ImeTracker: system_server:567f6084: onCancelled at PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY
+09-28 17:38:55.558  1813  1979 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+09-28 17:38:55.562  1403  1403 D BaseDepthController: setSurface:
+09-28 17:38:55.562  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:38:55.562  1403  1403 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x4fda961
+09-28 17:38:55.592  1403  1403 D RecentsView: onTaskRemoved: 654, not handling task stack changes
+09-28 17:38:55.592  1403  1403 D RecentsView: onTaskRemoved: 654, not handling task stack changes
+09-28 17:38:55.596  1403  1403 W SplitSelectStateCtor: Missing session instanceIds
+09-28 17:38:55.596  1403  1403 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+09-28 17:38:55.602  1403  1403 D SsBaseTemplateCard: No text view can be set up
+09-28 17:38:55.602  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:55.602  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:55.602  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:55.602  1403  1403 I SsBaseTemplateCard: Secondary card pane is null
+09-28 17:38:55.608 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: PRE_ON_CREATE
+09-28 17:38:55.608 16269 16269 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+09-28 17:38:55.613 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: CREATED
+09-28 17:38:55.614 16269 16269 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=androidx.activity.ComponentActivity@3375cd5
+09-28 17:38:55.615 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: STARTED
+09-28 17:38:55.615 16269 16269 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=androidx.activity.ComponentActivity@3375cd5
+09-28 17:38:55.616 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: RESUMED
+09-28 17:38:55.616 16269 16269 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=androidx.activity.ComponentActivity@3375cd5
+09-28 17:38:55.640 16329 16329 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:38:55.653   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:38:55.669   669   689 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug/androidx.activity.ComponentActivity for user 0: +117ms
+09-28 17:38:55.675 16329 16329 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@74436b2
+09-28 17:38:55.676  1403  1403 D BaseDepthController: setSurface:
+09-28 17:38:55.676  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:38:55.676  1403  1403 D BaseDepthController: 	mBaseSurface: null
+09-28 17:38:55.676  1403  1403 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+09-28 17:38:55.677 16329 16329 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:55.677  1403  1403 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+09-28 17:38:55.677  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:4)
+09-28 17:38:55.677  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:1)
+09-28 17:38:55.677  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:34)
+09-28 17:38:55.677  1403  1403 D StatsLog: LAUNCHER_ONSTOP
+09-28 17:38:55.678  1403  1403 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+09-28 17:38:55.679  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+09-28 17:38:55.681  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+09-28 17:38:55.688  1403  1403 D RecentsView: onTaskRemoved: 655, not handling task stack changes
+09-28 17:38:55.688  1403  1403 D RecentsView: onTaskRemoved: 655, not handling task stack changes
+09-28 17:38:55.692   669   792 I ImeTracker: com.majordaftapps.sshpeaches.debug:7429a06a: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+09-28 17:38:55.692 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:55.692 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:7429a06a: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:55.693  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+09-28 17:38:55.693   669  1796 I ImeTracker: system_server:70fc3445: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:38:55.693  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+09-28 17:38:55.693   669   692 I ImeTracker: system_server:70fc3445: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:38:55.694  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+09-28 17:38:55.694  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+09-28 17:38:55.717   669   693 I ImeTracker: system_server:8318aaac: onRequestShow at ORIGIN_SERVER reason CONTROLS_CHANGED fromUser false
+09-28 17:38:55.719 16269 16269 I ImeTracker: system_server:8318aaac: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+09-28 17:38:55.732  6816  6816 W TooltipLifecycleManager: TooltipLifecycleManager.dismissTooltips():154 Tooltip with id undo_access_point_promotion_banner not found in tooltipManager.
+09-28 17:38:55.736   669  1176 I ImeTracker: system_server:f0f1f7a1: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:38:55.739   669   692 I ImeTracker: system_server:f0f1f7a1: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:38:55.810 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:38:55.810 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:38:55.811 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:38:55.818 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:a8042787: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+09-28 17:38:55.818 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:a8042787: onFailed at PHASE_CLIENT_VIEW_SERVED
+09-28 17:38:55.821 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:55.822 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:b017716e: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_BY_INSETS_API fromUser false
+09-28 17:38:55.822 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:b017716e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:55.908   669  1546 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fa363987 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:38:55.911   541   619 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:38:55.914 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:e2c9e5f8: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+09-28 17:38:55.914 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:55.914 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:e2c9e5f8: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:55.915   541   541 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:38:55.915 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: PAUSED
+09-28 17:38:55.916 16269 16269 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=androidx.activity.ComponentActivity@3375cd5
+09-28 17:38:55.919 16329 16342 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+09-28 17:38:55.919 16329 16342 I EGL_emulation: Opening libGLESv2_emulation.so
+09-28 17:38:55.921   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:38:55.932 16329 16342 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-28 17:38:55.933 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:55.935 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:f76b52f: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_BY_INSETS_API fromUser false
+09-28 17:38:55.936 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:f76b52f: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:56.072  1403  1403 D StatsLog: LAUNCHER_ONRESUME
+09-28 17:38:56.078  1403  1453 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+09-28 17:38:56.082  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+09-28 17:38:56.082  1813  1979 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+09-28 17:38:56.082  1813  1979 I AiAiEcho: EchoTargets:
+09-28 17:38:56.082  1813  1979 I AiAiEcho: Filtered by AiAi flag check:
+09-28 17:38:56.082  1813  1979 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+09-28 17:38:56.083  1813  1979 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+09-28 17:38:56.083  1813  1979 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+09-28 17:38:56.086  1403  1403 D BaseDepthController: setSurface:
+09-28 17:38:56.086  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:38:56.086  1403  1403 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x4fda961
+09-28 17:38:56.107  1403  1403 D SsBaseTemplateCard: No text view can be set up
+09-28 17:38:56.107  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:56.107  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:56.107  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:56.107  1403  1403 I SsBaseTemplateCard: Secondary card pane is null
+09-28 17:38:56.120  1403  1403 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+09-28 17:38:56.120  1403  1403 D StateManager: 	at com.android.quickstep.util.ScalingWorkspaceRevealAnim.<init>(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:39)
+09-28 17:38:56.120  1403  1403 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:168)
+09-28 17:38:56.120  1403  1403 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager$WallpaperOpenLauncherAnimationRunner.onAnimationStart(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:17)
+09-28 17:38:56.121  1403  1403 D b/311077782: LauncherAnimationRunner.setAnimation
+09-28 17:38:56.123  1403  1403 D ScalingWorkspaceRevealAnim: alpha of workspace at the end of animation: 1.0
+09-28 17:38:56.135 16269 16269 D VRI[ComponentActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:38:56.145 16329 16329 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@bccf612
+09-28 17:38:56.148 16329 16329 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:56.161 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:dc994cf2: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+09-28 17:38:56.161 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:56.161 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:dc994cf2: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:56.163   669   792 I ImeTracker: com.google.android.apps.nexuslauncher:d2d69653: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+09-28 17:38:56.167 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: STOPPED
+09-28 17:38:56.167 16269 16269 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=androidx.activity.ComponentActivity@3375cd5
+09-28 17:38:56.169  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+09-28 17:38:56.170  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+09-28 17:38:56.171  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+09-28 17:38:56.176  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+09-28 17:38:56.178   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:38:56.181   669  1181 I ImeTracker: system_server:3774a6c4: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:38:56.183  1403  1403 D RecentsView: onTaskRemoved: 657, not handling task stack changes
+09-28 17:38:56.183  1403  1403 D RecentsView: onTaskRemoved: 657, not handling task stack changes
+09-28 17:38:56.183  1403  1403 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:56.183  1403  1403 I ImeTracker: com.google.android.apps.nexuslauncher:d2d69653: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:56.183   669   692 I ImeTracker: system_server:3774a6c4: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:38:56.189 16269 16269 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@25859af
+09-28 17:38:56.190 16269 16269 D LifecycleMonitor: Lifecycle status change: androidx.activity.ComponentActivity@3375cd5 in: DESTROYED
+09-28 17:38:56.190 16269 16269 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+09-28 17:38:56.195 16269 16269 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:56.199 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:59e0129f: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+09-28 17:38:56.202 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:59e0129f: onFailed at PHASE_CLIENT_VIEW_SERVED
+09-28 17:38:56.205  1403  1403 D RecentsView: onTaskRemoved: 656, not handling task stack changes
+09-28 17:38:56.205  1403  1403 D RecentsView: onTaskRemoved: 656, not handling task stack changes
+09-28 17:38:56.207 16269 16285 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@1e89065]
+09-28 17:38:56.208 16269 16285 I TestRunner: finished: terminalInput_actionMultipleRepeatsKnownHardwareKeys(com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest)

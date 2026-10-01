@@ -1,0 +1,6965 @@
+# proto-message: google.testing.platform.proto.api.core.TestSuiteResult
+# 2026-09-28T21:41:12.656329431Z:
+test_suite_meta_data {
+  scheduled_test_case_count: 124
+  device {
+    id: "emulator-5554"
+    friendly_name: "primary"
+  }
+}
+test_status: PASSED
+test_result {
+  test_case {
+    test_class: "PortForwardBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "searchFavoriteAndShareWorkForPortForward"
+    start_time {
+      seconds: 1790631413
+      nanos: 543000000
+    }
+    end_time {
+      seconds: 1790631422
+      nanos: 615000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardBrowserTest-searchFavoriteAndShareWorkForPortForward.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "PortForwardCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "addPortForward_showsHostBackgroundErrorUnderHostField"
+    start_time {
+      seconds: 1790631422
+      nanos: 692000000
+    }
+    end_time {
+      seconds: 1790631426
+      nanos: 409000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest-addPortForward_showsHostBackgroundErrorUnderHostField.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "PortForwardCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "addPortForward_showsInList"
+    start_time {
+      seconds: 1790631426
+      nanos: 417000000
+    }
+    end_time {
+      seconds: 1790631432
+      nanos: 119000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest-addPortForward_showsInList.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "PortForwardCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "editAndDeleteSeededPortForward"
+    start_time {
+      seconds: 1790631432
+      nanos: 123000000
+    }
+    end_time {
+      seconds: 1790631436
+      nanos: 469000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest-editAndDeleteSeededPortForward.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "PortForwardCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "addDialogDoesNotReopenWhenReturningToForwards"
+    start_time {
+      seconds: 1790631436
+      nanos: 472000000
+    }
+    end_time {
+      seconds: 1790631439
+      nanos: 263000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest-addDialogDoesNotReopenWhenReturningToForwards.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "PortForwardCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.forwards"
+    test_method: "addPortForward_showsAppBackgroundErrorOnlyAfterSubmitAttempt"
+    start_time {
+      seconds: 1790631439
+      nanos: 267000000
+    }
+    end_time {
+      seconds: 1790631443
+      nanos: 716000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest-addPortForward_showsAppBackgroundErrorOnlyAfterSubmitAttempt.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HomeScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.home"
+    test_method: "recentHostOverflowCanOpenEditDialog"
+    start_time {
+      seconds: 1790631443
+      nanos: 720000000
+    }
+    end_time {
+      seconds: 1790631445
+      nanos: 932000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.home.HomeScreenTest-recentHostOverflowCanOpenEditDialog.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HomeScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.home"
+    test_method: "homeScreenShowsWelcomeActionsWhenNoResourcesExist"
+    start_time {
+      seconds: 1790631445
+      nanos: 936000000
+    }
+    end_time {
+      seconds: 1790631446
+      nanos: 768000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.home.HomeScreenTest-homeScreenShowsWelcomeActionsWhenNoResourcesExist.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HomeScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.home"
+    test_method: "homeScreenShowsSeededFavoritesAcrossSections"
+    start_time {
+      seconds: 1790631446
+      nanos: 771000000
+    }
+    end_time {
+      seconds: 1790631447
+      nanos: 954000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.home.HomeScreenTest-homeScreenShowsSeededFavoritesAcrossSections.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HomeScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.home"
+    test_method: "favoriteIdentityOverflowCanOpenEditDialog"
+    start_time {
+      seconds: 1790631447
+      nanos: 957000000
+    }
+    end_time {
+      seconds: 1790631449
+      nanos: 744000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.home.HomeScreenTest-favoriteIdentityOverflowCanOpenEditDialog.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "hostSortSwitchesFromLastUsedToAlphabetical"
+    start_time {
+      seconds: 1790631449
+      nanos: 747000000
+    }
+    end_time {
+      seconds: 1790631451
+      nanos: 531000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-hostSortSwitchesFromLastUsedToAlphabetical.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "hostSearchFiltersByName"
+    start_time {
+      seconds: 1790631451
+      nanos: 534000000
+    }
+    end_time {
+      seconds: 1790631453
+      nanos: 144000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-hostSearchFiltersByName.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "passwordProtectedQrRequiresPassphraseAndThenShowsQrDialog"
+    start_time {
+      seconds: 1790631453
+      nanos: 147000000
+    }
+    end_time {
+      seconds: 1790631459
+      nanos: 127000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-passwordProtectedQrRequiresPassphraseAndThenShowsQrDialog.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "favoriteToggleAndHostActionsAreVisible"
+    start_time {
+      seconds: 1790631459
+      nanos: 130000000
+    }
+    end_time {
+      seconds: 1790631461
+      nanos: 166000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-favoriteToggleAndHostActionsAreVisible.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "scpActionNavigatesToConnectingScreenWithoutCrashing"
+    start_time {
+      seconds: 1790631461
+      nanos: 169000000
+    }
+    end_time {
+      seconds: 1790631464
+      nanos: 936000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-scpActionNavigatesToConnectingScreenWithoutCrashing.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.hosts"
+    test_method: "sshActionNavigatesToConnectingScreenWithoutCrashing"
+    start_time {
+      seconds: 1790631464
+      nanos: 939000000
+    }
+    end_time {
+      seconds: 1790631466
+      nanos: 522000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest-sshActionNavigatesToConnectingScreenWithoutCrashing.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IdentityBrowserTest"
+    test_package: "com.majordaftapps.sshpeaches.app.identities"
+    test_method: "searchFavoriteAndQrShareWorkForIdentity"
+    start_time {
+      seconds: 1790631466
+      nanos: 525000000
+    }
+    end_time {
+      seconds: 1790631469
+      nanos: 866000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.identities.IdentityBrowserTest-searchFavoriteAndQrShareWorkForIdentity.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IdentityCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.identities"
+    test_method: "editAndDeleteSeededIdentity"
+    start_time {
+      seconds: 1790631469
+      nanos: 869000000
+    }
+    end_time {
+      seconds: 1790631472
+      nanos: 809000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.identities.IdentityCrudTest-editAndDeleteSeededIdentity.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IdentityCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.identities"
+    test_method: "addGeneratedIdentity_showsInList"
+    start_time {
+      seconds: 1790631472
+      nanos: 838000000
+    }
+    end_time {
+      seconds: 1790631475
+      nanos: 601000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.identities.IdentityCrudTest-addGeneratedIdentity_showsInList.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "KeyboardEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.keyboard"
+    test_method: "keyboardEditor_canAssignFnToAnotherMainRowSlot"
+    start_time {
+      seconds: 1790631475
+      nanos: 604000000
+    }
+    end_time {
+      seconds: 1790631477
+      nanos: 487000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest-keyboardEditor_canAssignFnToAnotherMainRowSlot.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "KeyboardEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.keyboard"
+    test_method: "keyboardSlotPersistsAcrossRecreate"
+    start_time {
+      seconds: 1790631477
+      nanos: 490000000
+    }
+    end_time {
+      seconds: 1790631479
+      nanos: 423000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest-keyboardSlotPersistsAcrossRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "KeyboardEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.keyboard"
+    test_method: "keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor"
+    start_time {
+      seconds: 1790631479
+      nanos: 426000000
+    }
+    end_time {
+      seconds: 1790631481
+      nanos: 60000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest-keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsDialogRecreateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.lifecycle"
+    test_method: "addHostDialog_preservesInputAcrossRecreate"
+    start_time {
+      seconds: 1790631481
+      nanos: 66000000
+    }
+    end_time {
+      seconds: 1790631484
+      nanos: 258000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.lifecycle.HostsDialogRecreateTest-addHostDialog_preservesInputAcrossRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsSearchRecreateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.lifecycle"
+    test_method: "hostsSearchFilter_survivesActivityRecreate"
+    start_time {
+      seconds: 1790631484
+      nanos: 261000000
+    }
+    end_time {
+      seconds: 1790631485
+      nanos: 844000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.lifecycle.HostsSearchRecreateTest-hostsSearchFilter_survivesActivityRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ManagerSearchRecreateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.lifecycle"
+    test_method: "identitiesSearchFilter_survivesActivityRecreate"
+    start_time {
+      seconds: 1790631485
+      nanos: 872000000
+    }
+    end_time {
+      seconds: 1790631487
+      nanos: 957000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest-identitiesSearchFilter_survivesActivityRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ManagerSearchRecreateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.lifecycle"
+    test_method: "forwardsSearchFilter_survivesActivityRecreate"
+    start_time {
+      seconds: 1790631487
+      nanos: 960000000
+    }
+    end_time {
+      seconds: 1790631490
+      nanos: 196000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest-forwardsSearchFilter_survivesActivityRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ManagerSearchRecreateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.lifecycle"
+    test_method: "snippetsSearchFilter_survivesActivityRecreate"
+    start_time {
+      seconds: 1790631490
+      nanos: 223000000
+    }
+    end_time {
+      seconds: 1790631492
+      nanos: 912000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest-snippetsSearchFilter_survivesActivityRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "AppInfoNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.navigation"
+    test_method: "startupRoute_canOpenLicenseNoticesScreen"
+    start_time {
+      seconds: 1790631492
+      nanos: 914000000
+    }
+    end_time {
+      seconds: 1790631494
+      nanos: 974000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.navigation.AppInfoNavigationTest-startupRoute_canOpenLicenseNoticesScreen.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ExternalLinksNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.navigation"
+    test_method: "helpDrawerEntry_selectsHelpDestination"
+    start_time {
+      seconds: 1790631494
+      nanos: 976000000
+    }
+    end_time {
+      seconds: 1790631495
+      nanos: 681000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest-helpDrawerEntry_selectsHelpDestination.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ExternalLinksNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.navigation"
+    test_method: "aboutDialog_linksInvokeExpectedCallbacks"
+    start_time {
+      seconds: 1790631495
+      nanos: 687000000
+    }
+    end_time {
+      seconds: 1790631496
+      nanos: 568000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest-aboutDialog_linksInvokeExpectedCallbacks.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ExternalLinksNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.navigation"
+    test_method: "helpScreen_moreHelpInvokesSupportCallback"
+    start_time {
+      seconds: 1790631496
+      nanos: 570000000
+    }
+    end_time {
+      seconds: 1790631497
+      nanos: 123000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest-helpScreen_moreHelpInvokesSupportCallback.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "NotificationPermissionStateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.permissions"
+    test_method: "dialogListsAllMissingCorePermissions"
+    start_time {
+      seconds: 1790631497
+      nanos: 150000000
+    }
+    end_time {
+      seconds: 1790631497
+      nanos: 879000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest-dialogListsAllMissingCorePermissions.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "NotificationPermissionStateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.permissions"
+    test_method: "revokedNotifications_showPermissionsRequiredDialog"
+    start_time {
+      seconds: 1790631497
+      nanos: 882000000
+    }
+    end_time {
+      seconds: 1790631498
+      nanos: 511000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest-revokedNotifications_showPermissionsRequiredDialog.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "NotificationPermissionStateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.permissions"
+    test_method: "managePermissionsButton_invokesCallback"
+    start_time {
+      seconds: 1790631498
+      nanos: 513000000
+    }
+    end_time {
+      seconds: 1790631499
+      nanos: 343000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest-managePermissionsButton_invokesCallback.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "NotificationPermissionStateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.permissions"
+    test_method: "requestNowButton_invokesCallback"
+    start_time {
+      seconds: 1790631499
+      nanos: 345000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 125000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest-requestNowButton_invokesCallback.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "NotificationPermissionStateTest"
+    test_package: "com.majordaftapps.sshpeaches.app.permissions"
+    test_method: "settingsOnlyPermissions_hideRequestNowAndExplainSettings"
+    start_time {
+      seconds: 1790631500
+      nanos: 128000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 757000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest-settingsOnlyPermissions_hideRequestNowAndExplainSettings.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrRoundTripTest"
+    test_package: "com.majordaftapps.sshpeaches.app.qr"
+    test_method: "portForwardPayloadRoundTripProducesImportableLocalForward"
+    start_time {
+      seconds: 1790631500
+      nanos: 760000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 761000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest-portForwardPayloadRoundTripProducesImportableLocalForward.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrRoundTripTest"
+    test_package: "com.majordaftapps.sshpeaches.app.qr"
+    test_method: "hostPayloadRoundTripPreservesConnectionFields"
+    start_time {
+      seconds: 1790631500
+      nanos: 763000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 763000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest-hostPayloadRoundTripPreservesConnectionFields.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrRoundTripTest"
+    test_package: "com.majordaftapps.sshpeaches.app.qr"
+    test_method: "identityPayloadRoundTripRequestsOverwriteForExistingFingerprint"
+    start_time {
+      seconds: 1790631500
+      nanos: 765000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 766000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest-identityPayloadRoundTripRequestsOverwriteForExistingFingerprint.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrRoundTripTest"
+    test_package: "com.majordaftapps.sshpeaches.app.qr"
+    test_method: "snippetPayloadRoundTripProducesRunnableSnippet"
+    start_time {
+      seconds: 1790631500
+      nanos: 768000000
+    }
+    end_time {
+      seconds: 1790631500
+      nanos: 769000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest-snippetPayloadRoundTripProducesRunnableSnippet.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityLockRuntimeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "lockAppClearsRuntimeSessionPasswordsInBoundService"
+    start_time {
+      seconds: 1790631500
+      nanos: 771000000
+    }
+    end_time {
+      seconds: 1790631503
+      nanos: 306000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityLockRuntimeTest-lockAppClearsRuntimeSessionPasswordsInBoundService.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityManagerVaultTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "setPinMigratesLegacySecretsAndVerifyPinUnlocksVault"
+    start_time {
+      seconds: 1790631503
+      nanos: 308000000
+    }
+    end_time {
+      seconds: 1790631505
+      nanos: 498000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest-setPinMigratesLegacySecretsAndVerifyPinUnlocksVault.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityManagerVaultTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "legacySecretsRemainReadableUntilPinSet"
+    start_time {
+      seconds: 1790631505
+      nanos: 501000000
+    }
+    end_time {
+      seconds: 1790631505
+      nanos: 678000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest-legacySecretsRemainReadableUntilPinSet.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityManagerVaultTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "setPinLeavesAppUnlockedAndVaultReadable"
+    start_time {
+      seconds: 1790631505
+      nanos: 680000000
+    }
+    end_time {
+      seconds: 1790631507
+      nanos: 943000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest-setPinLeavesAppUnlockedAndVaultReadable.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityManagerVaultTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "clearPinRevertsVaultSecretsToLegacyStorage"
+    start_time {
+      seconds: 1790631507
+      nanos: 945000000
+    }
+    end_time {
+      seconds: 1790631509
+      nanos: 428000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest-clearPinRevertsVaultSecretsToLegacyStorage.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecurityManagerVaultTest"
+    test_package: "com.majordaftapps.sshpeaches.app.security"
+    test_method: "exportImportProtectedSecretsWorkWhileVaultBacked"
+    start_time {
+      seconds: 1790631509
+      nanos: 430000000
+    }
+    end_time {
+      seconds: 1790631518
+      nanos: 777000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest-exportImportProtectedSecretsWorkWhileVaultBacked.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "defaultKeyboard_allMainAndFnKeysDispatchAndControlsWork"
+    start_time {
+      seconds: 1790631518
+      nanos: 780000000
+    }
+    end_time {
+      seconds: 1790631521
+      nanos: 970000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-defaultKeyboard_allMainAndFnKeysDispatchAndControlsWork.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalActionModePaste_restoresImeFocusAndCommittedCtrlA"
+    start_time {
+      seconds: 1790631521
+      nanos: 972000000
+    }
+    end_time {
+      seconds: 1790631523
+      nanos: 555000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalActionModePaste_restoresImeFocusAndCommittedCtrlA.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalImeContextPasteAsPlainText_keepsCommittedCtrlAAfterPaste"
+    start_time {
+      seconds: 1790631523
+      nanos: 557000000
+    }
+    end_time {
+      seconds: 1790631524
+      nanos: 839000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalImeContextPasteAsPlainText_keepsCommittedCtrlAAfterPaste.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpPanel_remoteActionsInvokeManagementCallbacks"
+    start_time {
+      seconds: 1790631524
+      nanos: 841000000
+    }
+    end_time {
+      seconds: 1790631528
+      nanos: 661000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpPanel_remoteActionsInvokeManagementCallbacks.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpPanel_homeButtonUsesCanonicalHomePath"
+    start_time {
+      seconds: 1790631528
+      nanos: 664000000
+    }
+    end_time {
+      seconds: 1790631529
+      nanos: 771000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpPanel_homeButtonUsesCanonicalHomePath.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalImeContextPaste_keepsCommittedCtrlAAfterPaste"
+    start_time {
+      seconds: 1790631529
+      nanos: 774000000
+    }
+    end_time {
+      seconds: 1790631530
+      nanos: 904000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalImeContextPaste_keepsCommittedCtrlAAfterPaste.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes"
+    start_time {
+      seconds: 1790631530
+      nanos: 932000000
+    }
+    end_time {
+      seconds: 1790631531
+      nanos: 712000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "compactKeyboard_dispatchesModifierSequenceAliasAndPasswordActions"
+    start_time {
+      seconds: 1790631531
+      nanos: 714000000
+    }
+    end_time {
+      seconds: 1790631532
+      nanos: 469000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-compactKeyboard_dispatchesModifierSequenceAliasAndPasswordActions.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalTypeface_isRestoredWhenAppReturnsToForeground"
+    start_time {
+      seconds: 1790631532
+      nanos: 473000000
+    }
+    end_time {
+      seconds: 1790631533
+      nanos: 379000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalTypeface_isRestoredWhenAppReturnsToForeground.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode"
+    start_time {
+      seconds: 1790631533
+      nanos: 381000000
+    }
+    end_time {
+      seconds: 1790631534
+      nanos: 311000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "sftpPanel_identicalListingWithNewTokenCompletesCommand"
+    start_time {
+      seconds: 1790631534
+      nanos: 313000000
+    }
+    end_time {
+      seconds: 1790631536
+      nanos: 248000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-sftpPanel_identicalListingWithNewTokenCompletesCommand.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalInput_actionMultipleRepeatsKnownHardwareKeys"
+    start_time {
+      seconds: 1790631536
+      nanos: 251000000
+    }
+    end_time {
+      seconds: 1790631536
+      nanos: 931000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalInput_actionMultipleRepeatsKnownHardwareKeys.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpToolbar_keepsNavSortAndHiddenFilesOnOneNarrowRow"
+    start_time {
+      seconds: 1790631536
+      nanos: 932000000
+    }
+    end_time {
+      seconds: 1790631538
+      nanos: 14000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpToolbar_keepsNavSortAndHiddenFilesOnOneNarrowRow.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalInput_usesLatestSendCallbackAfterSameSessionRecomposition"
+    start_time {
+      seconds: 1790631538
+      nanos: 16000000
+    }
+    end_time {
+      seconds: 1790631538
+      nanos: 746000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalInput_usesLatestSendCallbackAfterSameSessionRecomposition.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalIme_reportsShadowSelectionAndSupportsForwardDelete"
+    start_time {
+      seconds: 1790631538
+      nanos: 748000000
+    }
+    end_time {
+      seconds: 1790631539
+      nanos: 352000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalIme_reportsShadowSelectionAndSupportsForwardDelete.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalActionModeCopy_doesNotFocusImeBridgeWhenSystemKeyboardHidden"
+    start_time {
+      seconds: 1790631539
+      nanos: 354000000
+    }
+    end_time {
+      seconds: 1790631540
+      nanos: 8000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalActionModeCopy_doesNotFocusImeBridgeWhenSystemKeyboardHidden.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalSelectionPaste_virtualImeKeyConsumesLatchedCtrlOnce"
+    start_time {
+      seconds: 1790631540
+      nanos: 10000000
+    }
+    end_time {
+      seconds: 1790631540
+      nanos: 939000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalSelectionPaste_virtualImeKeyConsumesLatchedCtrlOnce.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "sftpPutWithoutLocalPath_uploadsImmediatePickerResult"
+    start_time {
+      seconds: 1790631540
+      nanos: 942000000
+    }
+    end_time {
+      seconds: 1790631542
+      nanos: 273000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-sftpPutWithoutLocalPath_uploadsImmediatePickerResult.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "sftpPanel_invalidTypedPathShowsErrorToast"
+    start_time {
+      seconds: 1790631542
+      nanos: 277000000
+    }
+    end_time {
+      seconds: 1790631543
+      nanos: 911000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-sftpPanel_invalidTypedPathShowsErrorToast.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "errorState_showsLogsPaneAndInvokesRetry"
+    start_time {
+      seconds: 1790631543
+      nanos: 914000000
+    }
+    end_time {
+      seconds: 1790631546
+      nanos: 302000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-errorState_showsLogsPaneAndInvokesRetry.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpPanel_usesSelectionModelAndOverflowActions"
+    start_time {
+      seconds: 1790631546
+      nanos: 304000000
+    }
+    end_time {
+      seconds: 1790631547
+      nanos: 761000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpPanel_usesSelectionModelAndOverflowActions.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "connectingLogs_useTerminalStyleGrowUpwardAndFollowNewestLine"
+    start_time {
+      seconds: 1790631547
+      nanos: 764000000
+    }
+    end_time {
+      seconds: 1790631549
+      nanos: 296000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-connectingLogs_useTerminalStyleGrowUpwardAndFollowNewestLine.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalIme_composingTextIsSentOnceOnlyWhenCommitted"
+    start_time {
+      seconds: 1790631549
+      nanos: 298000000
+    }
+    end_time {
+      seconds: 1790631549
+      nanos: 951000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalIme_composingTextIsSentOnceOnlyWhenCommitted.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalImeBridgeKeyListener_virtualImeKeyConsumesLatchedCtrlOnce"
+    start_time {
+      seconds: 1790631549
+      nanos: 953000000
+    }
+    end_time {
+      seconds: 1790631550
+      nanos: 782000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalImeBridgeKeyListener_virtualImeKeyConsumesLatchedCtrlOnce.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalImeContextCopy_keepsCommittedCtrlAAfterSelectedShadowTextCopy"
+    start_time {
+      seconds: 1790631550
+      nanos: 785000000
+    }
+    end_time {
+      seconds: 1790631551
+      nanos: 564000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalImeContextCopy_keepsCommittedCtrlAAfterSelectedShadowTextCopy.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpDownloadButton_downloadsPickerResultImmediatelyAndRepicksEveryTime"
+    start_time {
+      seconds: 1790631551
+      nanos: 616000000
+    }
+    end_time {
+      seconds: 1790631552
+      nanos: 570000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpDownloadButton_downloadsPickerResultImmediatelyAndRepicksEveryTime.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalActionModeCopy_restoresImeFocusAndCommittedCtrlA"
+    start_time {
+      seconds: 1790631552
+      nanos: 573000000
+    }
+    end_time {
+      seconds: 1790631553
+      nanos: 629000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalActionModeCopy_restoresImeFocusAndCommittedCtrlA.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalIme_composingRegionReplacementHonorsCursorEdits"
+    start_time {
+      seconds: 1790631553
+      nanos: 656000000
+    }
+    end_time {
+      seconds: 1790631554
+      nanos: 461000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalIme_composingRegionReplacementHonorsCursorEdits.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback"
+    start_time {
+      seconds: 1790631554
+      nanos: 464000000
+    }
+    end_time {
+      seconds: 1790631555
+      nanos: 119000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpUploadButton_reviewsDestinationBeforeEachUpload"
+    start_time {
+      seconds: 1790631555
+      nanos: 221000000
+    }
+    end_time {
+      seconds: 1790631556
+      nanos: 628000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpUploadButton_reviewsDestinationBeforeEachUpload.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "sftpGetWithoutLocalPath_downloadsImmediatePickerResult"
+    start_time {
+      seconds: 1790631556
+      nanos: 655000000
+    }
+    end_time {
+      seconds: 1790631557
+      nanos: 787000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-sftpGetWithoutLocalPath_downloadsImmediatePickerResult.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "builtInKeyboard_keyboardButtonAndTap_showSoftKeyboard"
+    start_time {
+      seconds: 1790631557
+      nanos: 790000000
+    }
+    end_time {
+      seconds: 1790631561
+      nanos: 659000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-builtInKeyboard_keyboardButtonAndTap_showSoftKeyboard.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpUploadAction_isDisabledWhileDirectoryListingIsPending"
+    start_time {
+      seconds: 1790631561
+      nanos: 662000000
+    }
+    end_time {
+      seconds: 1790631562
+      nanos: 492000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpUploadAction_isDisabledWhileDirectoryListingIsPending.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "builtInKeyboard_keepsModifiersWorkingAcrossFnLayer"
+    start_time {
+      seconds: 1790631562
+      nanos: 495000000
+    }
+    end_time {
+      seconds: 1790631563
+      nanos: 224000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-builtInKeyboard_keepsModifiersWorkingAcrossFnLayer.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpForwardNavigation_isReachableOnNarrowScreens"
+    start_time {
+      seconds: 1790631563
+      nanos: 227000000
+    }
+    end_time {
+      seconds: 1790631564
+      nanos: 357000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpForwardNavigation_isReachableOnNarrowScreens.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalKeyboardButtonAndDoubleTap_showSoftKeyboard"
+    start_time {
+      seconds: 1790631564
+      nanos: 359000000
+    }
+    end_time {
+      seconds: 1790631567
+      nanos: 574000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalKeyboardButtonAndDoubleTap_showSoftKeyboard.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "scpUploadPanel_promotesUploadActionToToolbar"
+    start_time {
+      seconds: 1790631567
+      nanos: 624000000
+    }
+    end_time {
+      seconds: 1790631568
+      nanos: 504000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-scpUploadPanel_promotesUploadActionToToolbar.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalAndroidDispatcher_backAndSystemKeysDoNotClearLatchedCtrl"
+    start_time {
+      seconds: 1790631568
+      nanos: 506000000
+    }
+    end_time {
+      seconds: 1790631569
+      nanos: 210000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalAndroidDispatcher_backAndSystemKeysDoNotClearLatchedCtrl.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalSelectionCopy_virtualImeKeyConsumesLatchedCtrlOnce"
+    start_time {
+      seconds: 1790631569
+      nanos: 214000000
+    }
+    end_time {
+      seconds: 1790631569
+      nanos: 943000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalSelectionCopy_virtualImeKeyConsumesLatchedCtrlOnce.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "networkErrorState_identifiesNetworkFailure"
+    start_time {
+      seconds: 1790631569
+      nanos: 945000000
+    }
+    end_time {
+      seconds: 1790631570
+      nanos: 574000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-networkErrorState_identifiesNetworkFailure.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "passwordInjectUsesSavedHostPasswordAfterVaultMigration"
+    start_time {
+      seconds: 1790631570
+      nanos: 576000000
+    }
+    end_time {
+      seconds: 1790631573
+      nanos: 217000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-passwordInjectUsesSavedHostPasswordAfterVaultMigration.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "customKeyboard_fnLayerIsFixedAndBackReturnsToRemappableMainRows"
+    start_time {
+      seconds: 1790631573
+      nanos: 220000000
+    }
+    end_time {
+      seconds: 1790631574
+      nanos: 25000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-customKeyboard_fnLayerIsFixedAndBackReturnsToRemappableMainRows.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ConnectingScreenTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "terminalSession_supportsFindDialogAndSnippetPicker"
+    start_time {
+      seconds: 1790631574
+      nanos: 27000000
+    }
+    end_time {
+      seconds: 1790631576
+      nanos: 111000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest-terminalSession_supportsFindDialogAndSnippetPicker.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SessionColorProfileButtonTest"
+    test_package: "com.majordaftapps.sshpeaches.app.session_ui"
+    test_method: "selectingProfileFromMenuInvokesCallback"
+    start_time {
+      seconds: 1790631576
+      nanos: 114000000
+    }
+    end_time {
+      seconds: 1790631576
+      nanos: 867000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.session_ui.SessionColorProfileButtonTest-selectingProfileFromMenuInvokesCallback.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecuritySettingsTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "lockedAppShowsOverlayAndUnlocksWithPin"
+    start_time {
+      seconds: 1790631576
+      nanos: 869000000
+    }
+    end_time {
+      seconds: 1790631580
+      nanos: 285000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest-lockedAppShowsOverlayAndUnlocksWithPin.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecuritySettingsTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "setPinThenDisablePinUpdatesSecurityStatus"
+    start_time {
+      seconds: 1790631580
+      nanos: 287000000
+    }
+    end_time {
+      seconds: 1790631584
+      nanos: 235000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest-setPinThenDisablePinUpdatesSecurityStatus.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SecuritySettingsTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "biometricPreferenceDisplaysWhenPinConfigured"
+    start_time {
+      seconds: 1790631584
+      nanos: 261000000
+    }
+    end_time {
+      seconds: 1790631586
+      nanos: 872000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest-biometricPreferenceDisplaysWhenPinConfigured.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsPreferencesTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "exportQrWithoutSecrets_generatesQrDialog"
+    start_time {
+      seconds: 1790631586
+      nanos: 873000000
+    }
+    end_time {
+      seconds: 1790631589
+      nanos: 59000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest-exportQrWithoutSecrets_generatesQrDialog.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsPreferencesTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "themeModeAndTogglesPersistAcrossRecreate"
+    start_time {
+      seconds: 1790631589
+      nanos: 61000000
+    }
+    end_time {
+      seconds: 1790631592
+      nanos: 979000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest-themeModeAndTogglesPersistAcrossRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsPreferencesTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "exportQrWithSecretsValidatesPassphraseBeforeGenerating"
+    start_time {
+      seconds: 1790631592
+      nanos: 981000000
+    }
+    end_time {
+      seconds: 1790631596
+      nanos: 698000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest-exportQrWithSecretsValidatesPassphraseBeforeGenerating.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsPreferencesTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "exportQrDialog_preservesEntriesAcrossRecreate"
+    start_time {
+      seconds: 1790631596
+      nanos: 701000000
+    }
+    end_time {
+      seconds: 1790631599
+      nanos: 791000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest-exportQrDialog_preservesEntriesAcrossRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsRestoreDefaultsTest"
+    test_package: "com.majordaftapps.sshpeaches.app.settings"
+    test_method: "restoreDefaultsResetsSecurityToggles"
+    start_time {
+      seconds: 1790631599
+      nanos: 793000000
+    }
+    end_time {
+      seconds: 1790631602
+      nanos: 782000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.settings.SettingsRestoreDefaultsTest-restoreDefaultsResetsSecurityToggles.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SnippetCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.snippets"
+    test_method: "addEditSearchAndDeleteSnippet"
+    start_time {
+      seconds: 1790631602
+      nanos: 784000000
+    }
+    end_time {
+      seconds: 1790631606
+      nanos: 474000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.snippets.SnippetCrudTest-addEditSearchAndDeleteSnippet.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "staleOpenSessionIntentColdLaunchLandsOnHomeAndConsumesRequest"
+    start_time {
+      seconds: 1790631606
+      nanos: 476000000
+    }
+    end_time {
+      seconds: 1790631607
+      nanos: 256000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-staleOpenSessionIntentColdLaunchLandsOnHomeAndConsumesRequest.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "widgetConnectIntentStartsSessionLaunchPath"
+    start_time {
+      seconds: 1790631607
+      nanos: 258000000
+    }
+    end_time {
+      seconds: 1790631608
+      nanos: 113000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-widgetConnectIntentStartsSessionLaunchPath.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "widgetConnectLaunchPathStillPublishesSessionAfterImmediateRecreate"
+    start_time {
+      seconds: 1790631608
+      nanos: 115000000
+    }
+    end_time {
+      seconds: 1790631608
+      nanos: 869000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-widgetConnectLaunchPathStillPublishesSessionAfterImmediateRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "widgetConnectLaunchPathStillPublishesSessionAfterRecreate"
+    start_time {
+      seconds: 1790631608
+      nanos: 871000000
+    }
+    end_time {
+      seconds: 1790631609
+      nanos: 650000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-widgetConnectLaunchPathStillPublishesSessionAfterRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "forgedWidgetConnectIntentWithoutTokenDoesNotStartSessionLaunchPath"
+    start_time {
+      seconds: 1790631609
+      nanos: 677000000
+    }
+    end_time {
+      seconds: 1790631611
+      nanos: 361000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-forgedWidgetConnectIntentWithoutTokenDoesNotStartSessionLaunchPath.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "IntentLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "staleOpenSessionIntentFromNonSessionRouteKeepsCurrentRouteAndConsumesRequest"
+    start_time {
+      seconds: 1790631611
+      nanos: 363000000
+    }
+    end_time {
+      seconds: 1790631612
+      nanos: 820000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest-staleOpenSessionIntentFromNonSessionRouteKeepsCurrentRouteAndConsumesRequest.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QuickConnectLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "quickConnectRejectsInvalidPort"
+    start_time {
+      seconds: 1790631612
+      nanos: 822000000
+    }
+    end_time {
+      seconds: 1790631614
+      nanos: 530000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.QuickConnectLaunchTest-quickConnectRejectsInvalidPort.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QuickConnectLaunchTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "quickConnectRequiresHostPortAndUsername"
+    start_time {
+      seconds: 1790631614
+      nanos: 532000000
+    }
+    end_time {
+      seconds: 1790631615
+      nanos: 436000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.QuickConnectLaunchTest-quickConnectRequiresHostPortAndUsername.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SessionLaunchWithoutNotificationPermissionTest"
+    test_package: "com.majordaftapps.sshpeaches.app.startup"
+    test_method: "widgetConnectIntentDoesNotCrashWhenNotificationsAreRevoked"
+    start_time {
+      seconds: 1790631615
+      nanos: 438000000
+    }
+    end_time {
+      seconds: 1790631618
+      nanos: 453000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.startup.SessionLaunchWithoutNotificationPermissionTest-widgetConnectIntentDoesNotCrashWhenNotificationsAreRevoked.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "TermuxTerminalEngineConcurrencyTest"
+    test_package: "com.majordaftapps.sshpeaches.app.terminal"
+    test_method: "rapidResizeWhileOutputArrives_keepsEmulatorUsable"
+    start_time {
+      seconds: 1790631618
+      nanos: 480000000
+    }
+    end_time {
+      seconds: 1790631630
+      nanos: 481000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.terminal.TermuxTerminalEngineConcurrencyTest-rapidResizeWhileOutputArrives_keepsEmulatorUsable.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "TerminalThemeApplicationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "applyProfile_updatesEmulatorColorsAndCursorStyle"
+    start_time {
+      seconds: 1790631630
+      nanos: 483000000
+    }
+    end_time {
+      seconds: 1790631630
+      nanos: 483000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.TerminalThemeApplicationTest-applyProfile_updatesEmulatorColorsAndCursorStyle.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ThemeEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "duplicateThemeCanBecomeDefaultAndDeleteFallsBackToBuiltin"
+    start_time {
+      seconds: 1790631630
+      nanos: 484000000
+    }
+    end_time {
+      seconds: 1790631636
+      nanos: 963000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest-duplicateThemeCanBecomeDefaultAndDeleteFallsBackToBuiltin.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ThemeEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "duplicateThemeNameShowsValidationError"
+    start_time {
+      seconds: 1790631636
+      nanos: 965000000
+    }
+    end_time {
+      seconds: 1790631639
+      nanos: 654000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest-duplicateThemeNameShowsValidationError.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ThemeEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "stockThemePickerIncludesAddedBuiltinThemes"
+    start_time {
+      seconds: 1790631639
+      nanos: 706000000
+    }
+    end_time {
+      seconds: 1790631641
+      nanos: 188000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest-stockThemePickerIncludesAddedBuiltinThemes.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ThemeEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "createThemeProfile_returnsToThemeEditor"
+    start_time {
+      seconds: 1790631641
+      nanos: 189000000
+    }
+    end_time {
+      seconds: 1790631644
+      nanos: 303000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest-createThemeProfile_returnsToThemeEditor.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "ThemeEditorTest"
+    test_package: "com.majordaftapps.sshpeaches.app.themes"
+    test_method: "createThemeProfile_withCustomFontShowsFontInThemeList"
+    start_time {
+      seconds: 1790631644
+      nanos: 304000000
+    }
+    end_time {
+      seconds: 1790631647
+      nanos: 724000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest-createThemeProfile_withCustomFontShowsFontInThemeList.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "addHost_invalidHostAndPort_showsValidationErrors"
+    start_time {
+      seconds: 1790631647
+      nanos: 750000000
+    }
+    end_time {
+      seconds: 1790631652
+      nanos: 147000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.HostsCrudTest-addHost_invalidHostAndPort_showsValidationErrors.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "HostsCrudTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "addEditDeleteHost_updatesList"
+    start_time {
+      seconds: 1790631652
+      nanos: 149000000
+    }
+    end_time {
+      seconds: 1790631657
+      nanos: 303000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.HostsCrudTest-addEditDeleteHost_updatesList.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrImportUiSmokeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "invalidSnippetQrPayload_returnsError"
+    start_time {
+      seconds: 1790631657
+      nanos: 305000000
+    }
+    end_time {
+      seconds: 1790631658
+      nanos: 135000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest-invalidSnippetQrPayload_returnsError.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrImportUiSmokeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "invalidHostQrPayload_returnsError_andUiRemainsUsable"
+    start_time {
+      seconds: 1790631658
+      nanos: 137000000
+    }
+    end_time {
+      seconds: 1790631659
+      nanos: 593000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest-invalidHostQrPayload_returnsError_andUiRemainsUsable.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "QrImportUiSmokeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "validQrImportsBecomeVisibleAcrossManagersAfterRecreate"
+    start_time {
+      seconds: 1790631659
+      nanos: 595000000
+    }
+    end_time {
+      seconds: 1790631661
+      nanos: 956000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest-validQrImportsBecomeVisibleAcrossManagersAfterRecreate.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsSmokeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "exportQrDialogShowsPassphraseFieldsWhenSecretsEnabled"
+    start_time {
+      seconds: 1790631661
+      nanos: 958000000
+    }
+    end_time {
+      seconds: 1790631664
+      nanos: 874000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.SettingsSmokeTest-exportQrDialogShowsPassphraseFieldsWhenSecretsEnabled.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SettingsSmokeTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "toggleSettingsAndDropdowns_reflectsChanges"
+    start_time {
+      seconds: 1790631664
+      nanos: 876000000
+    }
+    end_time {
+      seconds: 1790631667
+      nanos: 942000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.SettingsSmokeTest-toggleSettingsAndDropdowns_reflectsChanges.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SmokeNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "drawerNavigation_showsAllCoreScreens"
+    start_time {
+      seconds: 1790631667
+      nanos: 943000000
+    }
+    end_time {
+      seconds: 1790631670
+      nanos: 155000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.SmokeNavigationTest-drawerNavigation_showsAllCoreScreens.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "SmokeNavigationTest"
+    test_package: "com.majordaftapps.sshpeaches.app.ui"
+    test_method: "drawerNavigation_canReturnHomeFromHosts"
+    start_time {
+      seconds: 1790631670
+      nanos: 157000000
+    }
+    end_time {
+      seconds: 1790631671
+      nanos: 388000000
+    }
+    device {
+      id: "emulator-5554"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/logcat-com.majordaftapps.sshpeaches.app.ui.SmokeNavigationTest-drawerNavigation_canReturnHomeFromHosts.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/cpuinfo"
+    }
+  }
+}
+output_artifact {
+  label {
+    label: "test-results.log"
+    namespace: "com.google.testing.platform.runtime.android.driver.AndroidInstrumentationDriver"
+  }
+  source_path {
+    path: "/opt/sshpeaches/app/build/outputs/androidTest-results/connected/debug/ci36(AVD) - 16/testlog/test-results.log"
+  }
+  type: TEST_DATA
+  mime_type: "text/plain"
+}

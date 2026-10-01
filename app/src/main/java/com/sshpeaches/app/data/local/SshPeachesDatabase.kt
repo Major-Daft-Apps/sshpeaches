@@ -13,11 +13,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         HostEntity::class,
         IdentityEntity::class,
         PortForwardEntity::class,
-        SnippetEntity::class,
-        HostUptimeConfigEntity::class,
-        HostUptimeSampleEntity::class
+        SnippetEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -26,8 +24,6 @@ abstract class SshPeachesDatabase : RoomDatabase() {
     abstract fun identityDao(): IdentityDao
     abstract fun portForwardDao(): PortForwardDao
     abstract fun snippetDao(): SnippetDao
-    abstract fun hostUptimeConfigDao(): HostUptimeConfigDao
-    abstract fun hostUptimeSampleDao(): HostUptimeSampleDao
 
     companion object {
         @Volatile private var instance: SshPeachesDatabase? = null
@@ -43,6 +39,7 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_6_8)
                     .addMigrations(MIGRATION_7_8)
                     .addMigrations(MIGRATION_8_9)
+                    .addMigrations(MIGRATION_9_10)
                     .build()
                     .also { instance = it }
             }
@@ -192,6 +189,13 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_host_uptime_samples_hostId_checkedAt` ON `host_uptime_samples`(`hostId`, `checkedAt`)"
                 )
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `host_uptime_samples`")
+                db.execSQL("DROP TABLE IF EXISTS `host_uptime_configs`")
             }
         }
 

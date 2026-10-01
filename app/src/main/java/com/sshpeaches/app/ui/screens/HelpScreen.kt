@@ -95,7 +95,7 @@ private fun HelpHeader(modifier: Modifier = Modifier) {
             Text("How to use SSHPeaches", style = MaterialTheme.typography.headlineSmall)
         }
         Text(
-            "Quick answers for the workflows people use most: connecting, keys, terminal input, file transfer, sharing, and common fixes.",
+            "The basics, in a few steps each.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -116,7 +116,7 @@ private fun HelpTopicCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -133,33 +133,15 @@ private fun HelpTopicCard(
                         modifier = Modifier.padding(10.dp)
                     )
                 }
-                Column(
+                Text(
+                    topic.title,
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(topic.title, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        topic.summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
 
             topic.steps.forEachIndexed { index, step ->
                 HelpInstructionRow(number = index + 1, text = step)
-            }
-
-            if (topic.tips.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    topic.tips.forEach { tip ->
-                        Text(
-                            text = tip,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
             }
         }
     }
@@ -213,9 +195,9 @@ private fun SupportCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Still stuck?", style = MaterialTheme.typography.titleMedium)
+            Text("Need more help?", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Open the support site for longer troubleshooting notes, release updates, and ways to report a reproducible issue.",
+                "Open the support site.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
@@ -233,82 +215,60 @@ private fun SupportCard(
 
 private data class HelpTopic(
     val title: String,
-    val summary: String,
     val icon: ImageVector,
     val tint: Color,
-    val steps: List<String>,
-    val tips: List<String> = emptyList()
+    val steps: List<String>
 )
 
 private fun helpTopics(): List<HelpTopic> = listOf(
     HelpTopic(
-        title = "Connect to a server",
-        summary = "Use Quick Connect for one-off access or Hosts for saved servers.",
+        title = "Connect",
         icon = Icons.Default.PlayArrow,
         tint = Color(0xFF2E7D32),
         steps = listOf(
-            "Open the drawer and tap Quick Connect for a temporary session, or open Hosts and tap + to save a server.",
-            "Enter host name or IP address, port, username, and the authentication method your server accepts.",
-            "For a saved host, use SSH for the terminal, SFTP for browsing files, or SCP for a focused copy workflow.",
-            "If connection fails, open the session log and check the exact host, port, username, network reachability, and server-side SSH settings."
+            "Menu → Quick Connect, or Hosts → + to save a server.",
+            "Enter host, port, username, and a password or key.",
+            "Tap connect. Use SSH for a terminal, SFTP or SCP for files."
         )
     ),
     HelpTopic(
-        title = "Set up keys and security",
-        summary = "Import or generate identities, then attach them to hosts.",
+        title = "Keys",
         icon = Icons.Default.Security,
         tint = Color(0xFF1565C0),
         steps = listOf(
-            "Open Identities and tap + to import an OpenSSH private key or create a new identity.",
-            "Open a host, set Auth to Identity or Password + Identity, and choose the identity to use.",
-            "When a host key prompt appears, compare the fingerprint with a trusted source before accepting it.",
-            "Use Settings > Security to enable PIN or biometric unlock before storing sensitive connection data."
-        ),
-        tips = listOf(
-            "Only clear a saved host key after you have verified the server really rotated its key."
+            "Identities → + to import or create a key.",
+            "On the host, set Auth to Identity and pick that key.",
+            "Check the fingerprint before you accept a new host key."
         )
     ),
     HelpTopic(
-        title = "Use the terminal",
-        summary = "Control the shell, paste text, and customize the compact key row.",
+        title = "Terminal",
         icon = Icons.Default.Keyboard,
         tint = PeachyOrange,
         steps = listOf(
-            "Double-tap the terminal to show or hide the system keyboard.",
-            "Use the compact key row for Esc, Tab, Ctrl, arrow/navigation keys, snippets, and custom sequences.",
-            "Paste with the Android paste menu, Ctrl+Shift+V on hardware keyboards, or clipboard suggestions above supported keyboards.",
-            "Open Keyboard Editor to replace any compact key with a letter, function key, modifier combo, saved sequence, snippet picker, or password injection action."
+            "Tap the terminal to type.",
+            "Use the extra keys for Esc, Ctrl, Tab, and arrows.",
+            "Keyboard Editor changes those keys."
         )
     ),
     HelpTopic(
-        title = "Move files and automate work",
-        summary = "Use SFTP/SCP for transfer, snippets for repeated commands, and QR for local sharing.",
+        title = "Files",
         icon = Icons.Default.FolderOpen,
         tint = Color(0xFFEF6C00),
         steps = listOf(
-            "Tap SFTP on a host when you need to browse remote directories, create folders, rename, delete, upload, or download.",
-            "Tap SCP when you already know what you want to copy and need a direct upload/download workflow.",
-            "Open Snippets to save reusable commands, then run them against an active SSH session or expose them from the terminal key row.",
-            "Use QR export/import from Hosts, Identities, Port Forwards, Snippets, or Settings > Transfer data to move local configuration between devices."
-        ),
-        tips = listOf(
-            "Encrypted QR exports require the same passphrase during import. SSHPeaches does not upload these transfers to cloud storage."
+            "Open a host with SFTP to browse, upload, or download.",
+            "Use SCP when you already know the path to copy.",
+            "Snippets save commands you run often."
         )
     ),
     HelpTopic(
-        title = "Fix common problems",
-        summary = "Start with the symptom, then verify the smallest thing that could be wrong.",
+        title = "If it fails",
         icon = Icons.Default.Warning,
         tint = Color(0xFFC62828),
         steps = listOf(
-            "Connection refused or timed out: verify the server is reachable from this device, the port is correct, and a firewall is not blocking SSH.",
-            "Password keeps failing: confirm the username, password, server PasswordAuthentication setting, and whether the server requires a key instead.",
-            "Identity login fails: re-import the key, confirm its passphrase, and check that the matching public key is in authorized_keys on the server.",
-            "Transfers fail: confirm the remote path exists, your account has permission, and the local destination is writable.",
-            "Background sessions stop: enable Run shells in background, allow notifications, and relax Android battery restrictions for SSHPeaches."
-        ),
-        tips = listOf(
-            "For a useful bug report, include the action you took, Android version, connection mode, and the visible error text from the session log."
+            "Can't connect: check host, port, and network.",
+            "Login fails: check username, password, or key.",
+            "Files fail: check the path and permissions."
         )
     )
 )

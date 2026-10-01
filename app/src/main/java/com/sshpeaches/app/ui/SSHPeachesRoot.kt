@@ -142,7 +142,6 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalFont
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
-import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.local.Converters
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
@@ -154,6 +153,8 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
 import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
+import com.majordaftapps.sshpeaches.app.ui.components.SessionColorProfileButton
+import com.majordaftapps.sshpeaches.app.ui.components.resolveSessionTerminalProfileId
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
@@ -176,7 +177,6 @@ import com.majordaftapps.sshpeaches.app.ui.screens.SnippetEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.SnippetManagerScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeEditorScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ThemeProfileEditorScreen
-import com.majordaftapps.sshpeaches.app.ui.screens.UptimeScreen
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.state.AppUiState
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -254,16 +254,12 @@ data class SSHPeachesRootActions(
     val onSetPin: (String) -> Unit,
     val onClearPin: () -> Unit,
     val onLockApp: () -> Unit,
-    val onUnlockWithPin: (String) -> Boolean,
+    val onUnlockWithPin: suspend (String) -> String?,
     val onBiometricUnlock: () -> Unit,
+    val onSecurityNoticeShown: () -> Unit,
     val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
     val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
     val onHostDelete: (String) -> Unit,
-    val onAddHostToUptime: (String) -> Unit,
-    val onUpdateUptimeConfig: (String, UptimeCheckMethod, Int, Int, Boolean) -> Unit,
-    val onSetUptimeEnabled: (String, Boolean) -> Unit,
-    val onRemoveHostFromUptime: (String) -> Unit,
-    val onRefreshUptime: (String?) -> Unit,
     val onImportHost: (HostConnection) -> Unit,
     val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
     val onHostInfoCommandsChange: (String, List<String>) -> Unit,
@@ -283,9 +279,10 @@ data class SSHPeachesRootActions(
     val onImportIdentityKeyPlain: (String, String) -> Boolean,
     val onStoreIdentityPublicKey: (String, String) -> Boolean,
     val onImportIdentityPublicKey: (String, String) -> Boolean,
-    val onStoreIdentityKeyPassphrase: (String, String?) -> Unit,
+    val onStoreIdentityKeyPassphrase: (String, String?) -> Boolean,
     val onImportIdentityKeyPassphrasePayload: (String, String, String) -> Boolean,
-    val onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> Boolean,
+    /** Returns null on success, or why copying failed. */
+    val onCopyIdentityKeyToHost: suspend (String, String, String?, String?) -> String?,
     val onRemoveIdentityKey: (String) -> Unit,
     val onKeyboardSlotChange: (Int, KeyboardSlotAction) -> Unit,
     val onImportKeyboardLayout: (List<KeyboardSlotAction>) -> Unit,
@@ -301,6 +298,7 @@ data class SSHPeachesRootActions(
     val onMarkPortForwardUsed: (String) -> Unit,
     val onMarkSnippetUsed: (String) -> Unit,
     val onSendSessionShortcut: (String, String) -> Unit,
+    val onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
     val onSendShellBytes: (String, ByteArray) -> Unit,
     val onResizeShell: (String, Int, Int) -> Unit,
     val onListSftpDirectory: (String, String) -> Unit,
@@ -407,14 +405,10 @@ fun SSHPeachesRoot(
     val onLockApp = actions.onLockApp
     val onUnlockWithPin = actions.onUnlockWithPin
     val onBiometricUnlock = actions.onBiometricUnlock
+    val onSecurityNoticeShown = actions.onSecurityNoticeShown
     val onHostAdd = actions.onHostAdd
     val onHostUpdate = actions.onHostUpdate
     val onHostDelete = actions.onHostDelete
-    val onAddHostToUptime = actions.onAddHostToUptime
-    val onUpdateUptimeConfig = actions.onUpdateUptimeConfig
-    val onSetUptimeEnabled = actions.onSetUptimeEnabled
-    val onRemoveHostFromUptime = actions.onRemoveHostFromUptime
-    val onRefreshUptime = actions.onRefreshUptime
     val onImportHost = actions.onImportHost
     val onHostInfoCommandsChange = actions.onHostInfoCommandsChange
     val onPortForwardAdd = actions.onPortForwardAdd
@@ -450,6 +444,7 @@ fun SSHPeachesRoot(
     val onMarkPortForwardUsed = actions.onMarkPortForwardUsed
     val onMarkSnippetUsed = actions.onMarkSnippetUsed
     val onSendSessionShortcut = actions.onSendSessionShortcut
+    val onFetchHostSystemInfo = actions.onFetchHostSystemInfo
     val onSendShellBytes = actions.onSendShellBytes
     val onResizeShell = actions.onResizeShell
     val onMoveRuntimeSessionPassword = actions.onMoveRuntimeSessionPassword
@@ -499,9 +494,9 @@ fun SSHPeachesRoot(
     val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
     val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val sessionTerminalProfileOverrides = remember { mutableStateMapOf<String, String>() }
     val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val suppressHomeWelcomeOnReturn = rememberSaveable { mutableStateOf(false) }
-    val uptimeAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostEditRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val hostEditRequestId = rememberSaveable { mutableStateOf<String?>(null) }
     val hostImportRequestToken = rememberSaveable { mutableIntStateOf(0) }
@@ -541,8 +536,6 @@ fun SSHPeachesRoot(
     val rawQuickConnectRequest = quickConnectRequest.value
     val snippetRunSelection = remember { mutableStateOf<Snippet?>(null) }
     val snippetRunTargetHostId = remember { mutableStateOf<String?>(null) }
-    val snippetRunInProgress = remember { mutableStateOf(false) }
-    val snippetRunResult = remember { mutableStateOf<SnippetRunResult?>(null) }
 
     fun quickRequestFromSnapshot(
         snapshot: com.majordaftapps.sshpeaches.app.service.SessionService.SessionSnapshot,
@@ -567,6 +560,13 @@ fun SSHPeachesRoot(
             initialFileTransferEntryMode = fileTransferEntryMode
         )
     }
+
+    fun resolvedSessionTerminalProfileId(request: QuickConnectRequest?): String? =
+        resolveSessionTerminalProfileId(
+            sessionId = request?.sessionId,
+            requestProfileId = request?.terminalProfileId,
+            overrides = sessionTerminalProfileOverrides
+        )
 
     fun reconcileQuickConnectRequest(
         current: QuickConnectRequest,
@@ -690,7 +690,6 @@ fun SSHPeachesRoot(
         } ?: "Connecting"
         Routes.HELP -> "Help"
         Routes.HOSTS -> "Hosts"
-        Routes.UPTIME -> "Uptime"
         Routes.IDENTITIES -> "Identities"
         Routes.FORWARDS -> "Port Forwards"
         Routes.SNIPPETS -> "Snippets"
@@ -714,6 +713,36 @@ fun SSHPeachesRoot(
     LaunchedEffect(currentRoute) {
         if (!isActualSessionVerticalRoute) {
             routeBeforeConnecting.value = currentRoute
+        }
+    }
+
+    // One-shot request tokens ("open Add host", "open Find", ...) are handled by their screen on
+    // arrival. A later fresh visit starts that screen with nothing handled and re-ran the stale
+    // token (dialogs and scanners reopening by themselves), so clear a screen's tokens once the
+    // user leaves it. Rotation keeps the route and the screen's saved "handled" marker.
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != Routes.HOSTS) {
+            hostAddRequestToken.intValue = 0
+            hostEditRequestToken.intValue = 0
+            hostImportRequestToken.intValue = 0
+        }
+        if (currentRoute != Routes.IDENTITIES) {
+            identityAddRequestToken.intValue = 0
+            identityEditRequestToken.intValue = 0
+            identityImportRequestToken.intValue = 0
+        }
+        if (currentRoute != Routes.FORWARDS) {
+            forwardAddRequestToken.intValue = 0
+            forwardEditRequestToken.intValue = 0
+            forwardImportRequestToken.intValue = 0
+        }
+        if (currentRoute != Routes.SNIPPETS) {
+            snippetAddRequestToken.intValue = 0
+            snippetEditRequestToken.intValue = 0
+            snippetImportRequestToken.intValue = 0
+        }
+        if (!isActualSessionVerticalRoute) {
+            connectingFindRequestToken.intValue = 0
         }
     }
 
@@ -777,6 +806,17 @@ fun SSHPeachesRoot(
     LaunchedEffect(quickConnectRequest.value?.sessionId) {
         sawSnapshotForCurrentRequest.value = false
         connectedHostBarCollapsed.value = false
+    }
+
+    LaunchedEffect(
+        sessions.map { it.hostId }.toSet(),
+        quickConnectRequest.value?.sessionId
+    ) {
+        val liveSessionIds = sessions.map { it.hostId }.toSet() +
+            setOfNotNull(quickConnectRequest.value?.sessionId)
+        sessionTerminalProfileOverrides.keys
+            .filter { it !in liveSessionIds }
+            .forEach { sessionTerminalProfileOverrides.remove(it) }
     }
 
     LaunchedEffect(rawQuickConnectRequest, currentQuickConnectSnapshot) {
@@ -894,6 +934,18 @@ fun SSHPeachesRoot(
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
+    LaunchedEffect(uiState.securityNotice) {
+        val notice = uiState.securityNotice ?: return@LaunchedEffect
+        // Show from the root scope: consuming the notice re-keys this effect and would cancel it.
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                message = notice,
+                withDismissAction = true,
+                duration = SnackbarDuration.Long
+            )
+        }
+        onSecurityNoticeShown()
+    }
     val showSuccessMessage: (String) -> Unit = { message ->
         scope.launch {
             snackbarHostState.showSnackbar(
@@ -927,6 +979,45 @@ fun SSHPeachesRoot(
             .plus(host.attachedForwards)
             .distinct()
             .forEach(onMarkPortForwardUsed)
+    }
+
+    fun executeSnippetOnSession(snippet: Snippet, sessionId: String) {
+        val payload = com.majordaftapps.sshpeaches.app.util.snippetCommandToTerminalPayload(snippet.command)
+        if (payload.isBlank()) {
+            showMessage("Snippet command is empty.")
+            snippetRunSelection.value = null
+            return
+        }
+        onMarkSnippetUsed(snippet.id)
+        onSendSessionShortcut(sessionId, payload)
+        snippetRunSelection.value = null
+        val snapshot = sessions.firstOrNull { it.hostId == sessionId } ?: return
+        pendingConnectingNavigation.value = false
+        quickConnectRequest.value = quickRequestFromSnapshot(snapshot)
+        quickConnectState.value = quickConnectUiStateFromSnapshot(snapshot, snapshot.host)
+        scope.launch {
+            drawerState.close()
+            navController.navigate(routeForSnapshot(snapshot)) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    fun beginSnippetRun(snippet: Snippet) {
+        if (activeSshSessions.isEmpty()) {
+            showMessage("Open an SSH session first, then run the snippet.")
+            return
+        }
+        if (activeSshSessions.size == 1) {
+            executeSnippetOnSession(snippet, activeSshSessions.first().hostId)
+            return
+        }
+        val preferredSessionId = quickConnectRequest.value?.sessionId
+        snippetRunTargetHostId.value = activeSshSessions
+            .firstOrNull { it.hostId == preferredSessionId }
+            ?.hostId
+            ?: activeSshSessions.first().hostId
+        snippetRunSelection.value = snippet
     }
 
     fun markRequestUsage(request: QuickConnectRequest) {
@@ -1001,7 +1092,7 @@ fun SSHPeachesRoot(
     }
 
     fun importTransferPayloadFromQr(encodedPayload: String, passphrase: String?): String {
-        val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export QR payload."
+        val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export payload."
 
         var importedHosts = 0
         var importedIdentities = 0
@@ -1019,11 +1110,14 @@ fun SSHPeachesRoot(
         val existingIdentityByFingerprint = uiState.identities
             .associateBy { it.fingerprint.trim() }
             .toMutableMap()
+        // Imports always bind to 127.0.0.1 (an imported config must not expose a port), so match
+        // existing forwards ignoring their bind address; otherwise a forward with a custom bind
+        // address never matched its own export and was duplicated on every re-import.
         val existingForwardByKey = uiState.portForwards
             .associateBy {
                 forwardTransferKey(
                     label = it.label,
-                    sourceHost = it.sourceHost,
+                    sourceHost = "127.0.0.1",
                     sourcePort = it.sourcePort,
                     destinationHost = it.destinationHost,
                     destinationPort = it.destinationPort
@@ -1033,6 +1127,9 @@ fun SSHPeachesRoot(
         val existingSnippetByKey = uiState.snippets
             .associateBy { snippetTransferKey(it.title, it.command) }
             .toMutableMap()
+        val localIdentityIds = uiState.identities.map { it.id }.toSet()
+        val localForwardIds = uiState.portForwards.map { it.id }.toSet()
+        val localSnippetIds = uiState.snippets.map { it.id }.toSet()
         val identityIdMap = mutableMapOf<String, String>()
         val forwardIdMap = mutableMapOf<String, String>()
         val snippetIdMap = mutableMapOf<String, String>()
@@ -1222,16 +1319,17 @@ fun SSHPeachesRoot(
                         ),
                         notes = item.optString("notes"),
                         defaultMode = defaultMode,
+                        // Keep only references that resolve to an imported or existing item.
                         attachedForwards = jsonStringList(item.optJSONArray("attachedForwards"))
-                            .map { forwardIdMap[it] ?: it },
+                            .mapNotNull { forwardIdMap[it] ?: it.takeIf { id -> id in localForwardIds } },
                         snippets = jsonStringList(item.optJSONArray("snippets"))
-                            .map { snippetIdMap[it] ?: it },
+                            .mapNotNull { snippetIdMap[it] ?: it.takeIf { id -> id in localSnippetIds } },
                         hasPassword = false,
                         useMosh = item.optBoolean("useMosh", false),
                         preferredIdentityId = item.optString("preferredIdentityId").trim().ifBlank { null }
-                            ?.let { identityIdMap[it] ?: it },
+                            ?.let { identityIdMap[it] ?: it.takeIf { id -> id in localIdentityIds } },
                         preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
-                            ?.let { forwardIdMap[it] ?: it },
+                            ?.let { forwardIdMap[it] ?: it.takeIf { id -> id in localForwardIds } },
                         startupScript = "",
                         backgroundBehavior = runCatching {
                             BackgroundBehavior.valueOf(
@@ -1298,6 +1396,10 @@ fun SSHPeachesRoot(
                 settings.optBoolean("useBuiltInKeyboard", uiState.useBuiltInKeyboard)
             )
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
+            // Host-key policy and the mosh server command are deliberately not imported (a shared
+            // export must not weaken host-key checks or run commands); auto-starting forwards is
+            // harmless, so restore it.
+            onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
             )
@@ -1462,7 +1564,7 @@ fun SSHPeachesRoot(
             fileTransferProgresses[current.sessionId]
         }
         val activeTerminalProfile = uiState.terminalProfiles.firstOrNull {
-            it.id == request?.terminalProfileId
+            it.id == resolvedSessionTerminalProfileId(request)
         } ?: uiState.terminalProfiles.firstOrNull {
             it.id == uiState.defaultTerminalProfileId
         } ?: uiState.terminalProfiles.firstOrNull()
@@ -1593,6 +1695,18 @@ fun SSHPeachesRoot(
         }
         when (destination.route) {
             Routes.ABOUT -> showAbout.value = true
+            Routes.HOME -> {
+                val returnedHome = navController.popBackStack(
+                    Routes.HOME,
+                    inclusive = false,
+                    saveState = true
+                )
+                if (!returnedHome && navController.currentDestination?.route != Routes.HOME) {
+                    navController.navigate(Routes.HOME) {
+                        launchSingleTop = true
+                    }
+                }
+            }
             else -> {
                 navController.navigate(destination.route) {
                     popUpTo(Routes.HOME) { saveState = true }
@@ -1627,13 +1741,12 @@ fun SSHPeachesRoot(
                 val shortcutRoute = when (event.keyCode) {
                     KeyEvent.KEYCODE_1 -> Routes.HOME
                     KeyEvent.KEYCODE_2 -> Routes.HOSTS
-                    KeyEvent.KEYCODE_3 -> Routes.UPTIME
-                    KeyEvent.KEYCODE_4 -> Routes.IDENTITIES
-                    KeyEvent.KEYCODE_5 -> Routes.FORWARDS
-                    KeyEvent.KEYCODE_6 -> Routes.SNIPPETS
-                    KeyEvent.KEYCODE_7 -> Routes.KEYBOARD
-                    KeyEvent.KEYCODE_8 -> Routes.THEME_EDITOR
-                    KeyEvent.KEYCODE_9 -> Routes.SETTINGS
+                    KeyEvent.KEYCODE_3 -> Routes.IDENTITIES
+                    KeyEvent.KEYCODE_4 -> Routes.FORWARDS
+                    KeyEvent.KEYCODE_5 -> Routes.SNIPPETS
+                    KeyEvent.KEYCODE_6 -> Routes.KEYBOARD
+                    KeyEvent.KEYCODE_7 -> Routes.THEME_EDITOR
+                    KeyEvent.KEYCODE_8 -> Routes.SETTINGS
                     else -> null
                 }
                 if (shortcutRoute != null) {
@@ -1649,13 +1762,12 @@ fun SSHPeachesRoot(
     }
 
     DisposableEffect(activity, isSessionVerticalRoute, uiState.isLocked) {
+        val handler: (KeyEvent) -> Boolean = { event -> updatedGlobalShortcutHandler.value(event) }
         if (!isSessionVerticalRoute) {
-            activity?.setHardwareKeyHandler { event -> updatedGlobalShortcutHandler.value(event) }
+            activity?.setHardwareKeyHandler(handler)
         }
         onDispose {
-            if (!isSessionVerticalRoute) {
-                activity?.setHardwareKeyHandler(null)
-            }
+            activity?.clearHardwareKeyHandler(handler)
         }
     }
 
@@ -1714,24 +1826,6 @@ fun SSHPeachesRoot(
                                         ) {
                                             Icon(Icons.Default.PlayArrow, contentDescription = "Quick Connect")
                                         }
-                                        val activeSnapshot = quickConnectRequest.value?.let { request ->
-                                            sessions.firstOrNull { it.hostId == request.sessionId }
-                                        }
-                                        if (activeSnapshot != null) {
-                                            IconButton(
-                                                onClick = {
-                                                    pendingConnectingNavigation.value = false
-                                                    navController.navigate(routeForSnapshot(activeSnapshot)) {
-                                                        launchSingleTop = true
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                    contentDescription = "Open active session"
-                                                )
-                                            }
-                                        }
                                     }
                                     if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
@@ -1746,6 +1840,15 @@ fun SSHPeachesRoot(
                                                     contentDescription = "Find"
                                                 )
                                             }
+                                            val sessionId = activeSessionRequest.sessionId
+                                            SessionColorProfileButton(
+                                                profiles = uiState.terminalProfiles,
+                                                selectedProfileId = resolvedSessionTerminalProfileId(activeSessionRequest)
+                                                    ?: uiState.defaultTerminalProfileId,
+                                                onSelectProfile = { profileId ->
+                                                    sessionTerminalProfileOverrides[sessionId] = profileId
+                                                }
+                                            )
                                         }
                                         IconButton(
                                             onClick = { closeCurrentConnectingSession() },
@@ -1780,18 +1883,6 @@ fun SSHPeachesRoot(
                                                 modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.HOSTS))
                                             ) {
                                                 Icon(Icons.Default.Add, contentDescription = "Add host")
-                                            }
-                                        }
-                                        Routes.UPTIME -> {
-                                            val hasAvailableUptimeHost = uiState.hosts.any { host ->
-                                                uiState.uptimeSummaries.none { summary -> summary.host.id == host.id }
-                                            }
-                                            IconButton(
-                                                onClick = { uptimeAddRequestToken.intValue += 1 },
-                                                enabled = hasAvailableUptimeHost,
-                                                modifier = Modifier.testTag(UiTestTags.topBarAdd(Routes.UPTIME))
-                                            ) {
-                                                Icon(Icons.Default.Add, contentDescription = "Add uptime host")
                                             }
                                         }
                                         Routes.IDENTITIES -> {
@@ -1916,6 +2007,7 @@ fun SSHPeachesRoot(
                                         fileTransferEntryMode = fileTransferEntryMode
                                     )
                                 },
+                                onFetchHostSystemInfo = onFetchHostSystemInfo,
                                 onRunInfoCommand = { host, command ->
                                     val activeSshSession = sessions.firstOrNull {
                                         it.host.id == host.id &&
@@ -1977,16 +2069,7 @@ fun SSHPeachesRoot(
                                 },
                                 onDeletePortForward = onPortForwardDelete,
                                 onRunSnippet = { snippet ->
-                                    if (activeSshSessions.isEmpty()) {
-                                        showMessage("No active SSH session to run snippet.")
-                                    } else {
-                                        val preferredSessionId = quickConnectRequest.value?.sessionId
-                                        snippetRunTargetHostId.value = activeSshSessions
-                                            .firstOrNull { it.hostId == preferredSessionId }
-                                            ?.hostId
-                                            ?: activeSshSessions.first().hostId
-                                        snippetRunSelection.value = snippet
-                                    }
+                                    beginSnippetRun(snippet)
                                 },
                                 onEditSnippet = { snippetId ->
                                     scope.launch {
@@ -2086,6 +2169,7 @@ fun SSHPeachesRoot(
                                 )
                             },
                             activeSshSessionHostIds = activeSshSessionHostIds,
+                            onFetchHostSystemInfo = onFetchHostSystemInfo,
                             onRunInfoCommand = { host, command ->
                                 val activeSshSession = sessions.firstOrNull {
                                     it.host.id == host.id &&
@@ -2104,18 +2188,6 @@ fun SSHPeachesRoot(
                             onInfoCommandsChange = { host, commands ->
                                 onHostInfoCommandsChange(host.id, commands)
                             }
-                        )
-                    }
-                    composable(Routes.UPTIME) {
-                        UptimeScreen(
-                            hosts = uiState.hosts,
-                            summaries = uiState.uptimeSummaries,
-                            addRequestKey = uptimeAddRequestToken.intValue,
-                            onAddHost = onAddHostToUptime,
-                            onUpdateConfig = onUpdateUptimeConfig,
-                            onSetEnabled = onSetUptimeEnabled,
-                            onRemoveHost = onRemoveHostFromUptime,
-                            onRefreshHost = onRefreshUptime
                         )
                     }
                     composable(Routes.IDENTITIES) {
@@ -2183,16 +2255,7 @@ fun SSHPeachesRoot(
                                 onImportFromQr = { showMessage("Snippet imported from QR") },
                                 onEmptyStateVisibleChanged = { emptyStateByRoute[Routes.SNIPPETS] = it },
                                 onRun = { snippet ->
-                                    if (activeSshSessions.isEmpty()) {
-                                        showMessage("No active SSH session to run snippet.")
-                                    } else {
-                                        val preferredSessionId = quickConnectRequest.value?.sessionId
-                                        snippetRunTargetHostId.value = activeSshSessions
-                                            .firstOrNull { it.hostId == preferredSessionId }
-                                            ?.hostId
-                                            ?: activeSshSessions.first().hostId
-                                        snippetRunSelection.value = snippet
-                                    }
+                                    beginSnippetRun(snippet)
                                 }
                             )
                         }
@@ -2422,6 +2485,8 @@ fun SSHPeachesRoot(
                 biometricAvailable = biometricAvailable,
                 onUnlockWithPin = onUnlockWithPin,
                 onBiometricUnlock = onBiometricUnlock,
+                onBackPressed = { activity?.moveTaskToBack(true) },
+                externalMessage = uiState.lockScreenMessage,
                 modifier = Modifier.zIndex(1f)
             )
         }
@@ -2468,13 +2533,12 @@ fun SSHPeachesRoot(
                     Text("F1  Help")
                     Text("Alt+1  Home")
                     Text("Alt+2  Hosts")
-                    Text("Alt+3  Uptime")
-                    Text("Alt+4  Identities")
-                    Text("Alt+5  Port Forwards")
-                    Text("Alt+6  Snippets")
-                    Text("Alt+7  Keyboard Editor")
-                    Text("Alt+8  Theme Editor")
-                    Text("Alt+9  Settings")
+                    Text("Alt+3  Identities")
+                    Text("Alt+4  Port Forwards")
+                    Text("Alt+5  Snippets")
+                    Text("Alt+6  Keyboard Editor")
+                    Text("Alt+7  Theme Editor")
+                    Text("Alt+8  Settings")
                 }
             },
             confirmButton = {
@@ -2603,7 +2667,8 @@ fun SSHPeachesRoot(
     } else {
         null
     }
-    hostKeyPrompt?.let { prompt ->
+    // Held back while locked: dialogs open in their own windows and would sit above the lock.
+    hostKeyPrompt?.takeIf { !uiState.isLocked }?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
             modifier = Modifier.testTag(UiTestTags.HOST_KEY_PROMPT_DIALOG),
@@ -2667,7 +2732,7 @@ fun SSHPeachesRoot(
             keyboardController?.show()
         }
     }
-    passwordPrompt?.let { prompt ->
+    passwordPrompt?.takeIf { !uiState.isLocked }?.let { prompt ->
         AlertDialog(
             onDismissRequest = {},
             modifier = Modifier.testTag(UiTestTags.PASSWORD_PROMPT_DIALOG),
@@ -2742,14 +2807,12 @@ fun SSHPeachesRoot(
         )
     }
 
-    snippetRunSelection.value?.let { snippet ->
+    snippetRunSelection.value?.takeIf { !uiState.isLocked }?.let { snippet ->
         val selectedSession = activeSshSessions.firstOrNull { it.hostId == snippetRunTargetHostId.value }
             ?: activeSshSessions.firstOrNull()
         AlertDialog(
             onDismissRequest = {
-                if (!snippetRunInProgress.value) {
-                    snippetRunSelection.value = null
-                }
+                snippetRunSelection.value = null
             },
             title = { Text("Run Snippet") },
             text = {
@@ -2776,7 +2839,7 @@ fun SSHPeachesRoot(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .clickable(enabled = !snippetRunInProgress.value) {
+                                        .clickable {
                                             snippetRunTargetHostId.value = session.hostId
                                         }
                                         .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -2785,11 +2848,8 @@ fun SSHPeachesRoot(
                                     RadioButton(
                                         selected = selected,
                                         onClick = {
-                                            if (!snippetRunInProgress.value) {
-                                                snippetRunTargetHostId.value = session.hostId
-                                            }
+                                            snippetRunTargetHostId.value = session.hostId
                                         },
-                                        enabled = !snippetRunInProgress.value
                                     )
                                     Column(
                                         modifier = Modifier
@@ -2810,114 +2870,26 @@ fun SSHPeachesRoot(
             },
             confirmButton = {
                 Button(
-                    enabled = !snippetRunInProgress.value && selectedSession != null,
+                    enabled = selectedSession != null,
                     onClick = {
                         val target = activeSshSessions.firstOrNull { it.hostId == snippetRunTargetHostId.value }
                             ?: activeSshSessions.firstOrNull()
                         if (target == null) {
                             snippetRunSelection.value = null
-                            showMessage("No active SSH session to run snippet.")
+                            showMessage("Open an SSH session first, then run the snippet.")
                             return@Button
                         }
-                        val marker = "__SSHPEACHES_SNIPPET_DONE_${UUID.randomUUID().toString().replace("-", "")}__"
-                        val payload = buildSnippetRunCommandPayload(snippet.command, marker)
-                        if (payload.isBlank()) {
-                            snippetRunSelection.value = null
-                            showMessage("Snippet command is empty.")
-                            return@Button
-                        }
-                        scope.launch {
-                            snippetRunInProgress.value = true
-                            try {
-                                onMarkSnippetUsed(snippet.id)
-                                val timeoutSeconds = uiState.snippetRunTimeoutSeconds.coerceIn(1, 60)
-                                val baselineOutput = shellOutputs[target.hostId].orEmpty()
-                                var latestDelta = ""
-                                onSendSessionShortcut(target.hostId, payload)
-                                val deltaUntilMarker = withTimeoutOrNull(timeoutSeconds * 1_000L) {
-                                    snapshotFlow { shellOutputs[target.hostId].orEmpty() }
-                                        .map { output ->
-                                            extractShellDelta(
-                                                previousOutput = baselineOutput,
-                                                latestOutput = output
-                                            ).also { delta -> latestDelta = delta }
-                                        }
-                                        .first { it.contains(marker) }
-                                }
-                                val rawOutput = if (deltaUntilMarker != null) {
-                                    deltaUntilMarker.substringBefore(marker)
-                                } else {
-                                    latestDelta
-                                }
-                                val hostLabel = target.host.name.ifBlank {
-                                    "${target.host.username}@${target.host.host}"
-                                }
-                                snippetRunResult.value = SnippetRunResult(
-                                    snippetTitle = snippet.title.ifBlank { "Snippet" },
-                                    hostLabel = hostLabel,
-                                    output = sanitizeSnippetOutput(rawOutput).ifBlank { "(no output)" },
-                                    timedOut = deltaUntilMarker == null,
-                                    timeoutSeconds = timeoutSeconds
-                                )
-                            } catch (error: Throwable) {
-                                showMessage("Failed to run snippet: ${error.message ?: "unknown error"}")
-                            } finally {
-                                snippetRunInProgress.value = false
-                                snippetRunSelection.value = null
-                            }
-                        }
+                        executeSnippetOnSession(snippet, target.hostId)
                     }
                 ) {
-                    Text(if (snippetRunInProgress.value) "Running..." else "Run")
+                    Text("Run")
                 }
             },
             dismissButton = {
                 TextButton(
-                    enabled = !snippetRunInProgress.value,
                     onClick = { snippetRunSelection.value = null }
                 ) {
                     Text("Cancel")
-                }
-            }
-        )
-    }
-
-    snippetRunResult.value?.let { result ->
-        AlertDialog(
-            onDismissRequest = { snippetRunResult.value = null },
-            title = { Text(if (result.timedOut) "Snippet Timed Out" else "Snippet Result") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "${result.snippetTitle} on ${result.hostLabel}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    if (result.timedOut) {
-                        Text(
-                            "Command did not finish in ${result.timeoutSeconds}s.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp),
-                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = result.output,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .padding(12.dp)
-                                .verticalScroll(rememberScrollState())
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { snippetRunResult.value = null }) {
-                    Text("Close")
                 }
             }
         )
@@ -2927,6 +2899,7 @@ fun SSHPeachesRoot(
         val website = context.getString(R.string.project_website)
         val supportUrl = context.getString(R.string.support_url)
         val privacy = context.getString(R.string.privacy_policy_url)
+        val sourceCode = context.getString(R.string.source_code_url)
         AboutDialog(
             onDismiss = { showAbout.value = false },
             onOpenWebsite = {
@@ -2941,6 +2914,9 @@ fun SSHPeachesRoot(
             onOpenSourceLicenses = {
                 showAbout.value = false
                 navController.navigate(Routes.OPEN_SOURCE_LICENSES)
+            },
+            onOpenSourceCode = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, sourceCode.toUri()))
             }
         )
     }
@@ -3020,44 +2996,6 @@ private fun quickConnectHost(request: QuickConnectRequest): HostConnection =
         startupScript = request.script,
         terminalProfileId = request.terminalProfileId
     )
-
-private data class SnippetRunResult(
-    val snippetTitle: String,
-    val hostLabel: String,
-    val output: String,
-    val timedOut: Boolean,
-    val timeoutSeconds: Int
-)
-
-private fun buildSnippetRunCommandPayload(command: String, marker: String): String {
-    val trimmedCommand = command.trimEnd()
-    if (trimmedCommand.isBlank()) return ""
-    return buildString {
-        append(trimmedCommand)
-        append("\n")
-        append("printf \"\\n")
-        append(marker)
-        append("\\n\"\n")
-    }
-}
-
-private fun extractShellDelta(previousOutput: String, latestOutput: String): String {
-    return if (latestOutput.startsWith(previousOutput)) {
-        latestOutput.substring(previousOutput.length)
-    } else {
-        latestOutput
-    }
-}
-
-private val ansiEscapeRegex = Regex("\\u001B\\[[;?0-9]*[ -/]*[@-~]")
-
-private fun sanitizeSnippetOutput(value: String): String {
-    return value
-        .replace("\u0000", "")
-        .replace("\r", "")
-        .replace(ansiEscapeRegex, "")
-        .trim()
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -3406,7 +3344,8 @@ internal fun AboutDialog(
     onOpenWebsite: () -> Unit,
     onOpenSupport: () -> Unit,
     onOpenPrivacy: () -> Unit,
-    onOpenSourceLicenses: () -> Unit
+    onOpenSourceLicenses: () -> Unit,
+    onOpenSourceCode: () -> Unit
 ) {
     val makerLogo = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
         R.drawable.major_daft_apps_white
@@ -3460,6 +3399,22 @@ internal fun AboutDialog(
                     )
                 }
                 Text("License: GPL-3.0")
+                // GPL-3.0: point to where the source is published.
+                Row(
+                    modifier = Modifier
+                        .testTag(UiTestTags.ABOUT_SOURCE_LINK)
+                        .clickable(onClick = onOpenSourceCode),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_github),
+                        contentDescription = "GitHub",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text("Source code", color = MaterialTheme.colorScheme.primary)
+                }
                 Text(
                     "Open Source License Notices",
                     color = MaterialTheme.colorScheme.primary,
@@ -3519,8 +3474,10 @@ internal fun encodeTransferPayloadEnvelope(payload: String): String {
 }
 
 internal fun decodeTransferPayloadEnvelope(encodedPayload: String): String? {
+    val trimmed = encodedPayload.trim().removePrefix("\uFEFF").trim()
+    if (trimmed.startsWith("{")) return trimmed
     val decodedBytes = runCatching {
-        Base64.getDecoder().decode(encodedPayload.trim())
+        Base64.getDecoder().decode(trimmed)
     }.getOrNull() ?: return null
     val payloadBytes = if (decodedBytes.isGzipPayload()) {
         runCatching {

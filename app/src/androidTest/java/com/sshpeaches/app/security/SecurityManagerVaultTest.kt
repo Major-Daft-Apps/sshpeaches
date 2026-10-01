@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.security
 
 import android.content.SharedPreferences
+import androidx.security.crypto.MasterKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -8,6 +9,7 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.testutil.AppStateResetRule
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
+import java.security.KeyStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -34,6 +36,86 @@ class SecurityManagerVaultTest {
         assertNotNull(prefs.getString("pwd_${host.id}", null))
         assertNull(prefs.getString("vault_pwd_${host.id}", null))
         assertEquals("hunter2", SecurityManager.getHostPassword(host.id))
+    }
+
+    @Test
+    fun setPinLeavesAppUnlockedAndVaultReadable() {
+        val host = hostFixture("unlocked-after-pin-host")
+        AppStateSeeder.seedHost(host, password = "keep-me")
+
+        SecurityManager.setPin("2468")
+
+        assertTrue(SecurityManager.isPinSet())
+        assertFalse(SecurityManager.isLocked())
+        assertEquals("keep-me", SecurityManager.getHostPassword(host.id))
+        assertTrue(SecurityManager.verifyPin("2468"))
+        assertFalse(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun setPinStoresNoFastPinHash() {
+        SecurityManager.setPin("2468")
+
+        // The PIN-wrapped vault key is the only verifier; a plain salted hash was an offline oracle.
+        assertFalse(securePrefs().contains("pin_hash"))
+        assertFalse(securePrefs().contains("pin_salt"))
+        SecurityManager.lock()
+        assertTrue(SecurityManager.verifyPin("2468"))
+    }
+
+    @Test
+    fun repeatedWrongPinsLockOutEvenTheCorrectPin() {
+        SecurityManager.setPin("2468")
+        SecurityManager.lock()
+
+        repeat(5) { assertFalse(SecurityManager.verifyPin("0000")) }
+
+        assertTrue(SecurityManager.pinLockoutRemainingMillis() > 0L)
+        assertFalse(SecurityManager.verifyPin("2468"))
+        assertTrue(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun backgroundTimeoutLocksOnceElapsed() {
+        SecurityManager.setPin("2468")
+
+        SecurityManager.markBackgrounded(lockAfterMs = 0L)
+
+        assertTrue(SecurityManager.lockIfBackgroundTimeoutElapsed())
+        assertTrue(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun backgroundTimeoutDoesNotLockEarly() {
+        SecurityManager.setPin("2468")
+
+        SecurityManager.markBackgrounded(lockAfterMs = 60_000L)
+
+        assertFalse(SecurityManager.lockIfBackgroundTimeoutElapsed())
+        assertFalse(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun undecryptableSecureStoreIsResetSoPinCanBeSet() {
+        val host = hostFixture("orphaned-store-host")
+        AppStateSeeder.seedHost(host, password = "unrecoverable")
+        securePrefs()
+
+        // Simulate the Keystore master key being lost while secure_store.xml survives, which
+        // previously left SecurityManager uninitialized and made Set PIN silently do nothing.
+        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            .deleteEntry(MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+        SecurityManager.resetForTesting()
+        SecurityManager.init(InstrumentationRegistry.getInstrumentation().targetContext.applicationContext)
+
+        SecurityManager.setPin("2468")
+
+        assertTrue(SecurityManager.isPinSet())
+        assertFalse(SecurityManager.isLocked())
+        assertTrue(SecurityManager.secureStorageResetState().value)
+        assertNull(SecurityManager.getHostPassword(host.id))
+        SecurityManager.lock()
+        assertTrue(SecurityManager.verifyPin("2468"))
     }
 
     @Test

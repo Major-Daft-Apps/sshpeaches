@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app
 
 import android.app.Application
+import android.app.NotificationManager
 import androidx.appcompat.app.AppCompatDelegate
 import com.majordaftapps.sshpeaches.app.appcheck.AppCheckInitializer
 import com.majordaftapps.sshpeaches.app.data.repository.AppContainer
@@ -8,14 +9,12 @@ import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.diagnostics.DiagnosticsScheduler
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
-import com.majordaftapps.sshpeaches.app.uptime.UptimeNotifications
-import com.majordaftapps.sshpeaches.app.uptime.UptimeScheduler
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
+import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -41,20 +40,19 @@ class SSHPeachesApplication : Application() {
         }
         AppCheckInitializer.initialize(this)
         TelemetryInitializer.initialize(this)
-        UptimeNotifications.ensureChannel(this)
+        runCatching {
+            WorkManager.getInstance(this).cancelUniqueWork("sshpeaches_uptime_checks")
+        }
+        // The Uptime feature was removed; drop its notification channel so it no longer shows in
+        // the app's notification settings.
+        runCatching {
+            getSystemService(NotificationManager::class.java)?.deleteNotificationChannel("uptime_alerts")
+        }
         appScope.launch {
             SettingsStore.usageReportsEnabled
                 .distinctUntilChanged()
                 .collect { enabled ->
                     DiagnosticsScheduler.update(this@SSHPeachesApplication, enabled)
-                }
-        }
-        appScope.launch {
-            container.uptimeRepository.configs
-                .map { configs -> configs.any { it.enabled } }
-                .distinctUntilChanged()
-                .collect { enabled ->
-                    UptimeScheduler.update(this@SSHPeachesApplication, enabled)
                 }
         }
     }

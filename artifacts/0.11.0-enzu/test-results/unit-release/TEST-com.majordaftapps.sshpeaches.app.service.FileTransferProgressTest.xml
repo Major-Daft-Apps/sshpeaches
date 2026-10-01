@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:45.274Z" hostname="362696.200293.sys.ipv4.io" time="0.007">
+  <properties/>
+  <testcase name="byte formatter preserves trailing zeroes in whole values" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.002"/>
+  <testcase name="status message stays transferring until bytes move" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.002"/>
+  <testcase name="terminal transfer exposes stable identity and truthful success" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.0"/>
+  <testcase name="progress throttle publishes first timed and final updates" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.001"/>
+  <testcase name="failed transfer includes its terminal error" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.001"/>
+  <testcase name="byte formatter scales units compactly" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.0"/>
+  <testcase name="progress summary shows percent and byte counts once transfer starts" classname="com.majordaftapps.sshpeaches.app.service.FileTransferProgressTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

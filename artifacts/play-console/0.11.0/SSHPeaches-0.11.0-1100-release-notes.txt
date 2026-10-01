@@ -1,0 +1,7 @@
+What's new in 0.11.0
+
+- Built-in terminal keyboard now shows when you tap to type.
+- Find uses a 1/2-style match counter and a dedicated highlight.
+- PIN lock no longer crashes; file export/import sits beside QR transfer.
+- Host Info shows live system details; snippets run in the open SSH session.
+- Session color-profile picker, simpler Help, and a one-row file-browser toolbar with type icons.

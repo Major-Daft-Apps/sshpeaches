@@ -1,0 +1,75 @@
+INFO: Constructing runner from config.
+INFO: Configuring Android Instrumentation driver: android_instrumentation_runtime {
+  instrumentation_info {
+    app_package: "com.majordaftapps.sshpeaches"
+    test_package: "com.majordaftapps.sshpeaches.macrobenchmark"
+    test_runner_class: "androidx.test.runner.AndroidJUnitRunner"
+  }
+  instrumentation_args {
+    args_map {
+      key: "additionalTestOutputDir"
+      value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output"
+    }
+    args_map {
+      key: "androidx.benchmark.suppressErrors"
+      value: "EMULATOR,LOW-BATTERY"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+
+INFO: Configuring AndroidTestApkInstallerPlugin: apks_to_install {
+  apk_paths: "/opt/sshpeaches/app/build/outputs/apk/benchmark/app-benchmark.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+apks_to_install {
+  apk_paths: "/opt/sshpeaches/macrobenchmark/build/outputs/apk/benchmark/macrobenchmark-benchmark.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+instrumentation_target_package_id: "com.majordaftapps.sshpeaches.macrobenchmark"
+
+INFO: No installables found in test fixture. Nothing to install.
+INFO: Installing [/opt/sshpeaches/app/build/outputs/apk/benchmark/app-benchmark.apk] on device emulator-5554.
+INFO: Installing [/opt/sshpeaches/macrobenchmark/build/outputs/apk/benchmark/macrobenchmark-benchmark.apk] on device emulator-5554.
+INFO: Start logcat streaming.
+INFO: Running Android Instrumentation driver.
+INFO: Copying files from device to host: /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json
+INFO: Copying files from device to host: /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-09-28-21-20-43.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-09-28-21-20-43.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-09-28-21-20-48.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-09-28-21-20-48.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-09-28-21-20-52.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-09-28-21-20-52.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-09-28-21-20-57.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-09-28-21-20-57.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-09-28-21-21-01.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-09-28-21-21-01.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json
+INFO: Copying files from device to host: /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter000_2026-09-28-21-20-07.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter001_2026-09-28-21-20-13.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter002_2026-09-28-21-20-18.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter003_2026-09-28-21-20-24.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_coldStartup_iter004_2026-09-28-21-20-30.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-09-28-21-20-43.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter000_2026-09-28-21-20-43.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-09-28-21-20-48.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter001_2026-09-28-21-20-48.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-09-28-21-20-52.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter002_2026-09-28-21-20-52.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-09-28-21-20-57.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter003_2026-09-28-21-20-57.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-09-28-21-21-01.perfetto-trace to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/StartupAndScrollBenchmark_warmStartupFrameTiming_iter004_2026-09-28-21-21-01.perfetto-trace
+INFO: Copying /sdcard/Android/media/com.majordaftapps.sshpeaches.macrobenchmark/additional_test_output/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json to /opt/sshpeaches/macrobenchmark/build/outputs/connected_android_test_additional_output/benchmark/connected/ci36(AVD) - 16/com.majordaftapps.sshpeaches.macrobenchmark-benchmarkData.json
+INFO: Stop logcat streaming.
+INFO: Uninstalling com.majordaftapps.sshpeaches for device emulator-5554.
+INFO: Uninstalling com.majordaftapps.sshpeaches.macrobenchmark for device emulator-5554.
+INFO: Execute com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark.coldStartup: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.macrobenchmark.StartupAndScrollBenchmark.warmStartupFrameTiming: PASSED

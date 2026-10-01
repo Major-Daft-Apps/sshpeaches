@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.view.KeyEvent
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -68,9 +69,7 @@ class MainActivity : FragmentActivity() {
     private val appViewModel: AppViewModel by viewModels {
         val app = application as SSHPeachesApplication
         AppViewModel.provideFactory(
-            repository = app.container.repository,
-            uptimeRepository = app.container.uptimeRepository,
-            uptimeMonitorRunner = app.container.uptimeMonitorRunner
+            repository = app.container.repository
         )
     }
     private val sessionServiceState = mutableStateOf<SessionService?>(null)
@@ -91,10 +90,12 @@ class MainActivity : FragmentActivity() {
     private val corePermissionsRefreshTick = mutableStateOf(0)
     private val pendingSftpDirectoryRequests = LinkedHashMap<String, String>()
     private val pendingFileTransferRequests = mutableListOf<PendingFileTransferRequest>()
+    // A connect tapped before the service is bound; run once it connects (latest wins). Dropping
+    // it left the connecting screen waiting forever.
+    private var pendingSessionStart: ((SessionService) -> Unit)? = null
     private var latestAllowBackgroundSessions: Boolean = true
     private var latestBackgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER
     private var latestUiState: AppUiState = AppUiState()
-    private var backgroundSessionTimeoutJob: Job? = null
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             UiDebugLog.result("notificationPermissionRequest", granted)
@@ -107,6 +108,17 @@ class MainActivity : FragmentActivity() {
             sessionServiceState.value = service
             serviceBound = true
             serviceConnectionRequested = true
+            // onStart may have run before the service was bound (e.g. after the task was swiped
+            // away), so its cancel was skipped; the app is visible, so cancel here as well.
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                service?.cancelBackgroundSessionStop()
+            }
+            if (service != null) {
+                pendingSessionStart?.let { start ->
+                    pendingSessionStart = null
+                    start(service)
+                }
+            }
             if (service != null && pendingSftpDirectoryRequests.isNotEmpty()) {
                 pendingSftpDirectoryRequests.forEach { (hostId, path) ->
                     service.listSftpDirectory(hostId, path)
@@ -291,6 +303,17 @@ class MainActivity : FragmentActivity() {
         hardwareKeyHandler = handler
     }
 
+    /**
+     * Clears [handler] only if it is still the active one. Screens overlap during navigation
+     * transitions, and an outgoing screen clearing unconditionally removed the incoming screen's
+     * freshly installed handler.
+     */
+    fun clearHardwareKeyHandler(handler: (KeyEvent) -> Boolean) {
+        if (hardwareKeyHandler === handler) {
+            hardwareKeyHandler = null
+        }
+    }
+
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (hardwareKeyHandler?.invoke(event) == true) {
@@ -363,11 +386,20 @@ class MainActivity : FragmentActivity() {
             val fileTransferProgress by sessionService?.fileTransferProgressFlow()
                 ?.collectAsStateWithLifecycle() ?: emptyFileTransferProgressState
             LaunchedEffect(uiState.hosts) {
-                HostWidgets.updateAll(this@MainActivity)
+                HostWidgets.updateAllAsync(this@MainActivity)
             }
             LaunchedEffect(uiState.isLocked, sessionService) {
                 if (uiState.isLocked) {
                     sessionService?.clearAllRuntimeSessionPasswords()
+                }
+            }
+            // With a PIN set, keep screen contents out of screenshots and the recents thumbnail,
+            // which is captured before the lock screen can appear.
+            LaunchedEffect(uiState.pinConfigured) {
+                if (uiState.pinConfigured) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 }
             }
             val startSession: (String, HostConnection, com.majordaftapps.sshpeaches.app.data.model.ConnectionMode, String?, Boolean) -> Unit =
@@ -385,11 +417,8 @@ class MainActivity : FragmentActivity() {
                         "uiStartSession",
                         "sessionId=$sessionId, hostId=${host.id}, mode=$mode, serviceReady=${sessionService != null}, hasPasswordOverride=${!password.isNullOrBlank()}, allowPasswordSave=$allowPasswordSave"
                     )
-                    if (sessionService == null) {
-                        ensureSessionServiceConnection()
-                        UiDebugLog.result("uiStartSession", false, "service-not-ready")
-                    } else {
-                        sessionService.startSession(
+                    val start: (SessionService) -> Unit = { service ->
+                        service.startSession(
                             requestedSessionId = sessionId,
                             host = host,
                             mode = mode,
@@ -402,6 +431,13 @@ class MainActivity : FragmentActivity() {
                             allowPasswordSave = allowPasswordSave,
                             terminalEmulation = uiState.terminalEmulation
                         )
+                    }
+                    if (sessionService == null) {
+                        pendingSessionStart = start
+                        ensureSessionServiceConnection()
+                        UiDebugLog.result("uiStartSession", true, "queued-until-service-ready sessionId=$sessionId")
+                    } else {
+                        start(sessionService)
                         UiDebugLog.result("uiStartSession", true, "sessionId=$sessionId, hostId=${host.id}")
                     }
                 }
@@ -589,6 +625,7 @@ class MainActivity : FragmentActivity() {
                         onClearPin = viewModel::clearPin,
                         onLockApp = viewModel::lockApp,
                         onUnlockWithPin = viewModel::unlockWithPin,
+                        onSecurityNoticeShown = viewModel::consumeSecurityNotice,
                         onBiometricUnlock = {
                         UiDebugLog.action("uiBiometricUnlock", "promptReady=${biometricPrompt != null && biometricPromptInfo != null}")
                         val prompt = biometricPrompt
@@ -599,6 +636,7 @@ class MainActivity : FragmentActivity() {
                             UiDebugLog.result("uiBiometricUnlock", true)
                         } else {
                             UiDebugLog.result("uiBiometricUnlock", false, "prompt-not-ready")
+                            viewModel.reportBiometricUnavailable()
                         }
                         },
                         onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
@@ -642,11 +680,6 @@ class MainActivity : FragmentActivity() {
                         )
                         },
                         onHostDelete = viewModel::deleteHost,
-                        onAddHostToUptime = viewModel::addHostToUptime,
-                        onUpdateUptimeConfig = viewModel::updateUptimeConfig,
-                        onSetUptimeEnabled = viewModel::setUptimeEnabled,
-                        onRemoveHostFromUptime = viewModel::removeHostFromUptime,
-                        onRefreshUptime = viewModel::refreshUptime,
                         onImportHost = viewModel::importHost,
                         onHostOsMetadataImported = viewModel::updateHostOsMetadata,
                         onHostInfoCommandsChange = viewModel::updateHostInfoCommands,
@@ -671,15 +704,17 @@ class MainActivity : FragmentActivity() {
                         onCopyIdentityKeyToHost = { identityId, hostId, hostPassword, identityPassphrase ->
                         val host = uiState.hosts.firstOrNull { it.id == hostId }
                         if (host == null) {
-                            false
+                            "That host no longer exists."
                         } else {
+                            // Pass the installer's reason (untrusted host key, missing public key,
+                            // remote error) through instead of a generic failure.
                             IdentityKeyInstaller.install(
                                 context = this@MainActivity,
                                 host = host,
                                 identityId = identityId,
                                 hostPasswordOverride = hostPassword,
                                 identityPassphraseOverride = identityPassphrase
-                            ).success
+                            ).let { result -> if (result.success) null else result.message }
                         }
                         },
                         onRemoveIdentityKey = viewModel::removeIdentityKey,
@@ -697,6 +732,18 @@ class MainActivity : FragmentActivity() {
                         onMarkPortForwardUsed = viewModel::markPortForwardUsed,
                         onMarkSnippetUsed = viewModel::markSnippetUsed,
                         onSendSessionShortcut = sendSessionShortcut,
+                        onFetchHostSystemInfo = { host, onResult ->
+                            val service = sessionServiceState.value
+                            if (service == null) {
+                                onResult(
+                                    com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo(
+                                        error = "Session service is not ready."
+                                    )
+                                )
+                            } else {
+                                service.fetchHostSystemInfo(host, onResult)
+                            }
+                        },
                         onSendShellBytes = sendShellBytes,
                         onResizeShell = resizeShell,
                         onListSftpDirectory = listSftpDirectory,
@@ -776,8 +823,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         UiDebugLog.action("MainActivity.onDestroy", "serviceBound=$serviceBound")
-        backgroundSessionTimeoutJob?.cancel()
-        backgroundSessionTimeoutJob = null
+        // The background-session timeout lives in SessionService so it survives this activity.
         if (serviceBound) {
             unbindService(connection)
             serviceBound = false
@@ -804,8 +850,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
-        backgroundSessionTimeoutJob?.cancel()
-        backgroundSessionTimeoutJob = null
+        sessionServiceState.value?.cancelBackgroundSessionStop()
         if (appUiBootstrapped) {
             appViewModel.onAppForegrounded()
         }
@@ -821,8 +866,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        backgroundSessionTimeoutJob?.cancel()
-        backgroundSessionTimeoutJob = null
+        sessionServiceState.value?.cancelBackgroundSessionStop()
         if (isChangingConfigurations || !appUiBootstrapped) {
             UiDebugLog.action("MainActivity.onStop", "persistSessions=true (config-change-or-not-ready)")
             UiDebugLog.result("MainActivity.onStop", true, "stoppedAllSessions=false")
@@ -844,15 +888,12 @@ class MainActivity : FragmentActivity() {
             }
             latestBackgroundSessionTimeout.durationMillis != null -> {
                 val timeoutMs = latestBackgroundSessionTimeout.durationMillis ?: 0L
-                backgroundSessionTimeoutJob = lifecycleScope.launch {
-                    delay(timeoutMs)
-                    sessionServiceState.value?.stopAllSessions()
-                    UiDebugLog.result(
-                        "MainActivity.backgroundSessionTimeout",
-                        true,
-                        "stopNow=timer elapsedMs=$timeoutMs"
-                    )
-                }
+                sessionServiceState.value?.scheduleBackgroundSessionStop(timeoutMs)
+                UiDebugLog.result(
+                    "MainActivity.backgroundSessionTimeout",
+                    true,
+                    "stopNow=scheduled timeoutMs=$timeoutMs"
+                )
             }
             else -> {
                 UiDebugLog.result("MainActivity.backgroundSessionTimeout", true, "stopNow=never")
@@ -1045,7 +1086,6 @@ class MainActivity : FragmentActivity() {
     private fun isSupportedStartupRoute(route: String): Boolean = route in setOf(
         Routes.HOME,
         Routes.HOSTS,
-        Routes.UPTIME,
         Routes.IDENTITIES,
         Routes.FORWARDS,
         Routes.SNIPPETS,

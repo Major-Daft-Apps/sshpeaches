@@ -18,6 +18,14 @@ class TransferPayloadCodecTest {
     }
 
     @Test
+    fun decodeTransferPayloadEnvelope_acceptsRawJsonFiles() {
+        val payload = """{"v":2,"hosts":[{"id":"host-1"}]}"""
+
+        assertEquals(payload, decodeTransferPayloadEnvelope(payload))
+        assertEquals(payload, decodeTransferPayloadEnvelope("\uFEFF$payload"))
+    }
+
+    @Test
     fun encodeTransferPayloadEnvelope_compressesLargePayloadsAndRoundTrips() {
         val payload = buildString {
             append("""{"v":2,"notes":[""")

@@ -24,8 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -332,10 +330,6 @@ private fun KeyActionEditorVertical(
     val textDraft = remember(current) {
         mutableStateOf(if (current.type == KeyboardActionType.TEXT) current.text else "")
     }
-    val sequenceDraft = remember(current) {
-        mutableStateOf(if (current.type == KeyboardActionType.SEQUENCE) current.sequence else "")
-    }
-    val advancedExpanded = remember { mutableStateOf(false) }
 
     val applyKeyAction: (KeyboardSlotAction) -> Unit = { base ->
         onApply(
@@ -463,59 +457,6 @@ private fun KeyActionEditorVertical(
             modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_USE_TEXT_BUTTON)
         ) {
             Text("Use Text")
-        }
-
-        SectionTitle("Actions")
-        TextButton(
-            onClick = {
-                onApply(KeyboardLayoutDefaults.snippetPickerAction(iconId = "code"))
-            }
-        ) {
-            Text("Snippet Picker")
-        }
-        TextButton(
-            onClick = {
-                onApply(KeyboardLayoutDefaults.passwordInjectAction(iconId = "key"))
-            }
-        ) {
-            Text("Inject Password")
-        }
-
-        TextButton(
-            onClick = { advancedExpanded.value = !advancedExpanded.value },
-            modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_ADVANCED_BUTTON)
-        ) {
-            Icon(
-                imageVector = if (advancedExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null
-            )
-            Text(if (advancedExpanded.value) "Advanced (hide)" else "Advanced")
-        }
-
-        if (advancedExpanded.value) {
-            SectionTitle("VT100/xterm Sequences")
-            PresetRow(KeyboardLayoutDefaults.advancedSequencePresets) { preset ->
-                onApply(preset)
-            }
-
-            OutlinedTextField(
-                value = sequenceDraft.value,
-                onValueChange = { sequenceDraft.value = it },
-                label = { Text("Custom sequence") },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(UiTestTags.KEYBOARD_EDITOR_SEQUENCE_INPUT)
-            )
-            TextButton(
-                enabled = sequenceDraft.value.isNotBlank(),
-                onClick = {
-                    onApply(KeyboardLayoutDefaults.sequenceAction("Seq", sequenceDraft.value))
-                },
-                modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_USE_SEQUENCE_BUTTON)
-            ) {
-                Text("Use Custom Sequence")
-            }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

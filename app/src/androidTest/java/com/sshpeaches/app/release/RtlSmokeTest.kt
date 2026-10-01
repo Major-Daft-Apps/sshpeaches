@@ -61,7 +61,8 @@ class RtlSmokeTest {
                     onOpenWebsite = {},
                     onOpenSupport = {},
                     onOpenPrivacy = {},
-                    onOpenSourceLicenses = {}
+                    onOpenSourceLicenses = {},
+                    onOpenSourceCode = {}
                 )
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,12 +60,12 @@ fun SnippetEditorScreen(
     onDirtyStateChange: (Boolean) -> Unit = {},
     onShowMessage: (String) -> Unit = {}
 ) {
-    var title by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.title.orEmpty()) }
-    var group by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.group.orEmpty()) }
-    var description by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.description.orEmpty()) }
-    var command by remember(initialSnippet?.id) { mutableStateOf(initialSnippet?.command.orEmpty()) }
-    var editorError by remember { mutableStateOf<String?>(null) }
-    var showDiscardDialog by remember { mutableStateOf(false) }
+    var title by rememberSaveable(initialSnippet?.id) { mutableStateOf(initialSnippet?.title.orEmpty()) }
+    var group by rememberSaveable(initialSnippet?.id) { mutableStateOf(initialSnippet?.group.orEmpty()) }
+    var description by rememberSaveable(initialSnippet?.id) { mutableStateOf(initialSnippet?.description.orEmpty()) }
+    var command by rememberSaveable(initialSnippet?.id) { mutableStateOf(initialSnippet?.command.orEmpty()) }
+    var editorError by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
     val isEditingExisting = initialSnippet != null
     val isDirty = title != initialSnippet?.title.orEmpty() ||
         group != initialSnippet?.group.orEmpty() ||

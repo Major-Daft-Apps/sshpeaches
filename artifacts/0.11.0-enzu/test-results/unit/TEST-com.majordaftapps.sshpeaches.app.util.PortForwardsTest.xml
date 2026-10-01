@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:38.677Z" hostname="362696.200293.sys.ipv4.io" time="0.002">
+  <properties/>
+  <testcase name="inferredDestinationHost_fallsBackToStoredAddressThenLoopback" classname="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" time="0.001"/>
+  <testcase name="normalizeAssociatedHostIds_keepsOnlyFirstDistinctHost" classname="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" time="0.0"/>
+  <testcase name="inferredDestinationHost_prefersStoredAddressEvenWhenHostIsAssociated" classname="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" time="0.0"/>
+  <testcase name="selectedHostId_returnsNullWhenNoHostIsAssociated" classname="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" time="0.0"/>
+  <testcase name="legacyLoopbackDestinationHost_returnsLoopbackWhenStoredHostMatchesAssociatedHost" classname="com.majordaftapps.sshpeaches.app.util.PortForwardsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

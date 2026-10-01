@@ -1,0 +1,171 @@
+INFO: Constructing runner from config.
+INFO: Configuring Android Instrumentation driver: android_instrumentation_runtime {
+  instrumentation_info {
+    app_package: "com.majordaftapps.sshpeaches.debug"
+    test_package: "com.majordaftapps.sshpeaches.debug.test"
+    test_runner_class: "androidx.test.runner.AndroidJUnitRunner"
+  }
+  instrumentation_args {
+    args_map {
+      key: "additionalTestOutputDir"
+      value: "/sdcard/Android/media/com.majordaftapps.sshpeaches.debug/additional_test_output"
+    }
+    args_map {
+      key: "clearPackageData"
+      value: "true"
+    }
+    args_map {
+      key: "notAnnotation"
+      value: "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest,com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+
+INFO: Configuring AndroidTestApkInstallerPlugin: apks_to_install {
+  apk_paths: "/opt/sshpeaches/app/build/outputs/apk/debug/app-debug.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+apks_to_install {
+  apk_paths: "/opt/sshpeaches/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+instrumentation_target_package_id: "com.majordaftapps.sshpeaches.debug"
+
+INFO: No installables found in test fixture. Nothing to install.
+INFO: Installing [/opt/sshpeaches/app/build/outputs/apk/debug/app-debug.apk] on device emulator-5554.
+INFO: Installing [/opt/sshpeaches/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk] on device emulator-5554.
+INFO: Start logcat streaming.
+INFO: Running Android Instrumentation driver.
+INFO: Copying files from device to host: /sdcard/Android/media/com.majordaftapps.sshpeaches.debug/additional_test_output to /opt/sshpeaches/app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected/ci36(AVD) - 16
+INFO: Stop logcat streaming.
+INFO: Uninstalling com.majordaftapps.sshpeaches.debug for device emulator-5554.
+INFO: Uninstalling com.majordaftapps.sshpeaches.debug.test for device emulator-5554.
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardBrowserTest.searchFavoriteAndShareWorkForPortForward: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest.addPortForward_showsHostBackgroundErrorUnderHostField: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest.addPortForward_showsInList: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest.editAndDeleteSeededPortForward: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest.addDialogDoesNotReopenWhenReturningToForwards: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.forwards.PortForwardCrudTest.addPortForward_showsAppBackgroundErrorOnlyAfterSubmitAttempt: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.home.HomeScreenTest.recentHostOverflowCanOpenEditDialog: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.home.HomeScreenTest.homeScreenShowsWelcomeActionsWhenNoResourcesExist: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.home.HomeScreenTest.homeScreenShowsSeededFavoritesAcrossSections: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.home.HomeScreenTest.favoriteIdentityOverflowCanOpenEditDialog: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.hostSortSwitchesFromLastUsedToAlphabetical: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.hostSearchFiltersByName: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.passwordProtectedQrRequiresPassphraseAndThenShowsQrDialog: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.favoriteToggleAndHostActionsAreVisible: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.scpActionNavigatesToConnectingScreenWithoutCrashing: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.hosts.HostsBrowserTest.sshActionNavigatesToConnectingScreenWithoutCrashing: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.identities.IdentityBrowserTest.searchFavoriteAndQrShareWorkForIdentity: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.identities.IdentityCrudTest.editAndDeleteSeededIdentity: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.identities.IdentityCrudTest.addGeneratedIdentity_showsInList: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest.keyboardEditor_canAssignFnToAnotherMainRowSlot: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest.keyboardSlotPersistsAcrossRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest.keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.lifecycle.HostsDialogRecreateTest.addHostDialog_preservesInputAcrossRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.lifecycle.HostsSearchRecreateTest.hostsSearchFilter_survivesActivityRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest.identitiesSearchFilter_survivesActivityRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest.forwardsSearchFilter_survivesActivityRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.lifecycle.ManagerSearchRecreateTest.snippetsSearchFilter_survivesActivityRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.navigation.AppInfoNavigationTest.startupRoute_canOpenLicenseNoticesScreen: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest.helpDrawerEntry_selectsHelpDestination: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest.aboutDialog_linksInvokeExpectedCallbacks: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.navigation.ExternalLinksNavigationTest.helpScreen_moreHelpInvokesSupportCallback: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest.dialogListsAllMissingCorePermissions: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest.revokedNotifications_showPermissionsRequiredDialog: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest.managePermissionsButton_invokesCallback: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest.requestNowButton_invokesCallback: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.permissions.NotificationPermissionStateTest.settingsOnlyPermissions_hideRequestNowAndExplainSettings: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest.portForwardPayloadRoundTripProducesImportableLocalForward: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest.hostPayloadRoundTripPreservesConnectionFields: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest.identityPayloadRoundTripRequestsOverwriteForExistingFingerprint: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.qr.QrRoundTripTest.snippetPayloadRoundTripProducesRunnableSnippet: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityLockRuntimeTest.lockAppClearsRuntimeSessionPasswordsInBoundService: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest.setPinMigratesLegacySecretsAndVerifyPinUnlocksVault: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest.legacySecretsRemainReadableUntilPinSet: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest.setPinLeavesAppUnlockedAndVaultReadable: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest.clearPinRevertsVaultSecretsToLegacyStorage: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest.exportImportProtectedSecretsWorkWhileVaultBacked: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.defaultKeyboard_allMainAndFnKeysDispatchAndControlsWork: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalActionModePaste_restoresImeFocusAndCommittedCtrlA: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalImeContextPasteAsPlainText_keepsCommittedCtrlAAfterPaste: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpPanel_remoteActionsInvokeManagementCallbacks: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpPanel_homeButtonUsesCanonicalHomePath: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalImeContextPaste_keepsCommittedCtrlAAfterPaste: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalIme_fastCommittedTextBurstDoesNotLoseKeystrokes: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.compactKeyboard_dispatchesModifierSequenceAliasAndPasswordActions: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalTypeface_isRestoredWhenAppReturnsToForeground: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.sftpPanel_identicalListingWithNewTokenCompletesCommand: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalInput_actionMultipleRepeatsKnownHardwareKeys: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpToolbar_keepsNavSortAndHiddenFilesOnOneNarrowRow: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalInput_usesLatestSendCallbackAfterSameSessionRecomposition: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalIme_reportsShadowSelectionAndSupportsForwardDelete: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalActionModeCopy_doesNotFocusImeBridgeWhenSystemKeyboardHidden: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalSelectionPaste_virtualImeKeyConsumesLatchedCtrlOnce: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.sftpPutWithoutLocalPath_uploadsImmediatePickerResult: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.sftpPanel_invalidTypedPathShowsErrorToast: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.errorState_showsLogsPaneAndInvokesRetry: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpPanel_usesSelectionModelAndOverflowActions: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.connectingLogs_useTerminalStyleGrowUpwardAndFollowNewestLine: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalIme_composingTextIsSentOnceOnlyWhenCommitted: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalImeBridgeKeyListener_virtualImeKeyConsumesLatchedCtrlOnce: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalImeContextCopy_keepsCommittedCtrlAAfterSelectedShadowTextCopy: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpDownloadButton_downloadsPickerResultImmediatelyAndRepicksEveryTime: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalActionModeCopy_restoresImeFocusAndCommittedCtrlA: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalIme_composingRegionReplacementHonorsCursorEdits: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.sftpTransferCompletionShowsSuccessStatusAndSnackbarCallback: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpUploadButton_reviewsDestinationBeforeEachUpload: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.sftpGetWithoutLocalPath_downloadsImmediatePickerResult: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.builtInKeyboard_keyboardButtonAndTap_showSoftKeyboard: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpUploadAction_isDisabledWhileDirectoryListingIsPending: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.builtInKeyboard_keepsModifiersWorkingAcrossFnLayer: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpForwardNavigation_isReachableOnNarrowScreens: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalKeyboardButtonAndDoubleTap_showSoftKeyboard: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.scpUploadPanel_promotesUploadActionToToolbar: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalAndroidDispatcher_backAndSystemKeysDoNotClearLatchedCtrl: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalSelectionCopy_virtualImeKeyConsumesLatchedCtrlOnce: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.networkErrorState_identifiesNetworkFailure: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.passwordInjectUsesSavedHostPasswordAfterVaultMigration: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.customKeyboard_fnLayerIsFixedAndBackReturnsToRemappableMainRows: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.ConnectingScreenTest.terminalSession_supportsFindDialogAndSnippetPicker: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.session_ui.SessionColorProfileButtonTest.selectingProfileFromMenuInvokesCallback: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest.lockedAppShowsOverlayAndUnlocksWithPin: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest.setPinThenDisablePinUpdatesSecurityStatus: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SecuritySettingsTest.biometricPreferenceDisplaysWhenPinConfigured: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest.exportQrWithoutSecrets_generatesQrDialog: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest.themeModeAndTogglesPersistAcrossRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest.exportQrWithSecretsValidatesPassphraseBeforeGenerating: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SettingsPreferencesTest.exportQrDialog_preservesEntriesAcrossRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.settings.SettingsRestoreDefaultsTest.restoreDefaultsResetsSecurityToggles: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.snippets.SnippetCrudTest.addEditSearchAndDeleteSnippet: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.staleOpenSessionIntentColdLaunchLandsOnHomeAndConsumesRequest: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.widgetConnectIntentStartsSessionLaunchPath: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.widgetConnectLaunchPathStillPublishesSessionAfterImmediateRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.widgetConnectLaunchPathStillPublishesSessionAfterRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.forgedWidgetConnectIntentWithoutTokenDoesNotStartSessionLaunchPath: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.IntentLaunchTest.staleOpenSessionIntentFromNonSessionRouteKeepsCurrentRouteAndConsumesRequest: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.QuickConnectLaunchTest.quickConnectRejectsInvalidPort: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.QuickConnectLaunchTest.quickConnectRequiresHostPortAndUsername: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.startup.SessionLaunchWithoutNotificationPermissionTest.widgetConnectIntentDoesNotCrashWhenNotificationsAreRevoked: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.terminal.TermuxTerminalEngineConcurrencyTest.rapidResizeWhileOutputArrives_keepsEmulatorUsable: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.TerminalThemeApplicationTest.applyProfile_updatesEmulatorColorsAndCursorStyle: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest.duplicateThemeCanBecomeDefaultAndDeleteFallsBackToBuiltin: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest.duplicateThemeNameShowsValidationError: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest.stockThemePickerIncludesAddedBuiltinThemes: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest.createThemeProfile_returnsToThemeEditor: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.themes.ThemeEditorTest.createThemeProfile_withCustomFontShowsFontInThemeList: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.HostsCrudTest.addHost_invalidHostAndPort_showsValidationErrors: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.HostsCrudTest.addEditDeleteHost_updatesList: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest.invalidSnippetQrPayload_returnsError: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest.invalidHostQrPayload_returnsError_andUiRemainsUsable: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.QrImportUiSmokeTest.validQrImportsBecomeVisibleAcrossManagersAfterRecreate: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.SettingsSmokeTest.exportQrDialogShowsPassphraseFieldsWhenSecretsEnabled: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.SettingsSmokeTest.toggleSettingsAndDropdowns_reflectsChanges: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.SmokeNavigationTest.drawerNavigation_showsAllCoreScreens: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.ui.SmokeNavigationTest.drawerNavigation_canReturnHomeFromHosts: PASSED

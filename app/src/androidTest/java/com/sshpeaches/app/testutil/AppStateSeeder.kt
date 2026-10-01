@@ -4,14 +4,11 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
 import com.majordaftapps.sshpeaches.app.data.local.asEntity
-import com.majordaftapps.sshpeaches.app.data.local.asModel
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
-import com.majordaftapps.sshpeaches.app.data.model.HostUptimeConfig
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
-import com.majordaftapps.sshpeaches.app.data.model.UptimeCheckMethod
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
@@ -76,32 +73,6 @@ object AppStateSeeder {
     fun seedSnippet(snippet: Snippet) {
         runBlocking {
             SshPeachesDatabase.get(context).snippetDao().upsert(snippet.asEntity())
-        }
-    }
-
-    fun seedUptimeConfig(
-        hostId: String,
-        method: UptimeCheckMethod = UptimeCheckMethod.TCP,
-        port: Int = 22,
-        intervalMinutes: Int = 15,
-        enabled: Boolean = true
-    ) {
-        runBlocking {
-            val database = SshPeachesDatabase.get(context)
-            val host = database.hostDao().getById(hostId)?.asModel()
-            database.hostUptimeConfigDao().upsert(
-                HostUptimeConfig(
-                    hostId = hostId,
-                    hostName = host?.name.orEmpty(),
-                    hostAddress = host?.host.orEmpty(),
-                    hostPort = host?.port ?: 22,
-                    hostUsername = host?.username.orEmpty(),
-                    method = method,
-                    port = port,
-                    intervalMinutes = intervalMinutes,
-                    enabled = enabled
-                ).asEntity()
-            )
         }
     }
 

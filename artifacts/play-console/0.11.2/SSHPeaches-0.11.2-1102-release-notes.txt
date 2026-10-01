@@ -1,0 +1,5 @@
+What's new in 0.11.2
+
+- Fixed "Couldn't save PIN" after connecting to a host.
+- PIN unlock, and encrypted export, import, and QR sharing, work again after connecting to a host.
+- About now links to the source code on GitHub.

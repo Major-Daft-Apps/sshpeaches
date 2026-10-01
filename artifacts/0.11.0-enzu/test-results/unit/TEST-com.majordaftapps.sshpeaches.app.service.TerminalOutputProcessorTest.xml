@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.TerminalOutputProcessorTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:31.769Z" hostname="362696.200293.sys.ipv4.io" time="0.006">
+  <properties/>
+  <testcase name="parserFailureDoesNotStopLaterOutput" classname="com.majordaftapps.sshpeaches.app.service.TerminalOutputProcessorTest" time="0.004"/>
+  <testcase name="cancellationStillStopsProcessing" classname="com.majordaftapps.sshpeaches.app.service.TerminalOutputProcessorTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

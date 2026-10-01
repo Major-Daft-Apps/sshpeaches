@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:33.017Z" hostname="362696.200293.sys.ipv4.io" time="0.005">
+  <properties/>
+  <testcase name="connectingNotificationTargetWithSnapshotReplacesLastVisibleTerminal" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.002"/>
+  <testcase name="serviceReadyWithMatchingLiveSnapshotPreservesTerminalRoute" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.001"/>
+  <testcase name="notificationTargetWithRuntimeBackingWaitsForSnapshotInsteadOfShowingLastTerminal" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadyWithMissingOpenSessionRequestRedirectsAndConsumesWithoutQuickConnectRequest" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadyWithMissingRequestedSessionRedirectsAndConsumesRequest" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadyWithMatchingRequestedOpenSessionSnapshotPreservesTerminalRoute" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadyWithMissingRequestedSessionConsumesStaleRequestOffSessionRoute" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadySessionRouteWithNoRequestGatesTerminalContent" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="foregroundStaleOpenSessionRequestOnExistingNonSessionRouteOnlyConsumesRequest" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.001"/>
+  <testcase name="explicitMissingNotificationSessionDoesNotFallBackToLastVisibleTerminal" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceReadyWithActiveSnapshotMissingTerminalEmulatorGatesTerminalContent" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="staleSessionRouteRenderingUsesRecoveryChromeBeforeCleanupNavigationCompletes" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="staleRouteBeforeConnectingValuesFallBackToHome" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="brandNewPendingConnectingRequestCanRenderUntilFirstSnapshotChancePasses" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="serviceNotReadyWithEmptySnapshotsGatesTerminalButDoesNotRedirect" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.0"/>
+  <testcase name="advancedSettingsRouteIsAValidSessionRecoveryTarget" classname="com.majordaftapps.sshpeaches.app.ui.SessionRouteReadinessTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

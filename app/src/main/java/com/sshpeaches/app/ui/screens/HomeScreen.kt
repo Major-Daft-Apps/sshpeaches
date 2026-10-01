@@ -108,6 +108,7 @@ fun HomeScreen(
     onOpenSession: (String) -> Unit = {},
     onDisconnectSession: (String) -> Unit = {},
     onHostAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
+    onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
     onToggleFavorite: (String) -> Unit = {},
@@ -268,12 +269,9 @@ fun HomeScreen(
                         items(favorites.hostFavorites, key = { it.id }) { host ->
                             HostCard(
                                 host = host,
-                                snippets = snippets,
                                 onToggleFavorite = onToggleFavorite,
                                 onAction = onHostAction,
-                                canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
-                                onRunInfoCommand = onRunInfoCommand,
-                                onInfoCommandsChange = onInfoCommandsChange,
+                                onFetchSystemInfo = onFetchHostSystemInfo,
                                 onEdit = { onEditHost(it.id) },
                                 onDelete = { pendingDelete.value = HomeDeleteTarget.Host(it) }
                             )
@@ -302,7 +300,9 @@ fun HomeScreen(
                                             identityShareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
                                             identitySharePassphraseError.value = null
                                         } else {
-                                            showQr("Share ${identity.label}", generateIdentityQr(identity, null))
+                                            scope.launch {
+                                                showQr("Share ${identity.label}", generateIdentityQr(identity, null))
+                                            }
                                         }
                                     },
                                     modifier = Modifier.testTag(
@@ -507,7 +507,9 @@ fun HomeScreen(
                                                 hostShareConfirmPassphraseState.value = ExportPassphraseCache.host.orEmpty()
                                                 hostSharePassphraseError.value = null
                                             } else {
-                                                showQr("Share ${recentHost.name.ifBlank { recentHost.host }}", generateHostQr(recentHost, null))
+                                                scope.launch {
+                                                    showQr("Share ${recentHost.name.ifBlank { recentHost.host }}", generateHostQr(recentHost, null))
+                                                }
                                             }
                                         },
                                         modifier = Modifier.testTag(
@@ -556,7 +558,9 @@ fun HomeScreen(
                                                 identityShareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
                                                 identitySharePassphraseError.value = null
                                             } else {
-                                                showQr("Share ${recentIdentity.label}", generateIdentityQr(recentIdentity, null))
+                                                scope.launch {
+                                                    showQr("Share ${recentIdentity.label}", generateIdentityQr(recentIdentity, null))
+                                                }
                                             }
                                         },
                                         modifier = Modifier.testTag(
@@ -756,14 +760,16 @@ fun HomeScreen(
                             hostSharePassphraseError.value = "Passphrases do not match."
                         }
                         else -> {
-                            val bitmap = generateHostQr(host, passphrase)
-                            if (bitmap == null) {
-                                hostSharePassphraseError.value = "Unable to export password. Unlock the app and try again."
-                            } else {
-                                ExportPassphraseCache.host = passphrase
-                                hostSharePrompt.value = null
-                                hostSharePassphraseError.value = null
-                                showQr("Share ${host.name.ifBlank { host.host }}", bitmap)
+                            scope.launch {
+                                val bitmap = generateHostQr(host, passphrase)
+                                if (bitmap == null) {
+                                    hostSharePassphraseError.value = "Unable to export password. Unlock the app and try again."
+                                } else {
+                                    ExportPassphraseCache.host = passphrase
+                                    hostSharePrompt.value = null
+                                    hostSharePassphraseError.value = null
+                                    showQr("Share ${host.name.ifBlank { host.host }}", bitmap)
+                                }
                             }
                         }
                     }
@@ -831,14 +837,16 @@ fun HomeScreen(
                             identitySharePassphraseError.value = "Passphrases do not match."
                         }
                         else -> {
-                            val bitmap = generateIdentityQr(identity, passphrase)
-                            if (bitmap == null) {
-                                identitySharePassphraseError.value = "Unable to export key. Unlock the app and try again."
-                            } else {
-                                ExportPassphraseCache.identity = passphrase
-                                identitySharePrompt.value = null
-                                identitySharePassphraseError.value = null
-                                showQr("Share ${identity.label}", bitmap)
+                            scope.launch {
+                                val bitmap = generateIdentityQr(identity, passphrase)
+                                if (bitmap == null) {
+                                    identitySharePassphraseError.value = "Unable to export key. Unlock the app and try again."
+                                } else {
+                                    ExportPassphraseCache.identity = passphrase
+                                    identitySharePrompt.value = null
+                                    identitySharePassphraseError.value = null
+                                    showQr("Share ${identity.label}", bitmap)
+                                }
                             }
                         }
                     }

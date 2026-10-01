@@ -1,0 +1,4 @@
+09-28 17:38:24.946 16269 16285 I TestRunner: started: setPinLeavesAppUnlockedAndVaultReadable(com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest)
+09-28 17:38:25.876  7415  7415 D BoundBrokerSvc: onUnbind: Intent { act=com.google.firebase.dynamiclinks.service.START xflg=0x4 pkg=com.google.android.gms }
+09-28 17:38:27.170  1246  1492 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+09-28 17:38:27.214 16269 16285 I TestRunner: finished: setPinLeavesAppUnlockedAndVaultReadable(com.majordaftapps.sshpeaches.app.security.SecurityManagerVaultTest)

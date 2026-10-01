@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Diagnostics are written only by the Cloud Function Admin SDK,
+    // which bypasses these rules. Clients have no direct access.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

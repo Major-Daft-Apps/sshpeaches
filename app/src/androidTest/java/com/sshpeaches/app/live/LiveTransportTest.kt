@@ -716,7 +716,7 @@ class LiveTransportSuiteTest {
         composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag(UiTestTags.CONNECTING_FIND_STATUS, useUnmergedTree = true)
                 .fetchSemanticsNodes()
-                .any { it.config.toString().contains("sshpeaches-live") }
+                .any { it.config.toString().contains("1/") }
         }
         composeRule.onAllNodesWithText("sshpeaches-live", substring = true)[0].assertIsDisplayed()
     }
@@ -746,7 +746,7 @@ class LiveTransportSuiteTest {
         composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag(UiTestTags.CONNECTING_FIND_STATUS, useUnmergedTree = true)
                 .fetchSemanticsNodes()
-                .any { it.config.toString().contains("CUSTOM-KEY-LIVE") }
+                .any { it.config.toString().contains("1/") }
         }
         composeRule.onAllNodesWithText("CUSTOM-KEY-LIVE", substring = true)[0].assertIsDisplayed()
     }

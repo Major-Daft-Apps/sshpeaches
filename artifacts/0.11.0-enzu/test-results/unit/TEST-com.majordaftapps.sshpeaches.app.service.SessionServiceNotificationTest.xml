@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.service.SessionServiceNotificationTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:24.582Z" hostname="362696.200293.sys.ipv4.io" time="7.112">
+  <properties/>
+  <testcase name="childNotificationsAreExplicitlyGroupedWithTheForegroundSummary" classname="com.majordaftapps.sshpeaches.app.service.SessionServiceNotificationTest" time="6.774"/>
+  <testcase name="observableSessionStateFlowsKeepStableIdentity" classname="com.majordaftapps.sshpeaches.app.service.SessionServiceNotificationTest" time="0.108"/>
+  <testcase name="parallelConnectingSessionNotificationsOpenTheirOwnSession" classname="com.majordaftapps.sshpeaches.app.service.SessionServiceNotificationTest" time="0.112"/>
+  <testcase name="parallelSessionsHaveStableSummaryDistinctLabelsAndIndependentActions" classname="com.majordaftapps.sshpeaches.app.service.SessionServiceNotificationTest" time="0.118"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

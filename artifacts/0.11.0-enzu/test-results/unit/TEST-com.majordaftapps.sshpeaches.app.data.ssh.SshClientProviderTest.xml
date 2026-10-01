@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:20.771Z" hostname="362696.200293.sys.ipv4.io" time="3.37">
+  <properties/>
+  <testcase name="regression_largeSftpUploadAndDownloadStayBelowSshjTransportPacketLimit" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="2.097"/>
+  <testcase name="regression_cannotConnectWhenDhOnlyServerIsUnavailableAndUnavailableToClient" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.039"/>
+  <testcase name="connectsToOpenSshLikeEcdhServerWithEcdsaHostKey" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.127"/>
+  <testcase name="compatibleHostKeyProviderKeepsSshjDefaultProviderUnset" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.002"/>
+  <testcase name="configuredClientPrefersFastCiphersAndDisablesCompression" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.021"/>
+  <testcase name="configuredClientUsesTransferOptimizedChannelFlowControl" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.015"/>
+  <testcase name="existingTerminalAndSftpSessionsSurviveAdditionalConnections" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.575"/>
+  <testcase name="compatibleKexRemovesDiffieHellmanWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.005"/>
+  <testcase name="connectsToLocalEcdhServerWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.108"/>
+  <testcase name="ed25519SignatureVerifiesPublicKeyWhenEncodedThrows" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.046"/>
+  <testcase name="connectsToOpenSshServerWithEd25519HostKeyWhenAvailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.199"/>
+  <testcase name="ed25519Pkcs8IdentityLoadsDirectKeyProvider" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.011"/>
+  <testcase name="regression_cannotConnectWhenDhOnlyServerIsUnavailableForCaseInsensitiveInput" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.004"/>
+  <testcase name="retriesPasswordAfterInitialFailureWhenDhKeyPairGeneratorIsUnavailable" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.097"/>
+  <testcase name="compatibleKexPrefersEcdhBeforeDiffieHellmanForOpenSshOverlap" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.01"/>
+  <testcase name="knownHostsTrustsEd25519PublicKeyWhenEncodedThrows" classname="com.majordaftapps.sshpeaches.app.data.ssh.SshClientProviderTest" time="0.01"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[Test worker] INFO org.apache.sshd.common.util.security.bouncycastle.BouncyCastleSecurityProviderRegistrar - getOrCreateProvider(BC) created instance of org.bouncycastle.jce.provider.BouncyCastleProvider
+[Test worker] INFO org.apache.sshd.common.io.DefaultIoServiceFactoryFactory - No detected/configured IoServiceFactoryFactory; using Nio2ServiceFactoryFactory
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=36855
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[308a6984](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit5412049957785698436/large-sftp-hostkey) Failed (StreamCorruptedException) to load: File /dev/shm/junit5412049957785698436/large-sftp-hostkey is not a host key
+[sshd-SshServer[308a6984](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[308a6984](port=0)-nio2-thread-4] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:49822 authenticated
+[Test worker] INFO net.schmizz.sshj.connection.channel.direct.SessionChannel - Will request `sftp` subsystem
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=45561
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[6272c96f](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit17271862705849872082/host-key-EC.ser) Failed (StreamCorruptedException) to load: File /dev/shm/junit17271862705849872082/host-key-EC.ser is not a host key
+[sshd-SshServer[6272c96f](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshj-Reader-/127.0.0.1:45561-1790629102887] ERROR net.schmizz.sshj.transport.TransportImpl - Dying because - Unable to reach a settlement of KeyExchangeAlgorithms: [curve25519-sha256, curve25519-sha256@libssh.org, ecdh-sha2-nistp256, ecdh-sha2-nistp384, ecdh-sha2-nistp521, ext-info-c, kex-strict-c-v00@openssh.com] and [diffie-hellman-group-exchange-sha256, ext-info-s, kex-strict-s-v00@openssh.com]
+net.schmizz.sshj.transport.TransportException: Unable to reach a settlement of KeyExchangeAlgorithms: [curve25519-sha256, curve25519-sha256@libssh.org, ecdh-sha2-nistp256, ecdh-sha2-nistp384, ecdh-sha2-nistp521, ext-info-c, kex-strict-c-v00@openssh.com] and [diffie-hellman-group-exchange-sha256, ext-info-s, kex-strict-s-v00@openssh.com]
+	at net.schmizz.sshj.transport.Proposal.firstMatch(Proposal.java:182)
+	at net.schmizz.sshj.transport.Proposal.negotiate(Proposal.java:136)
+	at net.schmizz.sshj.transport.KeyExchanger.gotKexInit(KeyExchanger.java:265)
+	at net.schmizz.sshj.transport.KeyExchanger.handle(KeyExchanger.java:424)
+	at net.schmizz.sshj.transport.TransportImpl.handle(TransportImpl.java:497)
+	at net.schmizz.sshj.transport.Decoder.decode(Decoder.java:113)
+	at net.schmizz.sshj.transport.Decoder.received(Decoder.java:200)
+	at net.schmizz.sshj.transport.Reader.run(Reader.java:60)
+[sshd-SshServer[6272c96f](port=0)-nio2-thread-1] WARN org.apache.sshd.server.session.ServerSessionImpl - exceptionCaught(ServerSessionImpl[null@/127.0.0.1:34274])[state=Opened] SshException: Unable to negotiate key exchange for kex algorithms (client: curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,ext-info-c / server: diffie-hellman-group-exchange-sha256,ext-info-s)
+[sshj-Reader-/127.0.0.1:45561-1790629102887] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - UNKNOWN
+[Test worker] ERROR net.schmizz.concurrent.Promise - <<kex done>> woke to: net.schmizz.sshj.transport.TransportException: Unable to reach a settlement of KeyExchangeAlgorithms: [curve25519-sha256, curve25519-sha256@libssh.org, ecdh-sha2-nistp256, ecdh-sha2-nistp384, ecdh-sha2-nistp521, ext-info-c, kex-strict-c-v00@openssh.com] and [diffie-hellman-group-exchange-sha256, ext-info-s, kex-strict-s-v00@openssh.com]
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[sshd-SshServer[6272c96f](port=0)-nio2-thread-1] INFO org.apache.sshd.server.session.ServerSessionImpl - Disconnecting(ServerSessionImpl[null@/127.0.0.1:34274]): SSH2_DISCONNECT_KEY_EXCHANGE_FAILED - Unable to negotiate key exchange for kex algorithms (client: curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,ext-info-c / server: diffie-hellman-group-exchange-sha256,ext-info-s)
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=37099
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[47f08b81](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit9136693011293645121/host-key-EC.ser) Failed (StreamCorruptedException) to load: File /dev/shm/junit9136693011293645121/host-key-EC.ser is not a host key
+[sshd-SshServer[47f08b81](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[47f08b81](port=0)-nio2-thread-4] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:52586 authenticated
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=33627
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[5f404594](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit2990717512565842103/host-key-EC.ser) Failed (StreamCorruptedException) to load: File /dev/shm/junit2990717512565842103/host-key-EC.ser is not a host key
+[sshd-SshServer[5f404594](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[5f404594](port=0)-nio2-thread-4] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44466 authenticated
+[Test worker] INFO net.schmizz.sshj.connection.channel.direct.SessionChannel - Will request `sftp` subsystem
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[5f404594](port=0)-nio2-thread-29] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44488 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-31] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44498 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-30] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44482 authenticated
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[sshd-SshServer[5f404594](port=0)-nio2-thread-36] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44494 authenticated
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[5f404594](port=0)-nio2-thread-59] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44514 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-61] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44526 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-63] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44516 authenticated
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[sshd-SshServer[5f404594](port=0)-nio2-thread-64] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44538 authenticated
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[5f404594](port=0)-nio2-thread-85] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44586 authenticated
+[pool-1-thread-3] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[sshd-SshServer[5f404594](port=0)-nio2-thread-90] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44562 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-92] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44574 authenticated
+[sshd-SshServer[5f404594](port=0)-nio2-thread-93] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:44548 authenticated
+[pool-1-thread-4] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-1] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[pool-1-thread-2] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=40333
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[4cafa9aa](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit2093645430184857934/host-key-EC.ser) Failed (StreamCorruptedException) to load: File /dev/shm/junit2093645430184857934/host-key-EC.ser is not a host key
+[sshd-SshServer[4cafa9aa](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[4cafa9aa](port=0)-nio2-thread-4] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:57684 authenticated
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-OpenSSH_9.9
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+[Test worker] INFO org.apache.sshd.server.SshServer - start() listen on auto-allocated port=45465
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Client identity string: SSH-2.0-SSHJ_0.40.0
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Server identity string: SSH-2.0-APACHE-SSHD-2.12.1
+[sshd-SshServer[59429fac](port=0)-nio2-thread-1] WARN org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - resolveKeyPair(/dev/shm/junit15583061118380505384/host-key-EC.ser) Failed (StreamCorruptedException) to load: File /dev/shm/junit15583061118380505384/host-key-EC.ser is not a host key
+[sshd-SshServer[59429fac](port=0)-nio2-thread-1] INFO org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider - generateKeyPair(EC) generating host key=nistp521
+[sshd-SshServer[59429fac](port=0)-nio2-thread-7] INFO org.apache.sshd.server.session.ServerSessionImpl - Session tester@/127.0.0.1:52602 authenticated
+[Test worker] INFO net.schmizz.sshj.transport.TransportImpl - Disconnected - BY_APPLICATION
+]]></system-err>
+</testsuite>

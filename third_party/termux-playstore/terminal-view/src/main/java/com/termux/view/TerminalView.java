@@ -1041,7 +1041,8 @@ public final class TerminalView extends View {
             selectionY1,
             selectionY2,
             selectionX1,
-            selectionX2
+            selectionX2,
+            mSearchHighlightActive && !hasActiveTextSelection
         );
 
         if (mTextSelectionCursorController != null) {

@@ -114,6 +114,10 @@ class HostsBrowserTest {
         composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "qr")).assertIsDisplayed()
 
         composeRule.onNodeWithTag(UiTestTags.hostAction(host.id, "qr")).performClick()
+        // The QR is rendered off the main thread, so wait for its dialog.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("Share ${host.name}").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("Share ${host.name}").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 

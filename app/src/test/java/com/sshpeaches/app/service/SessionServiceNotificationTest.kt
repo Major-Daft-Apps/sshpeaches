@@ -104,6 +104,23 @@ class SessionServiceNotificationTest {
     }
 
     @Test
+    fun fileTransferSessionNotificationUsesSftpLabel() {
+        service.publishSessionNotifications(
+            listOf(
+                snapshot(
+                    sessionId = "session-files",
+                    mode = ConnectionMode.SCP,
+                    statusMessage = "SFTP ready"
+                )
+            )
+        )
+
+        val child = childNotifications().single()
+        assertEquals("Production • SFTP • Session 1", notificationTitle(child))
+        assertEquals("SFTP ready", child.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+    }
+
+    @Test
     fun childNotificationsAreExplicitlyGroupedWithTheForegroundSummary() {
         service.publishSessionNotifications(listOf(snapshot("session-a"), snapshot("session-b")))
 
@@ -218,7 +235,9 @@ class SessionServiceNotificationTest {
 
     private fun snapshot(
         sessionId: String,
-        status: SessionService.SessionStatus = SessionService.SessionStatus.ACTIVE
+        status: SessionService.SessionStatus = SessionService.SessionStatus.ACTIVE,
+        mode: ConnectionMode = ConnectionMode.SSH,
+        statusMessage: String? = null
     ): SessionService.SessionSnapshot =
         SessionService.SessionSnapshot(
             hostId = sessionId,
@@ -229,9 +248,9 @@ class SessionServiceNotificationTest {
                 username = "deploy",
                 preferredAuth = AuthMethod.IDENTITY
             ),
-            mode = ConnectionMode.SSH,
+            mode = mode,
             status = status,
-            statusMessage = when (status) {
+            statusMessage = statusMessage ?: when (status) {
                 SessionService.SessionStatus.CONNECTING -> "Opening SSH connection..."
                 SessionService.SessionStatus.ACTIVE -> "Interactive shell session ready"
                 SessionService.SessionStatus.ERROR -> "Connection failed"

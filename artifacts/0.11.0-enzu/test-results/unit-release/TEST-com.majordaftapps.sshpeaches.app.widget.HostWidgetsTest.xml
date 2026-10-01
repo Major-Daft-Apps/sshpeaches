@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:55.222Z" hostname="362696.200293.sys.ipv4.io" time="1.132">
+  <properties/>
+  <testcase name="sessionsWidgetMinimumPrioritizesTwoSessionsAndReportsOverflow" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.058"/>
+  <testcase name="resizingAddsRowsAndEventuallyRemovesOverflow" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.066"/>
+  <testcase name="sessionStoreIncludesModeStatusAndEndpointInSubtitle" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.061"/>
+  <testcase name="quickWidgetMinimumAllocatesOneHostAndOneSessionWithOverflow" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.05"/>
+  <testcase name="hostRowUsesDistinctDirectionalLabelsAndFortyEightDpTargets" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.741"/>
+  <testcase name="uploadAndDownloadPendingIntentsKeepDistinctEntryModes" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.053"/>
+  <testcase name="openSessionRowRendersSubtitleAndAccessibleActions" classname="com.majordaftapps.sshpeaches.app.widget.HostWidgetsTest" time="0.103"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

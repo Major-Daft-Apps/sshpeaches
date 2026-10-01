@@ -1,0 +1,12 @@
+What's new in 0.11.1
+
+- Host Info shows live `free -h` and physical `df -h` output (no loop/tmpfs clutter), and drops the old address/user/auth/transport fields from that panel.
+- Fixed Set PIN silently doing nothing when the encrypted secure store could no longer be decrypted (for example after its Keystore key was lost). The unreadab...
+- The Set PIN dialog now says when the PIN is too short or the two entries don't match.
+- Built-in keyboard mode opens the system keyboard under the extra keys when a terminal session starts and when you return to the app.
+- The terminal keyboard key now reopens the keyboard with one press after it was dismissed with Back, instead of needing two presses.
+- PIN lock now locks based on real time spent in the background, including after the app is swiped away or the phone sleeps, and no longer briefly shows unlock...
+- The lock screen now covers dialogs and prompts that were open when the app locked, and Back sends the app to the background instead of reaching the content u...
+- Repeated wrong PINs now add an increasing delay, and PINs are checked with the slow key derivation only (no fast PIN hash is stored).
+- With a PIN set, app contents are hidden from screenshots and the recent-apps view.
+- Editing an identity no longer erases its saved key passphrase.

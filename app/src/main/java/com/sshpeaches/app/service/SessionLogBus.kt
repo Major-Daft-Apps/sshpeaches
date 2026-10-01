@@ -24,8 +24,15 @@ object SessionLogBus {
         val hostId: String,
         val level: LogLevel,
         val message: String,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        /** Strictly increasing across all entries; lets the UI track "entries after X" even after
+         * old entries are trimmed from a bounded buffer. */
+        val sequence: Long = nextSequence()
     )
+
+    private val sequenceCounter = java.util.concurrent.atomic.AtomicLong()
+
+    fun nextSequence(): Long = sequenceCounter.incrementAndGet()
 
     private val _entries = MutableSharedFlow<Entry>(extraBufferCapacity = 200)
     val entries: SharedFlow<Entry> = _entries.asSharedFlow()

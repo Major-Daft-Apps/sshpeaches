@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:50.959Z" hostname="362696.200293.sys.ipv4.io" time="0.083">
+  <properties/>
+  <testcase name="rangedDownloadOnlyIssuesReadsInsideTheRequestedOffsets" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.011"/>
+  <testcase name="writesCompletedChunksAtResponseOffsetOutOfOrder" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.014"/>
+  <testcase name="refillsPipelineWhenAReadCompletesAndBytesRemain" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.013"/>
+  <testcase name="sftpFastPresetSelectsDefaultKnobValues" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.001"/>
+  <testcase name="shortDataRepliesKeepTheRequestWindowAndStillAssembleTheFile" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.011"/>
+  <testcase name="defaultsMatchRequestedKnobs" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.001"/>
+  <testcase name="downloadsOneLargeFileAsDisjointRangedWorkers" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.011"/>
+  <testcase name="neverForcesOrFsyncsTheSinkPerChunk" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.007"/>
+  <testcase name="customReadSizeAndMaxRequestsAreTheSizesTheEngineUses" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.007"/>
+  <testcase name="fillsReadWindowBeforeTheFirstWriteWaitCycle" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloaderTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

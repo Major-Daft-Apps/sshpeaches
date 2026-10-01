@@ -74,6 +74,10 @@ class IdentityBrowserTest {
         composeRule.onNodeWithTag(UiTestTags.identityFavorite(target.id)).performClick()
 
         composeRule.onNodeWithTag(UiTestTags.identityShare(target.id)).performClick()
+        // The QR is rendered off the main thread, so wait for its dialog.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("Share Favorite Identity").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("Share Favorite Identity").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 

@@ -1,0 +1,111 @@
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest:
+INSTRUMENTATION_STATUS: test=drawerEntryPointsExposeAccessibleActions
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=drawerEntryPointsExposeAccessibleActions
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=settingsPermissionEntryPointIsClickable
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=settingsPermissionEntryPointIsClickable
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.QuickConnectAccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+com.majordaftapps.sshpeaches.app.release.QuickConnectAccessibilitySmokeTest:
+INSTRUMENTATION_STATUS: test=quickConnectControlsRemainFocusableAndClickable
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.QuickConnectAccessibilitySmokeTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=quickConnectControlsRemainFocusableAndClickable
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.RtlSmokeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+com.majordaftapps.sshpeaches.app.release.RtlSmokeTest:
+INSTRUMENTATION_STATUS: test=permissionDialogRendersInRtl
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.RtlSmokeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=permissionDialogRendersInRtl
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.RtlSmokeTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=aboutDialogRendersLinksInRtl
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.RtlSmokeTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=aboutDialogRendersLinksInRtl
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.VisualSmokeTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+com.majordaftapps.sshpeaches.app.release.VisualSmokeTest:
+INSTRUMENTATION_STATUS: test=aboutDialogRendersNonBlankDarkTheme
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.VisualSmokeTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=aboutDialogRendersNonBlankDarkTheme
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.VisualSmokeTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=permissionDialogRendersNonBlankLightTheme
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.majordaftapps.sshpeaches.app.release.VisualSmokeTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=7
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=permissionDialogRendersNonBlankLightTheme
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 8.998
+
+OK (7 tests)
+
+
+INSTRUMENTATION_CODE: -1
+

@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest" tests="7" failures="0" errors="0" skipped="0" time="9.984" timestamp="2026-09-28T21:46:48" hostname="localhost">
+  <properties>
+    <property name="device" value="ci36(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="drawerEntryPointsExposeAccessibleActions" classname="com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest" time="2.88" />
+  <testcase name="settingsPermissionEntryPointIsClickable" classname="com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest" time="2.219" />
+  <testcase name="quickConnectControlsRemainFocusableAndClickable" classname="com.majordaftapps.sshpeaches.app.release.QuickConnectAccessibilitySmokeTest" time="1.085" />
+  <testcase name="permissionDialogRendersInRtl" classname="com.majordaftapps.sshpeaches.app.release.RtlSmokeTest" time="0.687" />
+  <testcase name="aboutDialogRendersLinksInRtl" classname="com.majordaftapps.sshpeaches.app.release.RtlSmokeTest" time="0.559" />
+  <testcase name="aboutDialogRendersNonBlankDarkTheme" classname="com.majordaftapps.sshpeaches.app.release.VisualSmokeTest" time="0.781" />
+  <testcase name="permissionDialogRendersNonBlankLightTheme" classname="com.majordaftapps.sshpeaches.app.release.VisualSmokeTest" time="0.685" />
+</testsuite>

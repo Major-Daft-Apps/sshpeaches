@@ -28,6 +28,15 @@ interface HostDao {
     @Query("UPDATE hosts SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
+    @Query("UPDATE hosts SET hasPassword = :hasPassword WHERE id = :id")
+    suspend fun updateHasPassword(id: String, hasPassword: Boolean): Int
+
+    @Query("UPDATE hosts SET hasPassword = 0")
+    suspend fun clearAllHasPassword(): Int
+
+    @Query("UPDATE hosts SET preferredIdentityId = NULL WHERE preferredIdentityId = :identityId")
+    suspend fun clearPreferredIdentity(identityId: String): Int
+
     @Query("SELECT COUNT(*) FROM hosts")
     suspend fun countAll(): Int
 }
@@ -49,6 +58,12 @@ interface IdentityDao {
     @Query("UPDATE identities SET favorite = :favorite WHERE id = :id")
     suspend fun updateFavorite(id: String, favorite: Boolean): Int
 
+    @Query("UPDATE identities SET hasPrivateKey = :hasPrivateKey WHERE id = :id")
+    suspend fun updateHasPrivateKey(id: String, hasPrivateKey: Boolean): Int
+
+    @Query("UPDATE identities SET hasPrivateKey = 0")
+    suspend fun clearAllHasPrivateKey(): Int
+
     @Query("SELECT COUNT(*) FROM identities")
     suspend fun countAll(): Int
 }
@@ -60,6 +75,9 @@ interface PortForwardDao {
 
     @Query("SELECT * FROM port_forwards WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): PortForwardEntity?
+
+    @Query("SELECT * FROM port_forwards")
+    suspend fun getAll(): List<PortForwardEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(forward: PortForwardEntity): Long
@@ -81,6 +99,9 @@ interface SnippetDao {
 
     @Query("SELECT * FROM snippets WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): SnippetEntity?
+
+    @Query("SELECT * FROM snippets")
+    suspend fun getAll(): List<SnippetEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(snippet: SnippetEntity): Long

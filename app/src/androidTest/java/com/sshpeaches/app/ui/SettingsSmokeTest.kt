@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -96,11 +97,25 @@ class SettingsSmokeTest {
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
 
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
-        composeRule.onNodeWithText("Export via QR").performClick()
-
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_IMPORT_QR_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_DIALOG).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_DIALOG).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH).assertIsOn()
-        composeRule.onNodeWithText("Export passphrase").assertIsDisplayed()
-        composeRule.onNodeWithText("Confirm passphrase").assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT)
+                .fetchSemanticsNodes()
+                .isNotEmpty() &&
+                composeRule.onAllNodesWithTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+        }
         composeRule.onNodeWithText("Cancel").performClick()
     }
 }

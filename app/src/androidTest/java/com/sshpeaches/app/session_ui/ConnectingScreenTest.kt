@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -31,6 +32,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.espresso.intent.Intents
@@ -390,9 +393,9 @@ class ConnectingScreenTest {
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_INPUT).assertIsDisplayed()
-        composeRule.onNodeWithText("Enter search text").assertIsDisplayed()
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_INPUT).performTextInput("sshpeaches-live")
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_STATUS).assertIsDisplayed()
         composeRule.onNodeWithText("1/1", substring = true).assertIsDisplayed()
         composeRule.onAllNodesWithText("sshpeaches-live", substring = true)[0].assertIsDisplayed()
 
@@ -424,6 +427,54 @@ class ConnectingScreenTest {
                     remoteDirectory = null,
                     terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
                     terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
+        hideTerminalKeyboardForTest(device)
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        assertTerminalKeyboardRequested(device)
+
+        hideTerminalKeyboardForTest(device)
+
+        doubleTapTerminalPanel()
+        assertTerminalKeyboardRequested(device)
+    }
+
+    @Test
+    fun builtInKeyboard_keyboardButtonAndTap_showSoftKeyboard() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    useBuiltInKeyboard = true,
                     keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
                     snippets = emptyList(),
                     onSendShellBytes = {},
@@ -896,13 +947,63 @@ class ConnectingScreenTest {
     }
 
     @Test
+    fun defaultKeyboard_keyboardKeyAndTapReopenAfterBack() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        setSshTerminalContentWithCtrlKey(shellOutput = "user@host:~$ ", onSendShellBytes = {})
+
+        showTerminalKeyboardAndAssertBridgeFocus()
+        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+        device.pressBack()
+        composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }
+        waitForAppImeVisibility(visible = false)
+
+        // A single keyboard-key press must reopen it; previously this press "hid" the already
+        // hidden keyboard and a second press was needed.
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+
+        // Tapping the terminal after Back must still bring the keyboard back in default mode.
+        device.pressBack()
+        composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
+            .performTouchInput { click() }
+        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+    }
+
+    @Test
+    fun builtInKeyboard_opensOnSessionStartAndKeyboardKeyReopensAfterBack() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "user@host:~$ ",
+            useBuiltInKeyboard = true,
+            onSendShellBytes = {}
+        )
+
+        assertTerminalKeyboardRequested(device)
+        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+
+        device.pressBack()
+        composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }
+        waitForAppImeVisibility(visible = false)
+
+        // A single press must reopen it; previously the stale request made this press a no-op.
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+    }
+
+    @Test
     fun terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val sentPayloads = mutableListOf<ByteArray>()
         setSshTerminalContentWithCtrlKey(
             shellOutput = "copy-built-in-keyboard-selection-target",
             useBuiltInKeyboard = true,
             onSendShellBytes = { sentPayloads += it.copyOf() }
         )
+        // Built-in mode opens the keyboard on session start; dismiss it so copying can be checked
+        // for not bringing it back.
+        assertTerminalKeyboardRequested(device)
+        hideTerminalKeyboardForTest(device)
 
         lateinit var terminalView: TerminalView
         composeRule.runOnIdle {
@@ -2002,7 +2103,7 @@ class ConnectingScreenTest {
     }
 
     @Test
-    fun scpForwardNavigation_isReachableFromOverflowOnNarrowScreens() {
+    fun scpForwardNavigation_isReachableOnNarrowScreens() {
         val listedPaths = mutableListOf<String>()
         var remoteDirectory by mutableStateOf<SessionService.RemoteDirectorySnapshot?>(null)
 
@@ -2069,14 +2170,14 @@ class ConnectingScreenTest {
             )
         }
 
-        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("forward"))
+            .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
 
         composeRule.runOnIdle {
             check(listedPaths.lastOrNull() == "/home/tester/docs") {
-                "Narrow SCP Forward did not revisit the next history entry: $listedPaths"
+                "Narrow file-browser Forward did not revisit the next history entry: $listedPaths"
             }
         }
     }
@@ -2230,16 +2331,87 @@ class ConnectingScreenTest {
             )
         }
 
-        val homeActionTag = UiTestTags.connectingScpAction("home")
-        if (composeRule.onAllNodesWithTag(homeActionTag).fetchSemanticsNodes().isEmpty()) {
-            composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
-        }
-        composeRule.onNodeWithTag(homeActionTag).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("home")).performClick()
         composeRule.runOnIdle {
             check(listedPaths.lastOrNull() == "/home/tester") {
                 "SCP Home button should reuse the canonical home path instead of requesting '.'"
             }
         }
+    }
+
+    @Test
+    fun scpToolbar_keepsNavSortAndHiddenFilesOnOneNarrowRow() {
+        composeRule.setContent {
+            MaterialTheme {
+                Box(Modifier.width(320.dp).fillMaxHeight()) {
+                    ConnectingScreen(
+                        request = requestFor(ConnectionMode.SCP),
+                        state = QuickConnectUiState(
+                            phase = QuickConnectPhase.SUCCESS,
+                            message = "SCP transfer ready"
+                        ),
+                        logs = emptyList(),
+                        shellOutput = "",
+                        remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                            path = "/home/tester",
+                            entries = listOf(
+                                SessionService.RemoteDirectoryEntry(
+                                    name = "readme.txt",
+                                    isDirectory = false,
+                                    sizeBytes = 12
+                                ),
+                                SessionService.RemoteDirectoryEntry(
+                                    name = ".bashrc",
+                                    isDirectory = false,
+                                    sizeBytes = 4
+                                )
+                            )
+                        ),
+                        terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                        terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                        keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                        snippets = emptyList(),
+                        onSendShellBytes = {},
+                        onTerminalResize = { _, _ -> },
+                        onSftpListDirectory = {},
+                        onSftpDownload = { _, _ -> },
+                        onSftpUpload = { _, _ -> },
+                        onScpDownload = { _, _ -> },
+                        onScpUpload = { _, _ -> },
+                        onManageRemotePath = { _, _, _ -> },
+                        onRetry = {},
+                        onToggleConnectedHostBar = {},
+                        onOpenSettings = {},
+                        findRequestToken = 0
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("forward")).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("home")).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("refresh")).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("sort")).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Show hidden files").assertDoesNotExist()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/home/tester/.bashrc"))
+            .assertDoesNotExist()
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("toggle_hidden"), useUnmergedTree = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow("/home/tester/.bashrc"))
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("sort")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("sort_name"), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("sort_size"), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("sort_date"), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("folders_first"), useUnmergedTree = true)
+            .assertIsDisplayed()
     }
 
     private fun setSshTerminalContent(onSendShellBytes: (ByteArray) -> Unit) {
@@ -2616,12 +2788,35 @@ class ConnectingScreenTest {
         }
     }
 
+    /** Waits until the app's window reports the IME state the keyboard key decides from. */
+    private fun waitForAppImeVisibility(visible: Boolean) {
+        composeRule.waitUntil(10_000) {
+            var matches = false
+            composeRule.runOnUiThread {
+                val insets = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+                matches = insets?.isVisible(WindowInsetsCompat.Type.ime()) == visible
+            }
+            matches
+        }
+        composeRule.waitForIdle()
+    }
+
     private fun hideTerminalKeyboardForTest(device: UiDevice) {
         if (device.isSoftKeyboardShown()) {
             device.pressBack()
+            composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }
         }
+        waitForAppImeVisibility(visible = false)
         if (isTerminalKeyboardRequested()) {
+            // Back can leave the request set, and the keyboard key acts on what is on screen, so
+            // show the keyboard and hide it again to reach a clean "hidden, not requested" state.
             composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+            composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+            waitForAppImeVisibility(visible = true)
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+            composeRule.waitUntil(10_000) {
+                !device.isSoftKeyboardShown() && !isTerminalKeyboardRequested()
+            }
         }
     }
 

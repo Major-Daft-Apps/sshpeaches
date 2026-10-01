@@ -1,0 +1,182 @@
+09-28 17:37:58.697 16269 16285 I TestRunner: started: keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor(com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest)
+09-28 17:37:58.704  1403  1403 D RecentsView: onTaskRemoved: 599, not handling task stack changes
+09-28 17:37:58.704  1403  1403 D RecentsView: onTaskRemoved: 599, not handling task stack changes
+09-28 17:37:58.706  1403  1403 D RecentsView: onTaskRemoved: 600, not handling task stack changes
+09-28 17:37:58.706  1403  1403 D RecentsView: onTaskRemoved: 600, not handling task stack changes
+09-28 17:37:58.708 16269 16292 I SSHPeachesTelemetry: Debug telemetry updated: crash=true analytics=true usage=true
+09-28 17:37:58.783 16269 16269 D SSHPeachesUI: ACTION SessionService.onDestroy | activeSessions=0
+09-28 17:37:58.783 16269 16269 D SSHPeachesUI: ACTION stopAllSessions | count=0
+09-28 17:37:58.783 16269 16269 D SSHPeachesUI: RESULT stopAllSessions -> OK
+09-28 17:37:58.783 16269 16269 D SSHPeachesUI: RESULT SessionService.onDestroy -> OK
+09-28 17:37:58.784 16269 16285 I UiAutomationPermGranter: Permission: android.permission.POST_NOTIFICATIONS is already granted!
+09-28 17:37:58.785 16269 16285 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@2d6898a]
+09-28 17:37:58.787 16269 16285 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+09-28 17:37:58.790   669  1342 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@f88160e8 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:37:58.793   541   556 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:37:58.796  1403  1403 W SplitSelectStateCtor: Missing session instanceIds
+09-28 17:37:58.796  1403  1403 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+09-28 17:37:58.797   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:58.813 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: PRE_ON_CREATE
+09-28 17:37:58.813 16269 16269 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+09-28 17:37:58.815   541   541 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:37:58.824 16269 16269 D SSHPeachesUI: ACTION MainActivity.onCreate
+09-28 17:37:58.824 16269 16269 D SSHPeachesUI: RESULT MainActivity.onCreate -> OK
+09-28 17:37:58.824 16269 16269 D SSHPeachesUI: ACTION setupBiometricPrompt
+09-28 17:37:58.826 16269 16269 D SSHPeachesUI: RESULT setupBiometricPrompt -> FAIL | biometricUnavailable
+09-28 17:37:58.828 16269 16540 D SSHPeachesUI: STATE AppViewModel.uiState | resourcesLoaded=false, hosts=0, identities=0, forwards=0, snippets=0, sort=LAST_USED, theme=SYSTEM, locked=false, pinConfigured=false, background=true, biometric=false, diagnostics=true, keyboardFilled=14/14
+09-28 17:37:58.835 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: CREATED
+09-28 17:37:58.835 16269 16269 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@83f6865
+09-28 17:37:58.840 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: STARTED
+09-28 17:37:58.840 16269 16269 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@83f6865
+09-28 17:37:58.842 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: RESUMED
+09-28 17:37:58.842 16269 16269 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@83f6865
+09-28 17:37:58.873  1403  1403 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:37:58.881 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:37:58.882  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+09-28 17:37:58.901 16269 16269 D SSHPeachesUI: ACTION onAppForegrounded | locked=false
+09-28 17:37:58.901 16269 16269 D SSHPeachesUI: RESULT onAppForegrounded -> OK
+09-28 17:37:58.996  1073  1090 I ndroid.systemui: NativeAlloc concurrent mark compact GC freed 2613KB AllocSpace bytes, 1(20KB) LOS objects, 48% free, 25MB/49MB, paused 1.692ms,2.924ms total 330.710ms
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.000  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.003  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.004  1073  1092 W System  : A resource failed to call release.
+09-28 17:37:59.044 16269 16540 D SSHPeachesUI: STATE AppViewModel.uiState | resourcesLoaded=true, hosts=0, identities=0, forwards=0, snippets=0, sort=LAST_USED, theme=SYSTEM, locked=false, pinConfigured=false, background=true, biometric=false, diagnostics=true, keyboardFilled=14/14
+09-28 17:37:59.050 16269 16269 D SSHPeachesUI: RESULT MainActivity.ensureSessionServiceConnection -> OK | requestedServiceStart=true, bindRequested=true
+09-28 17:37:59.051   669   680 I system_server: NativeAlloc concurrent mark compact GC freed 8525KB AllocSpace bytes, 13(228KB) LOS objects, 43% free, 31MB/55MB, paused 2.728ms,7.730ms total 413.348ms
+09-28 17:37:59.051 16269 16269 D WindowLayoutComponentImpl: Register WindowLayoutInfoListener on Context=com.majordaftapps.sshpeaches.app.MainActivity@83f6865, of which baseContext=android.app.ContextImpl@e6047d2
+09-28 17:37:59.053   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:59.054   669   689 I ActivityTaskManager: Displayed com.majordaftapps.sshpeaches.debug/com.majordaftapps.sshpeaches.app.MainActivity for user 0: +255ms
+09-28 17:37:59.055 16269 16269 D SSHPeachesUI: ACTION SessionService.onCreate
+09-28 17:37:59.057  1403  1403 D BaseDepthController: setSurface:
+09-28 17:37:59.057  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:37:59.057  1403  1403 D BaseDepthController: 	mBaseSurface: null
+09-28 17:37:59.058  1403  1403 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+09-28 17:37:59.058  1403  1403 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+09-28 17:37:59.058  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:4)
+09-28 17:37:59.058  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:1)
+09-28 17:37:59.058  1403  1403 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:34)
+09-28 17:37:59.059  1403  1403 D StatsLog: LAUNCHER_ONSTOP
+09-28 17:37:59.059   669  1060 D ConnectivityService: requestNetwork for uid/pid:10231/16269 activeRequest: null callbackRequest: 716 [NetworkRequest [ REQUEST id=717, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10231 RequestorUid: 10231 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false declaredMethods: AVAIL|LOSING|LOST|NC
+09-28 17:37:59.060 16269 16269 D SSHPeachesUI: RESULT SessionService.onCreate -> OK
+09-28 17:37:59.060 16269 16269 D SSHPeachesUI: ACTION SessionService.onStartCommand | action=null, startId=1
+09-28 17:37:59.060  1403  1403 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+09-28 17:37:59.060 16269 16269 D SSHPeachesUI: RESULT SessionService.onStartCommand -> OK
+09-28 17:37:59.061   669   682 W System  : A resource failed to call HardwareBuffer.close.
+09-28 17:37:59.062   669   988 D ConnectivityService: NetReassign [717 : null → 100] [c 1] [a 0] [i 1]
+09-28 17:37:59.062   669   982 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=717, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10231 RequestorUid: 10231 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+09-28 17:37:59.062   669   982 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=717, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10231 RequestorUid: 10231 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+09-28 17:37:59.062   669   982 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=717, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10231 RequestorUid: 10231 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+09-28 17:37:59.062   669   982 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=717, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10231 RequestorUid: 10231 RequestorPkg: com.majordaftapps.sshpeaches.debug UnderlyingNetworks: Null] ]
+09-28 17:37:59.062   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.062   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.062 16269 16269 D SSHPeachesUI: RESULT SessionService.onServiceConnected -> OK | bound=true, serviceReady=true
+09-28 17:37:59.063   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.063   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.063   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.063   669   692 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:59.064   669   692 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:59.064   669   692 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:59.064   669   682 W System  : A resource failed to call release.
+09-28 17:37:59.072   669   792 I ImeTracker: com.majordaftapps.sshpeaches.debug:8d4e4e9c: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+09-28 17:37:59.072 16269 16269 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:37:59.072 16269 16269 I ImeTracker: com.majordaftapps.sshpeaches.debug:8d4e4e9c: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:37:59.073  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+09-28 17:37:59.074   669  1181 I ImeTracker: system_server:fe6ecbbc: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:37:59.074  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+09-28 17:37:59.074  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.majordaftapps.sshpeaches.debug, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+09-28 17:37:59.074   669   692 I ImeTracker: system_server:fe6ecbbc: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:37:59.075  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+09-28 17:37:59.121 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:37:59.355 16269 16269 W HWUI    : Image decoding logging dropped!
+09-28 17:37:59.935   669  1801 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@fa363987 does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+09-28 17:37:59.938   541   556 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:37:59.940  1073  1203 I ndroid.systemui: AssetManager2(0x7780359eb2f8) locale list changing from [] to [en-US]
+09-28 17:37:59.941   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:37:59.944 16269 16269 D SSHPeachesUI: ACTION onUserInteraction | locked=false
+09-28 17:37:59.944 16269 16269 D SSHPeachesUI: RESULT onUserInteraction -> OK
+09-28 17:37:59.944 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: PAUSED
+09-28 17:37:59.945 16269 16269 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@83f6865
+09-28 17:37:59.947 16329 16342 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+09-28 17:37:59.948 16329 16342 I EGL_emulation: Opening libGLESv2_emulation.so
+09-28 17:37:59.948   541   541 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:37:59.959 16329 16342 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-28 17:37:59.990  1073  1173 I ndroid.systemui: AssetManager2(0x7780359c4e78) locale list changing from [] to [en-US]
+09-28 17:37:59.990  1073  1173 I ndroid.systemui: AssetManager2(0x7780359e99f8) locale list changing from [] to [en-US]
+09-28 17:37:59.993   541   619 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+09-28 17:38:00.002 16269 16269 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:38:00.051  1403  1423 W System  : A resource failed to call release.
+09-28 17:38:00.051  1403  1423 W System  : A resource failed to call release.
+09-28 17:38:00.051  1403  1423 W System  : A resource failed to call release.
+09-28 17:38:00.173  1403  1403 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:00.173  1403  1403 D StatsLog: LAUNCHER_ONRESUME
+09-28 17:38:00.179 16269 16269 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@d1b062f
+09-28 17:38:00.179  1403  1453 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+09-28 17:38:00.182  1403  1403 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+09-28 17:38:00.185  1813  1979 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+09-28 17:38:00.185  1813  1979 I AiAiEcho: EchoTargets:
+09-28 17:38:00.185  1813  1979 I AiAiEcho: Filtered by AiAi flag check:
+09-28 17:38:00.185  1813  1979 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+09-28 17:38:00.185  1813  1979 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+09-28 17:38:00.186  1813  1979 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+09-28 17:38:00.187  1403  1403 D BaseDepthController: setSurface:
+09-28 17:38:00.187  1403  1403 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+09-28 17:38:00.187  1403  1403 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x4fda961
+09-28 17:38:00.190 16269 16269 D SSHPeachesUI: ACTION onAppBackgrounded | locked=false
+09-28 17:38:00.193 16269 16269 D SSHPeachesUI: RESULT onAppBackgrounded -> OK | timerActive=true
+09-28 17:38:00.193 16269 16269 D SSHPeachesUI: RESULT MainActivity.backgroundSessionTimeout -> OK | stopNow=never
+09-28 17:38:00.194 16269 16269 D SSHPeachesUI: ACTION MainActivity.onStop | persistSessions=true
+09-28 17:38:00.194 16269 16269 D SSHPeachesUI: RESULT MainActivity.onStop -> OK | stoppedAllSessions=false
+09-28 17:38:00.194 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: STOPPED
+09-28 17:38:00.195 16269 16269 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.majordaftapps.sshpeaches.app.MainActivity@83f6865
+09-28 17:38:00.209  1403  1403 D SsBaseTemplateCard: No text view can be set up
+09-28 17:38:00.209  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:00.210  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:00.210  1403  1403 D SsBaseTemplateCard: Passed-in item info is null
+09-28 17:38:00.210  1403  1403 I SsBaseTemplateCard: Secondary card pane is null
+09-28 17:38:00.222  1403  1403 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+09-28 17:38:00.222  1403  1403 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:22)
+09-28 17:38:00.222  1403  1403 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:11)
+09-28 17:38:00.222  1403  1403 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 72a59688580715d19f0e415c69e80376c2f062d1648c80db6730905005a27c20:339)
+09-28 17:38:00.223  1403  1403 D b/311077782: LauncherAnimationRunner.setAnimation
+09-28 17:38:00.224  1403  1403 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+09-28 17:38:00.238 16329 16329 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+09-28 17:38:00.246   669   792 I ImeTracker: com.google.android.apps.nexuslauncher:a34972b5: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+09-28 17:38:00.253  1403  1403 D InsetsController: hide(ime(), fromIme=false)
+09-28 17:38:00.253  1403  1403 I ImeTracker: com.google.android.apps.nexuslauncher:a34972b5: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-28 17:38:00.255  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+09-28 17:38:00.257  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+09-28 17:38:00.257  6816  6816 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+09-28 17:38:00.259  6816  6816 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+09-28 17:38:00.265   669  1793 I ImeTracker: system_server:aeed2e5d: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+09-28 17:38:00.268   594  3537 W IPCThreadState: Sending oneway calls to frozen process.
+09-28 17:38:00.269   669   692 I ImeTracker: system_server:aeed2e5d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+09-28 17:38:00.276 16329 16329 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@ae9d437
+09-28 17:38:00.280 16329 16329 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:00.295  1403  1403 D RecentsView: onTaskRemoved: 602, not handling task stack changes
+09-28 17:38:00.296  1403  1403 D RecentsView: onTaskRemoved: 602, not handling task stack changes
+09-28 17:38:00.309 16269 16269 D SSHPeachesUI: ACTION MainActivity.onDestroy | serviceBound=true
+09-28 17:38:00.309 16269 16269 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@57f298d
+09-28 17:38:00.310 16269 16269 D SSHPeachesUI: RESULT MainActivity.onDestroy -> OK
+09-28 17:38:00.310 16269 16269 D LifecycleMonitor: Lifecycle status change: com.majordaftapps.sshpeaches.app.MainActivity@83f6865 in: DESTROYED
+09-28 17:38:00.310 16269 16269 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+09-28 17:38:00.312 16269 16269 D ViewRootImpl: Skipping stats log for color mode
+09-28 17:38:00.313 16269 16285 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@2d6898a]
+09-28 17:38:00.318  1403  1403 D RecentsView: onTaskRemoved: 601, not handling task stack changes
+09-28 17:38:00.318  1403  1403 D RecentsView: onTaskRemoved: 601, not handling task stack changes
+09-28 17:38:00.321 16269 16285 I TestRunner: finished: keyboardEditor_hasTwoEditableRowsAndMainFnSlotOpensTheEditor(com.majordaftapps.sshpeaches.app.keyboard.KeyboardEditorTest)

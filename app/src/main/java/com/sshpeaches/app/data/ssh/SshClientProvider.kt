@@ -187,7 +187,7 @@ object SshClientProvider {
         // but letting SSHJ auto-register BC breaks transport digests on Android.
         SecurityUtils.setRegisterBouncyCastle(false)
         SecurityUtils.setSecurityProvider(null)
-        ensureBundledBouncyCastleProviderInstalled()
+        installBundledBouncyCastleProvider()
         ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
@@ -414,7 +414,13 @@ object SshClientProvider {
         }
     }
 
-    private fun ensureBundledBouncyCastleProviderInstalled() {
+    /**
+     * Replaces Android's "BC" provider with the bundled Bouncy Castle provider, process-wide.
+     * Every JCA lookup that only Bouncy Castle serves (e.g. PBKDF2WithHmacSHA256 for the PIN vault)
+     * goes to the bundled provider afterwards, which is why release builds keep its classes
+     * (see proguard-rules.pro). Public so a release-lane test can run the swap without an SSH client.
+     */
+    fun installBundledBouncyCastleProvider() {
         synchronized(providerInstallLock) {
             runCatching {
                 val existing = Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME)

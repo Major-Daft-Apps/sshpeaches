@@ -1,0 +1,58 @@
+INFO: Constructing runner from config.
+INFO: Configuring Android Instrumentation driver: android_instrumentation_runtime {
+  instrumentation_info {
+    app_package: "com.majordaftapps.sshpeaches"
+    test_package: "com.majordaftapps.sshpeaches.test"
+    test_runner_class: "androidx.test.runner.AndroidJUnitRunner"
+  }
+  instrumentation_args {
+    args_map {
+      key: "additionalTestOutputDir"
+      value: "/sdcard/Android/media/com.majordaftapps.sshpeaches/additional_test_output"
+    }
+    args_map {
+      key: "annotation"
+      value: "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    }
+    args_map {
+      key: "clearPackageData"
+      value: "true"
+    }
+    args_map {
+      key: "notAnnotation"
+      value: "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+
+INFO: Configuring AndroidTestApkInstallerPlugin: apks_to_install {
+  apk_paths: "/opt/sshpeaches/app/build/outputs/apk/release/app-release.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+apks_to_install {
+  apk_paths: "/opt/sshpeaches/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+instrumentation_target_package_id: "com.majordaftapps.sshpeaches"
+
+INFO: No installables found in test fixture. Nothing to install.
+INFO: Installing [/opt/sshpeaches/app/build/outputs/apk/release/app-release.apk] on device emulator-5554.
+INFO: Installing [/opt/sshpeaches/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk] on device emulator-5554.
+INFO: Start logcat streaming.
+INFO: Running Android Instrumentation driver.
+INFO: Copying files from device to host: /sdcard/Android/media/com.majordaftapps.sshpeaches/additional_test_output to /opt/sshpeaches/app/build/outputs/connected_android_test_additional_output/releaseAndroidTest/connected/ci36(AVD) - 16
+INFO: Stop logcat streaming.
+INFO: Uninstalling com.majordaftapps.sshpeaches for device emulator-5554.
+INFO: Uninstalling com.majordaftapps.sshpeaches.test for device emulator-5554.
+INFO: Execute com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest.drawerEntryPointsExposeAccessibleActions: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.AccessibilitySmokeTest.settingsPermissionEntryPointIsClickable: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.QuickConnectAccessibilitySmokeTest.quickConnectControlsRemainFocusableAndClickable: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.RtlSmokeTest.permissionDialogRendersInRtl: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.RtlSmokeTest.aboutDialogRendersLinksInRtl: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.VisualSmokeTest.aboutDialogRendersNonBlankDarkTheme: PASSED
+INFO: Execute com.majordaftapps.sshpeaches.app.release.VisualSmokeTest.permissionDialogRendersNonBlankLightTheme: PASSED

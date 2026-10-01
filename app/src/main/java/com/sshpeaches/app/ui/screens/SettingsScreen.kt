@@ -3,6 +3,7 @@ package com.majordaftapps.sshpeaches.app.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,13 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -89,7 +98,7 @@ private enum class SettingsCategory(
     SECURITY("Security", "PIN, biometrics, and host key policy"),
     AUTOMATION("Automation", "Snippets and port forward defaults"),
     DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
-    TRANSFER("Transfer / QR", "Export and import app data"),
+    TRANSFER("Transfer", "Export and import via QR or file"),
     ADVANCED("Advanced", "SFTP transfer tuning and other expert options")
 }
 
@@ -151,7 +160,7 @@ fun SettingsScreen(
     onClearPin: () -> Unit,
     onGenerateExportPayload: (String?) -> String?,
     onTransferPayloadRequiresPassphrase: (String) -> Boolean = { false },
-    onImportFromQrPayload: (String, String?) -> String = { _, _ -> "Invalid export QR." },
+    onImportFromQrPayload: (String, String?) -> String = { _, _ -> "Invalid export payload." },
     onShowMessage: (String) -> Unit = {},
     corePermissions: List<CorePermissionStatus> = emptyList(),
     onManagePermissions: () -> Unit = {}
@@ -222,889 +231,1031 @@ fun SettingsScreen(
     val pinEntry = remember { mutableStateOf("") }
     val pinRevealIndex = remember { mutableIntStateOf(-1) }
     val confirmPinEntry = remember { mutableStateOf("") }
+    val pinDialogError = remember { mutableStateOf<String?>(null) }
     val confirmPinRevealIndex = remember { mutableIntStateOf(-1) }
     val showDisablePinDialog = remember { mutableStateOf(false) }
-    val customMinutesState = remember(customLockTimeoutMinutes) { mutableStateOf(customLockTimeoutMinutes.toString()) }
-    val snippetTimeoutState = remember(snippetRunTimeoutSeconds) { mutableStateOf(snippetRunTimeoutSeconds.toString()) }
-    val terminalMarginState = remember(terminalMarginPx) { mutableStateOf(terminalMarginPx.toString()) }
-    val moshServerCommandState = remember(moshServerCommand) { mutableStateOf(moshServerCommand) }
-    val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    val exportPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
-    val exportPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
-    val exportConfirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
-    val exportConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
-    val exportPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
-    val pendingImportPayload = remember { mutableStateOf<String?>(null) }
-    val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
-    val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
-    val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
-    val scanLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
-        val contents = result.contents.orEmpty()
-        if (contents.isBlank()) {
-            onShowMessage("QR scan cancelled.")
-        } else {
-            if (onTransferPayloadRequiresPassphrase(contents)) {
-                pendingImportPayload.value = contents
-                importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
-                importPassphraseError.value = null
-            } else {
-                onShowMessage(onImportFromQrPayload(contents, null))
-            }
-        }
-    }
-    AutoHidePasswordReveal(pinRevealIndex)
-    AutoHidePasswordReveal(confirmPinRevealIndex)
-    AutoHidePasswordReveal(exportPassphraseRevealIndex)
-    AutoHidePasswordReveal(exportConfirmPassphraseRevealIndex)
-    AutoHidePasswordReveal(importPassphraseRevealIndex)
-    val selectedCategory = rememberSaveable { mutableStateOf(SettingsCategory.PERMISSIONS) }
+    val customMinutesState = rememberPersistedField(customLockTimeoutMinutes.toString())
+    val snippetTimeoutState = rememberPersistedField(snippetRunTimeoutSeconds.toString())
+    val terminalMarginState = rememberPersistedField(terminalMarginPx.toString())
+    val moshServerCommandState = rememberPersistedField(moshServerCommand)
+    val scope = rememberCoroutineScope()
+    val transferWorking = remember { mutableStateOf(false) }
 
-    @Composable
-    fun SettingsSections(
-        visibleCategories: Set<SettingsCategory>,
-        modifier: Modifier = Modifier
-    ) {
-        Column(
-            modifier = modifier
-                .verticalScroll(rememberScrollState())
-                .testTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            if (SettingsCategory.PERMISSIONS in visibleCategories) {
-            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Permissions", style = MaterialTheme.typography.titleMedium)
-                    corePermissions.forEach { permission ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(permission.title)
-                                Text(
-                                    permission.description,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (!permission.granted) {
-                                Icon(
-                                    imageVector = Icons.Default.ErrorOutline,
-                                    contentDescription = "Missing permission",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-                    Button(
-                        onClick = onManagePermissions,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Manage permissions")
-                    }
+    // Import runs PBKDF2 per protected item (about 1-2 s each), so keep it off the main thread.
+    fun runImport(contents: String, passphrase: String?) {
+        transferWorking.value = true
+        scope.launch {
+                val message = withContext(Dispatchers.Default) {
+                    runCatching { onImportFromQrPayload(contents, passphrase) }
+                        .getOrElse { "Import failed: ${it.message ?: it.javaClass.simpleName}" }
                 }
-            }
-            }
-            if (SettingsCategory.APPEARANCE in visibleCategories) {
-            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Theme", style = MaterialTheme.typography.titleMedium)
-                    ExposedDropdownMenuBox(
-                        expanded = expanded.value,
-                        onExpandedChange = { expanded.value = !expanded.value }
-                    ) {
-                        TextField(
-                            value = themeOptions.first { it.first == currentTheme }.second,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Mode") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
-                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                                .testTag(UiTestTags.SETTINGS_THEME_MODE_FIELD)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expanded.value,
-                            onDismissRequest = { expanded.value = false }
-                        ) {
-                            themeOptions.forEach { (mode, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        expanded.value = false
-                                        onThemeChange(mode)
-                                    },
-                                    modifier = Modifier.testTag(UiTestTags.settingsThemeOption(label))
-                                )
-                            }
-                        }
-                    }
-                    Text("App Icon", style = MaterialTheme.typography.titleSmall)
-                    appIconOptions.forEach { choice ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onAppIconChange(choice.option) }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AppIconPreview(choice)
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 12.dp, end = 12.dp)
-                            ) {
-                                Text(choice.title)
-                                Text(
-                                    choice.description,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            RadioButton(
-                                selected = currentAppIcon == choice.option,
-                                onClick = { onAppIconChange(choice.option) },
-                                modifier = Modifier.testTag(UiTestTags.settingsAppIconOption(choice.title))
-                            )
-                        }
-                    }
-                }
-            }
-            }
-            if (SettingsCategory.BACKGROUND in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 12.dp)
-                    ) {
-                        Text("Run shells in background")
-                        Text(
-                            "Keep SSH/Mosh sessions alive while app is backgrounded",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Switch(
-                        checked = allowBackgroundSessions,
-                        onCheckedChange = onBackgroundToggle,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
-                    )
-                }
-                ExposedDropdownMenuBox(
-                    expanded = backgroundTimeoutExpanded.value,
-                    onExpandedChange = {
-                        if (allowBackgroundSessions) {
-                            backgroundTimeoutExpanded.value = !backgroundTimeoutExpanded.value
-                        }
-                    }
-                ) {
-                    TextField(
-                        value = backgroundSessionTimeout.label,
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = allowBackgroundSessions,
-                        label = { Text("Background connection timeout") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundTimeoutExpanded.value)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = backgroundTimeoutExpanded.value,
-                        onDismissRequest = { backgroundTimeoutExpanded.value = false }
-                    ) {
-                        backgroundTimeoutOptions.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.label) },
-                                onClick = {
-                                    backgroundTimeoutExpanded.value = false
-                                    onBackgroundSessionTimeoutChange(option)
-                                }
-                            )
-                        }
-                    }
-                }
-                Text(
-                    "When app is backgrounded, sessions are stopped after this timeout.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                transferWorking.value = false
+                onShowMessage(message)
             }
         }
-            }
-            if (SettingsCategory.TERMINAL in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Terminal", style = MaterialTheme.typography.titleMedium)
-                ExposedDropdownMenuBox(
-                    expanded = terminalExpanded.value,
-                    onExpandedChange = { terminalExpanded.value = !terminalExpanded.value }
-                ) {
-                    TextField(
-                        value = terminalEmulation.label,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Emulation mode") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalExpanded.value) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                            .testTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = terminalExpanded.value,
-                        onDismissRequest = { terminalExpanded.value = false }
-                    ) {
-                        terminalOptions.forEach { option ->
-                            DropdownMenuItem(
-                                modifier = Modifier.testTag(
-                                    UiTestTags.settingsTerminalOption(option.label)
-                                ),
-                                text = { Text(option.label) },
-                                onClick = {
-                                    terminalExpanded.value = false
-                                    onTerminalEmulationChange(option)
-                                }
-                            )
-                        }
-                    }
+        val context = LocalContext.current
+        val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+        val exportToFile = rememberSaveable { mutableStateOf(false) }
+        val pendingExportPayload = remember { mutableStateOf<String?>(null) }
+        val exportPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+        val exportPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+        val exportConfirmPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+        val exportConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+        val exportPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
+        val pendingImportPayload = remember { mutableStateOf<String?>(null) }
+        val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
+        val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
+        val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
+        val scanLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
+            val contents = result.contents.orEmpty()
+            if (contents.isBlank()) {
+                onShowMessage("QR scan cancelled.")
+            } else {
+                if (onTransferPayloadRequiresPassphrase(contents)) {
+                    pendingImportPayload.value = contents
+                    importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                    importPassphraseError.value = null
+                } else {
+                    runImport(contents, null)
                 }
-                Text(
-                    "xterm is the default and recommended mode.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                OutlinedTextField(
-                    value = terminalMarginState.value,
-                    onValueChange = { next ->
-                        val digits = next.filter { it.isDigit() }.take(3)
-                        terminalMarginState.value = digits
-                        if (digits.isEmpty()) {
-                            onTerminalMarginPxChange(0)
-                        } else {
-                            val parsed = digits.toIntOrNull()
-                            if (parsed != null) {
-                                val clamped = parsed.coerceIn(0, 128)
-                                terminalMarginState.value = clamped.toString()
-                                onTerminalMarginPxChange(clamped)
+            }
+        }
+        val createExportFileLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            val payload = pendingExportPayload.value
+            pendingExportPayload.value = null
+            if (uri == null || payload == null) {
+                onShowMessage("File export cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            scope.launch {
+                val wrote = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            output.write(payload.toByteArray(Charsets.UTF_8))
+                            output.flush()
+                        } ?: error("missing output stream")
+                    }.isSuccess
+                }
+                onShowMessage(if (wrote) "Exported connections to file." else "Unable to write export file.")
+            }
+        }
+        val openImportFileLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri == null) {
+                onShowMessage("File import cancelled.")
+                return@rememberLauncherForActivityResult
+            }
+            scope.launch {
+                // Document providers can be slow (cloud storage), so read off the main thread.
+                val contents = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            input.readBytes().toString(Charsets.UTF_8)
+                        }
+                    }.getOrNull().orEmpty()
+                }
+                if (contents.isBlank()) {
+                    onShowMessage("Unable to read export file.")
+                } else if (onTransferPayloadRequiresPassphrase(contents)) {
+                    pendingImportPayload.value = contents
+                    importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                    importPassphraseError.value = null
+                } else {
+                    runImport(contents, null)
+                }
+            }
+        }
+        AutoHidePasswordReveal(pinRevealIndex)
+        AutoHidePasswordReveal(confirmPinRevealIndex)
+        AutoHidePasswordReveal(exportPassphraseRevealIndex)
+        AutoHidePasswordReveal(exportConfirmPassphraseRevealIndex)
+        AutoHidePasswordReveal(importPassphraseRevealIndex)
+        val selectedCategory = rememberSaveable { mutableStateOf(SettingsCategory.PERMISSIONS) }
+
+        @Composable
+        fun SettingsSections(
+            visibleCategories: Set<SettingsCategory>,
+            modifier: Modifier = Modifier
+        ) {
+            Column(
+                modifier = modifier
+                    .verticalScroll(rememberScrollState())
+                    .testTag(UiTestTags.SETTINGS_SCROLL_CONTAINER)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (SettingsCategory.PERMISSIONS in visibleCategories) {
+                Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Permissions", style = MaterialTheme.typography.titleMedium)
+                        corePermissions.forEach { permission ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(permission.title)
+                                    Text(
+                                        permission.description,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                if (!permission.granted) {
+                                    Icon(
+                                        imageVector = Icons.Default.ErrorOutline,
+                                        contentDescription = "Missing permission",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
-                    },
-                    label = { Text("Terminal margin (px)") },
-                    supportingText = {
-                        Text(
-                            "Adds space around the terminal content for screen protectors. Use 0 to disable. 8 or 16 is a good starting point."
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
-                )
-                ExposedDropdownMenuBox(
-                    expanded = bellExpanded.value,
-                    onExpandedChange = { bellExpanded.value = !bellExpanded.value }
-                ) {
-                    TextField(
-                        value = terminalBellMode.label,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Bell") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = bellExpanded.value)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
-                            .testTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = bellExpanded.value,
-                        onDismissRequest = { bellExpanded.value = false }
-                    ) {
-                        bellOptions.forEach { option ->
-                            DropdownMenuItem(
-                                modifier = Modifier.testTag(
-                                    UiTestTags.settingsTerminalBellOption(option.label)
-                                ),
-                                text = { Text(option.label) },
-                                onClick = {
-                                    bellExpanded.value = false
-                                    onTerminalBellModeChange(option)
-                                }
-                            )
+                        Button(
+                            onClick = onManagePermissions,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Manage permissions")
                         }
                     }
                 }
-                Text(
-                    terminalBellMode.description,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text("Use volume buttons to adjust font size")
-                        Text(
-                            "When enabled, volume up/down changes terminal font size instead of device volume while a terminal session is focused.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Switch(
-                        checked = useVolumeButtonsToAdjustFontSize,
-                        onCheckedChange = onUseVolumeButtonsToAdjustFontSizeChange,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH)
-                    )
                 }
-                SettingsToggleRow(
-                    title = "Use built-in keyboard",
-                    description = "Use SSHPeaches' built-in keyboard layout and Fn access instead of the Android soft keyboard.",
-                    checked = useBuiltInKeyboard,
-                    onCheckedChange = onUseBuiltInKeyboardToggle,
-                    modifier = Modifier.testTag(UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH)
-                )
-                OutlinedTextField(
-                    value = moshServerCommandState.value,
-                    onValueChange = { next ->
-                        moshServerCommandState.value = next
-                        onMoshServerCommandChange(next)
-                    },
-                    label = { Text("Mosh server command") },
-                    supportingText = {
-                        Text(
-                            "Command executed on the remote host to start mosh-server. Leave blank to use the default: $DEFAULT_MOSH_SERVER_COMMAND"
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Text
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
-                )
-                Text(
-                    "Selection mode",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                selectionOptions.forEach { option ->
+                if (SettingsCategory.APPEARANCE in visibleCategories) {
+                Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Theme", style = MaterialTheme.typography.titleMedium)
+                        ExposedDropdownMenuBox(
+                            expanded = expanded.value,
+                            onExpandedChange = { expanded.value = !expanded.value }
+                        ) {
+                            TextField(
+                                value = themeOptions.first { it.first == currentTheme }.second,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Mode") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value) },
+                                colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth()
+                                    .testTag(UiTestTags.SETTINGS_THEME_MODE_FIELD)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expanded.value,
+                                onDismissRequest = { expanded.value = false }
+                            ) {
+                                themeOptions.forEach { (mode, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            expanded.value = false
+                                            onThemeChange(mode)
+                                        },
+                                        modifier = Modifier.testTag(UiTestTags.settingsThemeOption(label))
+                                    )
+                                }
+                            }
+                        }
+                        Text("App Icon", style = MaterialTheme.typography.titleSmall)
+                        appIconOptions.forEach { choice ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onAppIconChange(choice.option) }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AppIconPreview(choice)
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 12.dp, end = 12.dp)
+                                ) {
+                                    Text(choice.title)
+                                    Text(
+                                        choice.description,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                RadioButton(
+                                    selected = currentAppIcon == choice.option,
+                                    onClick = { onAppIconChange(choice.option) },
+                                    modifier = Modifier.testTag(UiTestTags.settingsAppIconOption(choice.title))
+                                )
+                            }
+                        }
+                    }
+                }
+                }
+                if (SettingsCategory.BACKGROUND in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Background Sessions", style = MaterialTheme.typography.titleMedium)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 2.dp),
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(
-                            selected = terminalSelectionMode == option,
-                            onClick = { onTerminalSelectionModeChange(option) }
-                        )
                         Column(
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
                         ) {
-                            Text(option.label)
+                            Text("Run shells in background")
                             Text(
-                                option.description,
+                                "Keep SSH/Mosh sessions alive while app is backgrounded",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                        Switch(
+                            checked = allowBackgroundSessions,
+                            onCheckedChange = onBackgroundToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_BACKGROUND_SWITCH)
+                        )
                     }
+                    ExposedDropdownMenuBox(
+                        expanded = backgroundTimeoutExpanded.value,
+                        onExpandedChange = {
+                            if (allowBackgroundSessions) {
+                                backgroundTimeoutExpanded.value = !backgroundTimeoutExpanded.value
+                            }
+                        }
+                    ) {
+                        TextField(
+                            value = backgroundSessionTimeout.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = allowBackgroundSessions,
+                            label = { Text("Background connection timeout") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = backgroundTimeoutExpanded.value)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = backgroundTimeoutExpanded.value,
+                            onDismissRequest = { backgroundTimeoutExpanded.value = false }
+                        ) {
+                            backgroundTimeoutOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        backgroundTimeoutExpanded.value = false
+                                        onBackgroundSessionTimeoutChange(option)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "When app is backgrounded, sessions are stopped after this timeout.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
-        }
-            }
-            if (SettingsCategory.SECURITY in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Security", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Biometric lock")
-                        Text("Require fingerprint/face after inactivity", style = MaterialTheme.typography.bodySmall)
+                }
+                if (SettingsCategory.TERMINAL in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Terminal", style = MaterialTheme.typography.titleMedium)
+                    ExposedDropdownMenuBox(
+                        expanded = terminalExpanded.value,
+                        onExpandedChange = { terminalExpanded.value = !terminalExpanded.value }
+                    ) {
+                        TextField(
+                            value = terminalEmulation.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Emulation mode") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalExpanded.value) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .testTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = terminalExpanded.value,
+                            onDismissRequest = { terminalExpanded.value = false }
+                        ) {
+                            terminalOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    modifier = Modifier.testTag(
+                                        UiTestTags.settingsTerminalOption(option.label)
+                                    ),
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        terminalExpanded.value = false
+                                        onTerminalEmulationChange(option)
+                                    }
+                                )
+                            }
+                        }
                     }
-                    Switch(
-                        checked = biometricEnabled,
-                        onCheckedChange = onBiometricToggle,
-                        enabled = biometricAvailable && pinConfigured,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BIOMETRIC_SWITCH)
-                    )
-                }
-                if (!biometricAvailable) {
                     Text(
-                        "Biometric hardware not available on this device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        "xterm is the default and recommended mode.",
+                        style = MaterialTheme.typography.bodySmall
                     )
-                } else if (!pinConfigured) {
-                    Text(
-                        "Set a PIN to enable biometric unlock.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                ExposedDropdownMenuBox(
-                    expanded = lockExpanded.value,
-                    onExpandedChange = { lockExpanded.value = !lockExpanded.value }
-                ) {
-                    TextField(
-                        value = lockTimeout.label,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Lock timeout") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lockExpanded.value) },
+                    OutlinedTextField(
+                        value = terminalMarginState.value,
+                        onValueChange = { next ->
+                            val digits = next.filter { it.isDigit() }.take(3)
+                            terminalMarginState.value = digits
+                            if (digits.isEmpty()) {
+                                terminalMarginState.saved("0")
+                                onTerminalMarginPxChange(0)
+                            } else {
+                                val parsed = digits.toIntOrNull()
+                                if (parsed != null) {
+                                    val clamped = parsed.coerceIn(0, 128)
+                                    terminalMarginState.value = clamped.toString()
+                                    terminalMarginState.saved(clamped.toString())
+                                    onTerminalMarginPxChange(clamped)
+                                }
+                            }
+                        },
+                        label = { Text("Terminal margin (px)") },
+                        supportingText = {
+                            Text(
+                                "Adds space around the terminal content for screen protectors. Use 0 to disable. 8 or 16 is a good starting point."
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor()
+                            .testTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
                     )
-                    ExposedDropdownMenu(
-                        expanded = lockExpanded.value,
-                        onDismissRequest = { lockExpanded.value = false }
+                    ExposedDropdownMenuBox(
+                        expanded = bellExpanded.value,
+                        onExpandedChange = { bellExpanded.value = !bellExpanded.value }
                     ) {
-                        timeoutOptions.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.label) },
-                                onClick = {
-                                    lockExpanded.value = false
-                                    onLockTimeoutChange(option)
-                                }
+                        TextField(
+                            value = terminalBellMode.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Bell") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = bellExpanded.value)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                                .testTag(UiTestTags.SETTINGS_TERMINAL_BELL_FIELD)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = bellExpanded.value,
+                            onDismissRequest = { bellExpanded.value = false }
+                        ) {
+                            bellOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    modifier = Modifier.testTag(
+                                        UiTestTags.settingsTerminalBellOption(option.label)
+                                    ),
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        bellExpanded.value = false
+                                        onTerminalBellModeChange(option)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        terminalBellMode.description,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text("Use volume buttons to adjust font size")
+                            Text(
+                                "When enabled, volume up/down changes terminal font size instead of device volume while a terminal session is focused.",
+                                style = MaterialTheme.typography.bodySmall
                             )
+                        }
+                        Switch(
+                            checked = useVolumeButtonsToAdjustFontSize,
+                            onCheckedChange = onUseVolumeButtonsToAdjustFontSizeChange,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH)
+                        )
+                    }
+                    SettingsToggleRow(
+                        title = "Use built-in keyboard",
+                        description = "Show SSHPeaches extra keys (Esc, Ctrl, Fn, arrows) above the system keyboard, which opens automatically in terminal sessions. Tap the keyboard key to hide or show it.",
+                        checked = useBuiltInKeyboard,
+                        onCheckedChange = onUseBuiltInKeyboardToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH)
+                    )
+                    OutlinedTextField(
+                        value = moshServerCommandState.value,
+                        onValueChange = { next ->
+                            moshServerCommandState.value = next
+                            moshServerCommandState.saved(next)
+                            onMoshServerCommandChange(next)
+                        },
+                        label = { Text("Mosh server command") },
+                        supportingText = {
+                            Text(
+                                "Command executed on the remote host to start mosh-server. Leave blank to use the default: $DEFAULT_MOSH_SERVER_COMMAND"
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
+                    )
+                    Text(
+                        "Selection mode",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    selectionOptions.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = terminalSelectionMode == option,
+                                onClick = { onTerminalSelectionModeChange(option) }
+                            )
+                            Column(
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(option.label)
+                                Text(
+                                    option.description,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
                     }
                 }
-                if (lockTimeout == LockTimeout.CUSTOM) {
+            }
+                }
+                if (SettingsCategory.SECURITY in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Security", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Biometric lock")
+                            Text("Unlock with fingerprint/face instead of the PIN", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = biometricEnabled,
+                            onCheckedChange = onBiometricToggle,
+                            enabled = biometricAvailable && pinConfigured,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_BIOMETRIC_SWITCH)
+                        )
+                    }
+                    if (!biometricAvailable) {
+                        Text(
+                            "Biometric hardware not available on this device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else if (!pinConfigured) {
+                        Text(
+                            "Set a PIN to enable biometric unlock.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    ExposedDropdownMenuBox(
+                        expanded = lockExpanded.value,
+                        onExpandedChange = { lockExpanded.value = !lockExpanded.value }
+                    ) {
+                        TextField(
+                            value = lockTimeout.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Lock timeout") },
+                            supportingText = { Text("Locks after SSHPeaches has been in the background this long.") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = lockExpanded.value) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = lockExpanded.value,
+                            onDismissRequest = { lockExpanded.value = false }
+                        ) {
+                            timeoutOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        lockExpanded.value = false
+                                        onLockTimeoutChange(option)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    if (lockTimeout == LockTimeout.CUSTOM) {
+                        OutlinedTextField(
+                            value = customMinutesState.value,
+                            onValueChange = { next ->
+                                val digits = next.filter { it.isDigit() }.take(3)
+                                customMinutesState.value = digits
+                                val parsed = digits.toIntOrNull()
+                                if (parsed != null) {
+                                    val clamped = parsed.coerceIn(1, 720)
+                                    customMinutesState.saved(clamped.toString())
+                                    onCustomLockTimeoutMinutesChange(clamped)
+                                }
+                            },
+                            label = { Text("Custom timeout (minutes)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Host key prompts")
+                            Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = hostKeyPromptEnabled,
+                            onCheckedChange = onHostKeyPromptToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            Text("Automatically trust host key")
+                            Text(
+                                "If disabled, you will be prompted before trusting unknown host keys.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = autoTrustHostKey,
+                            onCheckedChange = onAutoTrustHostKeyToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH)
+                        )
+                    }
+                    Text(
+                        if (pinConfigured) "PIN lock configured."
+                        else "PIN lock not configured.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_STATUS_TEXT)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { showPinDialog.value = true },
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_SET_PIN_BUTTON)
+                        ) {
+                            Text(if (pinConfigured) "Change PIN" else "Set PIN")
+                        }
+                        if (pinConfigured) {
+                            Button(
+                                onClick = { showDisablePinDialog.value = true },
+                                enabled = !isLocked,
+                                modifier = Modifier.testTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON)
+                            ) { Text("Disable PIN") }
+                        }
+                    }
+                    if (pinConfigured && isLocked) {
+                        Text(
+                            "Unlock before disabling PIN.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+                }
+                if (SettingsCategory.AUTOMATION in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Snippets", style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
-                        value = customMinutesState.value,
+                        value = snippetTimeoutState.value,
                         onValueChange = { next ->
-                            val digits = next.filter { it.isDigit() }.take(3)
-                            customMinutesState.value = digits
+                            val digits = next.filter { it.isDigit() }.take(2)
+                            snippetTimeoutState.value = digits
                             val parsed = digits.toIntOrNull()
                             if (parsed != null) {
-                                onCustomLockTimeoutMinutesChange(parsed.coerceIn(1, 720))
+                                val clamped = parsed.coerceIn(1, 60)
+                                snippetTimeoutState.value = clamped.toString()
+                                snippetTimeoutState.saved(clamped.toString())
+                                onSnippetRunTimeoutSecondsChange(clamped)
                             }
                         },
-                        label = { Text("Custom timeout (minutes)") },
+                        label = { Text("Run timeout (seconds)") },
+                        supportingText = {
+                            Text("Used when running snippets on an open SSH session.")
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Host key prompts")
-                        Text("Warn when host fingerprints change", style = MaterialTheme.typography.bodySmall)
+            }
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Auto-start associated forwards")
+                            Text("Start linked tunnels when connecting", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = autoStartForwards, onCheckedChange = onAutoStartForwardsToggle)
                     }
-                    Switch(
-                        checked = hostKeyPromptEnabled,
-                        onCheckedChange = onHostKeyPromptToggle,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_HOST_KEY_PROMPT_SWITCH)
+                }
+            }
+                }
+                if (SettingsCategory.DIAGNOSTICS in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
+                    SettingsToggleRow(
+                        title = "Crash reports",
+                        description = "Send anonymous crash details",
+                        checked = crashReportsEnabled,
+                        onCheckedChange = onCrashReportsToggle
+                    )
+                    SettingsToggleRow(
+                        title = "Usage analytics",
+                        description = "Help improve SSHPeaches by sharing usage stats",
+                        checked = analyticsEnabled,
+                        onCheckedChange = onAnalyticsToggle
+                    )
+                    SettingsToggleRow(
+                        title = "Session diagnostics",
+                        description = "Capture local session logs for troubleshooting. Not uploaded.",
+                        checked = diagnosticsLoggingEnabled,
+                        onCheckedChange = onDiagnosticsToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
+                    )
+                    SettingsToggleRow(
+                        title = "Send usage reports",
+                        description = "Upload a usage report every 7 days",
+                        checked = usageReportsEnabled,
+                        onCheckedChange = onUsageReportsToggle
                     )
                 }
+            }
+                }
+                if (SettingsCategory.ADVANCED in visibleCategories) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK)
+                    .clickable(onClick = onOpenAdvancedSettings),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Advanced settings", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "SFTP transfer tuning and other expert options.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Open advanced settings"
+                    )
+                }
+            }
+                }
+                if (SettingsCategory.TRANSFER in visibleCategories) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Export hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings via QR code or file.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                exportToFile.value = false
+                                showTransferDialog.value = true
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+                        ) {
+                            Text("Export via QR")
+                        }
+                        Button(
+                            onClick = {
+                                scanLauncher.launch(
+                                    buildQrScanOptions(shellLayoutMode, "Scan SSHPeaches export QR")
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.SETTINGS_IMPORT_QR_BUTTON)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Text("Import via QR")
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                exportToFile.value = true
+                                showTransferDialog.value = true
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.SETTINGS_EXPORT_FILE_BUTTON)
+                        ) {
+                            Text("Export via file")
+                        }
+                        Button(
+                            onClick = {
+                                openImportFileLauncher.launch(
+                                    arrayOf("application/json", "text/plain", "text/*", "*/*")
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(UiTestTags.SETTINGS_IMPORT_FILE_BUTTON)
+                        ) {
+                            Text("Import via file")
+                        }
+                    }
+                }
+            }
+                }
+        }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(UiTestTags.SCREEN_SETTINGS)
+        ) {
+            if (shellLayoutMode == ShellLayoutMode.WIDE) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .width(280.dp)
+                            .fillMaxHeight(),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 1.dp,
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SettingsCategory.values().forEach { category ->
+                                val selected = selectedCategory.value == category
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag(UiTestTags.settingsCategory(category.title))
+                                        .clickable { selectedCategory.value = category },
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(category.title, style = MaterialTheme.typography.titleSmall)
+                                        Text(category.description, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    SettingsSections(
+                        visibleCategories = setOf(selectedCategory.value),
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 12.dp)
-                    ) {
-                        Text("Automatically trust host key")
-                        Text(
-                            "If disabled, you will be prompted before trusting unknown host keys.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Switch(
-                        checked = autoTrustHostKey,
-                        onCheckedChange = onAutoTrustHostKeyToggle,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_AUTO_TRUST_HOST_KEY_SWITCH)
+                            .fillMaxSize()
                     )
                 }
-                Text(
-                    if (pinConfigured) "PIN lock configured."
-                    else "PIN lock not configured.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_STATUS_TEXT)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { showPinDialog.value = true },
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_SET_PIN_BUTTON)
-                    ) {
-                        Text(if (pinConfigured) "Change PIN" else "Set PIN")
-                    }
-                    if (pinConfigured) {
-                        Button(
-                            onClick = { showDisablePinDialog.value = true },
-                            enabled = !isLocked,
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_DISABLE_PIN_BUTTON)
-                        ) { Text("Disable PIN") }
-                    }
-                }
-                if (pinConfigured && isLocked) {
-                    Text(
-                        "Unlock before disabling PIN.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
-            }
-            if (SettingsCategory.AUTOMATION in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Snippets", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = snippetTimeoutState.value,
-                    onValueChange = { next ->
-                        val digits = next.filter { it.isDigit() }.take(2)
-                        snippetTimeoutState.value = digits
-                        val parsed = digits.toIntOrNull()
-                        if (parsed != null) {
-                            val clamped = parsed.coerceIn(1, 60)
-                            snippetTimeoutState.value = clamped.toString()
-                            onSnippetRunTimeoutSecondsChange(clamped)
-                        }
-                    },
-                    label = { Text("Run timeout (seconds)") },
-                    supportingText = {
-                        Text("Used when running snippets on an open SSH session.")
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text("Auto-start associated forwards")
-                        Text("Start linked tunnels when connecting", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = autoStartForwards, onCheckedChange = onAutoStartForwardsToggle)
-                }
-            }
-        }
-            }
-            if (SettingsCategory.DIAGNOSTICS in visibleCategories) {
-        Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
-                SettingsToggleRow(
-                    title = "Crash reports",
-                    description = "Send anonymous crash details",
-                    checked = crashReportsEnabled,
-                    onCheckedChange = onCrashReportsToggle
-                )
-                SettingsToggleRow(
-                    title = "Usage analytics",
-                    description = "Help improve SSHPeaches by sharing usage stats",
-                    checked = analyticsEnabled,
-                    onCheckedChange = onAnalyticsToggle
-                )
-                SettingsToggleRow(
-                    title = "Session diagnostics",
-                    description = "Capture local session logs for troubleshooting. Not uploaded.",
-                    checked = diagnosticsLoggingEnabled,
-                    onCheckedChange = onDiagnosticsToggle,
-                    modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
-                )
-                SettingsToggleRow(
-                    title = "Send usage reports",
-                    description = "Upload a usage report every 7 days",
-                    checked = usageReportsEnabled,
-                    onCheckedChange = onUsageReportsToggle
-                )
-            }
-        }
-            }
-            if (SettingsCategory.ADVANCED in visibleCategories) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(UiTestTags.SETTINGS_ADVANCED_SETTINGS_LINK)
-                .clickable(onClick = onOpenAdvancedSettings),
-            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text("Advanced settings", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "SFTP transfer tuning and other expert options.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Open advanced settings"
-                )
-            }
-        }
-            }
-            if (SettingsCategory.TRANSFER in visibleCategories) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Export hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings via QR code.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Button(
-                    onClick = { showTransferDialog.value = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
-                ) {
-                    Text("Export via QR")
-                }
-                Button(
-                    onClick = {
-                        scanLauncher.launch(
-                            buildQrScanOptions(shellLayoutMode, "Scan SSHPeaches export QR")
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                    Text("Import via QR")
-                }
-            }
-        }
-            }
-    }
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag(UiTestTags.SCREEN_SETTINGS)
-    ) {
-        if (shellLayoutMode == ShellLayoutMode.WIDE) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .fillMaxHeight(),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp,
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        SettingsCategory.values().forEach { category ->
-                            val selected = selectedCategory.value == category
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(UiTestTags.settingsCategory(category.title))
-                                    .clickable { selectedCategory.value = category },
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(category.title, style = MaterialTheme.typography.titleSmall)
-                                    Text(category.description, style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
-                        }
-                    }
-                }
+            } else {
                 SettingsSections(
-                    visibleCategories = setOf(selectedCategory.value),
+                    visibleCategories = SettingsCategory.values().toSet(),
                     modifier = Modifier
-                        .weight(1f)
+                        .widthIn(max = 980.dp)
                         .fillMaxSize()
+                        .align(Alignment.TopCenter)
                 )
             }
-        } else {
-            SettingsSections(
-                visibleCategories = SettingsCategory.values().toSet(),
-                modifier = Modifier
-                    .widthIn(max = 980.dp)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter)
-            )
         }
-    }
-    if (showTransferDialog.value) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showTransferDialog.value = false },
-            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_DIALOG),
-            title = { Text("Export data") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings are always included in transfer exports.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    SettingsToggleRow(
-                        title = "Include passwords and private keys",
-                        description = "Encrypt saved passwords and private key material with a passphrase.",
-                        checked = includeSecretsInQr,
-                        onCheckedChange = onIncludeSecretsInQrToggle,
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
-                    )
-                    if (includeSecretsInQr) {
-                        OutlinedTextField(
-                            value = exportPassphraseState.value,
-                            onValueChange = {
-                                updatePasswordStateWithReveal(
-                                    exportPassphraseState,
-                                    exportPassphraseRevealIndex,
-                                    it
-                                )
-                                exportPassphraseError.value = null
-                            },
-                            label = { Text("Export passphrase") },
-                            singleLine = true,
-                            visualTransformation = TailRevealPasswordVisualTransformation(
-                                exportPassphraseRevealIndex.intValue
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                autoCorrect = false,
-                                capitalization = KeyboardCapitalization.None,
-                                keyboardType = KeyboardType.Password
-                            ),
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT)
-                        )
-                        OutlinedTextField(
-                            value = exportConfirmPassphraseState.value,
-                            onValueChange = {
-                                updatePasswordStateWithReveal(
-                                    exportConfirmPassphraseState,
-                                    exportConfirmPassphraseRevealIndex,
-                                    it
-                                )
-                                exportPassphraseError.value = null
-                            },
-                            label = { Text("Confirm passphrase") },
-                            singleLine = true,
-                            visualTransformation = TailRevealPasswordVisualTransformation(
-                                exportConfirmPassphraseRevealIndex.intValue
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                autoCorrect = false,
-                                capitalization = KeyboardCapitalization.None,
-                                keyboardType = KeyboardType.Password
-                            ),
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
-                        )
+        if (showTransferDialog.value) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showTransferDialog.value = false },
+                modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_DIALOG),
+                title = { Text(if (exportToFile.value) "Export to file" else "Export data") },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
-                            "Use this same passphrase when importing on another device.",
+                            "Hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings are always included in transfer exports.",
                             style = MaterialTheme.typography.bodySmall
                         )
-                    }
-                    exportPassphraseError.value?.let {
-                        Text(
-                            it,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_ERROR)
+                        SettingsToggleRow(
+                            title = "Include passwords and private keys",
+                            description = "Encrypt saved passwords and private key material with a passphrase.",
+                            checked = includeSecretsInQr,
+                            onCheckedChange = onIncludeSecretsInQrToggle,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_INCLUDE_SECRETS_SWITCH)
                         )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val passphrase = if (includeSecretsInQr) exportPassphraseState.value else null
-                        when {
-                            includeSecretsInQr &&
-                                passphrase.orEmpty().length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH -> {
-                                exportPassphraseError.value =
-                                    "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
-                                return@TextButton
-                            }
-                            includeSecretsInQr && passphrase != exportConfirmPassphraseState.value -> {
-                                exportPassphraseError.value = "Passphrases do not match."
-                                return@TextButton
-                            }
-                        }
-                        val payload = onGenerateExportPayload(passphrase)
-                        if (payload == null) {
-                            exportPassphraseError.value = if (includeSecretsInQr) {
-                                "Unable to export protected data. Unlock the app and try again."
-                            } else {
-                                "Unable to generate export QR."
-                            }
-                            return@TextButton
-                        }
-                        exportQrBitmap.value = runCatching {
-                            val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
-                            val bmp = createBitmap(
-                                matrix.width,
-                                matrix.height,
-                                android.graphics.Bitmap.Config.ARGB_8888
+                        if (includeSecretsInQr) {
+                            OutlinedTextField(
+                                value = exportPassphraseState.value,
+                                onValueChange = {
+                                    updatePasswordStateWithReveal(
+                                        exportPassphraseState,
+                                        exportPassphraseRevealIndex,
+                                        it
+                                    )
+                                    exportPassphraseError.value = null
+                                },
+                                label = { Text("Export passphrase") },
+                                singleLine = true,
+                                visualTransformation = TailRevealPasswordVisualTransformation(
+                                    exportPassphraseRevealIndex.intValue
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    autoCorrect = false,
+                                    capitalization = KeyboardCapitalization.None,
+                                    keyboardType = KeyboardType.Password
+                                ),
+                                modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_PASSPHRASE_INPUT)
                             )
-                            for (x in 0 until matrix.width) {
-                                for (y in 0 until matrix.height) {
-                                    bmp[x, y] =
-                                        if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                            OutlinedTextField(
+                                value = exportConfirmPassphraseState.value,
+                                onValueChange = {
+                                    updatePasswordStateWithReveal(
+                                        exportConfirmPassphraseState,
+                                        exportConfirmPassphraseRevealIndex,
+                                        it
+                                    )
+                                    exportPassphraseError.value = null
+                                },
+                                label = { Text("Confirm passphrase") },
+                                singleLine = true,
+                                visualTransformation = TailRevealPasswordVisualTransformation(
+                                    exportConfirmPassphraseRevealIndex.intValue
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    autoCorrect = false,
+                                    capitalization = KeyboardCapitalization.None,
+                                    keyboardType = KeyboardType.Password
+                                ),
+                                modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_CONFIRM_PASSPHRASE_INPUT)
+                            )
+                            Text(
+                                "Use this same passphrase when importing on another device.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        exportPassphraseError.value?.let {
+                            Text(
+                                it,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_ERROR)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val passphrase = if (includeSecretsInQr) exportPassphraseState.value else null
+                            when {
+                                includeSecretsInQr &&
+                                    passphrase.orEmpty().length < SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH -> {
+                                    exportPassphraseError.value =
+                                        "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
+                                    return@TextButton
+                                }
+                                includeSecretsInQr && passphrase != exportConfirmPassphraseState.value -> {
+                                    exportPassphraseError.value = "Passphrases do not match."
+                                    return@TextButton
                                 }
                             }
-                            bmp
-                        }.getOrNull()
-                        if (exportQrBitmap.value == null) {
-                            onShowMessage("Unable to generate export QR.")
-                        } else if (includeSecretsInQr) {
-                            ExportPassphraseCache.transfer = passphrase
+                            if (transferWorking.value) return@TextButton
+                            transferWorking.value = true
+                            scope.launch {
+                            // PBKDF2 per exported secret (about 1-2 s each) and QR rendering: off main.
+                            val payload = withContext(Dispatchers.Default) {
+                                runCatching { onGenerateExportPayload(passphrase) }.getOrNull()
+                            }
+                            transferWorking.value = false
+                            if (payload == null) {
+                                exportPassphraseError.value = if (includeSecretsInQr) {
+                                    "Unable to export protected data. Unlock the app and try again."
+                                } else if (exportToFile.value) {
+                                    "Unable to generate export file."
+                                } else {
+                                    "Unable to generate export QR."
+                                }
+                                return@launch
+                            }
+                            if (includeSecretsInQr) {
+                                ExportPassphraseCache.transfer = passphrase
+                            }
+                            exportPassphraseState.value = ""
+                            exportConfirmPassphraseState.value = ""
+                            exportPassphraseRevealIndex.intValue = -1
+                            exportConfirmPassphraseRevealIndex.intValue = -1
+                            exportPassphraseError.value = null
+                            showTransferDialog.value = false
+                            if (exportToFile.value) {
+                                pendingExportPayload.value = payload
+                                createExportFileLauncher.launch("sshpeaches-export.json")
+                                return@launch
+                            }
+                            exportQrBitmap.value = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
+                                    val bmp = createBitmap(
+                                        matrix.width,
+                                        matrix.height,
+                                        android.graphics.Bitmap.Config.ARGB_8888
+                                    )
+                                    for (x in 0 until matrix.width) {
+                                        for (y in 0 until matrix.height) {
+                                            bmp[x, y] =
+                                                if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                                        }
+                                    }
+                                    bmp
+                                }.getOrNull()
+                            }
+                            if (exportQrBitmap.value == null) {
+                                onShowMessage("Unable to generate export QR.")
+                            }
                         }
-                        exportPassphraseState.value = ""
-                        exportConfirmPassphraseState.value = ""
-                        exportPassphraseRevealIndex.intValue = -1
-                        exportConfirmPassphraseRevealIndex.intValue = -1
-                        exportPassphraseError.value = null
-                        showTransferDialog.value = false
                     },
+                    enabled = !transferWorking.value,
                     modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_GENERATE_BUTTON)
-                ) { Text("Generate QR") }
+                ) {
+                    Text(
+                        when {
+                            transferWorking.value -> "Working…"
+                            exportToFile.value -> "Save file"
+                            else -> "Generate QR"
+                        }
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showTransferDialog.value = false }) { Text("Cancel") }
@@ -1181,7 +1332,7 @@ fun SettingsScreen(
                         return@TextButton
                     }
                     ExportPassphraseCache.transfer = passphrase
-                    onShowMessage(onImportFromQrPayload(payload, passphrase))
+                    runImport(payload, passphrase)
                     pendingImportPayload.value = null
                     importPassphraseError.value = null
                 }) { Text("Import") }
@@ -1201,6 +1352,7 @@ fun SettingsScreen(
                 showPinDialog.value = false
                 pinEntry.value = ""
                 confirmPinEntry.value = ""
+                pinDialogError.value = null
             },
             modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_DIALOG),
             title = { Text(if (pinConfigured) "Change PIN" else "Set PIN") },
@@ -1242,16 +1394,29 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_CONFIRM_INPUT)
                     )
+                    pinDialogError.value?.let { message ->
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (pinEntry.value.length < 4 || pinEntry.value != confirmPinEntry.value) return@TextButton
-                        onSetPin(pinEntry.value)
+                        pinDialogError.value = when {
+                            pinEntry.value.length < 4 -> "PIN must be at least 4 digits."
+                            pinEntry.value != confirmPinEntry.value -> "PINs don't match."
+                            else -> null
+                        }
+                        if (pinDialogError.value != null) return@TextButton
+                        val pin = pinEntry.value
                         pinEntry.value = ""
                         confirmPinEntry.value = ""
                         showPinDialog.value = false
+                        runCatching { onSetPin(pin) }
                     },
                     modifier = Modifier.testTag(UiTestTags.SETTINGS_PIN_SAVE_BUTTON)
                 ) { Text("Save") }
@@ -1261,6 +1426,7 @@ fun SettingsScreen(
                     showPinDialog.value = false
                     pinEntry.value = ""
                     confirmPinEntry.value = ""
+                    pinDialogError.value = null
                 }) { Text("Cancel") }
             }
         )
@@ -1288,6 +1454,38 @@ fun SettingsScreen(
         )
     }
 
+}
+
+/**
+ * Text for a field that saves on every keystroke. Keying `remember` on the persisted value
+ * recreated the state whenever a save came back from DataStore, dropping characters typed in
+ * between; this keeps the typed text and only adopts a persisted value that is not an echo of one
+ * of this field's own saves (e.g. a restore or import changed it).
+ */
+private class PersistedFieldState(initial: String) {
+    var value by mutableStateOf(initial)
+    private val pendingSaves = ArrayDeque<String>()
+
+    fun saved(persistedForm: String) {
+        pendingSaves.addLast(persistedForm)
+    }
+
+    fun onPersisted(persisted: String) {
+        val echo = pendingSaves.indexOf(persisted)
+        if (echo >= 0) {
+            repeat(echo + 1) { pendingSaves.removeFirst() }
+        } else {
+            pendingSaves.clear()
+            value = persisted
+        }
+    }
+}
+
+@Composable
+private fun rememberPersistedField(persisted: String): PersistedFieldState {
+    val state = remember { PersistedFieldState(persisted) }
+    LaunchedEffect(persisted) { state.onPersisted(persisted) }
+    return state
 }
 
 private data class AppIconChoice(

@@ -125,7 +125,6 @@ private val sessionRecoveryRoutes = setOf(
     Routes.HOME,
     Routes.HELP,
     Routes.HOSTS,
-    Routes.UPTIME,
     Routes.IDENTITIES,
     Routes.FORWARDS,
     Routes.SNIPPETS,

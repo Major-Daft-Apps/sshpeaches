@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-28T20:58:50.270Z" hostname="362696.200293.sys.ipv4.io" time="0.684">
+  <properties/>
+  <testcase name="downloadsLargerThanOneChunkTwiceOnTheSameClient" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" time="0.488"/>
+  <testcase name="downloadsSeveralFilesConcurrentlyOnOneConnectedClient" classname="com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloadSshdTest" time="0.195"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -105,6 +105,8 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 private data class IdentityOverwrite(
     val targetId: String,
@@ -152,8 +154,8 @@ fun IdentitiesScreen(
     onImportIdentityKey: (id: String, payload: String, passphrase: String) -> Boolean = { _, _, _ -> false },
     onImportIdentityKeyPlain: (id: String, key: String) -> Boolean = { _, _ -> false },
     onStoreIdentityPublicKey: (id: String, key: String) -> Boolean = { _, _ -> false },
-    onStoreIdentityKeyPassphrase: (id: String, passphrase: String?) -> Unit = { _, _ -> },
-    onCopyKeyToHost: suspend (identityId: String, hostId: String, hostPassword: String?, identityPassphrase: String?) -> Boolean = { _, _, _, _ -> false },
+    onStoreIdentityKeyPassphrase: (id: String, passphrase: String?) -> Boolean = { _, _ -> false },
+    onCopyKeyToHost: suspend (identityId: String, hostId: String, hostPassword: String?, identityPassphrase: String?) -> String? = { _, _, _, _ -> "Not supported." },
     onRemoveIdentityKey: (id: String) -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onShowMessage: (String) -> Unit = {},
@@ -190,6 +192,7 @@ fun IdentitiesScreen(
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val generating = remember { mutableStateOf(false) }
     val dialogKeyPassphraseState = remember { mutableStateOf("") }
     val dialogKeyPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
     val showGenerateDialog = remember { mutableStateOf(false) }
@@ -234,55 +237,60 @@ fun IdentitiesScreen(
 
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val keyText = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        }.getOrNull()
-        if (keyText.isNullOrBlank()) {
-            onShowMessage("Unable to read key file")
-            return@rememberLauncherForActivityResult
-        }
-        val sanitized = keyText.trim()
-        val pendingDialogType = dialogFileType.value
-        if (pendingDialogType != null) {
-            dialogFileType.value = null
-            when (pendingDialogType) {
-                DialogKeyFileType.PRIVATE_KEY -> {
-                    if (!sanitized.startsWith("-----BEGIN")) {
-                        dialogError.value = "Invalid private key format."
-                        return@rememberLauncherForActivityResult
+        scope.launch {
+            // Document providers can be slow (cloud storage), so read off the main thread.
+            val keyText = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                }.getOrNull()
+            }
+            if (keyText.isNullOrBlank()) {
+                onShowMessage("Unable to read key file")
+                return@launch
+            }
+            val sanitized = keyText.trim()
+            val pendingDialogType = dialogFileType.value
+            if (pendingDialogType != null) {
+                dialogFileType.value = null
+                when (pendingDialogType) {
+                    DialogKeyFileType.PRIVATE_KEY -> {
+                        if (!sanitized.startsWith("-----BEGIN")) {
+                            dialogError.value = "Invalid private key format."
+                            return@launch
+                        }
+                        dialogPrivateKeyState.value = sanitized
+                        dialogError.value = null
+                        if (fingerprintState.value.isBlank()) {
+                            fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
+                        }
+                        dialogKeyStatus.value = "Private key selected."
                     }
-                    dialogPrivateKeyState.value = sanitized
-                    dialogError.value = null
-                    if (fingerprintState.value.isBlank()) {
+                    DialogKeyFileType.PUBLIC_KEY -> {
+                        dialogPublicKeyState.value = sanitized
+                        dialogError.value = null
                         fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
+                        dialogKeyStatus.value = "Public key selected."
                     }
-                    dialogKeyStatus.value = "Private key selected."
                 }
-                DialogKeyFileType.PUBLIC_KEY -> {
-                    dialogPublicKeyState.value = sanitized
-                    dialogError.value = null
-                    fingerprintState.value = computeFingerprintFromKeyMaterial(sanitized)
-                    dialogKeyStatus.value = "Public key selected."
-                }
+                return@launch
             }
-            return@rememberLauncherForActivityResult
-        }
 
-        val targetId = fileImportTarget.value ?: return@rememberLauncherForActivityResult
-        fileImportTarget.value = null
-        if (!sanitized.startsWith("-----BEGIN")) {
-            onShowMessage("Invalid key format")
-            return@rememberLauncherForActivityResult
-        }
-        val success = onImportIdentityKeyPlain(targetId, sanitized)
-        if (success) {
-            val comment = items.firstOrNull { it.id == targetId }?.label.orEmpty()
-            val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(sanitized, comment).orEmpty()
-            if (derivedPublic.isNotBlank()) {
-                onStoreIdentityPublicKey(targetId, derivedPublic)
+            val targetId = fileImportTarget.value ?: return@launch
+            fileImportTarget.value = null
+            if (!sanitized.startsWith("-----BEGIN")) {
+                onShowMessage("Invalid key format")
+                return@launch
             }
+            val success = onImportIdentityKeyPlain(targetId, sanitized)
+            if (success) {
+                val comment = items.firstOrNull { it.id == targetId }?.label.orEmpty()
+                val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(sanitized, comment).orEmpty()
+                if (derivedPublic.isNotBlank()) {
+                    onStoreIdentityPublicKey(targetId, derivedPublic)
+                }
+            }
+            onShowMessage(if (success) "Private key imported" else "Failed to import key")
         }
-        onShowMessage(if (success) "Private key imported" else "Failed to import key")
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -438,8 +446,10 @@ fun IdentitiesScreen(
             shareConfirmPassphraseState.value = ExportPassphraseCache.identity.orEmpty()
             sharePassphraseError.value = null
         } else {
-            shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
-            shareIdentity.value = identity
+            scope.launch {
+                shareQrBitmap.value = generateIdentityQr(identity, passphrase = null)
+                shareIdentity.value = identity
+            }
         }
     }
 
@@ -462,6 +472,7 @@ fun IdentitiesScreen(
         val privateKey = dialogPrivateKeyState.value.trim()
         val publicKeyInput = dialogPublicKeyState.value.trim()
         val keyPassphrase = dialogKeyPassphraseState.value.trim().takeIf { it.isNotBlank() }
+        val isNewIdentity = editingId.value == null
         val identityId = editingId.value ?: UUID.randomUUID().toString()
         if (editingId.value != null) {
             onUpdate(
@@ -489,10 +500,17 @@ fun IdentitiesScreen(
             privateKey.isNotBlank() -> SshKeyGenerator.derivePublicKeyFromPrivate(privateKey, labelState.value.trim()).orEmpty()
             else -> ""
         }.trim()
-        if (publicKey.isNotBlank()) {
-            onStoreIdentityPublicKey(identityId, publicKey)
+        if (publicKey.isNotBlank() && !onStoreIdentityPublicKey(identityId, publicKey)) {
+            onShowMessage("Failed to save the public key. Unlock the app and try again.")
         }
-        onStoreIdentityKeyPassphrase(identityId, keyPassphrase)
+        // The editor starts with an empty passphrase field, so when editing an identity without
+        // replacing its key, blank means "unchanged". Writing it anyway cleared the stored
+        // passphrase of encrypted keys on every rename.
+        if (keyPassphrase != null || privateKey.isNotBlank() || isNewIdentity) {
+            if (!onStoreIdentityKeyPassphrase(identityId, keyPassphrase)) {
+                onShowMessage("Failed to save the key passphrase. Unlock the app and try again.")
+            }
+        }
         closeEditorState()
         return true
     }
@@ -663,6 +681,11 @@ fun IdentitiesScreen(
                 value = dialogKeyPassphraseState.value,
                 onValueChange = { updatePasswordStateWithReveal(dialogKeyPassphraseState, dialogKeyPassphraseRevealIndex, it) },
                 label = { Text("Key passphrase (optional)") },
+                supportingText = if (editingId.value != null) {
+                    { Text("Leave blank to keep the current passphrase.") }
+                } else {
+                    null
+                },
                 singleLine = true,
                 visualTransformation = TailRevealPasswordVisualTransformation(dialogKeyPassphraseRevealIndex.intValue),
                 keyboardOptions = KeyboardOptions(
@@ -1224,24 +1247,34 @@ fun IdentitiesScreen(
                         comment = labelState.value.trim().ifBlank { "sshpeaches" },
                         keyPassphrase = phrase.takeIf { it.isNotBlank() }
                     )
-                    val generated = runCatching { SshKeyGenerator.generate(spec) }.getOrNull()
-                    if (generated == null) {
-                        generationError.value = "Failed to generate keypair."
-                        return@TextButton
-                    }
-                    applyGeneratedKeyPair(
-                        generated = generated,
-                        privateKeyState = dialogPrivateKeyState,
-                        publicKeyState = dialogPublicKeyState,
-                        fingerprintState = fingerprintState,
-                        passphraseState = dialogKeyPassphraseState,
-                        keyStatusState = dialogKeyStatus,
-                        passphrase = phrase
-                    )
-                    dialogError.value = null
-                    showGenerateDialog.value = false
+                    if (generating.value) return@TextButton
+                    generating.value = true
                     generationError.value = null
-                }) { Text("Generate") }
+                    scope.launch {
+                        // RSA-4096 generation (plus PBKDF2 with a passphrase) takes seconds on a
+                        // phone; doing it on the main thread froze the UI or triggered an ANR.
+                        val generated = withContext(Dispatchers.Default) {
+                            runCatching { SshKeyGenerator.generate(spec) }.getOrNull()
+                        }
+                        generating.value = false
+                        if (generated == null) {
+                            generationError.value = "Failed to generate keypair."
+                            return@launch
+                        }
+                        applyGeneratedKeyPair(
+                            generated = generated,
+                            privateKeyState = dialogPrivateKeyState,
+                            publicKeyState = dialogPublicKeyState,
+                            fingerprintState = fingerprintState,
+                            passphraseState = dialogKeyPassphraseState,
+                            keyStatusState = dialogKeyStatus,
+                            passphrase = phrase
+                        )
+                        dialogError.value = null
+                        showGenerateDialog.value = false
+                        generationError.value = null
+                    }
+                }, enabled = !generating.value) { Text(if (generating.value) "Generating…" else "Generate") }
             },
             dismissButton = {
                 TextButton(onClick = { showGenerateDialog.value = false }) { Text("Cancel") }
@@ -1344,18 +1377,20 @@ fun IdentitiesScreen(
                         copyError.value = null
                         copyInProgress.value = true
                         scope.launch {
-                            val success = onCopyKeyToHost(
-                                identity.id,
-                                hostId,
-                                copyHostPassword.value.trim().ifBlank { null },
-                                copyIdentityPassphrase.value.trim().ifBlank { null }
-                            )
+                            val failure = runCatching {
+                                onCopyKeyToHost(
+                                    identity.id,
+                                    hostId,
+                                    copyHostPassword.value.trim().ifBlank { null },
+                                    copyIdentityPassphrase.value.trim().ifBlank { null }
+                                )
+                            }.getOrElse { it.message ?: "Failed to copy key." }
                             copyInProgress.value = false
-                            if (success) {
+                            if (failure == null) {
                                 onShowMessage("Key copied to host")
                                 copyKeyIdentity.value = null
                             } else {
-                                copyError.value = "Failed to copy key. Verify authentication details."
+                                copyError.value = failure.ifBlank { "Failed to copy key. Verify authentication details." }
                             }
                         }
                     }
@@ -1454,17 +1489,19 @@ fun IdentitiesScreen(
                                 "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         phrase != shareConfirmPassphraseState.value -> sharePassphraseError.value = "Passphrases do not match."
                         else -> {
-                            val bitmap = generateIdentityQr(identity, phrase)
-                            if (bitmap != null) {
-                                shareQrBitmap.value = bitmap
-                                shareIdentity.value = identity
-                                sharePassphrasePrompt.value = null
-                                sharePassphraseState.value = phrase
-                                shareConfirmPassphraseState.value = phrase
-                                sharePassphraseError.value = null
-                                ExportPassphraseCache.identity = phrase
-                            } else {
-                                sharePassphraseError.value = "Unable to export key. Ensure the key exists and try again."
+                            scope.launch {
+                                val bitmap = generateIdentityQr(identity, phrase)
+                                if (bitmap != null) {
+                                    shareQrBitmap.value = bitmap
+                                    shareIdentity.value = identity
+                                    sharePassphrasePrompt.value = null
+                                    sharePassphraseState.value = phrase
+                                    shareConfirmPassphraseState.value = phrase
+                                    sharePassphraseError.value = null
+                                    ExportPassphraseCache.identity = phrase
+                                } else {
+                                    sharePassphraseError.value = "Unable to export key. Ensure the key exists and try again."
+                                }
                             }
                         }
                     }
@@ -1518,14 +1555,23 @@ fun IdentitiesScreen(
                             "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         return@TextButton
                     }
-                    val success = onImportIdentityKey(identityId, payload, phrase)
-                    if (success) {
-                        onShowMessage("Private key imported")
-                        pendingKeyImport.value = null
-                        importPassphraseState.value = ""
-                        importPassphraseError.value = null
-                    } else {
-                        importPassphraseError.value = "Incorrect passphrase."
+                    scope.launch {
+                        // PBKDF2 (about 1-2 s): off the main thread.
+                        val success = withContext(Dispatchers.Default) {
+                            runCatching { onImportIdentityKey(identityId, payload, phrase) }.getOrDefault(false)
+                        }
+                        if (success) {
+                            onShowMessage("Private key imported")
+                            pendingKeyImport.value = null
+                            importPassphraseState.value = ""
+                            importPassphraseError.value = null
+                        } else {
+                            importPassphraseError.value = if (SecurityManager.isLocked()) {
+                                "Unlock the app, then import again."
+                            } else {
+                                "Incorrect passphrase, or the payload is damaged."
+                            }
+                        }
                     }
                 }) { Text("Import") }
             },

@@ -2,6 +2,7 @@
     <string name="app_name">SSHPeaches</string>
     <string name="about_version">Version %1$s</string>
     <string name="project_website">https://majordaftapps.com</string>
+    <string name="source_code_url" translatable="false">https://github.com/Major-Daft-Apps/sshpeaches</string>
     <string name="support_url">https://majordaftapps.com/sshpeaches-support</string>
     <string name="privacy_policy_url">https://majordaftapps.com/privacy</string>
     <string name="widget_quick_connect_name">Hosts Quick Connect</string>

@@ -36,6 +36,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,22 +77,22 @@ fun ThemeProfileEditorScreen(
     onShowMessage: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var name by remember(initialProfile.id) { mutableStateOf(initialProfile.name) }
-    var font by remember(initialProfile.id) { mutableStateOf(initialProfile.font) }
-    var fontSizePt by remember(initialProfile.id) { mutableFloatStateOf(initialProfile.fontSizeSp.toFloat()) }
-    var foregroundHex by remember(initialProfile.id) { mutableStateOf(initialProfile.foregroundHex) }
-    var backgroundHex by remember(initialProfile.id) { mutableStateOf(initialProfile.backgroundHex) }
-    var cursorHex by remember(initialProfile.id) { mutableStateOf(initialProfile.cursorHex) }
-    var cursorStyle by remember(initialProfile.id) { mutableStateOf(initialProfile.cursorStyle) }
-    var cursorBlink by remember(initialProfile.id) { mutableStateOf(initialProfile.cursorBlink) }
+    var name by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.name) }
+    var font by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.font) }
+    var fontSizePt by rememberSaveable(initialProfile.id) { mutableFloatStateOf(initialProfile.fontSizeSp.toFloat()) }
+    var foregroundHex by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.foregroundHex) }
+    var backgroundHex by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.backgroundHex) }
+    var cursorHex by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.cursorHex) }
+    var cursorStyle by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.cursorStyle) }
+    var cursorBlink by rememberSaveable(initialProfile.id) { mutableStateOf(initialProfile.cursorBlink) }
 
-    var showNameDialog by remember { mutableStateOf(false) }
-    var showFontFamilyDialog by remember { mutableStateOf(false) }
-    var showFontSizeDialog by remember { mutableStateOf(false) }
-    var showCursorStyleDialog by remember { mutableStateOf(false) }
-    var colorFieldDialog by remember { mutableStateOf<ThemeColorField?>(null) }
-    var editorError by remember { mutableStateOf<String?>(null) }
-    var showDiscardDialog by remember { mutableStateOf(false) }
+    var showNameDialog by rememberSaveable { mutableStateOf(false) }
+    var showFontFamilyDialog by rememberSaveable { mutableStateOf(false) }
+    var showFontSizeDialog by rememberSaveable { mutableStateOf(false) }
+    var showCursorStyleDialog by rememberSaveable { mutableStateOf(false) }
+    var colorFieldDialog by rememberSaveable { mutableStateOf<ThemeColorField?>(null) }
+    var editorError by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
 
     val title = if (isEditingExisting) "Edit Terminal Theme" else "New Terminal Theme"
     val isDirty = name != initialProfile.name ||

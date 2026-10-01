@@ -45,6 +45,7 @@ fun FavoritesScreen(
     onDisconnectSession: (String) -> Unit = {},
     activeSshSessionHostIds: Set<String> = emptySet(),
     onHostAction: (HostConnection, ConnectionMode, FileTransferEntryMode?) -> Unit = { _, _, _ -> },
+    onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> },
     onToggleFavorite: (String) -> Unit = {},
@@ -127,12 +128,9 @@ fun FavoritesScreen(
             items(section.hostFavorites, key = { it.id }) { host ->
                 HostCard(
                     host = host,
-                    snippets = snippets,
                     onToggleFavorite = onToggleFavorite,
                     onAction = onHostAction,
-                    canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
-                    onRunInfoCommand = onRunInfoCommand,
-                    onInfoCommandsChange = onInfoCommandsChange
+                    onFetchSystemInfo = onFetchHostSystemInfo
                 )
             }
         }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +91,9 @@ import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
 import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class HostPaneMode {
     DETAILS,
@@ -142,6 +146,7 @@ fun HostsScreen(
     onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
     activeSshSessionHostIds: Set<String> = emptySet(),
+    onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
     onRunInfoCommand: (HostConnection, String) -> Boolean = { _, _ -> false },
     onInfoCommandsChange: (HostConnection, List<String>) -> Unit = { _, _ -> }
 ) {
@@ -198,6 +203,7 @@ fun HostsScreen(
     val pendingPaneClose = remember { mutableStateOf(false) }
     val dialogBodyMaxHeight = rememberDialogBodyMaxHeight()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val editingHost = hosts.firstOrNull { it.id == editingHostId.value }
     val isEditingHost = editingHostId.value != null
     AutoHidePasswordReveal(passwordRevealIndex)
@@ -246,24 +252,30 @@ fun HostsScreen(
     }
     val openSshConfigLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        val contents = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader(StandardCharsets.UTF_8).readText()
-            }.orEmpty()
-        }.getOrElse {
-            Toast.makeText(context, "Unable to read SSH config file.", Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-        val processed = OpenSshConfigImporter.parse(
-            contents = contents,
-            existingHosts = hosts,
-            existingPortForwards = portForwards
-        )
-        if (processed.hosts.isEmpty() && processed.localForwards.isEmpty()) {
-            val detail = processed.warnings.firstOrNull()?.let { " $it" }.orEmpty()
-            Toast.makeText(context, "No importable OpenSSH hosts found.$detail", Toast.LENGTH_LONG).show()
-        } else {
-            pendingOpenSshImport.value = processed
+        scope.launch {
+            // Document providers can be slow (cloud storage), so read off the main thread.
+            val contents = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader(StandardCharsets.UTF_8).readText()
+                    }.orEmpty()
+                }.getOrNull()
+            }
+            if (contents == null) {
+                Toast.makeText(context, "Unable to read SSH config file.", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val processed = OpenSshConfigImporter.parse(
+                contents = contents,
+                existingHosts = hosts,
+                existingPortForwards = portForwards
+            )
+            if (processed.hosts.isEmpty() && processed.localForwards.isEmpty()) {
+                val detail = processed.warnings.firstOrNull()?.let { " $it" }.orEmpty()
+                Toast.makeText(context, "No importable OpenSSH hosts found.$detail", Toast.LENGTH_LONG).show()
+            } else {
+                pendingOpenSshImport.value = processed
+            }
         }
     }
 
@@ -404,18 +416,22 @@ fun HostsScreen(
                             importPassphraseError.value =
                                 "Passphrase must be at least ${SecurityManager.MIN_SECRET_PASSPHRASE_LENGTH} characters."
                         payload.isBlank() -> importPassphraseError.value = "Encrypted payload missing."
-                        else -> {
-                            runCatching {
-                                check(onImportPasswordPayload(targetId, payload, phrase)) {
-                                    "Incorrect passphrase."
-                                }
-                            }.onSuccess {
+                        else -> scope.launch {
+                            // PBKDF2 (about 1-2 s): off the main thread.
+                            val imported = withContext(Dispatchers.Default) {
+                                runCatching { onImportPasswordPayload(targetId, payload, phrase) }.getOrDefault(false)
+                            }
+                            if (imported) {
                                 Toast.makeText(context, "Password imported", Toast.LENGTH_SHORT).show()
                                 pendingEncryptedImport.value = null
                                 importPassphraseState.value = ""
                                 importPassphraseError.value = null
-                            }.onFailure {
-                                importPassphraseError.value = "Incorrect passphrase."
+                            } else {
+                                importPassphraseError.value = if (SecurityManager.isLocked()) {
+                                    "Unlock the app, then import again."
+                                } else {
+                                    "Incorrect passphrase, or the payload is damaged."
+                                }
                             }
                         }
                     }
@@ -1447,11 +1463,8 @@ fun HostsScreen(
                         items(section.items, key = { it.id }) { host ->
                             HostCard(
                                 host = host,
-                                snippets = snippets,
                                 onToggleFavorite = onToggleFavorite,
-                                canRunInfoCommands = activeSshSessionHostIds.contains(host.id),
-                                onRunInfoCommand = onRunInfoCommand,
-                                onInfoCommandsChange = onInfoCommandsChange,
+                                onFetchSystemInfo = onFetchHostSystemInfo,
                                 onAction = { selected, mode, fileTransferEntryMode ->
                                     onStartSession(selected, mode, null, fileTransferEntryMode)
                                 },
