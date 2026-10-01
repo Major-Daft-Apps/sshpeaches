@@ -23,6 +23,7 @@ import org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil
 import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil
 import org.bouncycastle.crypto.util.PrivateKeyFactory
 import org.bouncycastle.crypto.util.PublicKeyFactory
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.math.ec.FixedPointCombMultiplier
 
 enum class IdentityKeyAlgorithm {
@@ -53,11 +54,15 @@ data class GeneratedIdentityKeyPair(
 
 object SshKeyGenerator {
     private const val PRIVATE_KEY_PBE_ITERATIONS = 210_000
+    private val bouncyCastle by lazy { BouncyCastleProvider() }
 
     fun generate(spec: IdentityKeyGenerationSpec): GeneratedIdentityKeyPair {
         val keyPair = when (spec.algorithm) {
             IdentityKeyAlgorithm.ED25519 -> {
-                KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+                // Ask Bouncy Castle directly: until an SSH connection swaps in the bundled provider,
+                // the platform's "Ed25519" generator throws "Not initialized" here, so generating a
+                // key (Ed25519 is the dialog's default) failed in a fresh app session.
+                KeyPairGenerator.getInstance("Ed25519", bouncyCastle).generateKeyPair()
             }
             IdentityKeyAlgorithm.RSA -> {
                 KeyPairGenerator.getInstance("RSA").apply {

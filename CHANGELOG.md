@@ -10,6 +10,8 @@ Release date: 2026-10-01
 
 - Fixed "Couldn't save PIN" (PBKDF2WithHmacSHA256 not available) in release builds after any SSH connection. The bundled Bouncy Castle provider that SSH connections install was missing classes removed by release shrinking, which also broke PIN unlock and encrypted export, import, and QR sharing in that state.
 - The About dialog now links to the source code on GitHub.
+- Fixed generating an Ed25519 key (the default type) failing with "Failed to generate keypair" until an SSH connection had been made in the session.
+- Fixed a spurious "session is not connected" error when opening the file browser.
 
 ## 0.11.1 (1101)
 

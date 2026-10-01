@@ -39,6 +39,7 @@ android {
     compileSdk = 36
     val liveSuiteAnnotation = "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
     val releaseLaneAnnotation = "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
+    val storeScreenshotAnnotation = "com.majordaftapps.sshpeaches.app.testutil.StoreScreenshotTest"
     val releaseInstrumentationRequested = gradle.startParameter.taskNames.any { taskName ->
         val lowerName = taskName.lowercase()
         lowerName.contains("releaselaneandroidtest") ||
@@ -92,7 +93,7 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
         if (liveSuiteRequested) {
             testInstrumentationRunnerArguments["annotation"] = liveSuiteAnnotation
-            testInstrumentationRunnerArguments["notAnnotation"] = releaseLaneAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = "$releaseLaneAnnotation,$storeScreenshotAnnotation"
             testInstrumentationRunnerArguments["liveSshHost"] = liveSshHost
             testInstrumentationRunnerArguments["liveSshPort"] = liveSshPort.toString()
             testInstrumentationRunnerArguments["liveSshUsername"] = liveSshUsername
@@ -101,10 +102,10 @@ android {
             testInstrumentationRunnerArguments["liveForwardHttpPort"] = liveForwardHttpPort.toString()
         } else if (releaseInstrumentationRequested) {
             testInstrumentationRunnerArguments["annotation"] = releaseLaneAnnotation
-            testInstrumentationRunnerArguments["notAnnotation"] = liveSuiteAnnotation
+            testInstrumentationRunnerArguments["notAnnotation"] = "$liveSuiteAnnotation,$storeScreenshotAnnotation"
         } else {
             testInstrumentationRunnerArguments["notAnnotation"] =
-                "$liveSuiteAnnotation,$releaseLaneAnnotation"
+                "$liveSuiteAnnotation,$releaseLaneAnnotation,$storeScreenshotAnnotation"
         }
         vectorDrawables {
             useSupportLibrary = true

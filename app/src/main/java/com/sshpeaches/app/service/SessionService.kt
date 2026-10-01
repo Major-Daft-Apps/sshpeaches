@@ -1762,6 +1762,11 @@ class SessionService : Service() {
                 }
             }
             if (!ok) {
+                // Failures with an exception were already reported. A missing transport was not,
+                // and the SFTP console/SCP browser would otherwise wait for a result forever.
+                if (!hasSftpTransport(hostId)) {
+                    reportSftpNotConnected(hostId)
+                }
                 UiDebugLog.result("manageRemotePath", false, "sftp-not-active hostId=$hostId")
             }
         }
@@ -1923,7 +1928,7 @@ class SessionService : Service() {
     }
 
     private fun runWithSftpClient(hostId: String, action: (SFTPClient) -> Unit): Boolean {
-        val connection = activeConnections[hostId] ?: return reportSftpNotConnected(hostId)
+        val connection = activeConnections[hostId] ?: return false
         val persistent = connection.sftpBinding?.client
         if (persistent != null) {
             return runCatching {
@@ -1935,7 +1940,7 @@ class SessionService : Service() {
                 reportSftpOperationFailure(hostId, err)
             }.getOrDefault(false)
         }
-        val client = connection.client ?: return reportSftpNotConnected(hostId)
+        val client = connection.client ?: return false
         return runCatching {
             measureOperation("runWithSftpClient:temporary", hostId) {
                 client.newSFTPClient().use { temporary ->
@@ -1948,7 +1953,14 @@ class SessionService : Service() {
         }.getOrDefault(false)
     }
 
-    /** Reports an operation that could not start because the session is gone; returns false. */
+    private fun hasSftpTransport(hostId: String): Boolean =
+        activeConnections[hostId]?.let { it.sftpBinding?.client != null || it.client != null } == true
+
+    /**
+     * Reports a user-initiated remote operation that could not start because the session is gone.
+     * Background listings stay silent: the file browser requests one while the connection is still
+     * coming up, and reporting that showed a spurious "not connected" error on every open.
+     */
     private fun reportSftpNotConnected(hostId: String): Boolean {
         SessionLogBus.emit(
             SessionLogBus.Entry(
