@@ -8,19 +8,20 @@ import org.junit.Test
 class KeyboardLayoutDefaultsTest {
 
     @Test
-    fun defaultLayout_keepsOnlyFormerBottomRowsAndReplacesAltWithFn() {
+    fun defaultLayout_putsFnWhereSwipeNavWasAndAltInSlotTwo() {
         val labels = KeyboardLayoutDefaults.DEFAULT_SLOTS.map { it.label }
 
         assertEquals(14, labels.size)
         assertEquals(
             listOf(
-                "Esc", "Fn", "Home", "Up", "End", "PgUp", "Swipe Nav",
+                "Esc", "Alt", "Home", "Up", "End", "PgUp", "Fn",
                 "Tab", "Ctrl", "Left", "Down", "Right", "PgDn", "Keyboard"
             ),
             labels
         )
-        assertEquals("fn", KeyboardLayoutDefaults.DEFAULT_SLOTS[1].iconId)
-        assertFalse(KeyboardLayoutDefaults.DEFAULT_SLOTS.any { it.modifier == KeyboardModifier.ALT })
+        assertEquals(KeyboardModifier.ALT, KeyboardLayoutDefaults.DEFAULT_SLOTS[1].modifier)
+        assertEquals("fn", KeyboardLayoutDefaults.DEFAULT_SLOTS[6].iconId)
+        assertFalse(KeyboardLayoutDefaults.DEFAULT_SLOTS.any { it.iconId == "swipe_nav" })
     }
 
     @Test
@@ -36,7 +37,7 @@ class KeyboardLayoutDefaultsTest {
 
         assertEquals(KeyboardLayoutDefaults.BUILTIN_SLOT_COUNT, compact.size)
         assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, compact)
-        assertEquals("Fn", compact[1].label)
+        assertEquals("Fn", compact[6].label)
         assertTrue(compact.any { it.modifier == KeyboardModifier.CTRL })
     }
 
@@ -59,9 +60,19 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
+    fun normalizeSlots_migratesPreviousFnInSlotTwoDefaultToNewDefault() {
+        val previousDefault = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[1] = KeyboardLayoutDefaults.fnKeyAction()
+            this[6] = swipeNavAction()
+        }
+
+        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, KeyboardLayoutDefaults.normalizeSlots(previousDefault))
+    }
+
+    @Test
     fun normalizeSlots_migratesOldTwentyEightSlotDefaultToNewDefault() {
         val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[1] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.ALT, "Alt")
+            this[6] = swipeNavAction()
         }
         val oldTopRows = List(14) { index ->
             KeyboardLayoutDefaults.textAction("legacy-$index", "Legacy")
@@ -75,8 +86,8 @@ class KeyboardLayoutDefaultsTest {
     @Test
     fun normalizeSlots_keepsCustomizedOldBottomRows() {
         val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[1] = KeyboardLayoutDefaults.modifierAction(KeyboardModifier.ALT, "Alt")
             this[2] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+            this[6] = swipeNavAction()
         }
         val oldTopRows = List(14) { KeyboardLayoutDefaults.emptyAction() }
 
@@ -85,23 +96,24 @@ class KeyboardLayoutDefaultsTest {
         assertEquals(14, compact.size)
         assertEquals("Alt", compact[1].label)
         assertEquals("Custom", compact[2].label)
+        assertEquals("Swipe Nav", compact[6].label)
     }
 
     @Test
-    fun fnLayout_isTwoFixedRowsOrderedBackShiftThenF1ThroughF12() {
+    fun fnLayout_isTwoFixedRowsOrderedBackThenF1ThroughF12ThenKeyboard() {
         val fnLayout = KeyboardLayoutDefaults.builtInFnLayout()
 
         assertEquals(14, fnLayout.size)
         assertEquals(
             listOf(
-                "Back", "Shift", "F1", "F2", "F3", "F4", "F5",
-                "F6", "F7", "F8", "F9", "F10", "F11", "F12"
+                "Back", "F1", "F2", "F3", "F4", "F5", "F6",
+                "F7", "F8", "F9", "F10", "F11", "F12", "Keyboard"
             ),
             fnLayout.map { it.label }
         )
         assertEquals("fn_back", fnLayout[0].iconId)
-        assertEquals(KeyboardActionType.MODIFIER, fnLayout[1].type)
-        assertEquals(KeyboardModifier.SHIFT, fnLayout[1].modifier)
+        assertEquals("keyboard", fnLayout[13].iconId)
+        assertFalse(fnLayout.any { it.type == KeyboardActionType.MODIFIER })
     }
 
     @Test
@@ -115,7 +127,7 @@ class KeyboardLayoutDefaultsTest {
 
         assertEquals(builtInFn, customFn)
         assertFalse(customFn.any { it.label == "Custom" })
-        assertEquals("F12", customFn.last().label)
+        assertEquals("Keyboard", customFn.last().label)
     }
 
     @Test
@@ -126,4 +138,7 @@ class KeyboardLayoutDefaultsTest {
         assertEquals("fn", fn.iconId)
         assertFalse(KeyboardLayoutDefaults.iconAliasPresets.any { it.iconId == "fn" })
     }
+
+    private fun swipeNavAction() =
+        KeyboardLayoutDefaults.textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav")
 }

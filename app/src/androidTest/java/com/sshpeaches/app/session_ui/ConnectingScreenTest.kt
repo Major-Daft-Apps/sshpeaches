@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -508,6 +509,7 @@ class ConnectingScreenTest {
     @Test
     fun defaultKeyboard_allMainAndFnKeysDispatchAndControlsWork() {
         val sentPayloads = mutableListOf<ByteArray>()
+        val arrowKeysToggleToken = mutableIntStateOf(0)
 
         composeRule.setContent {
             MaterialTheme {
@@ -536,12 +538,14 @@ class ConnectingScreenTest {
                     onRetry = {},
                     onToggleConnectedHostBar = {},
                     onOpenSettings = {},
-                    findRequestToken = 0
+                    findRequestToken = 0,
+                    arrowKeysToggleToken = arrowKeysToggleToken.intValue
                 )
             }
         }
 
         composeRule.onNodeWithText("Fn").assertIsDisplayed()
+        composeRule.onNodeWithText("Alt").assertIsDisplayed()
 
         listOf(0, 2, 3, 4, 5, 7, 9, 10, 11, 12).forEach { index ->
             composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(index))
@@ -549,23 +553,27 @@ class ConnectingScreenTest {
                 .performClick()
         }
 
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
+        // Swipe arrows are toggled from the top bar's ⋮ menu, not a key.
+        composeRule.runOnIdle { arrowKeysToggleToken.intValue = 1 }
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
             .performTouchInput { swipeRight() }
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
+        composeRule.runOnIdle { arrowKeysToggleToken.intValue = 2 }
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE)
             .assertIsDisplayed()
             .performClick()
 
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(8)).performClick()
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
         composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
-        composeRule.onNodeWithText("Shift").assertIsDisplayed().performClick()
-        (2..13).forEach { index ->
+        composeRule.onNodeWithText("Shift").assertDoesNotExist()
+        (1..12).forEach { index ->
             composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(index))
                 .assertIsDisplayed()
                 .performClick()
         }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE)
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
         composeRule.onNodeWithText("Esc").assertIsDisplayed()
 
@@ -575,7 +583,7 @@ class ConnectingScreenTest {
             val expected = "\u001B\u001B[H\u001B[A\u001B[F\u001B[5~\t" +
                 "\u001B[D\u001B[B\u001B[C\u001B[6~" +
                 "\u001B[C" +
-                "\u001B[1;6P\u001BOQ\u001BOR\u001BOS" +
+                "\u001B[1;5P\u001BOQ\u001BOR\u001BOS" +
                 "\u001B[15~\u001B[17~\u001B[18~\u001B[19~" +
                 "\u001B[20~\u001B[21~\u001B[23~\u001B[24~"
             check(actual == expected) {
@@ -626,7 +634,8 @@ class ConnectingScreenTest {
                     onRetry = {},
                     onToggleConnectedHostBar = {},
                     onOpenSettings = { openedSettings += 1 },
-                    findRequestToken = 0
+                    findRequestToken = 0,
+                    confirmPasswordInsert = false
                 )
             }
         }
@@ -1135,9 +1144,9 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(8)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
+        composeRule.onNodeWithText("F1").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
-        composeRule.onNodeWithText("Shift").assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(2)).performClick()
 
         composeRule.runOnIdle {
             val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
@@ -1186,10 +1195,10 @@ class ConnectingScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
         composeRule.onNodeWithText("F1").assertIsDisplayed()
         composeRule.onNodeWithText("Custom").assertDoesNotExist()
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(2)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
 
         composeRule.runOnIdle {
@@ -1200,6 +1209,70 @@ class ConnectingScreenTest {
         composeRule.onNodeWithText("F1").assertDoesNotExist()
         composeRule.onNodeWithText("Custom").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(13)).assertIsDisplayed()
+    }
+
+    @Test
+    fun insertPasswordFromMenu_asksFirstAndCanStopAsking() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val insertPasswordToken = mutableIntStateOf(0)
+        val confirmChanges = mutableListOf<Boolean>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    resolveRuntimeSessionPassword = { "secret" },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0,
+                    insertPasswordToken = insertPasswordToken.intValue,
+                    onConfirmPasswordInsertChange = { confirmChanges += it }
+                )
+            }
+        }
+
+        composeRule.runOnIdle { insertPasswordToken.intValue = 1 }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_DIALOG).assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_DIALOG).assertDoesNotExist()
+        composeRule.runOnIdle {
+            check(sentPayloads.none { String(it, StandardCharsets.UTF_8) == "secret" }) {
+                "Cancelling the confirmation still inserted the password"
+            }
+        }
+
+        composeRule.runOnIdle { insertPasswordToken.intValue = 2 }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_DONT_ASK).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_CONFIRM).performClick()
+
+        composeRule.runOnIdle {
+            check(sentPayloads.any { String(it, StandardCharsets.UTF_8) == "secret" }) {
+                "Confirming did not insert the password"
+            }
+            check(confirmChanges == listOf(false)) {
+                "\"Don't show this again\" was not saved: $confirmChanges"
+            }
+        }
     }
 
     @Test
@@ -1251,6 +1324,9 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_CONFIRM)
+            .assertIsDisplayed()
+            .performClick()
 
         composeRule.runOnIdle {
             check(sentPayloads.any { String(it, StandardCharsets.UTF_8) == "vaulted-secret" }) {

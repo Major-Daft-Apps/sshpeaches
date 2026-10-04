@@ -52,6 +52,7 @@ object SettingsStore {
     private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
     private val useBuiltInKeyboardKey = booleanPreferencesKey("use_built_in_terminal_keyboard")
+    private val confirmPasswordInsertKey = booleanPreferencesKey("confirm_password_insert")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val appIconKey = stringPreferencesKey("app_icon")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
@@ -141,6 +142,10 @@ object SettingsStore {
 
     val useBuiltInKeyboard: Flow<Boolean> by lazy {
         dataStore.data.map { prefs -> prefs[useBuiltInKeyboardKey] ?: false }
+    }
+
+    val confirmPasswordInsert: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[confirmPasswordInsertKey] ?: true }
     }
 
     val backgroundSessionTimeout: Flow<BackgroundSessionTimeout> by lazy {
@@ -338,6 +343,12 @@ object SettingsStore {
     suspend fun setUseBuiltInKeyboard(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[useBuiltInKeyboardKey] = enabled
+        }
+    }
+
+    suspend fun setConfirmPasswordInsert(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[confirmPasswordInsertKey] = enabled
         }
     }
 

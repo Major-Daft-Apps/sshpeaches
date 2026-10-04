@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -153,7 +152,7 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
 import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
-import com.majordaftapps.sshpeaches.app.ui.components.SessionColorProfileButton
+import com.majordaftapps.sshpeaches.app.ui.components.SessionOverflowMenu
 import com.majordaftapps.sshpeaches.app.ui.components.resolveSessionTerminalProfileId
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
@@ -239,6 +238,7 @@ data class SSHPeachesRootActions(
     val onTerminalMarginPxChange: (Int) -> Unit,
     val onMoshServerCommandChange: (String) -> Unit,
     val onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
+    val onConfirmPasswordInsertToggle: (Boolean) -> Unit,
     val onCrashReportsToggle: (Boolean) -> Unit,
     val onAnalyticsToggle: (Boolean) -> Unit,
     val onDiagnosticsToggle: (Boolean) -> Unit,
@@ -388,6 +388,7 @@ fun SSHPeachesRoot(
     val onTerminalMarginPxChange = actions.onTerminalMarginPxChange
     val onMoshServerCommandChange = actions.onMoshServerCommandChange
     val onUseBuiltInKeyboardToggle = actions.onUseBuiltInKeyboardToggle
+    val onConfirmPasswordInsertToggle = actions.onConfirmPasswordInsertToggle
     val onCrashReportsToggle = actions.onCrashReportsToggle
     val onAnalyticsToggle = actions.onAnalyticsToggle
     val onDiagnosticsToggle = actions.onDiagnosticsToggle
@@ -494,6 +495,12 @@ fun SSHPeachesRoot(
     val autoResumeHandled = rememberSaveable { mutableStateOf(false) }
     val connectedHostBarCollapsed = rememberSaveable { mutableStateOf(false) }
     val connectingFindRequestToken = rememberSaveable { mutableIntStateOf(0) }
+    val connectingArrowKeysToggleToken = rememberSaveable { mutableIntStateOf(0) }
+    val connectingInsertPasswordToken = rememberSaveable { mutableIntStateOf(0) }
+    val connectingSnippetsToken = rememberSaveable { mutableIntStateOf(0) }
+    val connectingResetToken = rememberSaveable { mutableIntStateOf(0) }
+    // Mirrors the terminal's swipe-arrow state so the ⋮ menu can show a check.
+    val connectingArrowKeysEnabled = remember { mutableStateOf(false) }
     val sessionTerminalProfileOverrides = remember { mutableStateMapOf<String, String>() }
     val hostAddRequestToken = rememberSaveable { mutableIntStateOf(0) }
     val suppressHomeWelcomeOnReturn = rememberSaveable { mutableStateOf(false) }
@@ -743,6 +750,10 @@ fun SSHPeachesRoot(
         }
         if (!isActualSessionVerticalRoute) {
             connectingFindRequestToken.intValue = 0
+            connectingArrowKeysToggleToken.intValue = 0
+            connectingInsertPasswordToken.intValue = 0
+            connectingSnippetsToken.intValue = 0
+            connectingResetToken.intValue = 0
         }
     }
 
@@ -1395,6 +1406,9 @@ fun SSHPeachesRoot(
             onUseBuiltInKeyboardToggle(
                 settings.optBoolean("useBuiltInKeyboard", uiState.useBuiltInKeyboard)
             )
+            onConfirmPasswordInsertToggle(
+                settings.optBoolean("confirmPasswordInsert", uiState.confirmPasswordInsert)
+            )
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
             // Host-key policy and the mosh server command are deliberately not imported (a shared
             // export must not weaken host-key checks or run commands); auto-starting forwards is
@@ -1672,6 +1686,13 @@ fun SSHPeachesRoot(
                 },
                 onShowMessage = showSuccessMessage,
                 findRequestToken = connectingFindRequestToken.intValue,
+                arrowKeysToggleToken = connectingArrowKeysToggleToken.intValue,
+                insertPasswordToken = connectingInsertPasswordToken.intValue,
+                snippetsToken = connectingSnippetsToken.intValue,
+                resetToken = connectingResetToken.intValue,
+                onArrowKeysEnabledChange = { enabled -> connectingArrowKeysEnabled.value = enabled },
+                confirmPasswordInsert = uiState.confirmPasswordInsert,
+                onConfirmPasswordInsertChange = onConfirmPasswordInsertToggle,
                 applyStatusBarsPadding = !showTopBarForCurrentSessionRoute
             )
         }
@@ -1829,24 +1850,29 @@ fun SSHPeachesRoot(
                                     }
                                     if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
-                                            IconButton(
-                                                onClick = {
-                                                    connectingFindRequestToken.intValue += 1
-                                                },
-                                                modifier = Modifier.testTag(UiTestTags.CONNECTING_FIND_BUTTON)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Search,
-                                                    contentDescription = "Find"
-                                                )
-                                            }
                                             val sessionId = activeSessionRequest.sessionId
-                                            SessionColorProfileButton(
+                                            SessionOverflowMenu(
                                                 profiles = uiState.terminalProfiles,
                                                 selectedProfileId = resolvedSessionTerminalProfileId(activeSessionRequest)
                                                     ?: uiState.defaultTerminalProfileId,
                                                 onSelectProfile = { profileId ->
                                                     sessionTerminalProfileOverrides[sessionId] = profileId
+                                                },
+                                                arrowKeysEnabled = connectingArrowKeysEnabled.value,
+                                                onToggleArrowKeys = {
+                                                    connectingArrowKeysToggleToken.intValue += 1
+                                                },
+                                                onInsertPassword = {
+                                                    connectingInsertPasswordToken.intValue += 1
+                                                },
+                                                onFind = {
+                                                    connectingFindRequestToken.intValue += 1
+                                                },
+                                                onSnippets = {
+                                                    connectingSnippetsToken.intValue += 1
+                                                },
+                                                onReset = {
+                                                    connectingResetToken.intValue += 1
                                                 }
                                             )
                                         }
@@ -2382,6 +2408,8 @@ fun SSHPeachesRoot(
                                 onUseVolumeButtonsToAdjustFontSizeChange = onTerminalVolumeButtonsAdjustFontSizeChange,
                                 useBuiltInKeyboard = uiState.useBuiltInKeyboard,
                                 onUseBuiltInKeyboardToggle = onUseBuiltInKeyboardToggle,
+                                confirmPasswordInsert = uiState.confirmPasswordInsert,
+                                onConfirmPasswordInsertToggle = onConfirmPasswordInsertToggle,
                                 terminalMarginPx = uiState.terminalMarginPx,
                                 onTerminalMarginPxChange = onTerminalMarginPxChange,
                                 moshServerCommand = uiState.moshServerCommand,
@@ -3736,6 +3764,7 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             put("terminalProfiles", terminalProfilesToJson(state.terminalProfiles))
             put("defaultTerminalProfileId", state.defaultTerminalProfileId)
             put("useBuiltInKeyboard", state.useBuiltInKeyboard)
+            put("confirmPasswordInsert", state.confirmPasswordInsert)
             put("crashReportsEnabled", state.crashReportsEnabled)
             put("analyticsEnabled", state.analyticsEnabled)
             put("diagnosticsLoggingEnabled", state.diagnosticsLoggingEnabled)

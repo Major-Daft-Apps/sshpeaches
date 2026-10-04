@@ -711,6 +711,7 @@ class LiveTransportSuiteTest {
         waitForTag(UiTestTags.CONNECTING_SNIPPET_PICKER)
         composeRule.onNodeWithText("Kernel Check").performClick()
 
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_MENU_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_INPUT).performTextInput("sshpeaches-live")
         composeRule.waitUntil(15_000) {
@@ -741,6 +742,7 @@ class LiveTransportSuiteTest {
 
         waitForTag(UiTestTags.CONNECTING_TERMINAL_PANEL)
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_MENU_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_FIND_INPUT).performTextInput("CUSTOM-KEY-LIVE")
         composeRule.waitUntil(15_000) {

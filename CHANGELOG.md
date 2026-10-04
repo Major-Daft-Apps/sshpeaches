@@ -6,12 +6,16 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.11.2 (1102)
 
-Release date: 2026-10-01
+Release date: 2026-10-04
 
 - Fixed "Couldn't save PIN" (PBKDF2WithHmacSHA256 not available) in release builds after any SSH connection. The bundled Bouncy Castle provider that SSH connections install was missing classes removed by release shrinking, which also broke PIN unlock and encrypted export, import, and QR sharing in that state.
 - The About dialog now links to the source code on GitHub.
 - Fixed generating an Ed25519 key (the default type) failing with "Failed to generate keypair" until an SSH connection had been made in the session.
 - Fixed a spurious "session is not connected" error when opening the file browser.
+- The Fn row is now Back, F1-F12, and a keyboard key. Shift is no longer on the Fn row.
+- Fn takes the place of the arrows (swipe navigation) key on the default keyboard, and Alt returns to the second slot. Keyboards still on an earlier default switch to the new one automatically; customized layouts are kept.
+- The terminal top bar is now back, connection name, ⋮, and close. The ⋮ menu holds Arrow keys, Insert password, Change theme, Find, Snippets, and Reset (sends `reset` to the shell).
+- Insert password asks for confirmation first, with a "Don't show this again" option. Turn the prompt back on in Settings.
 
 ## 0.11.1 (1101)
 

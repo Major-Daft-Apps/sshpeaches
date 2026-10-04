@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -146,6 +147,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.core.graphics.toColorInt
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -316,6 +318,13 @@ fun ConnectingScreen(
     onOpenSettings: () -> Unit,
     onShowMessage: (String) -> Unit = {},
     findRequestToken: Int,
+    arrowKeysToggleToken: Int = 0,
+    insertPasswordToken: Int = 0,
+    snippetsToken: Int = 0,
+    resetToken: Int = 0,
+    onArrowKeysEnabledChange: (Boolean) -> Unit = {},
+    confirmPasswordInsert: Boolean = true,
+    onConfirmPasswordInsertChange: (Boolean) -> Unit = {},
     applyStatusBarsPadding: Boolean = true
 ) {
     val listState = rememberLazyListState()
@@ -437,6 +446,7 @@ fun ConnectingScreen(
     var sftpCommandStartLogSequence by remember(request?.sessionId) { mutableStateOf(0L) }
     var sftpCommandStartDirectoryKey by remember(request?.sessionId) { mutableStateOf("") }
     var swipeNavigationEnabled by remember(request?.sessionId) { mutableStateOf(false) }
+    var showInsertPasswordConfirm by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
     var swipeStart by remember(request?.sessionId) { mutableStateOf<SwipeGestureStart?>(null) }
     var swipeIntercepting by remember(request?.sessionId) { mutableStateOf(false) }
     var swipeRepeatJob by remember(request?.sessionId) { mutableStateOf<Job?>(null) }
@@ -1416,6 +1426,39 @@ fun ConnectingScreen(
         }
     }
 
+    fun insertPassword() {
+        val password = resolveInjectPassword()
+        if (password.isNotEmpty()) {
+            terminalInput.sendText(
+                text = password,
+                ctrlDown = false,
+                altDown = false,
+                shiftDown = false
+            )
+        }
+    }
+
+    // Every Insert password path (⋮ menu, "key" icon, password key) asks first unless the user
+    // ticked "Don't show this again".
+    fun requestPasswordInsert() {
+        if (resolveInjectPassword().isEmpty()) {
+            onShowMessage("No saved password for this connection")
+        } else if (confirmPasswordInsert) {
+            showInsertPasswordConfirm = true
+        } else {
+            insertPassword()
+        }
+    }
+
+    fun toggleSwipeNavigation() {
+        swipeNavigationEnabled = !swipeNavigationEnabled
+        swipeStart = null
+        swipeIntercepting = false
+        if (!swipeNavigationEnabled) {
+            stopSwipeRepeat()
+        }
+    }
+
     fun handleIconAlias(action: KeyboardSlotAction): Boolean {
         return when (action.iconId) {
             "code", "snippet_picker" -> {
@@ -1423,24 +1466,11 @@ fun ConnectingScreen(
                 true
             }
             "key" -> {
-                val password = resolveInjectPassword()
-                if (password.isNotEmpty()) {
-                    terminalInput.sendText(
-                        text = password,
-                        ctrlDown = false,
-                        altDown = false,
-                        shiftDown = false
-                    )
-                }
+                requestPasswordInsert()
                 true
             }
             "swipe_nav" -> {
-                swipeNavigationEnabled = !swipeNavigationEnabled
-                swipeStart = null
-                swipeIntercepting = false
-                if (!swipeNavigationEnabled) {
-                    stopSwipeRepeat()
-                }
+                toggleSwipeNavigation()
                 true
             }
             "folder" -> {
@@ -1479,6 +1509,48 @@ fun ConnectingScreen(
             }
             else -> false
         }
+    }
+
+    // Same handled-token pattern as Find: the ⋮ menu's tokens outlive this screen instance.
+    var handledArrowKeysToggleToken by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(arrowKeysToggleToken, showTerminalSession) {
+        if (arrowKeysToggleToken > handledArrowKeysToggleToken && showTerminalSession) {
+            handledArrowKeysToggleToken = arrowKeysToggleToken
+            toggleSwipeNavigation()
+        } else if (arrowKeysToggleToken < handledArrowKeysToggleToken) {
+            handledArrowKeysToggleToken = arrowKeysToggleToken
+        }
+    }
+    var handledInsertPasswordToken by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(insertPasswordToken, showTerminalSession) {
+        if (insertPasswordToken > handledInsertPasswordToken && showTerminalSession) {
+            handledInsertPasswordToken = insertPasswordToken
+            requestPasswordInsert()
+        } else if (insertPasswordToken < handledInsertPasswordToken) {
+            handledInsertPasswordToken = insertPasswordToken
+        }
+    }
+    var handledSnippetsToken by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(snippetsToken, showTerminalSession) {
+        if (snippetsToken > handledSnippetsToken && showTerminalSession) {
+            handledSnippetsToken = snippetsToken
+            showSnippetPicker = true
+        } else if (snippetsToken < handledSnippetsToken) {
+            handledSnippetsToken = snippetsToken
+        }
+    }
+    var handledResetToken by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(resetToken, showTerminalSession) {
+        if (resetToken > handledResetToken && showTerminalSession) {
+            handledResetToken = resetToken
+            sendCommandWithEnter("reset")
+        } else if (resetToken < handledResetToken) {
+            handledResetToken = resetToken
+        }
+    }
+    val currentOnArrowKeysEnabledChange = rememberUpdatedState(onArrowKeysEnabledChange)
+    LaunchedEffect(swipeNavigationEnabled) {
+        currentOnArrowKeysEnabledChange.value(swipeNavigationEnabled)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1633,15 +1705,7 @@ fun ConnectingScreen(
                 pendingModifiers = emptySet()
             }
             KeyboardActionType.PASSWORD_INJECT -> {
-                val password = resolveInjectPassword()
-                if (password.isNotEmpty()) {
-                    terminalInput.sendText(
-                        text = password,
-                        ctrlDown = false,
-                        altDown = false,
-                        shiftDown = false
-                    )
-                }
+                requestPasswordInsert()
                 pendingModifiers = emptySet()
             }
             KeyboardActionType.SNIPPET_PICKER -> {
@@ -1823,6 +1887,18 @@ fun ConnectingScreen(
                     showSnippetPicker = false
                 },
                 onDismiss = { showSnippetPicker = false }
+            )
+        }
+        if (showInsertPasswordConfirm && showTerminalSession) {
+            InsertPasswordConfirmDialog(
+                onConfirm = { dontShowAgain ->
+                    showInsertPasswordConfirm = false
+                    if (dontShowAgain) {
+                        onConfirmPasswordInsertChange(false)
+                    }
+                    insertPassword()
+                },
+                onDismiss = { showInsertPasswordConfirm = false }
             )
         }
         if (state.phase == QuickConnectPhase.ERROR) {
@@ -4702,3 +4778,49 @@ private const val TERMINAL_BELL_NOTIFICATION_CHANNEL_ID = "terminal_bell"
 private const val TERMINAL_BELL_NOTIFICATION_ID_BASE = 24_000
 private const val TERMINAL_BELL_THROTTLE_MS = 750L
 private const val TERMINAL_BELL_VIBRATION_MS = 120L
+
+@Composable
+private fun InsertPasswordConfirmDialog(
+    onConfirm: (dontShowAgain: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var dontShowAgain by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(UiTestTags.CONNECTING_INSERT_PASSWORD_DIALOG),
+        title = { Text("Insert password?") },
+        text = {
+            Column {
+                Text("The saved password will be typed into this terminal.")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .toggleable(
+                            value = dontShowAgain,
+                            role = Role.Checkbox,
+                            onValueChange = { dontShowAgain = it }
+                        )
+                        .testTag(UiTestTags.CONNECTING_INSERT_PASSWORD_DONT_ASK)
+                ) {
+                    androidx.compose.material3.Checkbox(checked = dontShowAgain, onCheckedChange = null)
+                    Text("Don't show this again", modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(dontShowAgain) },
+                modifier = Modifier.testTag(UiTestTags.CONNECTING_INSERT_PASSWORD_CONFIRM)
+            ) {
+                Text("Insert")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}

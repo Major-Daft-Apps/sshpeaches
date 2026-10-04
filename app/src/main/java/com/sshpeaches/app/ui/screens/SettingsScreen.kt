@@ -132,6 +132,8 @@ fun SettingsScreen(
     onUseVolumeButtonsToAdjustFontSizeChange: (Boolean) -> Unit,
     useBuiltInKeyboard: Boolean,
     onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
+    confirmPasswordInsert: Boolean,
+    onConfirmPasswordInsertToggle: (Boolean) -> Unit,
     terminalMarginPx: Int,
     onTerminalMarginPxChange: (Int) -> Unit,
     moshServerCommand: String,
@@ -652,6 +654,13 @@ fun SettingsScreen(
                         checked = useBuiltInKeyboard,
                         onCheckedChange = onUseBuiltInKeyboardToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH)
+                    )
+                    SettingsToggleRow(
+                        title = "Confirm before inserting password",
+                        description = "Ask before Insert password types the saved password into the terminal.",
+                        checked = confirmPasswordInsert,
+                        onCheckedChange = onConfirmPasswordInsertToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_CONFIRM_PASSWORD_INSERT_SWITCH)
                     )
                     OutlinedTextField(
                         value = moshServerCommandState.value,

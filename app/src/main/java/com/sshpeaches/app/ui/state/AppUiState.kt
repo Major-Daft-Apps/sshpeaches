@@ -46,6 +46,7 @@ data class AppUiState(
     val autoTrustHostKey: Boolean = false,
     val usageReportsEnabled: Boolean = SettingsStore.defaultUsageReportsEnabled,
     val useBuiltInKeyboard: Boolean = false,
+    val confirmPasswordInsert: Boolean = true,
     val snippetRunTimeoutSeconds: Int = 10,
     val sftpTransferSettings: SftpTransferSettings = SftpTransferSettings(),
     val pinConfigured: Boolean = false,

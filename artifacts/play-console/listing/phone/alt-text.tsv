@@ -1,4 +1,4 @@
-01-terminal.png	SSH terminal showing a colorized deploy log, with a row of extra keys for Esc, Ctrl, Tab, Fn and arrows below it.
+01-terminal.png	SSH terminal showing a colorized deploy log, with a row of extra keys for Esc, Alt, Ctrl, Tab, Fn and arrows below it.
 02-hosts.png	Hosts grouped into Cloud and Home lab, with OS logos, favorites and one-tap SSH, file upload and download actions.
 03-file-browser.png	Remote file browser with folders and file-type icons for video, scripts, images, configs and notes.
 04-ssh-keys.png	SSH keys screen listing three Ed25519 identities with fingerprints and an Install Key To Host button.

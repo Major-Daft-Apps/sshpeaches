@@ -109,7 +109,7 @@ fun KeyboardEditorScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-            Text("Tap a main-row slot to edit it. Fn layer Back, Shift, and F1-F12 keys are fixed.")
+            Text("Tap a main-row slot to edit it. The Fn layer (Back, F1-F12, keyboard) is fixed.")
 
             BoxWithConstraints(
                 modifier = Modifier
@@ -370,7 +370,7 @@ private fun KeyActionEditorVertical(
 
         SectionTitle("Fn Layer")
         Text(
-            "Assign Fn to any main-row slot. Its Back, Shift, and F1-F12 keys stay fixed.",
+            "Assign Fn to any main-row slot. Its Back, F1-F12, and keyboard keys stay fixed.",
             style = MaterialTheme.typography.bodySmall
         )
         TextButton(

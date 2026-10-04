@@ -609,6 +609,7 @@ class MainActivity : FragmentActivity() {
                         onTerminalMarginPxChange = viewModel::setTerminalMarginPx,
                         onMoshServerCommandChange = viewModel::setMoshServerCommand,
                         onUseBuiltInKeyboardToggle = viewModel::setUseBuiltInKeyboard,
+                        onConfirmPasswordInsertToggle = viewModel::setConfirmPasswordInsert,
                         onCrashReportsToggle = viewModel::setCrashReports,
                         onAnalyticsToggle = viewModel::setAnalytics,
                         onDiagnosticsToggle = viewModel::setDiagnosticsLogging,

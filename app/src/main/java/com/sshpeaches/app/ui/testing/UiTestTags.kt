@@ -175,6 +175,7 @@ object UiTestTags {
     fun settingsTerminalBellOption(name: String): String =
         "settings_terminal_bell_option_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_BUILTIN_KEYBOARD_SWITCH = "settings_built_in_keyboard_switch"
+    const val SETTINGS_CONFIRM_PASSWORD_INSERT_SWITCH = "settings_confirm_password_insert_switch"
     fun settingsCategory(name: String): String =
         "settings_category_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"
@@ -227,9 +228,18 @@ object UiTestTags {
     const val CONNECTING_SFTP_PANEL = "connecting_sftp_panel"
     const val CONNECTING_SCP_PANEL = "connecting_scp_panel"
     const val CONNECTING_LOG_PANEL = "connecting_log_panel"
+    const val CONNECTING_MENU_BUTTON = "connecting_menu_button"
+    const val CONNECTING_MENU = "connecting_menu"
+    const val CONNECTING_ARROW_KEYS_BUTTON = "connecting_arrow_keys_button"
+    const val CONNECTING_INSERT_PASSWORD_BUTTON = "connecting_insert_password_button"
     const val CONNECTING_FIND_BUTTON = "connecting_find_button"
+    const val CONNECTING_SNIPPETS_BUTTON = "connecting_snippets_button"
+    const val CONNECTING_RESET_BUTTON = "connecting_reset_button"
     const val CONNECTING_THEME_BUTTON = "connecting_theme_button"
-    const val CONNECTING_THEME_MENU = "connecting_theme_menu"
+    const val CONNECTING_THEME_BACK_BUTTON = "connecting_theme_back_button"
+    const val CONNECTING_INSERT_PASSWORD_DIALOG = "connecting_insert_password_dialog"
+    const val CONNECTING_INSERT_PASSWORD_DONT_ASK = "connecting_insert_password_dont_ask"
+    const val CONNECTING_INSERT_PASSWORD_CONFIRM = "connecting_insert_password_confirm"
     fun connectingThemeItem(profileId: String): String = "connecting_theme_item_${sanitize(profileId)}"
     const val CONNECTING_CLOSE_BUTTON = "connecting_close_button"
     const val CONNECTING_KEYBOARD_STATE = "connecting_keyboard_state"

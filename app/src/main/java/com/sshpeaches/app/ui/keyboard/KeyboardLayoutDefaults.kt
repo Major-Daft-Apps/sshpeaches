@@ -45,14 +45,15 @@ object KeyboardLayoutDefaults {
     const val COMPACT_KEY_HEIGHT_DP = 30
     const val COMPACT_KEY_FONT_SP = 10
 
+    // Swipe Nav (the arrows toggle) lives in the terminal's overflow menu; Fn takes its slot.
     val DEFAULT_SLOTS: List<KeyboardSlotAction> = listOf(
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
-        fnKeyAction(),
+        modifierAction(KeyboardModifier.ALT, "Alt"),
         keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
         keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
         keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
         keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
-        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
+        fnKeyAction(),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
         keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
@@ -62,10 +63,20 @@ object KeyboardLayoutDefaults {
         textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
     )
 
-    private val FIXED_FN_SLOTS: List<KeyboardSlotAction> = listOf(
-        fnBackAction(),
-        modifierAction(KeyboardModifier.SHIFT, "Shift")
-    ) + (1..12).map(::functionKeyAction)
+    // Fn layer: Back (return to the main rows), F1-F12, then the keyboard toggle.
+    private val FIXED_FN_SLOTS: List<KeyboardSlotAction> = listOf(fnBackAction()) +
+        (1..12).map(::functionKeyAction) +
+        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+
+    // Earlier defaults; a layout still equal to one of them was never customized and moves to
+    // DEFAULT_SLOTS. Newest first: Fn in slot 2 with Swipe Nav, then the original with Alt.
+    private val PREVIOUS_DEFAULT_SLOTS: List<KeyboardSlotAction> = DEFAULT_SLOTS.toMutableList().apply {
+        this[1] = fnKeyAction()
+        this[6] = textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav")
+    }
+    private val ORIGINAL_DEFAULT_SLOTS: List<KeyboardSlotAction> = PREVIOUS_DEFAULT_SLOTS.toMutableList().apply {
+        this[1] = modifierAction(KeyboardModifier.ALT, "Alt")
+    }
 
     val modifierPresets: List<KeyboardSlotAction> = listOf(
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
@@ -224,10 +235,11 @@ object KeyboardLayoutDefaults {
     fun normalizeSlots(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> {
         if (slots.isEmpty()) return DEFAULT_SLOTS
         val visibleSlots = if (slots.size > SLOT_COUNT) slots.takeLast(SLOT_COUNT) else slots
-        val legacyDefault = DEFAULT_SLOTS.toMutableList().apply {
-            this[1] = modifierAction(KeyboardModifier.ALT, "Alt")
+        val migrated = if (visibleSlots == PREVIOUS_DEFAULT_SLOTS || visibleSlots == ORIGINAL_DEFAULT_SLOTS) {
+            DEFAULT_SLOTS
+        } else {
+            visibleSlots
         }
-        val migrated = if (visibleSlots == legacyDefault) DEFAULT_SLOTS else visibleSlots
         return List(SLOT_COUNT) { index ->
             val action = migrated.getOrNull(index) ?: DEFAULT_SLOTS.getOrNull(index) ?: emptyAction()
             applyLegacyIconAlias(action)

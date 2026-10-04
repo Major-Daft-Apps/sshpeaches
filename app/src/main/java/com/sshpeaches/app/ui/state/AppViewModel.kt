@@ -85,6 +85,7 @@ class AppViewModel(
     private val writeQueue = Mutex()
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
     private val useBuiltInKeyboardFlow = MutableStateFlow(false)
+    private val confirmPasswordInsertFlow = MutableStateFlow(true)
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
 
@@ -252,6 +253,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.useBuiltInKeyboard.collect { enabled ->
                 useBuiltInKeyboardFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.confirmPasswordInsert.collect { enabled ->
+                confirmPasswordInsertFlow.value = enabled
             }
         }
     }
@@ -507,12 +513,14 @@ class AppViewModel(
         coreUiStateBase,
         snippetRunTimeoutSecondsFlow,
         appIconFlow,
-        lockScreenMessageFlow
-    ) { state, snippetTimeout, appIcon, lockScreenMessage ->
+        lockScreenMessageFlow,
+        confirmPasswordInsertFlow
+    ) { state, snippetTimeout, appIcon, lockScreenMessage, confirmPasswordInsert ->
         state.copy(
             snippetRunTimeoutSeconds = snippetTimeout,
             appIcon = appIcon,
-            lockScreenMessage = lockScreenMessage
+            lockScreenMessage = lockScreenMessage,
+            confirmPasswordInsert = confirmPasswordInsert
         )
     }
 
@@ -604,6 +612,7 @@ class AppViewModel(
         append(state.autoTrustHostKey).append('|')
         append(state.usageReportsEnabled).append('|')
         append(state.useBuiltInKeyboard).append('|')
+        append(state.confirmPasswordInsert).append('|')
         append(state.pinConfigured).append('|')
         append(state.isLocked).append('|')
         append(state.keyboardSlots.size).append('|')
@@ -1711,6 +1720,12 @@ class AppViewModel(
     fun setUseBuiltInKeyboard(enabled: Boolean) {
         launchLogged("setUseBuiltInKeyboard", "enabled=$enabled") {
             SettingsStore.setUseBuiltInKeyboard(enabled)
+        }
+    }
+
+    fun setConfirmPasswordInsert(enabled: Boolean) {
+        launchLogged("setConfirmPasswordInsert", "enabled=$enabled") {
+            SettingsStore.setConfirmPasswordInsert(enabled)
         }
     }
 
