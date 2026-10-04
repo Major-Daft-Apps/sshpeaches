@@ -16,6 +16,8 @@ Release date: 2026-10-04
 - Fn takes the place of the arrows (swipe navigation) key on the default keyboard, and Alt returns to the second slot. Keyboards still on an earlier default switch to the new one automatically; customized layouts are kept.
 - The terminal top bar is now back, connection name, ⋮, and close. The ⋮ menu holds Arrow keys, Insert password, Change theme, Find, Snippets, and Reset (sends `reset` to the shell).
 - Insert password asks for confirmation first, with a "Don't show this again" option. Turn the prompt back on in Settings.
+- When a connection fails, the connection screen says what went wrong (host not found, port closed, server unreachable, password or key rejected, host key not accepted, mosh-server missing) and lists specific things to try, with Edit host, Identities, and Copy log buttons.
+- Help is now a searchable list of common questions (key logins, special keys, copy and paste, port forwarding, moving to a new phone, forgotten PIN, and more), each with steps that use the app's own labels and a button that opens the right screen.
 
 ## 0.11.1 (1101)
 

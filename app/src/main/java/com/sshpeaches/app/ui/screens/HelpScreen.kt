@@ -1,6 +1,8 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,60 +14,86 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.majordaftapps.sshpeaches.app.ui.help.HelpDestination
+import com.majordaftapps.sshpeaches.app.ui.help.HelpTopic
+import com.majordaftapps.sshpeaches.app.ui.help.helpTopics
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
-import com.majordaftapps.sshpeaches.app.ui.theme.PeachyOrange
 
 @Composable
 fun HelpScreen(
     onOpenSupport: () -> Unit,
+    onOpenDestination: (HelpDestination) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val topics = remember { helpTopics() }
+    var query by rememberSaveable { mutableStateOf("") }
+    var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val topics = remember(query) { helpTopics.filter { it.matches(query) } }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .testTag(UiTestTags.HELP_SCREEN),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
             HelpHeader(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+                query = query,
+                onQueryChange = { query = it },
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp)
             )
         }
 
-        items(topics.size) { index ->
+        items(topics, key = { it.id }) { topic ->
             HelpTopicCard(
-                topic = topics[index],
+                topic = topic,
+                expanded = expandedId == topic.id || query.isNotBlank() && topics.size == 1,
+                onToggle = { expandedId = if (expandedId == topic.id) null else topic.id },
+                onOpenDestination = onOpenDestination,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
-                    .testTag(UiTestTags.helpStep(index))
+                    .testTag(UiTestTags.helpTopic(topic.id))
             )
+        }
+
+        if (topics.isEmpty()) {
+            item {
+                Text(
+                    "Nothing matches \"${query.trim()}\". Try another word, or ask on the support site below.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
         }
 
         item {
@@ -78,7 +106,11 @@ fun HelpScreen(
 }
 
 @Composable
-private fun HelpHeader(modifier: Modifier = Modifier) {
+private fun HelpHeader(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -92,12 +124,26 @@ private fun HelpHeader(modifier: Modifier = Modifier) {
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-            Text("How to use SSHPeaches", style = MaterialTheme.typography.headlineSmall)
+            Text("How do I…", style = MaterialTheme.typography.headlineSmall)
         }
-        Text(
-            "The basics, in a few steps each.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(UiTestTags.HELP_SEARCH),
+            placeholder = { Text("Search help, e.g. key, paste, tunnel") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                    }
+                }
+            } else {
+                null
+            },
+            singleLine = true
         )
     }
 }
@@ -105,6 +151,9 @@ private fun HelpHeader(modifier: Modifier = Modifier) {
 @Composable
 private fun HelpTopicCard(
     topic: HelpTopic,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onOpenDestination: (HelpDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -114,34 +163,42 @@ private fun HelpTopicCard(
         ),
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(modifier = Modifier.animateContentSize()) {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Surface(
-                    color = topic.tint.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(
-                        topic.icon,
-                        contentDescription = null,
-                        tint = topic.tint,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
                 Text(
-                    topic.title,
+                    topic.question,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium
                 )
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand"
+                )
             }
-
-            topic.steps.forEachIndexed { index, step ->
-                HelpInstructionRow(number = index + 1, text = step)
+            if (expanded) {
+                Column(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    topic.steps.forEachIndexed { index, step ->
+                        HelpInstructionRow(number = index + 1, text = step)
+                    }
+                    topic.destination?.let { destination ->
+                        FilledTonalButton(
+                            onClick = { onOpenDestination(destination) },
+                            modifier = Modifier.testTag(UiTestTags.helpTopicAction(topic.id))
+                        ) {
+                            Text(destination.buttonLabel)
+                        }
+                    }
+                }
             }
         }
     }
@@ -195,9 +252,9 @@ private fun SupportCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Need more help?", style = MaterialTheme.typography.titleMedium)
+            Text("Still stuck?", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Open the support site.",
+                "Open the SSHPeaches support site.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
@@ -212,63 +269,3 @@ private fun SupportCard(
         }
     }
 }
-
-private data class HelpTopic(
-    val title: String,
-    val icon: ImageVector,
-    val tint: Color,
-    val steps: List<String>
-)
-
-private fun helpTopics(): List<HelpTopic> = listOf(
-    HelpTopic(
-        title = "Connect",
-        icon = Icons.Default.PlayArrow,
-        tint = Color(0xFF2E7D32),
-        steps = listOf(
-            "Menu → Quick Connect, or Hosts → + to save a server.",
-            "Enter host, port, username, and a password or key.",
-            "Tap connect. Use SSH for a terminal, SFTP or SCP for files."
-        )
-    ),
-    HelpTopic(
-        title = "Keys",
-        icon = Icons.Default.Security,
-        tint = Color(0xFF1565C0),
-        steps = listOf(
-            "Identities → + to import or create a key.",
-            "On the host, set Auth to Identity and pick that key.",
-            "Check the fingerprint before you accept a new host key."
-        )
-    ),
-    HelpTopic(
-        title = "Terminal",
-        icon = Icons.Default.Keyboard,
-        tint = PeachyOrange,
-        steps = listOf(
-            "Tap the terminal to type.",
-            "Use the extra keys for Esc, Ctrl, Tab, and arrows.",
-            "Keyboard Editor changes those keys."
-        )
-    ),
-    HelpTopic(
-        title = "Files",
-        icon = Icons.Default.FolderOpen,
-        tint = Color(0xFFEF6C00),
-        steps = listOf(
-            "Open a host with SFTP to browse, upload, or download.",
-            "Use SCP when you already know the path to copy.",
-            "Snippets save commands you run often."
-        )
-    ),
-    HelpTopic(
-        title = "If it fails",
-        icon = Icons.Default.Warning,
-        tint = Color(0xFFC62828),
-        steps = listOf(
-            "Can't connect: check host, port, and network.",
-            "Login fails: check username, password, or key.",
-            "Files fail: check the path and permissions."
-        )
-    )
-)

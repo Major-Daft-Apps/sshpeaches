@@ -2,12 +2,14 @@ package com.majordaftapps.sshpeaches.app.service
 
 import java.net.ConnectException
 import java.net.NoRouteToHostException
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.nio.channels.UnresolvedAddressException
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.connection.ConnectionException
 import net.schmizz.sshj.transport.TransportException
+import net.schmizz.sshj.userauth.UserAuthException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -42,15 +44,22 @@ class ConnectionFailureKindTest {
     }
 
     @Test
-    fun classifiesSocketAndDnsFailuresAsNetworkErrors() {
-        listOf(
-            UnknownHostException("unknown host"),
-            ConnectException("connection refused"),
-            NoRouteToHostException("no route"),
-            SocketTimeoutException("timed out"),
-            UnresolvedAddressException()
-        ).forEach { failure ->
-            assertEquals(ConnectionFailureKind.NETWORK, failure.connectionFailureKind())
+    fun classifiesSocketAndDnsFailuresBySpecificCause() {
+        mapOf(
+            UnknownHostException("unknown host") to ConnectionFailureKind.UNKNOWN_HOST,
+            UnresolvedAddressException() to ConnectionFailureKind.UNKNOWN_HOST,
+            ConnectException(
+                "failed to connect to /10.0.0.5 (port 22): isConnected failed: ECONNREFUSED (Connection refused)"
+            ) to ConnectionFailureKind.REFUSED,
+            ConnectException(
+                "failed to connect to /10.0.0.5 (port 22): isConnected failed: EHOSTUNREACH (No route to host)"
+            ) to ConnectionFailureKind.UNREACHABLE,
+            NoRouteToHostException("no route") to ConnectionFailureKind.UNREACHABLE,
+            SocketTimeoutException("timed out") to ConnectionFailureKind.UNREACHABLE,
+            SocketException("Software caused connection abort") to ConnectionFailureKind.NETWORK
+        ).forEach { (failure, expected) ->
+            assertEquals(failure.toString(), expected, failure.connectionFailureKind())
+            assertTrue(failure.toString(), expected.isNetwork)
         }
     }
 
@@ -61,7 +70,7 @@ class ConnectionFailureKindTest {
             RuntimeException("socket failed", ConnectException("connection refused"))
         )
 
-        assertEquals(ConnectionFailureKind.NETWORK, failure.connectionFailureKind())
+        assertEquals(ConnectionFailureKind.REFUSED, failure.connectionFailureKind())
     }
 
     @Test
@@ -79,18 +88,41 @@ class ConnectionFailureKindTest {
             ConnectException("connection refused")
         )
 
-        assertEquals(ConnectionFailureKind.NETWORK, failure.connectionFailureKind())
+        assertEquals(ConnectionFailureKind.REFUSED, failure.connectionFailureKind())
     }
 
     @Test
-    fun leavesExplicitNonNetworkFailuresUnclassified() {
-        assertNull(RuntimeException("Authentication failed").connectionFailureKind())
+    fun classifiesRejectedHostKeyBeforeItsSocketCause() {
+        val failure = TransportException(
+            DisconnectReason.HOST_KEY_NOT_VERIFIABLE,
+            "Host key was not accepted",
+            ConnectException("connection closed during verification")
+        )
+
+        assertEquals(ConnectionFailureKind.HOST_KEY_REJECTED, failure.connectionFailureKind())
+        assertFalse(ConnectionFailureKind.HOST_KEY_REJECTED.isNetwork)
+    }
+
+    @Test
+    fun usesTheKindAttachedWhereTheFailureWasThrown() {
+        val keyFailure = ConnectionFailure(
+            "Identity authentication failed.",
+            ConnectionFailureKind.AUTH_KEY,
+            UserAuthException("Exhausted available authentication methods")
+        )
+
+        assertEquals(ConnectionFailureKind.AUTH_KEY, RuntimeException("wrapped", keyFailure).connectionFailureKind())
+        assertEquals(
+            ConnectionFailureKind.AUTH,
+            UserAuthException("Exhausted available authentication methods").connectionFailureKind()
+        )
+    }
+
+    @Test
+    fun leavesUnexplainedFailuresUnclassified() {
+        assertNull(RuntimeException("Connection canceled while waiting for password.").connectionFailureKind())
         assertNull(
-            TransportException(
-                DisconnectReason.HOST_KEY_NOT_VERIFIABLE,
-                "Host key was not accepted",
-                ConnectException("connection closed during verification")
-            ).connectionFailureKind()
+            TransportException(DisconnectReason.PROTOCOL_ERROR, "bad packet").connectionFailureKind()
         )
     }
 }

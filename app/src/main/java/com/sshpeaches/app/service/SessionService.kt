@@ -2485,7 +2485,10 @@ class SessionService : Service() {
                 }
                 failedAttempts += 1
                 if (failedAttempts >= MAX_PASSWORD_PROMPT_ATTEMPTS) {
-                    throw RuntimeException("Authentication failed after $MAX_PASSWORD_PROMPT_ATTEMPTS attempts.")
+                    throw ConnectionFailure(
+                        "Authentication failed after $MAX_PASSWORD_PROMPT_ATTEMPTS attempts.",
+                        ConnectionFailureKind.AUTH_PASSWORD
+                    )
                 }
                 password = null
                 savePassword = false
@@ -2504,7 +2507,7 @@ class SessionService : Service() {
         val identityId = host.preferredIdentityId?.takeIf { it.isNotBlank() }
         if (identityId == null) {
             if (required) {
-                throw RuntimeException("No identity key selected for this host.")
+                throw ConnectionFailure("No identity key selected for this host.", ConnectionFailureKind.KEY_MISSING)
             }
             return false
         }
@@ -2516,7 +2519,10 @@ class SessionService : Service() {
         }.getOrNull()
         if (privateKey.isNullOrBlank()) {
             if (required) {
-                throw RuntimeException("Selected identity key is unavailable. Re-import the key and try again.")
+                throw ConnectionFailure(
+                    "Selected identity key is unavailable. Re-import the key and try again.",
+                    ConnectionFailureKind.KEY_MISSING
+                )
             }
             SessionLogBus.emit(
                 SessionLogBus.Entry(
@@ -2578,7 +2584,7 @@ class SessionService : Service() {
                     "error=${authError.safeIdentityAuthSummary(host)}"
             )
             if (required) {
-                throw RuntimeException("Identity authentication failed.", authError)
+                throw ConnectionFailure("Identity authentication failed.", ConnectionFailureKind.AUTH_KEY, authError)
             }
             false
         } finally {
@@ -2654,7 +2660,7 @@ class SessionService : Service() {
                 val detail = combined.toString().trim().ifBlank {
                     "No MOSH CONNECT reply received."
                 }
-                throw RuntimeException("Failed to start mosh-server. $detail")
+                throw ConnectionFailure("Failed to start mosh-server. $detail", ConnectionFailureKind.MOSH_SERVER)
             }
         }.also { connect ->
             SessionLogBus.emit(

@@ -162,6 +162,7 @@ import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
 import com.majordaftapps.sshpeaches.app.ui.screens.AdvancedSettingsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
+import com.majordaftapps.sshpeaches.app.ui.help.HelpDestination
 import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
@@ -1685,6 +1686,14 @@ fun SSHPeachesRoot(
                     navController.navigate(Routes.SETTINGS)
                 },
                 onShowMessage = showSuccessMessage,
+                onEditHost = { hostId ->
+                    hostEditRequestId.value = hostId
+                    hostEditRequestToken.intValue += 1
+                    navController.navigate(Routes.HOSTS) { launchSingleTop = true }
+                },
+                onOpenIdentities = {
+                    navController.navigate(Routes.IDENTITIES) { launchSingleTop = true }
+                },
                 findRequestToken = connectingFindRequestToken.intValue,
                 arrowKeysToggleToken = connectingArrowKeysToggleToken.intValue,
                 insertPasswordToken = connectingInsertPasswordToken.intValue,
@@ -2153,7 +2162,32 @@ fun SSHPeachesRoot(
                             SessionVerticalContent()
                         }
                     composable(Routes.HELP) {
-                        HelpScreen(onOpenSupport = ::openSupportSite)
+                        HelpScreen(
+                            onOpenSupport = ::openSupportSite,
+                            onOpenDestination = { destination ->
+                                val route = when (destination) {
+                                    HelpDestination.QUICK_CONNECT -> {
+                                        showQuickConnect.value = true
+                                        null
+                                    }
+                                    HelpDestination.SHORTCUTS -> {
+                                        showShortcutHelp.value = true
+                                        null
+                                    }
+                                    HelpDestination.HOSTS -> Routes.HOSTS
+                                    HelpDestination.IDENTITIES -> Routes.IDENTITIES
+                                    HelpDestination.FORWARDS -> Routes.FORWARDS
+                                    HelpDestination.SNIPPETS -> Routes.SNIPPETS
+                                    HelpDestination.KEYBOARD -> Routes.KEYBOARD
+                                    HelpDestination.THEMES -> Routes.THEME_EDITOR
+                                    HelpDestination.SETTINGS -> Routes.SETTINGS
+                                }
+                                route?.let { target ->
+                                    drawerDestinations.firstOrNull { it.route == target }
+                                        ?.let(onDrawerDestinationSelected)
+                                }
+                            }
+                        )
                     }
                     composable(Routes.HOSTS) {
                         val activeSshSessionHostIds = sessions

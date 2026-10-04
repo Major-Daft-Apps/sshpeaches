@@ -4,5 +4,7 @@ What's new in 0.11.2
 - New ⋮ terminal menu: arrow keys, insert password, theme, find, snippets, reset.
 - Fn row is now Back, F1-F12 and keyboard; Fn replaces the arrows key.
 - Insert password asks first (you can turn this off).
+- Failed connections now say what went wrong and what to try.
+- Searchable Help with step-by-step answers.
 - No false "not connected" error in the file browser.
 - About links to the source code on GitHub.

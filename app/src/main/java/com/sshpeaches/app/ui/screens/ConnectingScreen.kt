@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.toggleable
@@ -85,6 +86,7 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -186,6 +188,9 @@ import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.sftpDirectoryRefreshKey
+import com.majordaftapps.sshpeaches.app.ui.help.ConnectionFailureHelp
+import com.majordaftapps.sshpeaches.app.ui.help.FailureHelpAction
+import com.majordaftapps.sshpeaches.app.ui.help.connectionFailureHelp
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
@@ -321,6 +326,8 @@ fun ConnectingScreen(
     arrowKeysToggleToken: Int = 0,
     insertPasswordToken: Int = 0,
     snippetsToken: Int = 0,
+    onEditHost: (String) -> Unit = {},
+    onOpenIdentities: () -> Unit = {},
     resetToken: Int = 0,
     onArrowKeysEnabledChange: (Boolean) -> Unit = {},
     confirmPasswordInsert: Boolean = true,
@@ -552,10 +559,8 @@ fun ConnectingScreen(
     val statusText = when (state.phase) {
         QuickConnectPhase.CONNECTING -> "Connecting..."
         QuickConnectPhase.SUCCESS -> "Connected"
-        QuickConnectPhase.ERROR -> when (state.failureKind) {
-            ConnectionFailureKind.NETWORK -> "Network error"
-            null -> "Connection failed"
-        }
+        QuickConnectPhase.ERROR ->
+            if (state.failureKind?.isNetwork == true) "Network error" else "Connection failed"
         QuickConnectPhase.IDLE -> "Preparing..."
     }
     val statusColor = when (state.phase) {
@@ -1875,7 +1880,26 @@ fun ConnectingScreen(
                 userFacingStateMessage = userFacingStateMessage,
                 activeFileTransfer = activeFileTransfer,
                 renderedLogs = renderedLogs,
-                listState = listState
+                listState = listState,
+                failureHelp = request?.takeIf { state.phase == QuickConnectPhase.ERROR }?.let { current ->
+                    connectionFailureHelp(
+                        kind = state.failureKind,
+                        host = current.host,
+                        port = current.port,
+                        username = current.username,
+                        isSavedHost = current.savedHostId != null
+                    )
+                },
+                onFailureHelpAction = { action ->
+                    when (action) {
+                        FailureHelpAction.EDIT_HOST -> request?.savedHostId?.let(onEditHost)
+                        FailureHelpAction.OPEN_IDENTITIES -> onOpenIdentities()
+                    }
+                },
+                onCopyLog = {
+                    clipboardManager.setText(AnnotatedString(renderedLogs.joinToString("\n")))
+                    onShowMessage("Connection log copied")
+                }
             )
         }
 
@@ -3788,7 +3812,10 @@ private fun ConnectingStatusContent(
     userFacingStateMessage: String,
     activeFileTransfer: FileTransferProgress?,
     renderedLogs: List<String>,
-    listState: LazyListState
+    listState: LazyListState,
+    failureHelp: ConnectionFailureHelp? = null,
+    onFailureHelpAction: (FailureHelpAction) -> Unit = {},
+    onCopyLog: () -> Unit = {}
 ) {
     val colorScheme = MaterialTheme.colorScheme
     BoxWithConstraints(
@@ -3797,10 +3824,12 @@ private fun ConnectingStatusContent(
             .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
     ) {
         val isShortHeight = maxHeight <= 520.dp
-        val heroSize = if (isShortHeight) 180.dp else 360.dp
-        val outerGlowSize = if (isShortHeight) 168.dp else 340.dp
-        val innerGlowSize = if (isShortHeight) 120.dp else 250.dp
-        val logoSize = if (isShortHeight) 72.dp else 128.dp
+        // Shrink the logo on failure so the help card is on screen without scrolling.
+        val compactHero = isShortHeight || failureHelp != null
+        val heroSize = if (compactHero) 180.dp else 360.dp
+        val outerGlowSize = if (compactHero) 168.dp else 340.dp
+        val innerGlowSize = if (compactHero) 120.dp else 250.dp
+        val logoSize = if (compactHero) 72.dp else 128.dp
         val logsMaxHeight = minOf(180.dp, maxHeight * 0.24f)
         val contentSpacing = if (isShortHeight) 8.dp else 12.dp
 
@@ -3818,7 +3847,7 @@ private fun ConnectingStatusContent(
                     Box(
                         modifier = Modifier
                             .size(outerGlowSize)
-                            .blur(if (isShortHeight) 36.dp else 72.dp)
+                            .blur(if (compactHero) 36.dp else 72.dp)
                             .background(
                                 brush = Brush.radialGradient(
                                     colors = listOf(Color(0x2EFFFFFF), Color(0x14FFFFFF), Color(0x08F7F4EF), Color.Transparent)
@@ -3829,7 +3858,7 @@ private fun ConnectingStatusContent(
                     Box(
                         modifier = Modifier
                             .size(innerGlowSize)
-                            .blur(if (isShortHeight) 16.dp else 32.dp)
+                            .blur(if (compactHero) 16.dp else 32.dp)
                             .background(
                                 brush = Brush.radialGradient(
                                     colors = listOf(Color(0x18FFFFFF), Color(0x0CFBF7F1), Color.Transparent)
@@ -3871,6 +3900,14 @@ private fun ConnectingStatusContent(
                 activeFileTransfer?.let { transfer ->
                     FileTransferProgressCard(transfer = transfer)
                 }
+                failureHelp?.let { help ->
+                    ConnectionFailureHelpCard(
+                        help = help,
+                        canCopyLog = renderedLogs.isNotEmpty(),
+                        onAction = onFailureHelpAction,
+                        onCopyLog = onCopyLog
+                    )
+                }
             }
             if (renderedLogs.isNotEmpty()) {
                 ConnectionLogsPane(
@@ -3880,6 +3917,66 @@ private fun ConnectingStatusContent(
                         .fillMaxWidth()
                         .height(logsMaxHeight)
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ConnectionFailureHelpCard(
+    help: ConnectionFailureHelp,
+    canCopyLog: Boolean,
+    onAction: (FailureHelpAction) -> Unit,
+    onCopyLog: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(UiTestTags.CONNECTING_FAILURE_HELP),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                help.title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.testTag(UiTestTags.CONNECTING_FAILURE_HELP_TITLE)
+            )
+            help.tips.forEach { tip ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("•", style = MaterialTheme.typography.bodyMedium)
+                    Text(tip, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                help.actions.forEach { action ->
+                    OutlinedButton(
+                        onClick = { onAction(action) },
+                        modifier = Modifier.testTag(UiTestTags.connectingFailureAction(action.name))
+                    ) {
+                        Text(
+                            when (action) {
+                                FailureHelpAction.EDIT_HOST -> "Edit host"
+                                FailureHelpAction.OPEN_IDENTITIES -> "Identities"
+                            }
+                        )
+                    }
+                }
+                if (canCopyLog) {
+                    OutlinedButton(
+                        onClick = onCopyLog,
+                        modifier = Modifier.testTag(UiTestTags.CONNECTING_FAILURE_COPY_LOG)
+                    ) {
+                        Text("Copy log")
+                    }
+                }
             }
         }
     }

@@ -26,6 +26,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -1430,6 +1432,75 @@ class ConnectingScreenTest {
         composeRule.onNodeWithText("Network error").assertIsDisplayed()
         composeRule.onNodeWithText("Connection refused").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_RETRY_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun loginFailure_showsSpecificHelpWithWorkingButtons() {
+        val editedHostIds = mutableListOf<String>()
+        var identitiesOpened = 0
+        val messages = mutableListOf<String>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH).copy(savedHostId = "saved-host"),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.ERROR,
+                        message = "Identity authentication failed.",
+                        failureKind = ConnectionFailureKind.AUTH_KEY
+                    ),
+                    logs = listOf(
+                        SessionLogBus.Entry(
+                            hostId = "saved-host",
+                            level = SessionLogBus.LogLevel.ERROR,
+                            message = "Exhausted available authentication methods"
+                        )
+                    ),
+                    shellOutput = "",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    onShowMessage = { messages += it },
+                    findRequestToken = 0,
+                    onEditHost = { editedHostIds += it },
+                    onOpenIdentities = { identitiesOpened += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Connection failed").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_FAILURE_HELP_TITLE)
+            .assertIsDisplayed()
+            .assertTextEquals("The server rejected the key")
+        composeRule.onNodeWithTag(UiTestTags.connectingFailureAction("EDIT_HOST"))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingFailureAction("OPEN_IDENTITIES"))
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_FAILURE_COPY_LOG)
+            .performScrollTo()
+            .performClick()
+
+        composeRule.runOnIdle {
+            check(editedHostIds == listOf("saved-host")) { "Edit host opened $editedHostIds" }
+            check(identitiesOpened == 1) { "Identities opened $identitiesOpened times" }
+            check(messages == listOf("Connection log copied")) { "Messages: $messages" }
+        }
     }
 
     @Test
