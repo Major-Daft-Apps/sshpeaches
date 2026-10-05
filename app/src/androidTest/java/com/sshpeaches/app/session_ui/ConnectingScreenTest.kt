@@ -28,6 +28,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -2410,6 +2411,125 @@ class ConnectingScreenTest {
             ) {
                 "New folder action did not request mkdir for the current directory."
             }
+        }
+    }
+
+    @Test
+    fun scpPanel_permissionsEditorAndBreadcrumbsWork() {
+        val operations = mutableListOf<Triple<String, String, String?>>()
+        val listedPaths = mutableListOf<String>()
+        val saved = mutableListOf<Pair<String, String>>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "SCP transfer ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(
+                        path = "/home/tester/site",
+                        entries = listOf(
+                            SessionService.RemoteDirectoryEntry(
+                                name = "nginx.conf",
+                                isDirectory = false,
+                                sizeBytes = 60,
+                                permissionSummary = "-rw-r--r--"
+                            )
+                        )
+                    ),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = { listedPaths += it },
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { operation, source, destination ->
+                        operations += Triple(operation, source, destination)
+                    },
+                    onReadRemoteText = { Result.success("worker_processes 1;\n") },
+                    onWriteRemoteText = { path, text -> saved += path to text; Result.success(Unit) },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        val file = "/home/tester/site/nginx.conf"
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow(file)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("permissions")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PERMISSIONS_MODE).assertTextContains("644")
+        composeRule.onNodeWithTag(UiTestTags.connectingScpPermission("group_write")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PERMISSIONS_MODE).assertTextContains("664")
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_PERMISSIONS_APPLY).performClick()
+        composeRule.runOnIdle {
+            check(operations.lastOrNull() == Triple("chmod", file, "664")) { "Permissions sent $operations" }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow(file)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpAction("edit")).performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_EDITOR_TEXT)
+            .assertTextContains("worker_processes 1;", substring = true)
+            .performTextReplacement("worker_processes 2;\n")
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_EDITOR_SAVE).performClick()
+        composeRule.onNodeWithText("Saved").assertIsDisplayed()
+        composeRule.runOnIdle {
+            check(saved == listOf(file to "worker_processes 2;\n")) { "Editor saved $saved" }
+        }
+        composeRule.onNodeWithContentDescription("Close editor").performClick()
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_EDITOR).assertDoesNotExist()
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/home/tester/site") { "Saving didn't refresh the folder: $listedPaths" }
+        }
+    }
+
+    @Test
+    fun scpPanel_breadcrumbOpensAParentFolder() {
+        val listedPaths = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SCP),
+                    state = QuickConnectUiState(phase = QuickConnectPhase.SUCCESS, message = "SCP transfer ready"),
+                    logs = emptyList(),
+                    shellOutput = "",
+                    remoteDirectory = SessionService.RemoteDirectorySnapshot(path = "/home/tester/site", entries = emptyList()),
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = { listedPaths += it },
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        listedPaths.clear()
+        composeRule.onNodeWithTag(UiTestTags.connectingScpBreadcrumb(1)).assertTextContains("home").performClick()
+        composeRule.runOnIdle {
+            check(listedPaths.lastOrNull() == "/home") { "Breadcrumb listed $listedPaths" }
         }
     }
 

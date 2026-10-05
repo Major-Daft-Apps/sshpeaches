@@ -13,10 +13,11 @@ class HelpContentTest {
         "Generate keypair", "Install Key To Host", "Clear stored host key", "Import hosts", "OpenSSH config",
         "Use volume buttons to adjust font size", "Run shells in background", "Background connection timeout",
         "Local port", "Destination host", "Destination port", "Associated host", "Enable now",
-        "Export via file", "Export via QR", "Import via file", "Import via QR",
+        "Export", "Import", "Wi-Fi", "QR code", "File",
         "Include passwords and private keys", "Export passphrase", "Startup snippet", "Terminal profile",
         "Font Size", "Mosh server command", "Swipe for arrow keys", "Insert password", "Change theme", "Find",
-        "Snippets", "Reset", "Keyboard Editor", "Theme Editor", "Port Forwards", "Identities"
+        "Snippets", "Reset", "Keyboard Editor", "Theme Editor", "Port Forwards", "Identities",
+        "Reconnect automatically", "Attach to tmux", "Edit", "Permissions", "Continue"
     )
 
     private val helpText = (helpTopics.flatMap { listOf(it.question) + it.steps } +

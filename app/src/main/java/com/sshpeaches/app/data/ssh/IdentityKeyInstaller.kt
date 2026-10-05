@@ -223,7 +223,7 @@ object IdentityKeyInstaller {
         val password = hostPasswordOverride?.takeIf { it.isNotBlank() }
             ?: SecurityManager.getHostPassword(host.id)
             ?: error("Password is required to authenticate with ${host.name}.")
-        client.authPassword(host.username, password)
+        client.authPasswordOrInteractive(host.username, password)
     }
 
     private fun writeTempIdentityKey(hostId: String, privateKey: String): File {

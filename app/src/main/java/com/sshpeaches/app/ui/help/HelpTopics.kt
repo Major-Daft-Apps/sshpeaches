@@ -109,6 +109,36 @@ val helpTopics: List<HelpTopic> = listOf(
         keywords = listOf("disconnect", "keep alive", "background", "screen off", "sleep")
     ),
     HelpTopic(
+        id = "network-drop",
+        question = "What happens when my network drops or changes?",
+        steps = listOf(
+            "SSH terminals reconnect on their own and keep the screen. This is Settings → Background Sessions → Reconnect automatically.",
+            "The shell itself restarts on the server, so turn on Attach to tmux in the host's settings to land back in the same shell.",
+            "Mosh sessions and the file browser don't reconnect; open them again."
+        ),
+        destination = HelpDestination.SETTINGS,
+        keywords = listOf("reconnect", "reconnecting", "wifi", "mobile data", "tmux", "disconnected", "dropped")
+    ),
+    HelpTopic(
+        id = "two-factor",
+        question = "My server asks for a verification code. How do I log in?",
+        steps = listOf(
+            "Connect as usual. When the server asks a question such as a verification code, SSHPeaches shows it in a dialog.",
+            "Type the code from your authenticator app and tap Continue. The saved password is still sent for the password question."
+        ),
+        keywords = listOf("2fa", "otp", "totp", "duo", "google authenticator", "keyboard-interactive", "pam", "code")
+    ),
+    HelpTopic(
+        id = "file-tools",
+        question = "How do I edit a file or change its permissions on the server?",
+        steps = listOf(
+            "Open the host with the upload or download icon to get the file browser. Tap the path above the list to jump to a parent folder.",
+            "Select a file, then the ⋮ actions menu: Edit opens small text files in an editor that saves back to the server; Permissions changes who can read, write, or run it.",
+            "A download that fails partway picks up where it stopped when you download the same file again."
+        ),
+        keywords = listOf("sftp", "chmod", "edit", "text editor", "resume", "download", "breadcrumb", "rwx")
+    ),
+    HelpTopic(
         id = "port-forward",
         question = "How do I open a web page or database on my server through SSH?",
         steps = listOf(
@@ -124,12 +154,12 @@ val helpTopics: List<HelpTopic> = listOf(
         id = "transfer",
         question = "How do I move my hosts and keys to a new phone?",
         steps = listOf(
-            "Settings → Transfer Data → Export via file (or Export via QR).",
+            "On the old phone: Settings → Export, then choose Wi-Fi (both phones on the same network), QR code, or File.",
             "Turn on Include passwords and private keys to bring secrets too, and set an Export passphrase.",
-            "On the new phone: Settings → Transfer Data → Import via file (or Import via QR)."
+            "On the new phone: Settings → Import and choose the same method. For Wi-Fi, scan the code the old phone shows."
         ),
         destination = HelpDestination.SETTINGS,
-        keywords = listOf("backup", "export", "import", "restore", "new phone", "qr")
+        keywords = listOf("backup", "export", "import", "restore", "new phone", "qr", "wifi", "wi-fi", "local network")
     ),
     HelpTopic(
         id = "openssh-import",

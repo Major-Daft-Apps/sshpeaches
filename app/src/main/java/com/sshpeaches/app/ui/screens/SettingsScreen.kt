@@ -44,6 +44,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
+import com.majordaftapps.sshpeaches.app.transfer.LanTransferPeer
+import com.majordaftapps.sshpeaches.app.transfer.LanTransferBrowser
+import com.majordaftapps.sshpeaches.app.transfer.LanTransferAdvertiser
+import com.majordaftapps.sshpeaches.app.transfer.LanTransfer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,10 +67,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.set
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
@@ -134,6 +135,8 @@ fun SettingsScreen(
     onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
     confirmPasswordInsert: Boolean,
     onConfirmPasswordInsertToggle: (Boolean) -> Unit,
+    autoReconnect: Boolean,
+    onAutoReconnectToggle: (Boolean) -> Unit,
     terminalMarginPx: Int,
     onTerminalMarginPxChange: (Int) -> Unit,
     moshServerCommand: String,
@@ -258,6 +261,14 @@ fun SettingsScreen(
         val context = LocalContext.current
         val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
         val exportToFile = rememberSaveable { mutableStateOf(false) }
+        val exportToWifi = rememberSaveable { mutableStateOf(false) }
+        val transferChooser = rememberSaveable { mutableStateOf<String?>(null) } // "export" / "import"
+        val showWifiReceive = rememberSaveable { mutableStateOf(false) }
+        val wifiReceiving = remember { mutableStateOf(false) }
+        val wifiReceiveError = remember { mutableStateOf<String?>(null) }
+        val wifiPeers = remember { mutableStateOf<List<LanTransferPeer>>(emptyList()) }
+        val wifiSend = remember { mutableStateOf<WifiSendState?>(null) }
+        val wifiSender = remember { mutableStateOf<LanTransfer.Sender?>(null) }
         val pendingExportPayload = remember { mutableStateOf<String?>(null) }
         val exportPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
         val exportPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
@@ -268,18 +279,87 @@ fun SettingsScreen(
         val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
         val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
         val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
+        val advertiser = remember { LanTransferAdvertiser(context) }
+
+        fun handleReceivedPayload(contents: String) {
+            if (onTransferPayloadRequiresPassphrase(contents)) {
+                pendingImportPayload.value = contents
+                importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
+                importPassphraseError.value = null
+            } else {
+                runImport(contents, null)
+            }
+        }
+
+        fun receiveOverWifi(host: String, port: Int, code: String) {
+            if (wifiReceiving.value) return
+            wifiReceiving.value = true
+            wifiReceiveError.value = null
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { LanTransfer.receive(host, port, code) } }
+                wifiReceiving.value = false
+                result.onSuccess { contents ->
+                    showWifiReceive.value = false
+                    handleReceivedPayload(contents)
+                }.onFailure { error ->
+                    wifiReceiveError.value = when (error) {
+                        is LanTransfer.WrongCodeException -> error.message
+                        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.NoRouteToHostException ->
+                            "Couldn't reach that phone. Check both are on the same Wi-Fi and it still shows the code."
+                        else -> "Wi-Fi transfer failed: ${error.message ?: error.javaClass.simpleName}"
+                    }
+                }
+            }
+        }
+
+        fun sendOverWifi(payload: String) {
+            scope.launch {
+                val address = withContext(Dispatchers.IO) { LanTransfer.localNetworkAddress() }
+                if (address == null) {
+                    onShowMessage("Connect this phone to Wi-Fi to send over the local network.")
+                    return@launch
+                }
+                val sender = withContext(Dispatchers.Default) {
+                    runCatching { LanTransfer.Sender(payload, address) }.getOrNull()
+                }
+                if (sender == null) {
+                    onShowMessage("Couldn't start the Wi-Fi transfer.")
+                    return@launch
+                }
+                val qr = withContext(Dispatchers.Default) {
+                    renderQrBitmap(LanTransfer.pairingUri(sender.host, sender.port, sender.code))
+                }
+                wifiSender.value = sender
+                wifiSend.value = WifiSendState(sender.host, sender.port, sender.code, qr)
+                advertiser.start(sender.port)
+                try {
+                    val peer = withContext(Dispatchers.IO) { sender.awaitTransfer(WIFI_TRANSFER_TIMEOUT_MS) }
+                    onShowMessage("Sent to ${peer.hostAddress}.")
+                } catch (_: java.net.SocketTimeoutException) {
+                    onShowMessage("No phone connected within 5 minutes.")
+                } catch (error: Exception) {
+                    if (wifiSender.value != null) {
+                        onShowMessage("Wi-Fi transfer failed: ${error.message ?: error.javaClass.simpleName}")
+                    }
+                } finally {
+                    advertiser.stop()
+                    sender.close()
+                    wifiSender.value = null
+                    wifiSend.value = null
+                }
+            }
+        }
+
         val scanLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
             val contents = result.contents.orEmpty()
-            if (contents.isBlank()) {
+            val pairing = LanTransfer.parsePairingUri(contents)
+            if (pairing != null) {
+                showWifiReceive.value = true
+                receiveOverWifi(pairing.host, pairing.port, pairing.code)
+            } else if (contents.isBlank()) {
                 onShowMessage("QR scan cancelled.")
             } else {
-                if (onTransferPayloadRequiresPassphrase(contents)) {
-                    pendingImportPayload.value = contents
-                    importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
-                    importPassphraseError.value = null
-                } else {
-                    runImport(contents, null)
-                }
+                handleReceivedPayload(contents)
             }
         }
         val createExportFileLauncher = rememberLauncherForActivityResult(
@@ -516,6 +596,13 @@ fun SettingsScreen(
                     Text(
                         "When app is backgrounded, sessions are stopped after this timeout.",
                         style = MaterialTheme.typography.bodySmall
+                    )
+                    SettingsToggleRow(
+                        title = "Reconnect automatically",
+                        description = "When the network drops or changes (for example Wi-Fi to mobile data), SSH terminals reconnect instead of closing. Turn on Attach to tmux on a host to also get your shell back.",
+                        checked = autoReconnect,
+                        onCheckedChange = onAutoReconnectToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_AUTO_RECONNECT_SWITCH)
                     )
                 }
             }
@@ -973,7 +1060,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Transfer Data", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Export hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings via QR code or file.",
+                        "Export hosts, identities, favorites, port forwards, snippets, terminal themes, custom keys, and app settings to a file, a QR code, or another phone on the same Wi-Fi.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Row(
@@ -981,56 +1068,20 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = {
-                                exportToFile.value = false
-                                showTransferDialog.value = true
-                            },
+                            onClick = { transferChooser.value = "export" },
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+                                .testTag(UiTestTags.SETTINGS_EXPORT_BUTTON)
                         ) {
-                            Text("Export via QR")
+                            Text("Export")
                         }
                         Button(
-                            onClick = {
-                                scanLauncher.launch(
-                                    buildQrScanOptions(shellLayoutMode, "Scan SSHPeaches export QR")
-                                )
-                            },
+                            onClick = { transferChooser.value = "import" },
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag(UiTestTags.SETTINGS_IMPORT_QR_BUTTON)
+                                .testTag(UiTestTags.SETTINGS_IMPORT_BUTTON)
                         ) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                            Text("Import via QR")
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                exportToFile.value = true
-                                showTransferDialog.value = true
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(UiTestTags.SETTINGS_EXPORT_FILE_BUTTON)
-                        ) {
-                            Text("Export via file")
-                        }
-                        Button(
-                            onClick = {
-                                openImportFileLauncher.launch(
-                                    arrayOf("application/json", "text/plain", "text/*", "*/*")
-                                )
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(UiTestTags.SETTINGS_IMPORT_FILE_BUTTON)
-                        ) {
-                            Text("Import via file")
+                            Text("Import")
                         }
                     }
                 }
@@ -1104,11 +1155,77 @@ fun SettingsScreen(
                 )
             }
         }
+        transferChooser.value?.let { direction ->
+            TransferMethodDialog(
+                exporting = direction == "export",
+                onDismiss = { transferChooser.value = null },
+                onChoose = { method ->
+                    transferChooser.value = null
+                    if (direction == "export") {
+                        exportToFile.value = method == TransferMethod.FILE
+                        exportToWifi.value = method == TransferMethod.WIFI
+                        showTransferDialog.value = true
+                    } else when (method) {
+                        TransferMethod.FILE -> openImportFileLauncher.launch(
+                            arrayOf("application/json", "text/plain", "text/*", "*/*")
+                        )
+                        TransferMethod.QR -> scanLauncher.launch(
+                            buildQrScanOptions(shellLayoutMode, "Scan SSHPeaches export QR")
+                        )
+                        TransferMethod.WIFI -> {
+                            wifiReceiveError.value = null
+                            showWifiReceive.value = true
+                        }
+                    }
+                }
+            )
+        }
+        wifiSend.value?.let { sending ->
+            WifiSendDialog(
+                host = sending.host,
+                port = sending.port,
+                code = sending.code,
+                qr = sending.qr,
+                onCancel = {
+                    val sender = wifiSender.value
+                    wifiSender.value = null
+                    sender?.close()
+                }
+            )
+        }
+        if (showWifiReceive.value) {
+            DisposableEffect(Unit) {
+                val browser = LanTransferBrowser(context) { peers -> wifiPeers.value = peers }
+                browser.start()
+                onDispose {
+                    browser.stop()
+                    wifiPeers.value = emptyList()
+                }
+            }
+            WifiReceiveDialog(
+                peers = wifiPeers.value,
+                receiving = wifiReceiving.value,
+                error = wifiReceiveError.value,
+                onScanQr = {
+                    scanLauncher.launch(buildQrScanOptions(shellLayoutMode, "Scan the QR on the other phone"))
+                },
+                onReceive = ::receiveOverWifi,
+                onDismiss = { showWifiReceive.value = false }
+            )
+        }
         if (showTransferDialog.value) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showTransferDialog.value = false },
                 modifier = Modifier.testTag(UiTestTags.SETTINGS_EXPORT_DIALOG),
-                title = { Text(if (exportToFile.value) "Export to file" else "Export data") },
+                title = {
+                    Text(
+                        when {
+                            exportToWifi.value -> "Send over Wi-Fi"
+                            exportToFile.value -> "Export to file"
+                            else -> "Export data"
+                        }
+                    )
+                },
                 text = {
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -1227,28 +1344,16 @@ fun SettingsScreen(
                             exportConfirmPassphraseRevealIndex.intValue = -1
                             exportPassphraseError.value = null
                             showTransferDialog.value = false
+                            if (exportToWifi.value) {
+                                sendOverWifi(payload)
+                                return@launch
+                            }
                             if (exportToFile.value) {
                                 pendingExportPayload.value = payload
                                 createExportFileLauncher.launch("sshpeaches-export.json")
                                 return@launch
                             }
-                            exportQrBitmap.value = withContext(Dispatchers.Default) {
-                                runCatching {
-                                    val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 640)
-                                    val bmp = createBitmap(
-                                        matrix.width,
-                                        matrix.height,
-                                        android.graphics.Bitmap.Config.ARGB_8888
-                                    )
-                                    for (x in 0 until matrix.width) {
-                                        for (y in 0 until matrix.height) {
-                                            bmp[x, y] =
-                                                if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-                                        }
-                                    }
-                                    bmp
-                                }.getOrNull()
-                            }
+                            exportQrBitmap.value = withContext(Dispatchers.Default) { renderQrBitmap(payload) }
                             if (exportQrBitmap.value == null) {
                                 onShowMessage("Unable to generate export QR.")
                             }
@@ -1260,6 +1365,7 @@ fun SettingsScreen(
                     Text(
                         when {
                             transferWorking.value -> "Working…"
+                            exportToWifi.value -> "Start"
                             exportToFile.value -> "Save file"
                             else -> "Generate QR"
                         }
@@ -1554,3 +1660,7 @@ private fun SettingsToggleRow(
         )
     }
 }
+
+private data class WifiSendState(val host: String, val port: Int, val code: String, val qr: android.graphics.Bitmap?)
+
+private const val WIFI_TRANSFER_TIMEOUT_MS = 5 * 60 * 1000

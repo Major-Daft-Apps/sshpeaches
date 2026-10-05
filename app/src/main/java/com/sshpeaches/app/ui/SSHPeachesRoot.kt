@@ -96,6 +96,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -240,6 +241,7 @@ data class SSHPeachesRootActions(
     val onMoshServerCommandChange: (String) -> Unit,
     val onUseBuiltInKeyboardToggle: (Boolean) -> Unit,
     val onConfirmPasswordInsertToggle: (Boolean) -> Unit,
+    val onAutoReconnectToggle: (Boolean) -> Unit,
     val onCrashReportsToggle: (Boolean) -> Unit,
     val onAnalyticsToggle: (Boolean) -> Unit,
     val onDiagnosticsToggle: (Boolean) -> Unit,
@@ -258,8 +260,8 @@ data class SSHPeachesRootActions(
     val onUnlockWithPin: suspend (String) -> String?,
     val onBiometricUnlock: () -> Unit,
     val onSecurityNoticeShown: () -> Unit,
-    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit,
-    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean) -> Unit,
     val onHostDelete: (String) -> Unit,
     val onImportHost: (HostConnection) -> Unit,
     val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
@@ -306,6 +308,8 @@ data class SSHPeachesRootActions(
     val onSftpDownloadFile: (String, String, String?) -> Unit,
     val onSftpUploadFile: (String, String, String) -> Unit,
     val onManageRemotePath: (String, String, String, String?) -> Unit,
+    val onReadRemoteText: suspend (String, String) -> Result<String> = { _, _ -> Result.failure(UnsupportedOperationException()) },
+    val onWriteRemoteText: suspend (String, String, String) -> Result<Unit> = { _, _, _ -> Result.failure(UnsupportedOperationException()) },
     val onScpDownloadFile: (String, String, String?) -> Unit,
     val onScpUploadFile: (String, String, String) -> Unit,
     val onOpenSessionRequestHandled: (String) -> Unit,
@@ -390,6 +394,7 @@ fun SSHPeachesRoot(
     val onMoshServerCommandChange = actions.onMoshServerCommandChange
     val onUseBuiltInKeyboardToggle = actions.onUseBuiltInKeyboardToggle
     val onConfirmPasswordInsertToggle = actions.onConfirmPasswordInsertToggle
+    val onAutoReconnectToggle = actions.onAutoReconnectToggle
     val onCrashReportsToggle = actions.onCrashReportsToggle
     val onAnalyticsToggle = actions.onAnalyticsToggle
     val onDiagnosticsToggle = actions.onDiagnosticsToggle
@@ -454,6 +459,8 @@ fun SSHPeachesRoot(
     val onSftpDownloadFile = actions.onSftpDownloadFile
     val onSftpUploadFile = actions.onSftpUploadFile
     val onManageRemotePath = actions.onManageRemotePath
+    val onReadRemoteText = actions.onReadRemoteText
+    val onWriteRemoteText = actions.onWriteRemoteText
     val onScpDownloadFile = actions.onScpDownloadFile
     val onScpUploadFile = actions.onScpUploadFile
     val onCancelFileTransfer = actions.onCancelFileTransfer
@@ -1338,6 +1345,7 @@ fun SSHPeachesRoot(
                             .mapNotNull { snippetIdMap[it] ?: it.takeIf { id -> id in localSnippetIds } },
                         hasPassword = false,
                         useMosh = item.optBoolean("useMosh", false),
+                        attachTmux = item.optBoolean("attachTmux", false),
                         preferredIdentityId = item.optString("preferredIdentityId").trim().ifBlank { null }
                             ?.let { identityIdMap[it] ?: it.takeIf { id -> id in localIdentityIds } },
                         preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
@@ -1410,6 +1418,7 @@ fun SSHPeachesRoot(
             onConfirmPasswordInsertToggle(
                 settings.optBoolean("confirmPasswordInsert", uiState.confirmPasswordInsert)
             )
+            onAutoReconnectToggle(settings.optBoolean("autoReconnect", uiState.autoReconnect))
             onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
             // Host-key policy and the mosh server command are deliberately not imported (a shared
             // export must not weaken host-key checks or run commands); auto-starting forwards is
@@ -1640,6 +1649,14 @@ fun SSHPeachesRoot(
                     request?.let { current ->
                         onCancelFileTransfer(current.sessionId)
                     }
+                },
+                onReadRemoteText = { path ->
+                    request?.let { current -> onReadRemoteText(current.sessionId, path) }
+                        ?: Result.failure(IllegalStateException("No session."))
+                },
+                onWriteRemoteText = { path, text ->
+                    request?.let { current -> onWriteRemoteText(current.sessionId, path, text) }
+                        ?: Result.failure(IllegalStateException("No session."))
                 },
                 onManageRemotePath = { operation, sourcePath, destinationPath ->
                     request?.let { current ->
@@ -2444,6 +2461,8 @@ fun SSHPeachesRoot(
                                 onUseBuiltInKeyboardToggle = onUseBuiltInKeyboardToggle,
                                 confirmPasswordInsert = uiState.confirmPasswordInsert,
                                 onConfirmPasswordInsertToggle = onConfirmPasswordInsertToggle,
+                                autoReconnect = uiState.autoReconnect,
+                                onAutoReconnectToggle = onAutoReconnectToggle,
                                 terminalMarginPx = uiState.terminalMarginPx,
                                 onTerminalMarginPxChange = onTerminalMarginPxChange,
                                 moshServerCommand = uiState.moshServerCommand,
@@ -2640,7 +2659,8 @@ fun SSHPeachesRoot(
                         BackgroundBehavior.INHERIT,
                         terminalProfileId,
                         password,
-                        pinnedId
+                        pinnedId,
+                        false
                     )
                 }
                 quickConnectRequest.value = QuickConnectRequest(
@@ -2798,7 +2818,7 @@ fun SSHPeachesRoot(
         AlertDialog(
             onDismissRequest = {},
             modifier = Modifier.testTag(UiTestTags.PASSWORD_PROMPT_DIALOG),
-            title = { Text("Password Required") },
+            title = { Text(prompt.title) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(prompt.reason)
@@ -2806,11 +2826,15 @@ fun SSHPeachesRoot(
                     OutlinedTextField(
                         value = promptPassword.value,
                         onValueChange = { updatePasswordStateWithReveal(promptPassword, promptPasswordRevealIndex, it) },
-                        label = { Text("Password") },
+                        label = { Text(prompt.fieldLabel) },
                         singleLine = true,
-                        visualTransformation = TailRevealPasswordVisualTransformation(promptPasswordRevealIndex.intValue),
+                        visualTransformation = if (prompt.echo) {
+                            VisualTransformation.None
+                        } else {
+                            TailRevealPasswordVisualTransformation(promptPasswordRevealIndex.intValue)
+                        },
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
+                            keyboardType = if (prompt.echo) KeyboardType.Text else KeyboardType.Password,
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
@@ -3740,6 +3764,7 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                     put("osMetadata", Converters.fromOsMetadata(host.osMetadata))
                     put("hasPassword", host.hasPassword)
                     put("useMosh", host.useMosh)
+                    put("attachTmux", host.attachTmux)
                     put("preferredIdentityId", host.preferredIdentityId)
                     put("preferredForwardId", host.preferredForwardId)
                     put("startupScript", host.startupScript)
@@ -3799,6 +3824,7 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
             put("defaultTerminalProfileId", state.defaultTerminalProfileId)
             put("useBuiltInKeyboard", state.useBuiltInKeyboard)
             put("confirmPasswordInsert", state.confirmPasswordInsert)
+            put("autoReconnect", state.autoReconnect)
             put("crashReportsEnabled", state.crashReportsEnabled)
             put("analyticsEnabled", state.analyticsEnabled)
             put("diagnosticsLoggingEnabled", state.diagnosticsLoggingEnabled)

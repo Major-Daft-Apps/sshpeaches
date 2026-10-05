@@ -526,6 +526,20 @@ class MainActivity : FragmentActivity() {
                     sessionService?.manageRemotePath(hostId, operation, sourcePath, destinationPath)
                 }
             }
+            val readRemoteText: suspend (String, String) -> Result<String> = remember(sessionService) {
+                val read: suspend (String, String) -> Result<String> = { hostId, path ->
+                    sessionService?.readRemoteTextFile(hostId, path)
+                        ?: Result.failure(IllegalStateException("The file browser isn't connected."))
+                }
+                read
+            }
+            val writeRemoteText: suspend (String, String, String) -> Result<Unit> = remember(sessionService) {
+                val write: suspend (String, String, String) -> Result<Unit> = { hostId, path, text ->
+                    sessionService?.writeRemoteTextFile(hostId, path, text)
+                        ?: Result.failure(IllegalStateException("The file browser isn't connected."))
+                }
+                write
+            }
             val scpDownloadFile: (String, String, String?) -> Unit = remember(sessionService) {
                 { hostId: String, remotePath: String, localPath: String? ->
                     submitOrQueueFileTransfer(
@@ -610,6 +624,7 @@ class MainActivity : FragmentActivity() {
                         onMoshServerCommandChange = viewModel::setMoshServerCommand,
                         onUseBuiltInKeyboardToggle = viewModel::setUseBuiltInKeyboard,
                         onConfirmPasswordInsertToggle = viewModel::setConfirmPasswordInsert,
+                        onAutoReconnectToggle = viewModel::setAutoReconnect,
                         onCrashReportsToggle = viewModel::setCrashReports,
                         onAnalyticsToggle = viewModel::setAnalytics,
                         onDiagnosticsToggle = viewModel::setDiagnosticsLogging,
@@ -640,7 +655,7 @@ class MainActivity : FragmentActivity() {
                             viewModel.reportBiometricUnavailable()
                         }
                         },
-                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId ->
+                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId, attachTmux ->
                         viewModel.addHost(
                             name,
                             host,
@@ -657,10 +672,11 @@ class MainActivity : FragmentActivity() {
                             backgroundBehavior,
                             terminalProfileId,
                             password,
-                            suppliedId
+                            suppliedId,
+                            attachTmux
                         )
                         },
-                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password ->
+                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, attachTmux ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -677,7 +693,8 @@ class MainActivity : FragmentActivity() {
                             script,
                             backgroundBehavior,
                             terminalProfileId,
-                            password
+                            password,
+                            attachTmux
                         )
                         },
                         onHostDelete = viewModel::deleteHost,
@@ -751,6 +768,8 @@ class MainActivity : FragmentActivity() {
                         onSftpDownloadFile = sftpDownloadFile,
                         onSftpUploadFile = sftpUploadFile,
                         onManageRemotePath = manageRemotePath,
+                        onReadRemoteText = readRemoteText,
+                        onWriteRemoteText = writeRemoteText,
                         onScpDownloadFile = scpDownloadFile,
                         onScpUploadFile = scpUploadFile,
                         onCancelFileTransfer = cancelFileTransfer,

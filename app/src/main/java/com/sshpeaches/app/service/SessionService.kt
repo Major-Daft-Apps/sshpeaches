@@ -34,7 +34,8 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.sftp.SftpDownloadAdmission
-import com.majordaftapps.sshpeaches.app.sftp.SftpPipelinedDownloader
+import com.majordaftapps.sshpeaches.app.sftp.SftpResumableDownloader
+import com.majordaftapps.sshpeaches.app.sftp.SftpPartialDownload
 import com.majordaftapps.sshpeaches.app.sftp.SftpTransferSettings
 import com.majordaftapps.sshpeaches.app.data.ssh.Ed25519IdentityKeyProvider
 import com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo
@@ -59,6 +60,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
+import java.util.EnumSet
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -72,6 +74,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,8 +97,13 @@ import net.schmizz.sshj.connection.channel.Channel
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.userauth.UserAuthException
+import com.majordaftapps.sshpeaches.app.data.ssh.INTERACTIVE_LOGIN_TIMEOUT_MS
+import com.majordaftapps.sshpeaches.app.data.ssh.LoginCanceledException
+import com.majordaftapps.sshpeaches.app.data.ssh.LoginChallenge
+import com.majordaftapps.sshpeaches.app.data.ssh.authPasswordOrInteractive
 import net.schmizz.sshj.xfer.LocalDestFile
 import net.schmizz.sshj.xfer.FileSystemFile
 import net.schmizz.sshj.xfer.FileTransfer
@@ -163,6 +172,13 @@ class SessionService : Service() {
     private var diagnosticsEnabled: Boolean = false
     @Volatile
     private var sftpTransferSettings: SftpTransferSettings = SftpTransferSettings()
+    @Volatile
+    private var autoReconnectEnabled: Boolean = true
+    /** Completing a session's signal makes its job drop the connection and reconnect. */
+    private val reconnectSignals = ConcurrentHashMap<String, CompletableDeferred<String>>()
+    /** Sessions between losing their connection and getting a new one. */
+    private val reconnectingSessions: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val networkAvailable = MutableStateFlow(true)
 
     override fun onCreate() {
         super.onCreate()
@@ -176,6 +192,11 @@ class SessionService : Service() {
         collectorScope.launch {
             SettingsStore.sftpTransferSettings.collect { settings ->
                 sftpTransferSettings = settings
+            }
+        }
+        collectorScope.launch {
+            SettingsStore.autoReconnect.collect { enabled ->
+                autoReconnectEnabled = enabled
             }
         }
         deleteLeftoverTempFiles()
@@ -211,6 +232,7 @@ class SessionService : Service() {
             cacheDir.listFiles { file -> file.isFile && prefixes.any { file.name.startsWith(it) } }
                 ?.forEach { it.delete() }
         }
+        runCatching { SftpPartialDownload.deleteStale(sftpPartialDirectory(), PARTIAL_DOWNLOAD_MAX_AGE_MS) }
     }
 
     override fun onDestroy() {
@@ -245,6 +267,7 @@ class SessionService : Service() {
 
     private val defaultNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
+            networkAvailable.value = true
             networkTransitionTracker.onAvailable(
                 network = network,
                 isVpn = networkIsVpn(network)
@@ -268,6 +291,7 @@ class SessionService : Service() {
 
         override fun onLost(network: Network) {
             networkTransitionTracker.onLost(network)
+                ?.also { networkAvailable.value = false }
                 ?.let(::disconnectForNetworkTransition)
         }
     }
@@ -280,6 +304,7 @@ class SessionService : Service() {
             network = initialNetwork,
             isVpn = initialNetwork?.let(::networkIsVpn)
         )
+        networkAvailable.value = initialNetwork != null
         runCatching {
             manager.registerDefaultNetworkCallback(defaultNetworkCallback)
         }.onSuccess {
@@ -320,24 +345,22 @@ class SessionService : Service() {
                 )
                 return@post
             }
-            val message = when (transition) {
-                DefaultNetworkTransition.LOST ->
-                    "Network connection lost. Session disconnected."
-                DefaultNetworkTransition.CHANGED ->
-                    "Network route changed. Session disconnected."
-                DefaultNetworkTransition.VPN_STATE_CHANGED ->
-                    "VPN state changed. Session disconnected."
+            val cause = when (transition) {
+                DefaultNetworkTransition.LOST -> "Network connection lost."
+                DefaultNetworkTransition.CHANGED -> "Network route changed."
+                DefaultNetworkTransition.VPN_STATE_CHANGED -> "VPN state changed."
             }
             sessionIds.forEach { sessionId ->
+                if (requestReconnect(sessionId, cause)) return@forEach
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = sessionId,
                         level = SessionLogBus.LogLevel.WARN,
-                        message = message
+                        message = "$cause Session disconnected."
                     )
                 )
+                stopSession(sessionId)
             }
-            stopAllSessions()
             UiDebugLog.result(
                 "SessionService.networkTransition",
                 true,
@@ -345,6 +368,22 @@ class SessionService : Service() {
             )
         }
     }
+
+    /**
+     * Asks an active plain-SSH session to reconnect. False when it can't (setting off, Mosh, file
+     * browser, or not connected yet), so the caller falls back to closing it.
+     */
+    private fun requestReconnect(sessionId: String, reason: String): Boolean {
+        if (!autoReconnectEnabled) return false
+        if (sessionId in reconnectingSessions) return true
+        val signal = reconnectSignals[sessionId] ?: return false
+        reconnectingSessions.add(sessionId)
+        signal.complete(reason)
+        return true
+    }
+
+    private fun reconnectDelayMillis(attempt: Int): Long =
+        RECONNECT_BACKOFF_MS.getOrElse(attempt - 1) { RECONNECT_BACKOFF_MS.last() }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         UiDebugLog.action(
@@ -408,9 +447,31 @@ class SessionService : Service() {
             var scpBinding: ScpBinding? = null
             var activeForwardBindings: List<PortForwardBinding> = emptyList()
             var sessionHost = host
+            // Plain SSH shells reconnect in place after the network drops or changes; the screen,
+            // terminal contents, and the password that worked are kept for the new connection.
+            val reconnectable = mode == ConnectionMode.SSH && !useMoshTransport
+            var reconnectReason: String? = null
+            var reconnectAttempt = 0
+            var reusableTerminalEngine: TermuxTerminalEngine? = null
+            var lastGoodPassword: String? = initialPassword
+            while (true) {
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
-            runCatching {
-                updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+            val reconnectSignal = CompletableDeferred<String>()
+            val attempt = runCatching {
+                if (reconnectReason != null) {
+                    updateSessionSnapshot(
+                        sessionId, sessionHost, mode, SessionStatus.CONNECTING,
+                        "$reconnectReason Waiting for the network..."
+                    )
+                    withTimeoutOrNull(RECONNECT_NETWORK_WAIT_MS) { networkAvailable.first { it } }
+                    updateSessionSnapshot(
+                        sessionId, sessionHost, mode, SessionStatus.CONNECTING,
+                        "Reconnecting (attempt $reconnectAttempt of $MAX_RECONNECT_ATTEMPTS)..."
+                    )
+                    connectionTranscriptEnabled.set(true)
+                } else {
+                    updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+                }
                 client = SshClientProvider.createClient(
                     this@SessionService,
                     sessionHost,
@@ -433,12 +494,12 @@ class SessionService : Service() {
                 throwIfAttemptTimedOut(attemptDeadlineMillis)
                 when (host.preferredAuth) {
                     AuthMethod.PASSWORD -> {
-                        authenticateWithPassword(
+                        lastGoodPassword = authenticateWithPassword(
                             client = client!!,
                             host = host,
                             sessionId = sessionId,
                             mode = mode,
-                            initialPassword = initialPassword,
+                            initialPassword = lastGoodPassword,
                             deadlineMillis = attemptDeadlineMillis,
                             allowPasswordSave = allowPasswordSave,
                             useRuntimePasswordCache = useRuntimePasswordCache
@@ -462,12 +523,12 @@ class SessionService : Service() {
                             required = false
                         )
                         if (!client!!.isAuthenticated) {
-                            authenticateWithPassword(
+                            lastGoodPassword = authenticateWithPassword(
                                 client = client!!,
                                 host = host,
                                 sessionId = sessionId,
                                 mode = mode,
-                                initialPassword = initialPassword,
+                                initialPassword = lastGoodPassword,
                                 deadlineMillis = attemptDeadlineMillis,
                                 allowPasswordSave = allowPasswordSave,
                                 useRuntimePasswordCache = useRuntimePasswordCache
@@ -504,7 +565,13 @@ class SessionService : Service() {
                             )
                         } else {
                             updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
-                            shellBinding = openShell(sessionId, client!!, terminalEmulation)
+                            shellBinding = openShell(
+                                sessionId,
+                                client!!,
+                                terminalEmulation,
+                                reusableTerminalEngine,
+                                attachTmux = sessionHost.attachTmux
+                            )
                         }
                     }
                     ConnectionMode.SFTP -> {
@@ -645,11 +712,56 @@ class SessionService : Service() {
                     }
                 }
 
-                // Keep the connection alive until user stops it.
-                while (currentCoroutineContext().isActive) {
-                    delay(10_000)
+                reconnectAttempt = 0
+                reconnectingSessions.remove(sessionId)
+                if (reconnectable) {
+                    reconnectSignals[sessionId] = reconnectSignal
                 }
-            }.onFailure { e ->
+                // Keep the connection until the user stops it, or until it needs a reconnect.
+                reconnectSignal.await()
+            }
+            reconnectSignals.remove(sessionId, reconnectSignal)
+            val retryReason: String? = attempt.fold(
+                onSuccess = { reason -> reason },
+                onFailure = { error ->
+                    val retryable = reconnectReason != null &&
+                        error !is CancellationException &&
+                        error.connectionFailureKind()?.isNetwork == true &&
+                        reconnectAttempt < MAX_RECONNECT_ATTEMPTS
+                    if (retryable) reconnectReason else null
+                }
+            )
+            if (retryReason != null && autoReconnectEnabled && currentCoroutineContext().isActive) {
+                reconnectingSessions.add(sessionId)
+                reusableTerminalEngine = shellBinding?.terminalEngine ?: reusableTerminalEngine
+                activeConnections.remove(sessionId)
+                runCatching { shellBinding?.outputReaderJob?.cancel() }
+                runCatching { shellBinding?.inputWriterJob?.cancel() }
+                runCatching { shellBinding?.resizeWriterJob?.cancel() }
+                runCatching { shellBinding?.inputQueue?.close() }
+                runCatching { shellBinding?.resizeQueue?.close() }
+                runCatching { shellBinding?.shell?.close() }
+                runCatching { shellBinding?.session?.close() }
+                runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
+                runCatching { client?.disconnect() }
+                client = null
+                shellBinding = null
+                activeForwardBindings = emptyList()
+                reconnectAttempt += 1
+                reconnectReason = retryReason
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "$retryReason Reconnecting..."
+                    )
+                )
+                updateSessionNotifications()
+                delay(reconnectDelayMillis(reconnectAttempt))
+                continue
+            }
+            reconnectingSessions.remove(sessionId)
+            attempt.onFailure { e ->
                 if (e !is CancellationException) {
                     clearHostKeyPromptsForHost(sessionId, trust = false)
                     clearPasswordPromptsForHost(sessionId, password = null)
@@ -665,6 +777,8 @@ class SessionService : Service() {
                     UiDebugLog.error("startSession", e, "sessionId=$sessionId, mode=$mode")
                     UiDebugLog.result("startSession", false, "sessionId=$sessionId, mode=$mode")
                 }
+            }
+            break
             }
             cancelFileTransfer(sessionId, restoreSftpAfterCancellation = false)
             runCatching { shellBinding?.resizeQueue?.close() }
@@ -712,6 +826,8 @@ class SessionService : Service() {
 
     fun stopSession(hostId: String) {
         UiDebugLog.action("stopSession", "hostId=$hostId")
+        reconnectSignals.remove(hostId)
+        reconnectingSessions.remove(hostId)
         cancelFileTransfer(hostId, restoreSftpAfterCancellation = false)
         clearHostKeyPromptsForHost(hostId, trust = false)
         clearPasswordPromptsForHost(hostId, password = null)
@@ -890,7 +1006,7 @@ class SessionService : Service() {
 
     fun respondToPasswordPrompt(promptId: String, password: String?, savePassword: Boolean) {
         val prompt = passwordPrompts.value.firstOrNull { it.id == promptId }
-        if (prompt?.allowSave == false && !password.isNullOrBlank()) {
+        if (prompt?.allowSave == false && prompt.isChallenge.not() && !password.isNullOrBlank()) {
             runtimeSessionPasswords[prompt.hostId] = password
         }
         passwordPromptWaiters.remove(promptId)?.complete(
@@ -1450,34 +1566,42 @@ class SessionService : Service() {
             }
             admission.withPermit {
                 throwIfFileTransferCancelled(transfer)
-                if (destinationUri != null) {
-                    val staged = File.createTempFile("sftp_dl_", ".bin", cacheDir)
-                    try {
-                        SftpPipelinedDownloader.downloadFromSftp(
-                            sftp = sftp,
-                            remotePath = source,
-                            localFile = staged,
-                            settings = settings,
-                            onBytesTransferred = ::publishProgress,
-                            isCancelled = cancelled
+                // Received bytes survive a failed attempt; downloading the same file again resumes.
+                val hostKey = activeConnections[hostId]?.host?.let { "${it.username}@${it.host}:${it.port}" } ?: hostId
+                val partial = SftpPartialDownload.forRemote(sftpPartialDirectory(), hostKey, source)
+                SftpResumableDownloader.download(
+                    sftp = sftp,
+                    remotePath = source,
+                    partial = partial,
+                    settings = settings,
+                    onBytesTransferred = ::publishProgress,
+                    isCancelled = cancelled,
+                    onResume = { already, size ->
+                        val percent = if (size > 0L) already * 100 / size else 0L
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = hostId,
+                                level = SessionLogBus.LogLevel.INFO,
+                                message = "Resuming download of $source from $percent%"
+                            )
                         )
-                        contentResolver.openOutputStream(destinationUri, "w")?.use { output ->
-                            staged.inputStream().use { input -> input.copyTo(output) }
-                        } ?: throw IOException("Unable to open destination stream for $destinationUri")
-                    } finally {
-                        staged.delete()
                     }
-                } else {
-                    destinationFile.parentFile?.mkdirs()
-                    SftpPipelinedDownloader.downloadFromSftp(
-                        sftp = sftp,
-                        remotePath = source,
-                        localFile = destinationFile,
-                        settings = settings,
-                        onBytesTransferred = ::publishProgress,
-                        isCancelled = cancelled
-                    )
+                )
+                try {
+                    if (destinationUri != null) {
+                        contentResolver.openOutputStream(destinationUri, "w")?.use { output ->
+                            partial.dataFile.inputStream().use { input -> input.copyTo(output) }
+                        } ?: throw IOException("Unable to open destination stream for $destinationUri")
+                    } else {
+                        destinationFile.parentFile?.mkdirs()
+                        if (!partial.dataFile.renameTo(destinationFile)) {
+                            partial.dataFile.copyTo(destinationFile, overwrite = true)
+                        }
+                    }
+                } finally {
+                    partial.delete()
                 }
+                Unit
             }
             "SFTP download complete: $source -> $destinationLabel"
         }
@@ -1750,6 +1874,7 @@ class SessionService : Service() {
                             require(dest.isNotBlank()) { "Destination is required." }
                             sftp.rename(src, dest)
                         }
+                        "chmod" -> sftp.chmod(src, destination.orEmpty().toInt(8))
                         else -> error("Unsupported operation: $normalizedOperation")
                     }
                     SessionLogBus.emit(
@@ -1952,6 +2077,40 @@ class SessionService : Service() {
             reportSftpOperationFailure(hostId, err)
         }.getOrDefault(false)
     }
+
+    /** Reads a small remote text file for the in-app editor. */
+    suspend fun readRemoteTextFile(hostId: String, path: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val sftp = activeConnections[hostId]?.sftpBinding?.client ?: error("The file browser isn't connected.")
+            val size = sftp.stat(path).size
+            require(size <= MAX_EDITABLE_FILE_BYTES) {
+                "This file is larger than ${MAX_EDITABLE_FILE_BYTES / 1024} KB. Download it to edit it."
+            }
+            val bytes = sftp.open(path).use { file -> file.RemoteFileInputStream().use { it.readBytes() } }
+            require(bytes.none { it == 0.toByte() }) { "This looks like a binary file, so it can't be edited here." }
+            String(bytes, StandardCharsets.UTF_8)
+        }
+    }
+
+    /** Replaces a remote file's contents (keeping its permissions) with [text]. */
+    suspend fun writeRemoteTextFile(hostId: String, path: String, text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val sftp = activeConnections[hostId]?.sftpBinding?.client ?: error("The file browser isn't connected.")
+            val bytes = text.toByteArray(StandardCharsets.UTF_8)
+            sftp.open(path, EnumSet.of(OpenMode.WRITE, OpenMode.TRUNC)).use { file ->
+                file.RemoteFileOutputStream().use { it.write(bytes) }
+            }
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = hostId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Saved $path (${bytes.size} bytes)"
+                )
+            )
+        }
+    }
+
+    private fun sftpPartialDirectory(): File = File(cacheDir, "sftp-partial")
 
     private fun hasSftpTransport(hostId: String): Boolean =
         activeConnections[hostId]?.let { it.sftpBinding?.client != null || it.client != null } == true
@@ -2340,7 +2499,8 @@ class SessionService : Service() {
         mode: ConnectionMode,
         reason: String,
         deadlineMillis: Long,
-        allowSave: Boolean
+        allowSave: Boolean,
+        challenge: LoginChallenge? = null
     ): PasswordResponse? {
         val promptId = UUID.randomUUID().toString()
         val waiter = CompletableFuture<PasswordResponse>()
@@ -2351,7 +2511,11 @@ class SessionService : Service() {
             port = host.port,
             username = host.username,
             reason = reason,
-            allowSave = allowSave
+            allowSave = allowSave && challenge == null,
+            title = if (challenge == null) "Password Required" else "Server Login Question",
+            fieldLabel = challenge?.prompt?.trimEnd(':', ' ')?.ifBlank { null } ?: if (challenge == null) "Password" else "Answer",
+            echo = challenge?.echo == true,
+            isChallenge = challenge != null
         )
         passwordPromptWaiters[promptId] = waiter
         passwordPrompts.update { prompts -> prompts + prompt }
@@ -2427,7 +2591,7 @@ class SessionService : Service() {
         deadlineMillis: Long,
         allowPasswordSave: Boolean,
         useRuntimePasswordCache: Boolean
-    ) {
+    ): String {
         var password = initialPassword
         var savePassword = false
         var failedAttempts = 0
@@ -2459,7 +2623,18 @@ class SessionService : Service() {
             try {
                 val currentPassword = password
                 updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, "Authenticating as ${host.username}...")
-                client.authPassword(host.username, currentPassword)
+                client.authPasswordOrInteractive(host.username, currentPassword) { challenge ->
+                    awaitPasswordDecision(
+                        host = host,
+                        sessionId = sessionId,
+                        mode = mode,
+                        reason = challenge.instruction.ifBlank { "The server asks for more information to log in." },
+                        // A person may need to fetch a code; give each question its own window.
+                        deadlineMillis = System.currentTimeMillis() + INTERACTIVE_LOGIN_TIMEOUT_MS,
+                        allowSave = false,
+                        challenge = challenge
+                    )?.password
+                }
                 if (savePassword) {
                     runCatching { SecurityManager.storeHostPassword(host.id, currentPassword) }
                         .onSuccess {
@@ -2478,7 +2653,9 @@ class SessionService : Service() {
                             )
                         }
                 }
-                return
+                return currentPassword
+            } catch (_: LoginCanceledException) {
+                throw RuntimeException("Connection canceled while waiting for password.")
             } catch (_: UserAuthException) {
                 if (useRuntimePasswordCache) {
                     clearRuntimeSessionPassword(sessionId)
@@ -3053,7 +3230,7 @@ class SessionService : Service() {
         fun tryPassword(): Boolean {
             if (savedPassword.isNullOrBlank()) return false
             return runCatching {
-                client.authPassword(host.username, savedPassword)
+                client.authPasswordOrInteractive(host.username, savedPassword)
                 client.isAuthenticated
             }.getOrDefault(false)
         }
@@ -3186,7 +3363,9 @@ class SessionService : Service() {
     private fun openShell(
         hostId: String,
         client: SSHClient,
-        terminalEmulation: TerminalEmulation
+        terminalEmulation: TerminalEmulation,
+        reuseTerminalEngine: TermuxTerminalEngine? = null,
+        attachTmux: Boolean = false
     ): ShellBinding {
         val session = client.startSession()
         val allocated = runCatching {
@@ -3202,8 +3381,9 @@ class SessionService : Service() {
         if (!allocated) {
             session.allocateDefaultPTY()
         }
-        val shell = session.startShell()
-        val terminalEngine = TermuxTerminalEngine(
+        // sshj's session channel is both a Command and a Shell, so an exec'd tmux behaves like a shell.
+        val shell = if (attachTmux) session.exec(TMUX_ATTACH_COMMAND) as Session.Shell else session.startShell()
+        val terminalEngine = reuseTerminalEngine ?: TermuxTerminalEngine(
             onWriteToRemote = {},
             onTerminalDiagnostic = { message ->
                 if (!diagnosticsEnabled) return@TermuxTerminalEngine
@@ -3264,6 +3444,7 @@ class SessionService : Service() {
                     hostId,
                     "RX stream error: ${error::class.java.simpleName}: ${error.message ?: "unknown error"}"
                 )
+                if (requestReconnect(hostId, "Connection lost.")) return@launch
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = hostId,
@@ -3279,6 +3460,7 @@ class SessionService : Service() {
             }
 
             if (read < 0) {
+                if (!isActive || hostId in reconnectingSessions) return@launch
                 emitShellLifecycleDiagnostic(hostId, "RX EOF")
                 closeSessionAfterShellExit(hostId, "Shell exited (EOF)")
                 return@launch
@@ -3929,6 +4111,15 @@ class SessionService : Service() {
         const val ACTION_OPEN_SESSIONS = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSIONS"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
+        private const val MAX_RECONNECT_ATTEMPTS = 8
+        private const val MAX_EDITABLE_FILE_BYTES = 1024L * 1024L
+        private const val PARTIAL_DOWNLOAD_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
+        // Attach to (or create) tmux session "sshpeaches"; without tmux, fall back to the login shell.
+        // Wrapped in sh -c so it works whatever the user's login shell is (fish included).
+        internal const val TMUX_ATTACH_COMMAND =
+            "sh -c 'command -v tmux >/dev/null 2>&1 && exec tmux new-session -A -s sshpeaches; exec \"\${SHELL:-/bin/sh}\" -l'"
+        private const val RECONNECT_NETWORK_WAIT_MS = 60_000L
+        private val RECONNECT_BACKOFF_MS = longArrayOf(1_000, 2_000, 4_000, 8_000, 15_000, 30_000)
         private const val TIMEOUT_WAITING_FOR_INPUT_MESSAGE = "Connection timed out while waiting for user input."
         private const val MAX_PASSWORD_PROMPT_ATTEMPTS = 3
         private const val MAX_SHELL_OUTPUT_CHARS = 32_000
@@ -4084,7 +4275,13 @@ class SessionService : Service() {
         val port: Int,
         val username: String,
         val reason: String,
-        val allowSave: Boolean
+        val allowSave: Boolean,
+        val title: String = "Password Required",
+        val fieldLabel: String = "Password",
+        /** Show the answer while typing (the server marked it as not secret, e.g. some 2FA codes). */
+        val echo: Boolean = false,
+        /** A keyboard-interactive question other than the password; its answer is never cached. */
+        val isChallenge: Boolean = false
     )
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }

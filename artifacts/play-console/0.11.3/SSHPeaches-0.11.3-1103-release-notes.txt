@@ -1,4 +1,8 @@
 What's new in 0.11.3
 
-- Fn now replaces the swipe-arrows key on keyboards saved before this update.
-- Swipe arrows are toggled from the ⋮ menu: "Swipe for arrow keys".
+- SSH sessions reconnect on their own after Wi-Fi or mobile data changes.
+- Optional per-host tmux attach to get your shell back.
+- 2FA / verification-code logins.
+- File browser: edit text files, change permissions, tap the path, resume downloads.
+- Export and Import over Wi-Fi to another phone on the same network.
+- Fn replaces the swipe-arrows key; "Swipe for arrow keys" is in the ⋮ menu.

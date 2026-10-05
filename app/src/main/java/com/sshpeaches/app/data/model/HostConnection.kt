@@ -19,6 +19,8 @@ data class HostConnection(
     val snippets: List<String> = emptyList(),
     val hasPassword: Boolean = false,
     val useMosh: Boolean = false,
+    /** Run `tmux new-session -A` when the shell opens, so a reconnect returns to the same shell. */
+    val attachTmux: Boolean = false,
     val preferredIdentityId: String? = null,
     val preferredForwardId: String? = null,
     val startupScript: String = "",

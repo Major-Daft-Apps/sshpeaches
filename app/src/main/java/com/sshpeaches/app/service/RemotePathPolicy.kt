@@ -46,7 +46,12 @@ internal fun validateRemotePathMutation(
     val normalizedOperation = operation.trim().lowercase()
     val protectsSource = remoteDeleteMode(normalizedOperation) != null ||
         normalizedOperation == "move" ||
-        normalizedOperation == "rename"
+        normalizedOperation == "rename" ||
+        normalizedOperation == "chmod"
+    if (normalizedOperation == "chmod") {
+        val mode = destinationPath.orEmpty().trim()
+        require(mode.length in 3..4 && mode.all { it in '0'..'7' }) { "Permissions must be an octal mode such as 644." }
+    }
     val protectsDestination = normalizedOperation == "move" || normalizedOperation == "rename"
 
     if (protectsSource) {

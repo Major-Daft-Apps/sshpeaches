@@ -86,6 +86,7 @@ class AppViewModel(
     private val keyboardSlotsFlow = MutableStateFlow(KeyboardLayoutDefaults.DEFAULT_SLOTS)
     private val useBuiltInKeyboardFlow = MutableStateFlow(false)
     private val confirmPasswordInsertFlow = MutableStateFlow(true)
+    private val autoReconnectFlow = MutableStateFlow(true)
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
 
@@ -258,6 +259,11 @@ class AppViewModel(
         viewModelScope.launch {
             SettingsStore.confirmPasswordInsert.collect { enabled ->
                 confirmPasswordInsertFlow.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            SettingsStore.autoReconnect.collect { enabled ->
+                autoReconnectFlow.value = enabled
             }
         }
     }
@@ -514,13 +520,14 @@ class AppViewModel(
         snippetRunTimeoutSecondsFlow,
         appIconFlow,
         lockScreenMessageFlow,
-        confirmPasswordInsertFlow
-    ) { state, snippetTimeout, appIcon, lockScreenMessage, confirmPasswordInsert ->
+        combine(confirmPasswordInsertFlow, autoReconnectFlow, ::Pair)
+    ) { state, snippetTimeout, appIcon, lockScreenMessage, (confirmPasswordInsert, autoReconnect) ->
         state.copy(
             snippetRunTimeoutSeconds = snippetTimeout,
             appIcon = appIcon,
             lockScreenMessage = lockScreenMessage,
-            confirmPasswordInsert = confirmPasswordInsert
+            confirmPasswordInsert = confirmPasswordInsert,
+            autoReconnect = autoReconnect
         )
     }
 
@@ -613,6 +620,7 @@ class AppViewModel(
         append(state.usageReportsEnabled).append('|')
         append(state.useBuiltInKeyboard).append('|')
         append(state.confirmPasswordInsert).append('|')
+        append(state.autoReconnect).append('|')
         append(state.pinConfigured).append('|')
         append(state.isLocked).append('|')
         append(state.keyboardSlots.size).append('|')
@@ -876,7 +884,8 @@ class AppViewModel(
         backgroundBehavior: BackgroundBehavior,
         terminalProfileId: String?,
         password: String?,
-        suppliedId: String? = null
+        suppliedId: String? = null,
+        attachTmux: Boolean = false
     ) {
         logAction(
             "addHost",
@@ -909,6 +918,7 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword,
             useMosh = useMosh,
+            attachTmux = attachTmux,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
@@ -936,7 +946,8 @@ class AppViewModel(
         startupScript: String,
         backgroundBehavior: BackgroundBehavior,
         terminalProfileId: String?,
-        password: String?
+        password: String?,
+        attachTmux: Boolean = false
     ) {
         logAction(
             "updateHost",
@@ -972,6 +983,7 @@ class AppViewModel(
             defaultMode = defaultMode,
             hasPassword = hasPassword,
             useMosh = useMosh,
+            attachTmux = attachTmux,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
@@ -1720,6 +1732,12 @@ class AppViewModel(
     fun setUseBuiltInKeyboard(enabled: Boolean) {
         launchLogged("setUseBuiltInKeyboard", "enabled=$enabled") {
             SettingsStore.setUseBuiltInKeyboard(enabled)
+        }
+    }
+
+    fun setAutoReconnect(enabled: Boolean) {
+        launchLogged("setAutoReconnect", "enabled=$enabled") {
+            SettingsStore.setAutoReconnect(enabled)
         }
     }
 

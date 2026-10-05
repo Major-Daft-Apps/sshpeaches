@@ -123,7 +123,8 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 
@@ -139,7 +140,8 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 
@@ -184,7 +186,8 @@ class SettingsPreferencesTest {
         composeRule.activityRule.scenario.recreate()
 
         openSettings()
-        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         waitForTag(UiTestTags.SETTINGS_EXPORT_DIALOG)
 

@@ -40,7 +40,8 @@ class KeyboardEditorTest {
         composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0)).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.keyboardSlot(13)).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.keyboardSlot(14)).assertDoesNotExist()
-        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(1))
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(1)).assertContentDescriptionEquals("Alt")
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(6))
             .assertContentDescriptionEquals("Fn")
             .performClick()
 

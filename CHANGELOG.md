@@ -10,6 +10,11 @@ Release date: 2026-10-05
 
 - Keyboards saved before this update that still had the swipe-arrows key now show Fn in its place, and a Fn key elsewhere becomes Alt. Swiping for arrow keys is switched on from the session ⋮ menu. A Swipe Nav key added back in the Keyboard Editor stays.
 - The ⋮ menu item "Arrow keys" is now "Swipe for arrow keys".
+- Servers that ask extra login questions (keyboard-interactive, such as PAM or a 2FA verification code) now show the question in a dialog. The saved password still answers the password question, and a mistyped password now counts as one failed attempt instead of two.
+- SSH terminals reconnect on their own when the network drops or changes (for example Wi-Fi to mobile data), keeping the screen. Turn it off in Settings → Background Sessions → Reconnect automatically. Mosh sessions and the file browser behave as before.
+- New per-host Attach to tmux option opens tmux session "sshpeaches" when the shell starts (falling back to the normal shell if tmux isn't installed), so a reconnect returns to the same shell.
+- File browser: Edit small text files in an in-app editor that saves back to the server, change Permissions (chmod), jump to a parent folder from the clickable path, and resume a download that failed partway by downloading the same file again.
+- Settings now has one Export and one Import button, each offering File, QR code, or Wi-Fi. Wi-Fi sends to another phone on the same local network only, encrypted with a one-time code shown on the sending phone; the receiving phone finds it automatically or scans its QR code.
 
 ## 0.11.2 (1102)
 

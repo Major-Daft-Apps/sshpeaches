@@ -316,6 +316,8 @@ fun ConnectingScreen(
     onScpUpload: (String, String) -> Unit,
     onCancelFileTransfer: () -> Unit = {},
     onManageRemotePath: (operation: String, sourcePath: String, destinationPath: String?) -> Unit,
+    onReadRemoteText: suspend (String) -> Result<String> = { Result.failure(UnsupportedOperationException()) },
+    onWriteRemoteText: suspend (String, String) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException()) },
     resolveTerminalEmulator: (String) -> com.termux.terminal.TerminalEmulator? = { null },
     resolveRuntimeSessionPassword: (String) -> String? = { null },
     onRetry: () -> Unit,
@@ -902,6 +904,7 @@ fun ConnectingScreen(
             message.startsWith("Remote move completed:") ||
                 message.startsWith("Remote delete completed:") ||
                 message.startsWith("Remote mkdir completed:") ||
+                message.startsWith("Remote chmod completed:") ||
                 message.startsWith("SFTP operation failed:")
         } ?: return@LaunchedEffect
         val key = "${entry.timestamp}:${entry.message}"
@@ -919,6 +922,10 @@ fun ConnectingScreen(
             }
             latest.startsWith("Remote mkdir completed:") -> {
                 scpTransferStatus = "Folder created successfully."
+                browseScpPath(scpLastListedPath, recordHistory = false, clearStatus = false)
+            }
+            latest.startsWith("Remote chmod completed:") -> {
+                scpTransferStatus = "Permissions changed."
                 browseScpPath(scpLastListedPath, recordHistory = false, clearStatus = false)
             }
             latest.startsWith("SFTP operation failed:") -> {
@@ -1820,6 +1827,8 @@ fun ConnectingScreen(
                 onScpUpload = onScpUpload,
                 onCancelFileTransfer = onCancelFileTransfer,
                 onManageRemotePath = onManageRemotePath,
+                onReadRemoteText = onReadRemoteText,
+                onWriteRemoteText = onWriteRemoteText,
                 inferRemoteDestination = ::inferRemoteDestination,
                 resolveChildPath = ::resolveChildPath,
                 parentPath = ::parentPath
@@ -2620,11 +2629,15 @@ private fun ConnectingScpContent(
     onScpUpload: (String, String) -> Unit,
     onCancelFileTransfer: () -> Unit,
     onManageRemotePath: (String, String, String?) -> Unit,
+    onReadRemoteText: suspend (String) -> Result<String>,
+    onWriteRemoteText: suspend (String, String) -> Result<Unit>,
     inferRemoteDestination: (String, String) -> String,
     resolveChildPath: (String, String) -> String,
     parentPath: (String) -> String
 ) {
     var showHiddenFiles by rememberSaveable(sessionId) { mutableStateOf(false) }
+    var permissionsTarget by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
+    var editorPath by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     var sortMenuExpanded by rememberSaveable(sessionId) { mutableStateOf(false) }
     var sortFieldName by rememberSaveable(sessionId) { mutableStateOf(RemoteFileSortField.NAME.name) }
     var sortAscending by rememberSaveable(sessionId) { mutableStateOf(true) }
@@ -2933,6 +2946,24 @@ private fun ConnectingScpContent(
                             modifier = Modifier.testTag(UiTestTags.connectingScpAction("move"))
                         )
                         DropdownMenuItem(
+                            text = { Text("Edit") },
+                            enabled = selectedEntry != null && !selectedEntry.isDirectory && !scpTransferActive,
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                editorPath = selectedPath
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("edit"))
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Permissions") },
+                            enabled = canMoveSelection && selectedEntry?.permissionSummary?.let(::permissionSummaryToMode) != null,
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                permissionsTarget = selectedPath
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("permissions"))
+                        )
+                        DropdownMenuItem(
                             text = { Text("Copy path") },
                             enabled = canMutateSelection,
                             onClick = {
@@ -2988,6 +3019,11 @@ private fun ConnectingScpContent(
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, "Go to path")
                 }
             }
+        )
+        RemoteBreadcrumbBar(
+            path = effectiveRemotePath,
+            enabled = !scpListingInProgress,
+            onNavigate = { target -> browseScpPath(target, true, true, true) }
         )
         Text(
             text = selectedEntry?.let {
@@ -3242,6 +3278,34 @@ private fun ConnectingScpContent(
         )
     }
 
+    permissionsTarget?.let { target ->
+        val entry = remoteItems.firstOrNull { entryPathFor(it) == target }
+        val mode = entry?.permissionSummary?.let(::permissionSummaryToMode)
+        if (entry == null || mode == null) {
+            permissionsTarget = null
+        } else {
+            RemotePermissionsDialog(
+                name = target,
+                initialMode = mode,
+                onDismiss = { permissionsTarget = null },
+                onApply = { modeText ->
+                    permissionsTarget = null
+                    onManageRemotePath("chmod", target, modeText)
+                }
+            )
+        }
+    }
+    editorPath?.let { target ->
+        RemoteTextEditorDialog(
+            path = target,
+            load = { onReadRemoteText(target) },
+            save = { text -> onWriteRemoteText(target, text) },
+            onClose = { saved ->
+                editorPath = null
+                if (saved) browseScpPath(scpLastListedPath, false, false, false)
+            }
+        )
+    }
     if (showScpRenameDialog && selectedEntry != null) {
         val validRename = isValidRemoteChildName(scpRenameValue)
         AlertDialog(

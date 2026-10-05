@@ -26,6 +26,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -111,6 +113,7 @@ private data class HostEditorSnapshot(
     val authMethod: AuthMethod,
     val preferredIdentityId: String?,
     val useMosh: Boolean,
+    val attachTmux: Boolean = false,
     val terminalProfileId: String?,
     val preferredForwardId: String?,
     val startupScript: String,
@@ -136,14 +139,14 @@ fun HostsScreen(
     editRequestId: String? = null,
     importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportHost: (HostConnection) -> Unit = {},
     onImportPortForward: (PortForward) -> Unit = {},
     onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
     activeSshSessionHostIds: Set<String> = emptySet(),
     onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
@@ -172,6 +175,7 @@ fun HostsScreen(
     val preferredIdentityIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val identityExpanded = remember { mutableStateOf(false) }
     val useMoshState = rememberSaveable { mutableStateOf(false) }
+    val attachTmuxState = rememberSaveable { mutableStateOf(false) }
     val terminalProfileIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val terminalProfileExpanded = remember { mutableStateOf(false) }
     val preferredForwardIdState = rememberSaveable { mutableStateOf<String?>(null) }
@@ -238,7 +242,8 @@ fun HostsScreen(
                     imported.backgroundBehavior,
                     imported.terminalProfileId,
                     null,
-                    processed.data.targetId
+                    processed.data.targetId,
+                    imported.attachTmux
                 )
                 if (processed.data.encryptedPasswordPayload != null) {
                     pendingEncryptedImport.value = processed.data.encryptedPasswordPayload to processed.data.targetId
@@ -458,6 +463,7 @@ fun HostsScreen(
         authMethod = authState.value,
         preferredIdentityId = preferredIdentityIdState.value,
         useMosh = useMoshState.value,
+        attachTmux = attachTmuxState.value,
         terminalProfileId = terminalProfileIdState.value,
         preferredForwardId = preferredForwardIdState.value,
         startupScript = startupScriptState.value,
@@ -502,6 +508,7 @@ fun HostsScreen(
         preferredIdentityIdState.value = host?.preferredIdentityId
         identityExpanded.value = false
         useMoshState.value = host?.useMosh ?: false
+        attachTmuxState.value = host?.attachTmux ?: false
         terminalProfileIdState.value = host?.terminalProfileId
         terminalProfileExpanded.value = false
         preferredForwardIdState.value = host?.preferredForwardId
@@ -676,7 +683,8 @@ fun HostsScreen(
                 backgroundBehaviorState.value,
                 terminalProfileIdState.value,
                 passwordValue,
-                null
+                null,
+                attachTmuxState.value
             )
         } else {
             onUpdate(
@@ -695,7 +703,8 @@ fun HostsScreen(
                 startupScriptState.value,
                 backgroundBehaviorState.value,
                 terminalProfileIdState.value,
-                passwordValue
+                passwordValue,
+                attachTmuxState.value
             )
         }
         closeDialog()
@@ -995,6 +1004,9 @@ fun HostsScreen(
                         Text(if (useMoshState.value) "Mosh \u2713" else "Mosh")
                     }
                 }
+            }
+            if (!useMoshState.value) {
+                AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
             }
             ExposedDropdownMenuBox(
                 expanded = terminalProfileExpanded.value,
@@ -1821,6 +1833,9 @@ fun HostsScreen(
                             ) { Text(if (useMoshState.value) "Mosh ✓" else "Mosh") }
                         }
                     }
+                    if (!useMoshState.value) {
+                        AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
+                    }
                     ExposedDropdownMenuBox(
                         expanded = terminalProfileExpanded.value,
                         onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
@@ -2085,7 +2100,8 @@ fun HostsScreen(
                             backgroundBehaviorState.value,
                             terminalProfileIdState.value,
                             passwordValue,
-                            null
+                            null,
+                            attachTmuxState.value
                         )
                     } else {
                         onUpdate(
@@ -2104,7 +2120,8 @@ fun HostsScreen(
                             startupScriptState.value,
                             backgroundBehaviorState.value,
                             terminalProfileIdState.value,
-                            passwordValue
+                            passwordValue,
+                            attachTmuxState.value
                         )
                     }
                     closeDialog()
@@ -2234,4 +2251,25 @@ fun HostsScreen(
         )
     }
 
+}
+
+@Composable
+private fun AttachTmuxRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .testTag(UiTestTags.HOST_DIALOG_ATTACH_TMUX),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text("Attach to tmux")
+            Text(
+                "Opens tmux session \"sshpeaches\" when the shell starts (if tmux is installed), " +
+                    "so after a reconnect you're back where you were.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
 }

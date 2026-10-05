@@ -56,6 +56,7 @@ object SettingsStore {
     private val keyboardLayoutVersionKey = intPreferencesKey("keyboard_layout_version")
     private val useBuiltInKeyboardKey = booleanPreferencesKey("use_built_in_terminal_keyboard")
     private val confirmPasswordInsertKey = booleanPreferencesKey("confirm_password_insert")
+    private val autoReconnectKey = booleanPreferencesKey("auto_reconnect_sessions")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val appIconKey = stringPreferencesKey("app_icon")
     private val lockTimeoutKey = stringPreferencesKey("lock_timeout")
@@ -154,6 +155,10 @@ object SettingsStore {
 
     val useBuiltInKeyboard: Flow<Boolean> by lazy {
         dataStore.data.map { prefs -> prefs[useBuiltInKeyboardKey] ?: false }
+    }
+
+    val autoReconnect: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[autoReconnectKey] ?: true }
     }
 
     val confirmPasswordInsert: Flow<Boolean> by lazy {
@@ -371,6 +376,12 @@ object SettingsStore {
     suspend fun setUseBuiltInKeyboard(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[useBuiltInKeyboardKey] = enabled
+        }
+    }
+
+    suspend fun setAutoReconnect(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[autoReconnectKey] = enabled
         }
     }
 

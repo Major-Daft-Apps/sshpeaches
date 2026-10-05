@@ -96,9 +96,12 @@ class SettingsSmokeTest {
         composeRule.navigateDrawer(Routes.SETTINGS)
         composeRule.onNodeWithTag(UiTestTags.SCREEN_SETTINGS).assertIsDisplayed()
 
-        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_IMPORT_QR_BUTTON).assertIsDisplayed()
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_EXPORT_BUTTON)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_IMPORT_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_BUTTON).performClick()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_WIFI_BUTTON).assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_FILE_BUTTON).assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_EXPORT_QR_BUTTON).performClick()
         composeRule.waitUntil(5_000) {
             runCatching {

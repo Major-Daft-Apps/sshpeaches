@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PortForwardEntity::class,
         SnippetEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,6 +40,7 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_7_8)
                     .addMigrations(MIGRATION_8_9)
                     .addMigrations(MIGRATION_9_10)
+                    .addMigrations(MIGRATION_10_11)
                     .build()
                     .also { instance = it }
             }
@@ -196,6 +197,12 @@ abstract class SshPeachesDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS `host_uptime_samples`")
                 db.execSQL("DROP TABLE IF EXISTS `host_uptime_configs`")
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE hosts ADD COLUMN `attachTmux` INTEGER NOT NULL DEFAULT 0")
             }
         }
 

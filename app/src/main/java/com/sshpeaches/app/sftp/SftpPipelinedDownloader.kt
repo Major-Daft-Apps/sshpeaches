@@ -149,7 +149,8 @@ object SftpPipelinedDownloader {
         isCancelled: () -> Boolean = { false },
         waitTimeoutMs: Long = DEFAULT_READ_WAIT_TIMEOUT_MS,
         rangeStart: Long = 0L,
-        rangeEnd: Long = fileSize
+        rangeEnd: Long = fileSize,
+        onContiguousEnd: (Long) -> Unit = {}
     ) {
         val resolved = settings.sanitized()
         val readSize = resolved.sftpReadSize
@@ -164,6 +165,10 @@ object SftpPipelinedDownloader {
         var nextOffset = start
         val inflight = ArrayList<OutstandingSftpRead>(maxRequests.coerceAtMost(64))
         var transferred = 0L
+        // Replies arrive out of order; [contiguous] is the end of the gap-free prefix written so far,
+        // which is what a resumed download can safely start from.
+        val writtenSpans = java.util.TreeMap<Long, Long>()
+        var contiguous = start
 
         fun throwIfCancelled() {
             if (isCancelled()) throw SftpDownloadCancelledException()
@@ -202,6 +207,12 @@ object SftpPipelinedDownloader {
                     sink.writeAt(completed.offset, data)
                     transferred += data.size.toLong()
                     onBytesTransferred(transferred)
+                    writtenSpans[completed.offset] = completed.offset + data.size
+                    val before = contiguous
+                    while (true) {
+                        contiguous = writtenSpans.remove(contiguous) ?: break
+                    }
+                    if (contiguous != before) onContiguousEnd(contiguous)
                 }
                 val receivedEnd = completed.offset + data.size
                 val requestedEnd = completed.offset + completed.length
@@ -256,9 +267,11 @@ object SftpPipelinedDownloader {
         onBytesTransferred: (Long) -> Unit = {},
         isCancelled: () -> Boolean = { false },
         waitTimeoutMs: Long = DEFAULT_READ_WAIT_TIMEOUT_MS,
-        onSegmentStarted: () -> Unit = {}
+        onSegmentStarted: () -> Unit = {},
+        ranges: List<SftpByteRange> = splitRanges(fileSize, settings),
+        onRangeProgress: (rangeIndex: Int, contiguousEnd: Long) -> Unit = { _, _ -> }
     ) {
-        val ranges = splitRanges(fileSize, settings)
+        if (ranges.isEmpty()) return
         if (ranges.size <= 1) {
             val range = ranges.first()
             val source = sourceForRange(range)
@@ -273,7 +286,8 @@ object SftpPipelinedDownloader {
                     isCancelled = isCancelled,
                     waitTimeoutMs = waitTimeoutMs,
                     rangeStart = range.start,
-                    rangeEnd = range.endExclusive
+                    rangeEnd = range.endExclusive,
+                    onContiguousEnd = { end -> onRangeProgress(0, end) }
                 )
             } finally {
                 (source as? AutoCloseable)?.close()
@@ -303,7 +317,8 @@ object SftpPipelinedDownloader {
                         isCancelled = isCancelled,
                         waitTimeoutMs = waitTimeoutMs,
                         rangeStart = range.start,
-                        rangeEnd = range.endExclusive
+                        rangeEnd = range.endExclusive,
+                        onContiguousEnd = { end -> onRangeProgress(index, end) }
                     )
                 } catch (error: Throwable) {
                     errors.add(error)

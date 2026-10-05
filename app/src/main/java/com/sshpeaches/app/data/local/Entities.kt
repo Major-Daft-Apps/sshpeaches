@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -28,6 +29,7 @@ data class HostEntity(
     val snippets: List<String>,
     val hasPassword: Boolean,
     val useMosh: Boolean,
+    @ColumnInfo(defaultValue = "0") val attachTmux: Boolean = false,
     val preferredIdentityId: String?,
     val preferredForwardId: String?,
     val startupScript: String,
