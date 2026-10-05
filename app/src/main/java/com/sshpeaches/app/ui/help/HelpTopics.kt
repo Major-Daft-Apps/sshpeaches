@@ -90,7 +90,7 @@ val helpTopics: List<HelpTopic> = listOf(
         id = "session-menu",
         question = "What's in the three-dot menu (⋮) during a session?",
         steps = listOf(
-            "Arrow keys: swipe on the terminal to send arrow keys, handy in editors and shell history.",
+            "Swipe for arrow keys: while it's checked, swiping on the terminal sends arrow keys, handy in editors and shell history.",
             "Insert password: types this host's saved password, after asking you first.",
             "Change theme: switches colors for this session only.",
             "Find, Snippets (run a saved command), and Reset (sends reset to fix a garbled screen)."

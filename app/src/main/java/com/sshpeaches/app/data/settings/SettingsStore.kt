@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.data.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.VisibleForTesting
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -39,6 +40,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 
 object SettingsStore {
     private lateinit var appContext: Context
+    private const val KEYBOARD_LAYOUT_VERSION = 2
     private const val startupThemePrefsName = "startup_theme_mode"
     private const val startupThemeKey = "theme_mode"
     private const val telemetryPrefsName = "telemetry_settings"
@@ -51,6 +53,7 @@ object SettingsStore {
     private val backgroundSessionTimeoutKey = stringPreferencesKey("background_session_timeout")
     private val biometricLockKey = booleanPreferencesKey("biometric_lock_enabled")
     private val keyboardLayoutKey = stringPreferencesKey("keyboard_layout")
+    private val keyboardLayoutVersionKey = intPreferencesKey("keyboard_layout_version")
     private val useBuiltInKeyboardKey = booleanPreferencesKey("use_built_in_terminal_keyboard")
     private val confirmPasswordInsertKey = booleanPreferencesKey("confirm_password_insert")
     private val themeModeKey = stringPreferencesKey("theme_mode")
@@ -136,7 +139,16 @@ object SettingsStore {
 
     val keyboardLayout: Flow<List<KeyboardSlotAction>> by lazy {
         dataStore.data.map { prefs ->
-            prefs[keyboardLayoutKey]?.let { decodeKeyboardSlots(it) } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
+            prefs[keyboardLayoutKey]?.let { serialized ->
+                val slots = decodeKeyboardSlots(serialized)
+                // Saving any layout records the current version, so a Swipe Nav key added back in
+                // the Keyboard Editor afterwards stays.
+                if ((prefs[keyboardLayoutVersionKey] ?: 1) < KEYBOARD_LAYOUT_VERSION) {
+                    KeyboardLayoutDefaults.replaceSwipeNavWithFn(slots)
+                } else {
+                    slots
+                }
+            } ?: KeyboardLayoutDefaults.DEFAULT_SLOTS
         }
     }
 
@@ -317,6 +329,24 @@ object SettingsStore {
     }
 
     suspend fun setKeyboardLayout(slots: List<KeyboardSlotAction>) {
+        val serialized = encodeKeyboardSlots(slots)
+        dataStore.edit { prefs ->
+            prefs[keyboardLayoutKey] = serialized
+            prefs[keyboardLayoutVersionKey] = KEYBOARD_LAYOUT_VERSION
+        }
+    }
+
+    /** Stores [slots] the way releases before 0.11.3 did, without a layout version. */
+    @VisibleForTesting
+    internal suspend fun setKeyboardLayoutWithoutVersionForTesting(slots: List<KeyboardSlotAction>) {
+        val serialized = encodeKeyboardSlots(slots)
+        dataStore.edit { prefs ->
+            prefs[keyboardLayoutKey] = serialized
+            prefs.remove(keyboardLayoutVersionKey)
+        }
+    }
+
+    private fun encodeKeyboardSlots(slots: List<KeyboardSlotAction>): String {
         val array = JSONArray()
         KeyboardLayoutDefaults.normalizeSlots(slots).forEach { slot ->
             array.put(
@@ -335,9 +365,7 @@ object SettingsStore {
                 }
             )
         }
-        dataStore.edit { prefs ->
-            prefs[keyboardLayoutKey] = array.toString()
-        }
+        return array.toString()
     }
 
     suspend fun setUseBuiltInKeyboard(enabled: Boolean) {

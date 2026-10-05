@@ -60,17 +60,52 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
-    fun normalizeSlots_migratesPreviousFnInSlotTwoDefaultToNewDefault() {
+    fun replaceSwipeNavWithFn_turnsThePreviousDefaultIntoTheNewDefault() {
         val previousDefault = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
             this[1] = KeyboardLayoutDefaults.fnKeyAction()
             this[6] = swipeNavAction()
         }
 
-        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, KeyboardLayoutDefaults.normalizeSlots(previousDefault))
+        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, KeyboardLayoutDefaults.replaceSwipeNavWithFn(previousDefault))
     }
 
     @Test
-    fun normalizeSlots_migratesOldTwentyEightSlotDefaultToNewDefault() {
+    fun replaceSwipeNavWithFn_turnsTheOriginalAltDefaultIntoTheNewDefault() {
+        val originalDefault = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[6] = swipeNavAction()
+        }
+
+        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, KeyboardLayoutDefaults.replaceSwipeNavWithFn(originalDefault))
+    }
+
+    @Test
+    fun replaceSwipeNavWithFn_keepsOtherCustomKeys() {
+        val custom = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[1] = KeyboardLayoutDefaults.fnKeyAction()
+            this[2] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+            this[6] = swipeNavAction()
+        }
+
+        val migrated = KeyboardLayoutDefaults.replaceSwipeNavWithFn(custom)
+
+        assertEquals("Alt", migrated[1].label)
+        assertEquals("Custom", migrated[2].label)
+        assertEquals("fn", migrated[6].iconId)
+        assertEquals(custom.drop(7), migrated.drop(7))
+    }
+
+    @Test
+    fun replaceSwipeNavWithFn_leavesLayoutsWithoutSwipeNavAlone() {
+        val custom = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            this[1] = KeyboardLayoutDefaults.fnKeyAction()
+            this[6] = KeyboardLayoutDefaults.textAction("custom", "Custom")
+        }
+
+        assertEquals(custom, KeyboardLayoutDefaults.replaceSwipeNavWithFn(custom))
+    }
+
+    @Test
+    fun normalizeSlots_keepsTheBottomRowsOfOldTwentyEightSlotLayouts() {
         val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
             this[6] = swipeNavAction()
         }
@@ -78,25 +113,7 @@ class KeyboardLayoutDefaultsTest {
             KeyboardLayoutDefaults.textAction("legacy-$index", "Legacy")
         }
 
-        val compact = KeyboardLayoutDefaults.normalizeSlots(oldTopRows + oldBottomRows)
-
-        assertEquals(KeyboardLayoutDefaults.DEFAULT_SLOTS, compact)
-    }
-
-    @Test
-    fun normalizeSlots_keepsCustomizedOldBottomRows() {
-        val oldBottomRows = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
-            this[2] = KeyboardLayoutDefaults.textAction("custom", "Custom")
-            this[6] = swipeNavAction()
-        }
-        val oldTopRows = List(14) { KeyboardLayoutDefaults.emptyAction() }
-
-        val compact = KeyboardLayoutDefaults.normalizeSlots(oldTopRows + oldBottomRows)
-
-        assertEquals(14, compact.size)
-        assertEquals("Alt", compact[1].label)
-        assertEquals("Custom", compact[2].label)
-        assertEquals("Swipe Nav", compact[6].label)
+        assertEquals(oldBottomRows, KeyboardLayoutDefaults.normalizeSlots(oldTopRows + oldBottomRows))
     }
 
     @Test

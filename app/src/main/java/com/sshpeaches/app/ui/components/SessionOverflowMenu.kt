@@ -98,7 +98,7 @@ fun SessionOverflowMenu(
                 }
             } else {
                 DropdownMenuItem(
-                    text = { Text("Arrow keys") },
+                    text = { Text("Swipe for arrow keys") },
                     onClick = {
                         close()
                         onToggleArrowKeys()

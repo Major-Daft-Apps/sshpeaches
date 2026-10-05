@@ -68,16 +68,6 @@ object KeyboardLayoutDefaults {
         (1..12).map(::functionKeyAction) +
         textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
 
-    // Earlier defaults; a layout still equal to one of them was never customized and moves to
-    // DEFAULT_SLOTS. Newest first: Fn in slot 2 with Swipe Nav, then the original with Alt.
-    private val PREVIOUS_DEFAULT_SLOTS: List<KeyboardSlotAction> = DEFAULT_SLOTS.toMutableList().apply {
-        this[1] = fnKeyAction()
-        this[6] = textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav")
-    }
-    private val ORIGINAL_DEFAULT_SLOTS: List<KeyboardSlotAction> = PREVIOUS_DEFAULT_SLOTS.toMutableList().apply {
-        this[1] = modifierAction(KeyboardModifier.ALT, "Alt")
-    }
-
     val modifierPresets: List<KeyboardSlotAction> = listOf(
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
         modifierAction(KeyboardModifier.ALT, "Alt"),
@@ -235,14 +225,27 @@ object KeyboardLayoutDefaults {
     fun normalizeSlots(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> {
         if (slots.isEmpty()) return DEFAULT_SLOTS
         val visibleSlots = if (slots.size > SLOT_COUNT) slots.takeLast(SLOT_COUNT) else slots
-        val migrated = if (visibleSlots == PREVIOUS_DEFAULT_SLOTS || visibleSlots == ORIGINAL_DEFAULT_SLOTS) {
-            DEFAULT_SLOTS
-        } else {
-            visibleSlots
-        }
         return List(SLOT_COUNT) { index ->
-            val action = migrated.getOrNull(index) ?: DEFAULT_SLOTS.getOrNull(index) ?: emptyAction()
+            val action = visibleSlots.getOrNull(index) ?: DEFAULT_SLOTS.getOrNull(index) ?: emptyAction()
             applyLegacyIconAlias(action)
+        }
+    }
+
+    /**
+     * One-time move for layouts saved before 0.11.3: swipe arrows are toggled from the session ⋮
+     * menu now, so the Swipe Nav key becomes Fn. A Fn key elsewhere becomes Alt when the layout has
+     * no Alt, which turns both earlier defaults into DEFAULT_SLOTS; other keys are left alone.
+     */
+    fun replaceSwipeNavWithFn(slots: List<KeyboardSlotAction>): List<KeyboardSlotAction> {
+        val swipeIndex = slots.indexOfFirst { it.iconId == "swipe_nav" }
+        if (swipeIndex < 0) return slots
+        val hasAlt = slots.any { it.type == KeyboardActionType.MODIFIER && it.modifier == KeyboardModifier.ALT }
+        return slots.mapIndexed { index, slot ->
+            when {
+                index == swipeIndex -> fnKeyAction()
+                !hasAlt && slot.iconId in setOf("fn", "fn_active") -> modifierAction(KeyboardModifier.ALT, "Alt")
+                else -> slot
+            }
         }
     }
 

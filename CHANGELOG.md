@@ -4,6 +4,13 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.3 (1103)
+
+Release date: 2026-10-05
+
+- Keyboards saved before this update that still had the swipe-arrows key now show Fn in its place, and a Fn key elsewhere becomes Alt. Swiping for arrow keys is switched on from the session ⋮ menu. A Swipe Nav key added back in the Keyboard Editor stays.
+- The ⋮ menu item "Arrow keys" is now "Swipe for arrow keys".
+
 ## 0.11.2 (1102)
 
 Release date: 2026-10-04

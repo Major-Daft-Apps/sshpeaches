@@ -15,7 +15,7 @@ class HelpContentTest {
         "Local port", "Destination host", "Destination port", "Associated host", "Enable now",
         "Export via file", "Export via QR", "Import via file", "Import via QR",
         "Include passwords and private keys", "Export passphrase", "Startup snippet", "Terminal profile",
-        "Font Size", "Mosh server command", "Arrow keys", "Insert password", "Change theme", "Find",
+        "Font Size", "Mosh server command", "Swipe for arrow keys", "Insert password", "Change theme", "Find",
         "Snippets", "Reset", "Keyboard Editor", "Theme Editor", "Port Forwards", "Identities"
     )
 

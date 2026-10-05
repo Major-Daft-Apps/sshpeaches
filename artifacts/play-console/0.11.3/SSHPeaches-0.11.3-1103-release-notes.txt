@@ -1,0 +1,4 @@
+What's new in 0.11.3
+
+- Fn now replaces the swipe-arrows key on keyboards saved before this update.
+- Swipe arrows are toggled from the ⋮ menu: "Swipe for arrow keys".
