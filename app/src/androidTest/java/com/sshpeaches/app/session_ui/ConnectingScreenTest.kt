@@ -68,6 +68,7 @@ import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
 import com.majordaftapps.sshpeaches.app.service.ConnectionFailureKind
+import com.majordaftapps.sshpeaches.app.diagnostics.ProblemReport
 import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
@@ -1501,6 +1502,69 @@ class ConnectingScreenTest {
             check(editedHostIds == listOf("saved-host")) { "Edit host opened $editedHostIds" }
             check(identitiesOpened == 1) { "Identities opened $identitiesOpened times" }
             check(messages == listOf("Connection log copied")) { "Messages: $messages" }
+        }
+    }
+
+    @Test
+    fun failedConnection_sendToDeveloperShowsAScrubbedPreviewAndSendsOnlyOnConfirm() {
+        val sent = mutableListOf<ProblemReport>()
+        val messages = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH).copy(host = "homeserver.lan", username = "alice"),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.ERROR,
+                        message = "failed to connect to /192.168.1.20 (port 2222): ECONNREFUSED",
+                        failureKind = ConnectionFailureKind.REFUSED
+                    ),
+                    logs = listOf(
+                        SessionLogBus.Entry(
+                            hostId = "session-ssh",
+                            level = SessionLogBus.LogLevel.ERROR,
+                            message = "Connecting to homeserver.lan (192.168.1.20) as alice"
+                        )
+                    ),
+                    shellOutput = "",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = {},
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    onShowMessage = { messages += it },
+                    findRequestToken = 0,
+                    onSendProblemReport = { report -> sent += report; Result.success(Unit) }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_FAILURE_SEND_REPORT).performScrollTo().performClick()
+        composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_DIALOG).assertIsDisplayed()
+        val preview = composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_PREVIEW).fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        listOf("homeserver", "alice", "192.168.1.20").forEach { secret ->
+            check(!preview.contains(secret)) { "Preview leaked $secret: $preview" }
+        }
+        check(preview.contains("REFUSED")) { "Preview is missing the failure kind: $preview" }
+        composeRule.runOnIdle { check(sent.isEmpty()) { "Sent before the user confirmed" } }
+
+        composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_NOTE).performTextInput("Worked yesterday")
+        composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_SEND).performClick()
+        composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_DIALOG).assertDoesNotExist()
+        composeRule.runOnIdle {
+            check(sent.size == 1 && sent.single().note == "Worked yesterday") { "Sent: $sent" }
+            check(messages == listOf("Report sent. Thank you!")) { "Messages: $messages" }
         }
     }
 

@@ -48,6 +48,7 @@ import androidx.compose.runtime.DisposableEffect
 import com.majordaftapps.sshpeaches.app.transfer.LanTransferPeer
 import com.majordaftapps.sshpeaches.app.transfer.LanTransferBrowser
 import com.majordaftapps.sshpeaches.app.transfer.LanTransferAdvertiser
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import com.majordaftapps.sshpeaches.app.transfer.LanTransfer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -254,7 +255,10 @@ fun SettingsScreen(
         scope.launch {
                 val message = withContext(Dispatchers.Default) {
                     runCatching { onImportFromQrPayload(contents, passphrase) }
-                        .getOrElse { "Import failed: ${it.message ?: it.javaClass.simpleName}" }
+                        .getOrElse {
+                            TelemetryInitializer.recordNonFatal("import", it)
+                            "Import failed: ${it.message ?: it.javaClass.simpleName}"
+                        }
                 }
                 transferWorking.value = false
                 onShowMessage(message)
@@ -336,7 +340,10 @@ fun SettingsScreen(
                         is LanTransfer.WrongCodeException -> error.message
                         is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.NoRouteToHostException ->
                             "Couldn't reach that phone. Check both are on the same Wi-Fi and it still shows the code."
-                        else -> "Wi-Fi transfer failed: ${error.message ?: error.javaClass.simpleName}"
+                        else -> {
+                            TelemetryInitializer.recordNonFatal("wifi_receive", error)
+                            "Wi-Fi transfer failed: ${error.message ?: error.javaClass.simpleName}"
+                        }
                     }
                 }
             }
@@ -369,6 +376,7 @@ fun SettingsScreen(
                     onShowMessage("No phone connected within 5 minutes.")
                 } catch (error: Exception) {
                     if (wifiSender.value != null) {
+                        TelemetryInitializer.recordNonFatal("wifi_send", error)
                         onShowMessage("Wi-Fi transfer failed: ${error.message ?: error.javaClass.simpleName}")
                     }
                 } finally {
@@ -1059,7 +1067,7 @@ fun SettingsScreen(
                     Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
                     SettingsToggleRow(
                         title = "Crash reports",
-                        description = "Send anonymous crash details",
+                        description = "Send anonymous crash and error reports, with the screens and session steps that led to them. Host names, addresses, usernames, and file paths are removed.",
                         checked = crashReportsEnabled,
                         onCheckedChange = onCrashReportsToggle
                     )
@@ -1071,7 +1079,7 @@ fun SettingsScreen(
                     )
                     SettingsToggleRow(
                         title = "Session diagnostics",
-                        description = "Capture local session logs for troubleshooting. Not uploaded.",
+                        description = "Add detailed SSH and terminal diagnostics to the connection log. Logs stay on this phone unless you choose Send to developer.",
                         checked = diagnosticsLoggingEnabled,
                         onCheckedChange = onDiagnosticsToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)

@@ -99,6 +99,8 @@ import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
+import net.schmizz.sshj.sftp.SFTPException
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import net.schmizz.sshj.userauth.UserAuthException
 import com.majordaftapps.sshpeaches.app.data.ssh.INTERACTIVE_LOGIN_TIMEOUT_MS
 import com.majordaftapps.sshpeaches.app.data.ssh.LoginCanceledException
@@ -672,6 +674,8 @@ class SessionService : Service() {
                 }
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
                 connectionTranscriptEnabled.set(false)
+                TelemetryInitializer.breadcrumb("session active mode=$mode mosh=$useMoshTransport tmux=${sessionHost.attachTmux}")
+                TelemetryInitializer.setState("open_sessions", activeJobs.size.toString())
                 UiDebugLog.result("startSession", true, "sessionId=$sessionId, mode=$mode")
                 if (mode != ConnectionMode.SSH && currentCoroutineContext().isActive) {
                     detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
@@ -749,6 +753,7 @@ class SessionService : Service() {
                 activeForwardBindings = emptyList()
                 reconnectAttempt += 1
                 reconnectReason = retryReason
+                TelemetryInitializer.breadcrumb("session reconnect attempt=$reconnectAttempt mode=$mode")
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = sessionId,
@@ -763,6 +768,22 @@ class SessionService : Service() {
             reconnectingSessions.remove(sessionId)
             attempt.onFailure { e ->
                 if (e !is CancellationException) {
+                    val kind = e.connectionFailureKind()
+                    TelemetryInitializer.breadcrumb("session failed mode=$mode kind=${kind ?: "unclassified"}")
+                    if (kind == null) {
+                        reportUnexpected(
+                            "session_failed",
+                            sessionId,
+                            e,
+                            context = mapOf(
+                                "session_mode" to mode.name,
+                                "session_auth" to host.preferredAuth.name,
+                                "session_mosh" to useMoshTransport.toString(),
+                                "session_reconnecting" to (reconnectReason != null).toString()
+                            ),
+                            host = host
+                        )
+                    }
                     clearHostKeyPromptsForHost(sessionId, trust = false)
                     clearPasswordPromptsForHost(sessionId, password = null)
                     val statusMessage = e.message ?: "Connection failed"
@@ -1406,6 +1427,17 @@ class SessionService : Service() {
                             } else {
                                 "${transfer.operationLabel} failed: ${error.message ?: "unknown error"}"
                             }
+                        )
+                    )
+                }
+                if (!cancelled) {
+                    reportUnexpected(
+                        "file_transfer",
+                        transfer.sessionId,
+                        error,
+                        context = mapOf(
+                            "transfer_mode" to transfer.initialProgress.mode.name,
+                            "transfer_direction" to transfer.initialProgress.direction.name
                         )
                     )
                 }
@@ -2089,6 +2121,10 @@ class SessionService : Service() {
             val bytes = sftp.open(path).use { file -> file.RemoteFileInputStream().use { it.readBytes() } }
             require(bytes.none { it == 0.toByte() }) { "This looks like a binary file, so it can't be edited here." }
             String(bytes, StandardCharsets.UTF_8)
+        }.onFailure { error ->
+            if (error !is IllegalArgumentException && error !is IllegalStateException) {
+                reportUnexpected("editor_read", hostId, error)
+            }
         }
     }
 
@@ -2107,10 +2143,33 @@ class SessionService : Service() {
                     message = "Saved $path (${bytes.size} bytes)"
                 )
             )
+        }.onFailure { error ->
+            if (error !is IllegalStateException) reportUnexpected("editor_write", hostId, error)
         }
     }
 
     private fun sftpPartialDirectory(): File = File(cacheDir, "sftp-partial")
+
+    private fun telemetrySecrets(hostId: String, host: HostConnection? = activeConnections[hostId]?.host): List<String?> =
+        listOf(host?.host, host?.username, host?.name)
+
+    /**
+     * Sends an error to crash reporting (when the user allows it) only if it looks like our bug:
+     * not a cancellation, a network problem, a login or host-key failure, or the server refusing
+     * a file operation. Scrubbed of hosts, users, addresses, and paths.
+     */
+    private fun reportUnexpected(
+        action: String,
+        hostId: String,
+        error: Throwable,
+        context: Map<String, String> = emptyMap(),
+        host: HostConnection? = activeConnections[hostId]?.host
+    ) {
+        if (error is CancellationException || error is FileTransferCancelledException) return
+        if (error.connectionFailureKind() != null) return
+        if (generateSequence(error) { it.cause }.take(8).any { it is SFTPException }) return
+        TelemetryInitializer.recordNonFatal(action, error, context, telemetrySecrets(hostId, host))
+    }
 
     private fun hasSftpTransport(hostId: String): Boolean =
         activeConnections[hostId]?.let { it.sftpBinding?.client != null || it.client != null } == true
@@ -2132,6 +2191,7 @@ class SessionService : Service() {
     }
 
     private fun reportSftpOperationFailure(hostId: String, error: Throwable) {
+        reportUnexpected("sftp_operation", hostId, error)
         SessionLogBus.emit(
             SessionLogBus.Entry(
                 hostId = hostId,
@@ -3422,6 +3482,7 @@ class SessionService : Service() {
         val outputProcessor = TerminalOutputProcessor(
             appendToTerminal = terminalEngine::appendIncoming,
             onParserFailure = { error ->
+                TelemetryInitializer.recordNonFatal("terminal_parser", error)
                 emitShellLifecycleDiagnostic(
                     hostId,
                     "Terminal parser error: ${error::class.java.simpleName}: ${error.message ?: "unknown error"}"

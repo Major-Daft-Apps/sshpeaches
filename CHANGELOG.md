@@ -10,6 +10,10 @@ Release date: 2026-10-05
 
 - Keyboards saved before this update that still had the swipe-arrows key now show Fn in its place, and a Fn key elsewhere becomes Alt. Swiping for arrow keys is switched on from the session ⋮ menu. A Swipe Nav key added back in the Keyboard Editor stays.
 - The ⋮ menu item "Arrow keys" is now "Swipe for arrow keys".
+- Fixed an occasional freeze at app start (ANR) caused by Firebase Performance Monitoring reading its config on the main thread; Performance Monitoring is removed.
+- With Crash reports on, crash reports now include the screens and session steps leading up to them, and unexpected errors in sessions, file transfers, imports, and the editor are reported without crashing. Host names, addresses, usernames, and file paths are removed first.
+- A failed connection offers Send to developer: it shows exactly what will be sent (app version, the error, and the connection log with host names, addresses, usernames, and paths removed), plus an optional note, and sends only when you tap Send. Session logs otherwise stay on the phone.
+- Data-collection switches now each do exactly what they say: Usage analytics alone controls Firebase Analytics (Send usage reports no longer kept it on), turning off Crash reports also discards reports not yet sent, and debug builds no longer switch them all back on at launch. Session diagnostics now says what it does: detailed SSH and terminal logs kept on the phone.
 - Servers that ask extra login questions (keyboard-interactive, such as PAM or a 2FA verification code) now show the question in a dialog. The saved password still answers the password question, and a mistyped password now counts as one failed attempt instead of two.
 - SSH terminals reconnect on their own when the network drops or changes (for example Wi-Fi to mobile data), keeping the screen. Turn it off in Settings → Background Sessions → Reconnect automatically. Mosh sessions and the file browser behave as before.
 - New per-host Attach to tmux option opens tmux session "sshpeaches" when the shell starts (falling back to the normal shell if tmux isn't installed), so a reconnect returns to the same shell.

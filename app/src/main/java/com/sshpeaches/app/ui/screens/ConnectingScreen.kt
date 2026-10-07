@@ -188,6 +188,8 @@ import com.majordaftapps.sshpeaches.app.service.FileTransferDirection
 import com.majordaftapps.sshpeaches.app.service.FileTransferProgress
 import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.sftpDirectoryRefreshKey
+import com.majordaftapps.sshpeaches.app.diagnostics.ProblemReport
+import com.majordaftapps.sshpeaches.app.diagnostics.ProblemReportSender
 import com.majordaftapps.sshpeaches.app.ui.help.ConnectionFailureHelp
 import com.majordaftapps.sshpeaches.app.ui.help.FailureHelpAction
 import com.majordaftapps.sshpeaches.app.ui.help.connectionFailureHelp
@@ -330,6 +332,7 @@ fun ConnectingScreen(
     snippetsToken: Int = 0,
     onEditHost: (String) -> Unit = {},
     onOpenIdentities: () -> Unit = {},
+    onSendProblemReport: suspend (ProblemReport) -> Result<Unit> = { ProblemReportSender.send(it) },
     resetToken: Int = 0,
     onArrowKeysEnabledChange: (Boolean) -> Unit = {},
     confirmPasswordInsert: Boolean = true,
@@ -456,6 +459,7 @@ fun ConnectingScreen(
     var sftpCommandStartDirectoryKey by remember(request?.sessionId) { mutableStateOf("") }
     var swipeNavigationEnabled by remember(request?.sessionId) { mutableStateOf(false) }
     var showInsertPasswordConfirm by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
+    var problemReport by remember(request?.sessionId) { mutableStateOf<ProblemReport?>(null) }
     var swipeStart by remember(request?.sessionId) { mutableStateOf<SwipeGestureStart?>(null) }
     var swipeIntercepting by remember(request?.sessionId) { mutableStateOf(false) }
     var swipeRepeatJob by remember(request?.sessionId) { mutableStateOf<Job?>(null) }
@@ -1908,6 +1912,23 @@ fun ConnectingScreen(
                 onCopyLog = {
                     clipboardManager.setText(AnnotatedString(renderedLogs.joinToString("\n")))
                     onShowMessage("Connection log copied")
+                },
+                onSendReport = {
+                    val current = request ?: return@ConnectingStatusContent
+                    val help = connectionFailureHelp(
+                        state.failureKind, current.host, current.port, current.username, current.savedHostId != null
+                    )
+                    problemReport = ProblemReport.create(
+                        summary = "Connection failed: ${help.title}",
+                        details = mapOf(
+                            "Failure" to (state.failureKind?.name ?: "unclassified"),
+                            "Mode" to current.mode.name,
+                            "Authentication" to current.auth.name,
+                            "Message" to state.message
+                        ),
+                        log = renderedLogs,
+                        secrets = listOf(current.host, current.username)
+                    )
                 }
             )
         }
@@ -1920,6 +1941,17 @@ fun ConnectingScreen(
                     showSnippetPicker = false
                 },
                 onDismiss = { showSnippetPicker = false }
+            )
+        }
+        problemReport?.let { report ->
+            ProblemReportDialog(
+                report = report,
+                send = onSendProblemReport,
+                onSent = {
+                    problemReport = null
+                    onShowMessage("Report sent. Thank you!")
+                },
+                onDismiss = { problemReport = null }
             )
         }
         if (showInsertPasswordConfirm && showTerminalSession) {
@@ -3879,7 +3911,8 @@ private fun ConnectingStatusContent(
     listState: LazyListState,
     failureHelp: ConnectionFailureHelp? = null,
     onFailureHelpAction: (FailureHelpAction) -> Unit = {},
-    onCopyLog: () -> Unit = {}
+    onCopyLog: () -> Unit = {},
+    onSendReport: () -> Unit = {}
 ) {
     val colorScheme = MaterialTheme.colorScheme
     BoxWithConstraints(
@@ -3969,7 +4002,8 @@ private fun ConnectingStatusContent(
                         help = help,
                         canCopyLog = renderedLogs.isNotEmpty(),
                         onAction = onFailureHelpAction,
-                        onCopyLog = onCopyLog
+                        onCopyLog = onCopyLog,
+                        onSendReport = onSendReport
                     )
                 }
             }
@@ -3992,7 +4026,8 @@ private fun ConnectionFailureHelpCard(
     help: ConnectionFailureHelp,
     canCopyLog: Boolean,
     onAction: (FailureHelpAction) -> Unit,
-    onCopyLog: () -> Unit
+    onCopyLog: () -> Unit,
+    onSendReport: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -4040,6 +4075,12 @@ private fun ConnectionFailureHelpCard(
                     ) {
                         Text("Copy log")
                     }
+                }
+                OutlinedButton(
+                    onClick = onSendReport,
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_FAILURE_SEND_REPORT)
+                ) {
+                    Text("Send to developer")
                 }
             }
         }

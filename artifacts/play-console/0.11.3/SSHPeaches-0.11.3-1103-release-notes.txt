@@ -3,6 +3,7 @@ What's new in 0.11.3
 - SSH sessions reconnect on their own after Wi-Fi or mobile data changes.
 - Optional per-host tmux attach to get your shell back.
 - 2FA / verification-code logins.
-- File browser: edit text files, change permissions, tap the path, resume downloads.
+- File browser: edit files, change permissions, resume downloads.
 - Export over Wi-Fi, Bluetooth, or Quick Share; tap a received file to import.
 - Fn replaces the swipe-arrows key; "Swipe for arrow keys" is in the ⋮ menu.
+- Fixed a rare startup freeze; "Send to developer" on connection errors.

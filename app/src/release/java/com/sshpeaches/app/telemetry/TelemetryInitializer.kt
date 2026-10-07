@@ -6,7 +6,6 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.perf.FirebasePerformance
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +25,6 @@ object TelemetryInitializer {
     @Volatile private var usageReportsEnabled = false
     @Volatile private var crashlytics: FirebaseCrashlytics? = null
     @Volatile private var analytics: FirebaseAnalytics? = null
-    @Volatile private var performance: FirebasePerformance? = null
 
     fun initialize(application: Application) {
         if (initialized) return
@@ -50,14 +48,10 @@ object TelemetryInitializer {
         usageReportsEnabled = SettingsStore.getStartupUsageReportsEnabled()
 
         crashlytics = FirebaseCrashlytics.getInstance().also {
-            it.setCrashlyticsCollectionEnabled(crashReportsEnabled)
+            applyCrashReports(it, crashReportsEnabled)
         }
         analytics = FirebaseAnalytics.getInstance(application).also {
-            it.setAnalyticsCollectionEnabled(analyticsEnabled || usageReportsEnabled)
-            it.setUserProperty("usage_reports_opt_in", usageReportsEnabled.toString())
-        }
-        performance = FirebasePerformance.getInstance().also {
-            it.isPerformanceCollectionEnabled = analyticsEnabled
+            applyAnalytics(it, analyticsEnabled, usageReportsEnabled)
         }
 
         scope.launch {
@@ -71,22 +65,67 @@ object TelemetryInitializer {
                 crashReportsEnabled = crashEnabled
                 this@TelemetryInitializer.analyticsEnabled = analyticsEnabled
                 usageReportsEnabled = usageEnabled
-                crashlytics?.setCrashlyticsCollectionEnabled(crashEnabled)
-                analytics?.setAnalyticsCollectionEnabled(analyticsEnabled || usageEnabled)
-                analytics?.setUserProperty("usage_reports_opt_in", usageEnabled.toString())
-                performance?.isPerformanceCollectionEnabled = analyticsEnabled
+                crashlytics?.let { applyCrashReports(it, crashEnabled) }
+                analytics?.let { applyAnalytics(it, analyticsEnabled, usageEnabled) }
             }
         }
     }
 
-    fun recordNonFatal(action: String, throwable: Throwable) {
+    /**
+     * Reports an unexpected error that didn't crash the app. Only with "Crash reports" on, and
+     * scrubbed first: no host names, addresses, usernames, or paths ([secrets] adds known ones).
+     */
+    fun recordNonFatal(
+        action: String,
+        throwable: Throwable,
+        context: Map<String, String> = emptyMap(),
+        secrets: Collection<String?> = emptyList()
+    ) {
         if (!crashReportsEnabled) return
-        crashlytics?.setCustomKey("action", action)
-        crashlytics?.recordException(throwable)
+        val reporter = crashlytics ?: return
+        reporter.setCustomKey("action", action)
+        context.forEach { (key, value) -> reporter.setCustomKey(key, TelemetrySanitizer.scrub(value, secrets)) }
+        reporter.recordException(TelemetrySanitizer.sanitize(throwable, secrets))
     }
 
+    /** A scrubbed line in the log Crashlytics attaches to the next crash or non-fatal report. */
+    fun breadcrumb(event: String, secrets: Collection<String?> = emptyList()) {
+        if (!crashReportsEnabled) return
+        crashlytics?.log(TelemetrySanitizer.scrub(event, secrets))
+    }
+
+    /** App state attached to later reports, such as the number of open sessions. */
+    fun setState(key: String, value: String) {
+        if (!crashReportsEnabled) return
+        crashlytics?.setCustomKey(key, TelemetrySanitizer.scrub(value))
+    }
+
+    /**
+     * "Crash reports" off also discards reports recorded but not yet sent, so nothing collected
+     * before the switch leaves the phone afterwards.
+     */
+    private fun applyCrashReports(reporter: FirebaseCrashlytics, enabled: Boolean) {
+        reporter.setCrashlyticsCollectionEnabled(enabled)
+        if (!enabled) reporter.deleteUnsentReports()
+    }
+
+    /** "Usage analytics" alone controls Firebase Analytics; "Send usage reports" is the weekly upload. */
+    private fun applyAnalytics(analytics: FirebaseAnalytics, enabled: Boolean, usageReports: Boolean) {
+        analytics.setAnalyticsCollectionEnabled(enabled)
+        analyticsCollectionApplied = enabled
+        if (enabled) analytics.setUserProperty("usage_reports_opt_in", usageReports.toString())
+    }
+
+    @Volatile private var analyticsCollectionApplied: Boolean? = null
+
+    /** What each SDK was last told, for tests and support. Null where it isn't initialized. */
+    fun collectionState(): TelemetryCollectionState = TelemetryCollectionState(
+        crashReports = crashlytics?.isCrashlyticsCollectionEnabled,
+        analytics = analyticsCollectionApplied
+    )
+
     fun logUsageEvent(action: String) {
-        if (!analyticsEnabled && !usageReportsEnabled) return
+        if (!analyticsEnabled) return
         val sanitized = action
             .lowercase()
             .replace(Regex("[^a-z0-9_]"), "_")

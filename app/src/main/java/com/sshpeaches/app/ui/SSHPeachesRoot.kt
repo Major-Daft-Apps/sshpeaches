@@ -164,6 +164,7 @@ import com.majordaftapps.sshpeaches.app.ui.screens.AdvancedSettingsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
 import com.majordaftapps.sshpeaches.app.ui.help.HelpDestination
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HostsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.IdentitiesScreen
@@ -814,6 +815,10 @@ fun SSHPeachesRoot(
         onOpenSessionRequestHandled(targetHostId)
     }
 
+    LaunchedEffect(currentRoute) {
+        // Route names only (no arguments), so crash reports show where the user was.
+        TelemetryInitializer.breadcrumb("screen ${currentRoute.substringBefore('?')}")
+    }
     LaunchedEffect(requestedStartupRoute, backStackEntry?.destination?.route) {
         val startupRoute = requestedStartupRoute ?: return@LaunchedEffect
         if (backStackEntry == null) return@LaunchedEffect

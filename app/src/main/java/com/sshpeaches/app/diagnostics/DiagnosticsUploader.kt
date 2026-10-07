@@ -9,13 +9,15 @@ import java.nio.charset.StandardCharsets
 class DiagnosticsUploader(
     private val endpoint: String
 ) {
-    fun upload(bundle: DiagnosticsBundle, appCheckToken: String?): UploadResult {
+    fun upload(bundle: DiagnosticsBundle, appCheckToken: String?): UploadResult =
+        uploadJson(bundle.toJson().toString(), appCheckToken)
+
+    fun uploadJson(payload: String, appCheckToken: String?): UploadResult {
         if (endpoint.isBlank()) {
             return UploadResult.Skipped("Diagnostics endpoint not configured")
         }
         val url = runCatching { URL(endpoint) }.getOrNull()
             ?: return UploadResult.Failed("Invalid diagnostics endpoint URL")
-        val payload = bundle.toJson().toString()
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 10_000

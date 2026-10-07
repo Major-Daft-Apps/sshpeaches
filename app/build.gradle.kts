@@ -4,7 +4,6 @@ plugins {
     id("kotlin-kapt")
 	id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
-    id("com.google.firebase.firebase-perf")
 }
 
 import java.util.Properties
@@ -303,10 +302,7 @@ dependencies {
     releaseImplementation("com.google.firebase:firebase-crashlytics")
     releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
     releaseImplementation("com.google.firebase:firebase-analytics")
-    releaseImplementation("com.google.firebase:firebase-perf")
     releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
-    add("benchmarkImplementation", firebaseBom)
-    add("benchmarkImplementation", "com.google.firebase:firebase-perf")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Debug builds keep telemetry signals enabled locally without Firebase wiring.
+ * Debug builds have no Firebase: reports go to Logcat, following the same toggles as release.
  */
 object TelemetryInitializer {
     private const val TAG = "SSHPeachesTelemetry"
@@ -24,22 +24,6 @@ object TelemetryInitializer {
     fun initialize(application: Application) {
         if (initialized) return
         initialized = true
-
-        crashReportsEnabled = true
-        analyticsEnabled = true
-        usageReportsEnabled = true
-
-        Log.i(
-            TAG,
-            "Debug telemetry forcing all local telemetry on; Firebase remains disabled in debug."
-        )
-
-        scope.launch {
-            SettingsStore.setCrashReportsEnabled(true)
-            SettingsStore.setAnalyticsEnabled(true)
-            SettingsStore.setDiagnosticsEnabled(true)
-            SettingsStore.setUsageReportsEnabled(true)
-        }
 
         scope.launch {
             combine(
@@ -60,13 +44,31 @@ object TelemetryInitializer {
         }
     }
 
-    fun recordNonFatal(action: String, throwable: Throwable) {
+    fun recordNonFatal(
+        action: String,
+        throwable: Throwable,
+        context: Map<String, String> = emptyMap(),
+        secrets: Collection<String?> = emptyList()
+    ) {
         if (!crashReportsEnabled) return
-        Log.e(TAG, "Debug non-fatal [$action]", throwable)
+        Log.e(TAG, "Debug non-fatal [$action] $context", TelemetrySanitizer.sanitize(throwable, secrets))
     }
 
+    fun breadcrumb(event: String, secrets: Collection<String?> = emptyList()) {
+        if (!crashReportsEnabled) return
+        Log.i(TAG, "Breadcrumb: ${TelemetrySanitizer.scrub(event, secrets)}")
+    }
+
+    fun setState(key: String, value: String) {
+        if (!crashReportsEnabled) return
+        Log.i(TAG, "State $key=${TelemetrySanitizer.scrub(value)}")
+    }
+
+    fun collectionState(): TelemetryCollectionState =
+        TelemetryCollectionState(crashReports = crashReportsEnabled, analytics = analyticsEnabled)
+
     fun logUsageEvent(action: String) {
-        if (!analyticsEnabled && !usageReportsEnabled) return
+        if (!analyticsEnabled) return
         Log.i(TAG, "Debug usage event [$action]")
     }
 }
