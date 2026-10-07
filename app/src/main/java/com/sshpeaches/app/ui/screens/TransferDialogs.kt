@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,7 +51,7 @@ import com.majordaftapps.sshpeaches.app.transfer.LanTransfer
 import com.majordaftapps.sshpeaches.app.transfer.LanTransferPeer
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
-enum class TransferMethod { FILE, QR, WIFI }
+enum class TransferMethod { FILE, QR, WIFI, SHARE }
 
 internal fun renderQrBitmap(text: String, size: Int = 640): Bitmap? = runCatching {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size)
@@ -91,8 +92,9 @@ internal fun TransferMethodDialog(
                     option(TransferMethod.FILE, Icons.Default.Description, "File", "Save a file you can copy or back up.", UiTestTags.SETTINGS_EXPORT_FILE_BUTTON)
                     option(TransferMethod.QR, Icons.Default.QrCode2, "QR code", "Show a code for another phone to scan. Best for a few hosts.", UiTestTags.SETTINGS_EXPORT_QR_BUTTON)
                     option(TransferMethod.WIFI, Icons.Default.Wifi, "Wi-Fi", "Send to a phone on the same network. Any size.", UiTestTags.SETTINGS_EXPORT_WIFI_BUTTON)
+                    option(TransferMethod.SHARE, Icons.Default.Share, "Share", "Send the file with Bluetooth, Quick Share, email, or another app.", UiTestTags.SETTINGS_EXPORT_SHARE_BUTTON)
                 } else {
-                    option(TransferMethod.FILE, Icons.Default.Description, "File", "Open an SSHPeaches export file.", UiTestTags.SETTINGS_IMPORT_FILE_BUTTON)
+                    option(TransferMethod.FILE, Icons.Default.Description, "File", "Open an SSHPeaches export file, such as one received over Bluetooth.", UiTestTags.SETTINGS_IMPORT_FILE_BUTTON)
                     option(TransferMethod.QR, Icons.Default.QrCodeScanner, "QR code", "Scan the code shown by another phone.", UiTestTags.SETTINGS_IMPORT_QR_BUTTON)
                     option(TransferMethod.WIFI, Icons.Default.Wifi, "Wi-Fi", "Receive from a phone on the same network.", UiTestTags.SETTINGS_IMPORT_WIFI_BUTTON)
                 }

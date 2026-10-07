@@ -168,7 +168,9 @@ fun SettingsScreen(
     onImportFromQrPayload: (String, String?) -> String = { _, _ -> "Invalid export payload." },
     onShowMessage: (String) -> Unit = {},
     corePermissions: List<CorePermissionStatus> = emptyList(),
-    onManagePermissions: () -> Unit = {}
+    onManagePermissions: () -> Unit = {},
+    incomingImportUri: String? = null,
+    onIncomingImportHandled: () -> Unit = {}
 ) {
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
@@ -262,6 +264,8 @@ fun SettingsScreen(
         val exportQrBitmap = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
         val exportToFile = rememberSaveable { mutableStateOf(false) }
         val exportToWifi = rememberSaveable { mutableStateOf(false) }
+        val exportToShare = rememberSaveable { mutableStateOf(false) }
+        val incomingImport = remember { mutableStateOf<Pair<String, String>?>(null) } // name to contents
         val transferChooser = rememberSaveable { mutableStateOf<String?>(null) } // "export" / "import"
         val showWifiReceive = rememberSaveable { mutableStateOf(false) }
         val wifiReceiving = remember { mutableStateOf(false) }
@@ -288,6 +292,32 @@ fun SettingsScreen(
                 importPassphraseError.value = null
             } else {
                 runImport(contents, null)
+            }
+        }
+
+        fun shareExport(payload: String) {
+            scope.launch {
+                val uri = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val directory = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+                        directory.listFiles()?.forEach { it.delete() }
+                        val file = java.io.File(directory, "sshpeaches-export.json")
+                        file.writeText(payload)
+                        androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.exports", file)
+                    }.getOrNull()
+                }
+                if (uri == null) {
+                    onShowMessage("Couldn't prepare the export file.")
+                    return@launch
+                }
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("application/json")
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                send.clipData = android.content.ClipData.newRawUri("sshpeaches-export.json", uri)
+                runCatching {
+                    context.startActivity(android.content.Intent.createChooser(send, "Share SSHPeaches export"))
+                }.onFailure { onShowMessage("No app can share files on this device.") }
             }
         }
 
@@ -347,6 +377,39 @@ fun SettingsScreen(
                     wifiSender.value = null
                     wifiSend.value = null
                 }
+            }
+        }
+
+        LaunchedEffect(incomingImportUri, isLocked) {
+            val uriText = incomingImportUri ?: return@LaunchedEffect
+            if (isLocked) return@LaunchedEffect
+            val uri = android.net.Uri.parse(uriText)
+            val read = withContext(Dispatchers.IO) {
+                runCatching {
+                    val name = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                        ?: uri.lastPathSegment
+                        ?: "export file"
+                    val contents = context.contentResolver.openInputStream(uri)?.use { input ->
+                        // Exports are small; refuse anything absurd rather than read it into memory.
+                        val buffer = java.io.ByteArrayOutputStream()
+                        val chunk = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(chunk)
+                            if (read < 0) break
+                            buffer.write(chunk, 0, read)
+                            require(buffer.size() <= MAX_IMPORT_FILE_BYTES) { "too large" }
+                        }
+                        buffer.toString(Charsets.UTF_8.name())
+                    }.orEmpty()
+                    name to contents
+                }.getOrNull()
+            }
+            onIncomingImportHandled()
+            if (read == null || read.second.isBlank()) {
+                onShowMessage("Couldn't read that file.")
+            } else {
+                incomingImport.value = read
             }
         }
 
@@ -1164,8 +1227,10 @@ fun SettingsScreen(
                     if (direction == "export") {
                         exportToFile.value = method == TransferMethod.FILE
                         exportToWifi.value = method == TransferMethod.WIFI
+                        exportToShare.value = method == TransferMethod.SHARE
                         showTransferDialog.value = true
                     } else when (method) {
+                        TransferMethod.SHARE -> Unit
                         TransferMethod.FILE -> openImportFileLauncher.launch(
                             arrayOf("application/json", "text/plain", "text/*", "*/*")
                         )
@@ -1178,6 +1243,29 @@ fun SettingsScreen(
                         }
                     }
                 }
+            )
+        }
+        incomingImport.value?.takeIf { !isLocked }?.let { (name, contents) ->
+            AlertDialog(
+                onDismissRequest = { incomingImport.value = null },
+                modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_DIALOG),
+                title = { Text("Import this file?") },
+                text = {
+                    Text(
+                        "\"$name\" will be imported into SSHPeaches. Hosts, keys, and settings in it are " +
+                            "merged with what you have; newer local changes are kept."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            incomingImport.value = null
+                            handleReceivedPayload(contents)
+                        },
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_CONFIRM)
+                    ) { Text("Import") }
+                },
+                dismissButton = { TextButton(onClick = { incomingImport.value = null }) { Text("Cancel") } }
             )
         }
         wifiSend.value?.let { sending ->
@@ -1221,6 +1309,7 @@ fun SettingsScreen(
                     Text(
                         when {
                             exportToWifi.value -> "Send over Wi-Fi"
+                            exportToShare.value -> "Share export"
                             exportToFile.value -> "Export to file"
                             else -> "Export data"
                         }
@@ -1348,6 +1437,10 @@ fun SettingsScreen(
                                 sendOverWifi(payload)
                                 return@launch
                             }
+                            if (exportToShare.value) {
+                                shareExport(payload)
+                                return@launch
+                            }
                             if (exportToFile.value) {
                                 pendingExportPayload.value = payload
                                 createExportFileLauncher.launch("sshpeaches-export.json")
@@ -1366,6 +1459,7 @@ fun SettingsScreen(
                         when {
                             transferWorking.value -> "Working…"
                             exportToWifi.value -> "Start"
+                            exportToShare.value -> "Share"
                             exportToFile.value -> "Save file"
                             else -> "Generate QR"
                         }
@@ -1664,3 +1758,4 @@ private fun SettingsToggleRow(
 private data class WifiSendState(val host: String, val port: Int, val code: String, val qr: android.graphics.Bitmap?)
 
 private const val WIFI_TRANSFER_TIMEOUT_MS = 5 * 60 * 1000
+private const val MAX_IMPORT_FILE_BYTES = 32 * 1024 * 1024

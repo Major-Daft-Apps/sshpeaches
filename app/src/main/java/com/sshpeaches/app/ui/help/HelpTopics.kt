@@ -154,12 +154,12 @@ val helpTopics: List<HelpTopic> = listOf(
         id = "transfer",
         question = "How do I move my hosts and keys to a new phone?",
         steps = listOf(
-            "On the old phone: Settings → Export, then choose Wi-Fi (both phones on the same network), QR code, or File.",
+            "On the old phone: Settings → Export, then choose Wi-Fi (both phones on the same network), QR code, File, or Share (Bluetooth, Quick Share, email).",
             "Turn on Include passwords and private keys to bring secrets too, and set an Export passphrase.",
-            "On the new phone: Settings → Import and choose the same method. For Wi-Fi, scan the code the old phone shows."
+            "On the new phone: Settings → Import and choose the same method. For Wi-Fi, scan the code the old phone shows. A shared file opens SSHPeaches when you tap it."
         ),
         destination = HelpDestination.SETTINGS,
-        keywords = listOf("backup", "export", "import", "restore", "new phone", "qr", "wifi", "wi-fi", "local network")
+        keywords = listOf("backup", "export", "import", "restore", "new phone", "qr", "wifi", "wi-fi", "local network", "bluetooth", "quick share", "nearby share")
     ),
     HelpTopic(
         id = "openssh-import",

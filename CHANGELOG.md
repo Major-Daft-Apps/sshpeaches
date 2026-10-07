@@ -14,7 +14,7 @@ Release date: 2026-10-05
 - SSH terminals reconnect on their own when the network drops or changes (for example Wi-Fi to mobile data), keeping the screen. Turn it off in Settings → Background Sessions → Reconnect automatically. Mosh sessions and the file browser behave as before.
 - New per-host Attach to tmux option opens tmux session "sshpeaches" when the shell starts (falling back to the normal shell if tmux isn't installed), so a reconnect returns to the same shell.
 - File browser: Edit small text files in an in-app editor that saves back to the server, change Permissions (chmod), jump to a parent folder from the clickable path, and resume a download that failed partway by downloading the same file again.
-- Settings now has one Export and one Import button, each offering File, QR code, or Wi-Fi. Wi-Fi sends to another phone on the same local network only, encrypted with a one-time code shown on the sending phone; the receiving phone finds it automatically or scans its QR code.
+- Settings now has one Export and one Import button. Export offers File, QR code, Wi-Fi, or Share (Bluetooth, Quick Share, email, or any app); Import offers File, QR code, or Wi-Fi, and tapping a received export file opens SSHPeaches and asks before importing it. Wi-Fi sends to another phone on the same local network only, encrypted with a one-time code shown on the sending phone; the receiving phone finds it automatically or scans its QR code.
 
 ## 0.11.2 (1102)
 

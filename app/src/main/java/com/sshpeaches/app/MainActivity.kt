@@ -83,6 +83,8 @@ class MainActivity : FragmentActivity() {
     private val requestedOpenSessionHostId = mutableStateOf<String?>(null)
     private val requestedOpenSessionFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
     private val requestedStartupRoute = mutableStateOf<String?>(null)
+    /** An export file another app (Bluetooth, Quick Share, a file manager) asked us to open. */
+    private val incomingImportUri = mutableStateOf<String?>(null)
     private val pendingWidgetConnectHostId = mutableStateOf<String?>(null)
     private val pendingWidgetConnectMode = mutableStateOf<ConnectionMode?>(null)
     private val pendingWidgetConnectFileTransferEntryMode = mutableStateOf<FileTransferEntryMode?>(null)
@@ -801,6 +803,9 @@ class MainActivity : FragmentActivity() {
                         },
                         onStartupRouteHandled = {
                         requestedStartupRoute.value = null
+                        },
+                        onIncomingImportHandled = {
+                        incomingImportUri.value = null
                         }
                     ),
                     runtime = SSHPeachesRootRuntime(
@@ -817,7 +822,8 @@ class MainActivity : FragmentActivity() {
                         requestedOpenSessionId = requestedOpenSessionHostId.value,
                         requestedOpenSessionFileTransferEntryMode = requestedOpenSessionFileTransferEntryMode.value,
                         corePermissions = corePermissions,
-                        requestedStartupRoute = requestedStartupRoute.value
+                        requestedStartupRoute = requestedStartupRoute.value,
+                        incomingImportUri = incomingImportUri.value
                     )
                 )
             }
@@ -832,6 +838,7 @@ class MainActivity : FragmentActivity() {
             requestedOpenSessionFileTransferEntryMode.value?.name
         )
         outState.putString(STATE_REQUESTED_STARTUP_ROUTE, requestedStartupRoute.value)
+        outState.putString(STATE_INCOMING_IMPORT_URI, incomingImportUri.value)
         outState.putString(STATE_PENDING_WIDGET_HOST_ID, pendingWidgetConnectHostId.value)
         outState.putString(STATE_PENDING_WIDGET_MODE, pendingWidgetConnectMode.value?.name)
         outState.putString(STATE_PENDING_WIDGET_SESSION_ID, pendingWidgetConnectSessionId.value)
@@ -928,6 +935,18 @@ class MainActivity : FragmentActivity() {
             ?.takeIf(::isSupportedStartupRoute)
             ?.let { requestedStartupRoute.value = it }
         when (intent?.action) {
+            Intent.ACTION_VIEW, Intent.ACTION_SEND -> {
+                @Suppress("DEPRECATION")
+                val uri = intent.data ?: intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                if (uri == null || uri.scheme !in setOf("content", "file")) {
+                    UiDebugLog.result("handleImportFileIntent", false, "no-file")
+                    return
+                }
+                incomingImportUri.value = uri.toString()
+                requestedStartupRoute.value = Routes.SETTINGS
+                UiDebugLog.result("handleImportFileIntent", true, "scheme=${uri.scheme}")
+            }
+
             SessionService.ACTION_OPEN_SESSION -> {
                 val hostId = intent.getStringExtra(SessionService.EXTRA_HOST_ID).orEmpty()
                 if (hostId.isBlank()) {
@@ -984,6 +1003,7 @@ class MainActivity : FragmentActivity() {
         requestedStartupRoute.value =
             savedInstanceState.getString(STATE_REQUESTED_STARTUP_ROUTE)
                 ?.takeIf(::isSupportedStartupRoute)
+        incomingImportUri.value = savedInstanceState.getString(STATE_INCOMING_IMPORT_URI)
         pendingWidgetConnectHostId.value =
             savedInstanceState.getString(STATE_PENDING_WIDGET_HOST_ID)
         pendingWidgetConnectMode.value =
@@ -1129,6 +1149,7 @@ class MainActivity : FragmentActivity() {
         private const val STATE_REQUESTED_OPEN_SESSION_FILE_TRANSFER_ENTRY_MODE =
             "state_requested_open_session_file_transfer_entry_mode"
         private const val STATE_REQUESTED_STARTUP_ROUTE = "state_requested_startup_route"
+        private const val STATE_INCOMING_IMPORT_URI = "state_incoming_import_uri"
         private const val STATE_PENDING_WIDGET_HOST_ID = "state_pending_widget_host_id"
         private const val STATE_PENDING_WIDGET_MODE = "state_pending_widget_mode"
         private const val STATE_PENDING_WIDGET_SESSION_ID = "state_pending_widget_session_id"

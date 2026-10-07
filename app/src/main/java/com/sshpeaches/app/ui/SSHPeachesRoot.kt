@@ -318,6 +318,7 @@ data class SSHPeachesRootActions(
     val onRequestCorePermissions: () -> Unit,
     val onOpenAppPermissionSettings: () -> Unit,
     val onStartupRouteHandled: () -> Unit,
+    val onIncomingImportHandled: () -> Unit = {},
     val onCancelFileTransfer: (String) -> Unit = {}
 )
 
@@ -335,7 +336,8 @@ data class SSHPeachesRootRuntime(
     val requestedOpenSessionId: String?,
     val requestedOpenSessionFileTransferEntryMode: FileTransferEntryMode? = null,
     val corePermissions: List<CorePermissionStatus>,
-    val requestedStartupRoute: String? = null
+    val requestedStartupRoute: String? = null,
+    val incomingImportUri: String? = null
 )
 
 internal fun quickConnectUiStateFromSnapshot(
@@ -470,6 +472,8 @@ fun SSHPeachesRoot(
     val onRequestCorePermissions = actions.onRequestCorePermissions
     val onOpenAppPermissionSettings = actions.onOpenAppPermissionSettings
     val onStartupRouteHandled = actions.onStartupRouteHandled
+    val onIncomingImportHandled = actions.onIncomingImportHandled
+    val incomingImportUri = runtime.incomingImportUri
     val resolveTerminalEmulator = runtime.resolveTerminalEmulator
     val resolveRuntimeSessionPassword = runtime.resolveRuntimeSessionPassword
     val sessionServiceReady = runtime.sessionServiceReady
@@ -2432,6 +2436,8 @@ fun SSHPeachesRoot(
                     }
                         composable(Routes.SETTINGS) {
                             SettingsScreen(
+                                incomingImportUri = incomingImportUri,
+                                onIncomingImportHandled = onIncomingImportHandled,
                                 currentTheme = uiState.themeMode,
                                 shellLayoutMode = shellLayoutMode,
                                 onThemeChange = onThemeModeChange,
