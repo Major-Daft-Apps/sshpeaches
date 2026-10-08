@@ -22,6 +22,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -463,7 +464,7 @@ class ConnectingScreenTest {
     }
 
     @Test
-    fun builtInKeyboard_keyboardButtonAndTap_showSoftKeyboard() {
+    fun builtInKeyboard_keyboardKeyAndTapsShowInAppKeyboardNotSystemKeyboard() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
         composeRule.setContent {
@@ -499,15 +500,70 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
-        hideTerminalKeyboardForTest(device)
+        // Built-in mode opens SSHPeaches' own keyboard, never the system one.
+        waitForInAppKeyboard(shown = true)
+        assertTerminalKeyboardRequested(device)
+        check(!device.isSoftKeyboardShown()) { "System keyboard opened in built-in keyboard mode" }
 
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
-        assertTerminalKeyboardRequested(device)
+        waitForInAppKeyboard(shown = false)
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+        waitForInAppKeyboard(shown = true)
 
         hideTerminalKeyboardForTest(device)
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).performTouchInput { click() }
+        waitForInAppKeyboard(shown = true)
 
+        hideTerminalKeyboardForTest(device)
         doubleTapTerminalPanel()
+        waitForInAppKeyboard(shown = true)
         assertTerminalKeyboardRequested(device)
+        check(!device.isSoftKeyboardShown()) { "System keyboard opened in built-in keyboard mode" }
+    }
+
+    @Test
+    fun builtInKeyboard_inAppKeysTypeLettersSymbolsAndModifiers() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "user@host:~$ ",
+            useBuiltInKeyboard = true,
+            onSendShellBytes = { sentPayloads += it.copyOf() }
+        )
+        waitForInAppKeyboard(shown = true)
+        fun tap(id: String) = composeRule.onNodeWithTag(UiTestTags.inAppKey(id)).performClick()
+        fun sent(): String = sentPayloads.fold(ByteArray(0)) { all, payload -> all + payload }
+            .toString(StandardCharsets.UTF_8)
+
+        listOf("l", "s", "space", "-", "l").forEach(::tap)
+        tap("enter")
+        composeRule.runOnIdle { check(sent() == "ls -l\r") { "typed ${sent()}" } }
+
+        sentPayloads.clear()
+        tap("shift")
+        tap("a")
+        tap("a")
+        composeRule.runOnIdle { check(sent() == "Aa") { "Shift should apply to one letter: ${sent()}" } }
+
+        sentPayloads.clear()
+        tap("symbols")
+        listOf("1", "$", "/").forEach(::tap)
+        tap("more_symbols")
+        listOf("|", "~").forEach(::tap)
+        tap("letters")
+        tap("backspace")
+        composeRule.runOnIdle { check(sent() == "1$/|~\u007F") { "symbols sent ${sent()}" } }
+
+        // Long-pressing the top row types its digit.
+        sentPayloads.clear()
+        composeRule.onNodeWithTag(UiTestTags.inAppKey("q")).performTouchInput { longClick() }
+        composeRule.runOnIdle { check(sent() == "1") { "long-press q sent ${sent()}" } }
+
+        // The extra rows' Ctrl applies to the next in-app key.
+        sentPayloads.clear()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        tap("c")
+        tap("c")
+        composeRule.runOnIdle { check(sent() == "\u0003c") { "Ctrl+C sent ${sent()}" } }
     }
 
     @Test
@@ -993,15 +1049,18 @@ class ConnectingScreenTest {
         )
 
         assertTerminalKeyboardRequested(device)
-        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+        waitForInAppKeyboard(shown = true)
 
+        // Back closes the in-app keyboard first, and does not leave the session.
         device.pressBack()
-        composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }
-        waitForAppImeVisibility(visible = false)
+        waitForInAppKeyboard(shown = false)
+        check(!isTerminalKeyboardRequested()) { "Back left the keyboard requested" }
+        composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).assertIsDisplayed()
 
-        // A single press must reopen it; previously the stale request made this press a no-op.
+        // A single press must reopen it.
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
-        composeRule.waitUntil(10_000) { device.isSoftKeyboardShown() }
+        waitForInAppKeyboard(shown = true)
+        check(!device.isSoftKeyboardShown()) { "System keyboard opened in built-in keyboard mode" }
     }
 
     @Test
@@ -2544,6 +2603,10 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.connectingScpRemoteRow(file)).performClick()
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_ACTIONS_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingScpAction("edit")).performClick()
+        // The file is read and the editor's grammars load in the background.
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.CONNECTING_SCP_EDITOR_TEXT).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_SCP_EDITOR_TEXT)
             .assertTextContains("worker_processes 1;", substring = true)
             .performTextReplacement("worker_processes 2;\n")
@@ -3132,7 +3195,19 @@ class ConnectingScreenTest {
         composeRule.waitForIdle()
     }
 
+    private fun isInAppKeyboardShown(): Boolean =
+        composeRule.onAllNodesWithTag(UiTestTags.IN_APP_KEYBOARD).fetchSemanticsNodes().isNotEmpty()
+
+    private fun waitForInAppKeyboard(shown: Boolean) {
+        composeRule.waitUntil(10_000) { isInAppKeyboardShown() == shown }
+    }
+
     private fun hideTerminalKeyboardForTest(device: UiDevice) {
+        if (isInAppKeyboardShown()) {
+            composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
+            composeRule.waitUntil(10_000) { !isInAppKeyboardShown() && !isTerminalKeyboardRequested() }
+            return
+        }
         if (device.isSoftKeyboardShown()) {
             device.pressBack()
             composeRule.waitUntil(10_000) { !device.isSoftKeyboardShown() }

@@ -14,3 +14,11 @@
 # use are kept through normal reachability.
 -keep class org.bouncycastle.jcajce.provider.** { *; }
 -keep class org.bouncycastle.jce.provider.** { *; }
+
+# Code editor: TextMate grammars/themes are parsed by reflection (Gson, tm4e) and the Oniguruma port
+# (joni/jcodings) loads encodings by class name.
+-keep class org.eclipse.tm4e.** { *; }
+-keep class io.github.rosemoe.sora.langs.textmate.** { *; }
+-keep class org.joni.** { *; }
+-keep class org.jcodings.** { *; }
+-dontwarn org.eclipse.jdt.annotation.**

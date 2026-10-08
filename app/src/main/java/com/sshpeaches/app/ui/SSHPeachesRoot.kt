@@ -163,6 +163,7 @@ import com.majordaftapps.sshpeaches.app.ui.navigation.drawerDestinations
 import com.majordaftapps.sshpeaches.app.ui.screens.AdvancedSettingsScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.ConnectingScreen
 import com.majordaftapps.sshpeaches.app.ui.screens.HelpScreen
+import com.majordaftapps.sshpeaches.app.ui.screens.AdvancedTerminalSettings
 import com.majordaftapps.sshpeaches.app.ui.help.HelpDestination
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import com.majordaftapps.sshpeaches.app.ui.screens.HomeScreen
@@ -1875,14 +1876,6 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 actions = {
-                                    if (!isSessionVerticalRoute) {
-                                        IconButton(
-                                            onClick = { showQuickConnect.value = true },
-                                            modifier = Modifier.testTag(UiTestTags.DRAWER_QUICK_CONNECT)
-                                        ) {
-                                            Icon(Icons.Default.PlayArrow, contentDescription = "Quick Connect")
-                                        }
-                                    }
                                     if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
                                             val sessionId = activeSessionRequest.sessionId
@@ -1996,6 +1989,15 @@ fun SSHPeachesRoot(
                                             ) {
                                                 Icon(Icons.Default.Add, contentDescription = "Add snippet")
                                             }
+                                        }
+                                    }
+                                    // Quick Connect stays the rightmost button on every screen that shows it.
+                                    if (!isSessionVerticalRoute) {
+                                        IconButton(
+                                            onClick = { showQuickConnect.value = true },
+                                            modifier = Modifier.testTag(UiTestTags.DRAWER_QUICK_CONNECT)
+                                        ) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = "Quick Connect")
                                         }
                                     }
                                 }
@@ -2458,12 +2460,6 @@ fun SSHPeachesRoot(
                                 onLockTimeoutChange = onLockTimeoutChange,
                                 customLockTimeoutMinutes = uiState.customLockTimeoutMinutes,
                                 onCustomLockTimeoutMinutesChange = onCustomLockTimeoutMinutesChange,
-                                snippetRunTimeoutSeconds = uiState.snippetRunTimeoutSeconds,
-                                onSnippetRunTimeoutSecondsChange = onSnippetRunTimeoutSecondsChange,
-                                terminalEmulation = uiState.terminalEmulation,
-                                onTerminalEmulationChange = onTerminalEmulationChange,
-                                terminalSelectionMode = uiState.terminalSelectionMode,
-                                onTerminalSelectionModeChange = onTerminalSelectionModeChange,
                                 terminalBellMode = uiState.terminalBellMode,
                                 onTerminalBellModeChange = onTerminalBellModeChange,
                                 useVolumeButtonsToAdjustFontSize = uiState.terminalVolumeButtonsAdjustFontSize,
@@ -2474,10 +2470,6 @@ fun SSHPeachesRoot(
                                 onConfirmPasswordInsertToggle = onConfirmPasswordInsertToggle,
                                 autoReconnect = uiState.autoReconnect,
                                 onAutoReconnectToggle = onAutoReconnectToggle,
-                                terminalMarginPx = uiState.terminalMarginPx,
-                                onTerminalMarginPxChange = onTerminalMarginPxChange,
-                                moshServerCommand = uiState.moshServerCommand,
-                                onMoshServerCommandChange = onMoshServerCommandChange,
                                 crashReportsEnabled = uiState.crashReportsEnabled,
                                 onCrashReportsToggle = onCrashReportsToggle,
                                 analyticsEnabled = uiState.analyticsEnabled,
@@ -2518,7 +2510,21 @@ fun SSHPeachesRoot(
                                 onParallelDownloadsChange = onParallelDownloadsChange,
                                 onApplySftpFastPreset = onApplySftpFastPreset,
                                 onRestoreDefaultSettings = onRestoreDefaultSettings,
-                                onShowMessage = showMessage
+                                onShowMessage = showMessage,
+                                terminalSettings = {
+                                    AdvancedTerminalSettings(
+                                        terminalEmulation = uiState.terminalEmulation,
+                                        onTerminalEmulationChange = onTerminalEmulationChange,
+                                        terminalSelectionMode = uiState.terminalSelectionMode,
+                                        onTerminalSelectionModeChange = onTerminalSelectionModeChange,
+                                        terminalMarginPx = uiState.terminalMarginPx,
+                                        onTerminalMarginPxChange = onTerminalMarginPxChange,
+                                        moshServerCommand = uiState.moshServerCommand,
+                                        onMoshServerCommandChange = onMoshServerCommandChange,
+                                        snippetRunTimeoutSeconds = uiState.snippetRunTimeoutSeconds,
+                                        onSnippetRunTimeoutSecondsChange = onSnippetRunTimeoutSecondsChange
+                                    )
+                                }
                             )
                         }
                         composable(Routes.OPEN_SOURCE_LICENSES) {

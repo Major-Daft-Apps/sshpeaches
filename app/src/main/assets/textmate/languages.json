@@ -1,0 +1,83 @@
+{
+ "languages": [
+  {
+   "name": "shellscript",
+   "scopeName": "source.shell",
+   "grammar": "textmate/shell/shell-unix-bash.tmLanguage.json",
+   "languageConfiguration": "textmate/shell/language-configuration.json"
+  },
+  {
+   "name": "json",
+   "scopeName": "source.json",
+   "grammar": "textmate/json/JSON.tmLanguage.json",
+   "languageConfiguration": "textmate/json/language-configuration.json"
+  },
+  {
+   "name": "yaml",
+   "scopeName": "source.yaml",
+   "grammar": "textmate/yaml/yaml.tmLanguage.json",
+   "languageConfiguration": "textmate/yaml/language-configuration.json"
+  },
+  {
+   "name": "yaml-1.0",
+   "scopeName": "source.yaml.1.0",
+   "grammar": "textmate/yaml/yaml-1.0.tmLanguage.json"
+  },
+  {
+   "name": "yaml-1.1",
+   "scopeName": "source.yaml.1.1",
+   "grammar": "textmate/yaml/yaml-1.1.tmLanguage.json"
+  },
+  {
+   "name": "yaml-1.2",
+   "scopeName": "source.yaml.1.2",
+   "grammar": "textmate/yaml/yaml-1.2.tmLanguage.json"
+  },
+  {
+   "name": "yaml-1.3",
+   "scopeName": "source.yaml.1.3",
+   "grammar": "textmate/yaml/yaml-1.3.tmLanguage.json"
+  },
+  {
+   "name": "yaml-embedded",
+   "scopeName": "source.yaml.embedded",
+   "grammar": "textmate/yaml/yaml-embedded.tmLanguage.json"
+  },
+  {
+   "name": "ini",
+   "scopeName": "source.ini",
+   "grammar": "textmate/ini/ini.tmLanguage.json",
+   "languageConfiguration": "textmate/ini/ini.language-configuration.json"
+  },
+  {
+   "name": "python",
+   "scopeName": "source.python",
+   "grammar": "textmate/python/MagicPython.tmLanguage.json",
+   "languageConfiguration": "textmate/python/language-configuration.json"
+  },
+  {
+   "name": "javascript",
+   "scopeName": "source.js",
+   "grammar": "textmate/javascript/JavaScript.tmLanguage.json",
+   "languageConfiguration": "textmate/javascript/javascript-language-configuration.json"
+  },
+  {
+   "name": "xml",
+   "scopeName": "text.xml",
+   "grammar": "textmate/xml/xml.tmLanguage.json",
+   "languageConfiguration": "textmate/xml/xml.language-configuration.json"
+  },
+  {
+   "name": "markdown",
+   "scopeName": "text.html.markdown",
+   "grammar": "textmate/markdown/markdown.tmLanguage.json",
+   "languageConfiguration": "textmate/markdown/language-configuration.json"
+  },
+  {
+   "name": "dockerfile",
+   "scopeName": "source.dockerfile",
+   "grammar": "textmate/docker/docker.tmLanguage.json",
+   "languageConfiguration": "textmate/docker/language-configuration.json"
+  }
+ ]
+}

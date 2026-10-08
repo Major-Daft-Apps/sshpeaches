@@ -156,7 +156,8 @@ class HostsBrowserTest {
         composeRule.onNodeWithTag(UiTestTags.HOST_EXPORT_PASSWORD_CONFIRM_INPUT).performTextInput("peaches-pass")
         composeRule.onNodeWithTag(UiTestTags.HOST_EXPORT_PASSWORD_CONFIRM_BUTTON).performClick()
 
-        waitForTag(UiTestTags.HOST_QR_DIALOG)
+        // Encrypting the export runs PBKDF2, which is slow on the emulator.
+        waitForTag(UiTestTags.HOST_QR_DIALOG, timeoutMillis = 30_000)
         composeRule.onNodeWithText("Share ${host.name}").assertIsDisplayed()
     }
 
@@ -192,8 +193,8 @@ class HostsBrowserTest {
         }
     }
 
-    private fun waitForTag(tag: String) {
-        composeRule.waitUntil(5_000) {
+    private fun waitForTag(tag: String, timeoutMillis: Long = 5_000) {
+        composeRule.waitUntil(timeoutMillis) {
             composeRule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
     }

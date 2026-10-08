@@ -122,12 +122,6 @@ fun SettingsScreen(
     onLockTimeoutChange: (LockTimeout) -> Unit,
     customLockTimeoutMinutes: Int,
     onCustomLockTimeoutMinutesChange: (Int) -> Unit,
-    snippetRunTimeoutSeconds: Int,
-    onSnippetRunTimeoutSecondsChange: (Int) -> Unit,
-    terminalEmulation: TerminalEmulation,
-    onTerminalEmulationChange: (TerminalEmulation) -> Unit,
-    terminalSelectionMode: TerminalSelectionMode,
-    onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
     terminalBellMode: TerminalBellMode,
     onTerminalBellModeChange: (TerminalBellMode) -> Unit,
     useVolumeButtonsToAdjustFontSize: Boolean,
@@ -138,10 +132,6 @@ fun SettingsScreen(
     onConfirmPasswordInsertToggle: (Boolean) -> Unit,
     autoReconnect: Boolean,
     onAutoReconnectToggle: (Boolean) -> Unit,
-    terminalMarginPx: Int,
-    onTerminalMarginPxChange: (Int) -> Unit,
-    moshServerCommand: String,
-    onMoshServerCommandChange: (String) -> Unit,
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -176,7 +166,6 @@ fun SettingsScreen(
     val expanded = remember { mutableStateOf(false) }
     val lockExpanded = remember { mutableStateOf(false) }
     val backgroundTimeoutExpanded = remember { mutableStateOf(false) }
-    val terminalExpanded = remember { mutableStateOf(false) }
     val bellExpanded = remember { mutableStateOf(false) }
     val showTransferDialog = rememberSaveable { mutableStateOf(false) }
     val themeOptions = listOf(
@@ -228,13 +217,11 @@ fun SettingsScreen(
         BackgroundSessionTimeout.ONE_HOUR,
         BackgroundSessionTimeout.FOREVER
     )
-    val terminalOptions = listOf(TerminalEmulation.XTERM, TerminalEmulation.VT100)
     val bellOptions = listOf(
         TerminalBellMode.DISABLED,
         TerminalBellMode.VIBRATE_DEVICE,
         TerminalBellMode.SHOW_NOTIFICATION
     )
-    val selectionOptions = listOf(TerminalSelectionMode.NATURAL, TerminalSelectionMode.BLOCK)
     val showPinDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
     val pinRevealIndex = remember { mutableIntStateOf(-1) }
@@ -243,9 +230,6 @@ fun SettingsScreen(
     val confirmPinRevealIndex = remember { mutableIntStateOf(-1) }
     val showDisablePinDialog = remember { mutableStateOf(false) }
     val customMinutesState = rememberPersistedField(customLockTimeoutMinutes.toString())
-    val snippetTimeoutState = rememberPersistedField(snippetRunTimeoutSeconds.toString())
-    val terminalMarginState = rememberPersistedField(terminalMarginPx.toString())
-    val moshServerCommandState = rememberPersistedField(moshServerCommand)
     val scope = rememberCoroutineScope()
     val transferWorking = remember { mutableStateOf(false) }
 
@@ -683,73 +667,6 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Terminal", style = MaterialTheme.typography.titleMedium)
                     ExposedDropdownMenuBox(
-                        expanded = terminalExpanded.value,
-                        onExpandedChange = { terminalExpanded.value = !terminalExpanded.value }
-                    ) {
-                        TextField(
-                            value = terminalEmulation.label,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Emulation mode") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = terminalExpanded.value) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                                .testTag(UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = terminalExpanded.value,
-                            onDismissRequest = { terminalExpanded.value = false }
-                        ) {
-                            terminalOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    modifier = Modifier.testTag(
-                                        UiTestTags.settingsTerminalOption(option.label)
-                                    ),
-                                    text = { Text(option.label) },
-                                    onClick = {
-                                        terminalExpanded.value = false
-                                        onTerminalEmulationChange(option)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        "xterm is the default and recommended mode.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = terminalMarginState.value,
-                        onValueChange = { next ->
-                            val digits = next.filter { it.isDigit() }.take(3)
-                            terminalMarginState.value = digits
-                            if (digits.isEmpty()) {
-                                terminalMarginState.saved("0")
-                                onTerminalMarginPxChange(0)
-                            } else {
-                                val parsed = digits.toIntOrNull()
-                                if (parsed != null) {
-                                    val clamped = parsed.coerceIn(0, 128)
-                                    terminalMarginState.value = clamped.toString()
-                                    terminalMarginState.saved(clamped.toString())
-                                    onTerminalMarginPxChange(clamped)
-                                }
-                            }
-                        },
-                        label = { Text("Terminal margin (px)") },
-                        supportingText = {
-                            Text(
-                                "Adds space around the terminal content for screen protectors. Use 0 to disable. 8 or 16 is a good starting point."
-                            )
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT)
-                    )
-                    ExposedDropdownMenuBox(
                         expanded = bellExpanded.value,
                         onExpandedChange = { bellExpanded.value = !bellExpanded.value }
                     ) {
@@ -808,7 +725,7 @@ fun SettingsScreen(
                     }
                     SettingsToggleRow(
                         title = "Use built-in keyboard",
-                        description = "Show SSHPeaches extra keys (Esc, Ctrl, Fn, arrows) above the system keyboard, which opens automatically in terminal sessions. Tap the keyboard key to hide or show it.",
+                        description = "Type with SSHPeaches' own full keyboard (letters, symbols and the Esc, Ctrl, Fn and arrow keys) instead of your phone's keyboard. It opens in terminal sessions; tap the keyboard key or Back to hide it.",
                         checked = useBuiltInKeyboard,
                         onCheckedChange = onUseBuiltInKeyboardToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH)
@@ -820,54 +737,6 @@ fun SettingsScreen(
                         onCheckedChange = onConfirmPasswordInsertToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_CONFIRM_PASSWORD_INSERT_SWITCH)
                     )
-                    OutlinedTextField(
-                        value = moshServerCommandState.value,
-                        onValueChange = { next ->
-                            moshServerCommandState.value = next
-                            moshServerCommandState.saved(next)
-                            onMoshServerCommandChange(next)
-                        },
-                        label = { Text("Mosh server command") },
-                        supportingText = {
-                            Text(
-                                "Command executed on the remote host to start mosh-server. Leave blank to use the default: $DEFAULT_MOSH_SERVER_COMMAND"
-                            )
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            keyboardType = KeyboardType.Text
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT)
-                    )
-                    Text(
-                        "Selection mode",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    selectionOptions.forEach { option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = terminalSelectionMode == option,
-                                onClick = { onTerminalSelectionModeChange(option) }
-                            )
-                            Column(
-                                modifier = Modifier.padding(start = 8.dp)
-                            ) {
-                                Text(option.label)
-                                Text(
-                                    option.description,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
                 }
             }
                 }
@@ -1020,31 +889,6 @@ fun SettingsScreen(
             }
                 }
                 if (SettingsCategory.AUTOMATION in visibleCategories) {
-            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Snippets", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = snippetTimeoutState.value,
-                        onValueChange = { next ->
-                            val digits = next.filter { it.isDigit() }.take(2)
-                            snippetTimeoutState.value = digits
-                            val parsed = digits.toIntOrNull()
-                            if (parsed != null) {
-                                val clamped = parsed.coerceIn(1, 60)
-                                snippetTimeoutState.value = clamped.toString()
-                                snippetTimeoutState.saved(clamped.toString())
-                                onSnippetRunTimeoutSecondsChange(clamped)
-                            }
-                        },
-                        label = { Text("Run timeout (seconds)") },
-                        supportingText = {
-                            Text("Used when running snippets on an open SSH session.")
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Port Forwards", style = MaterialTheme.typography.titleMedium)
@@ -1679,7 +1523,7 @@ fun SettingsScreen(
  * between; this keeps the typed text and only adopts a persisted value that is not an echo of one
  * of this field's own saves (e.g. a restore or import changed it).
  */
-private class PersistedFieldState(initial: String) {
+internal class PersistedFieldState(initial: String) {
     var value by mutableStateOf(initial)
     private val pendingSaves = ArrayDeque<String>()
 
@@ -1699,7 +1543,7 @@ private class PersistedFieldState(initial: String) {
 }
 
 @Composable
-private fun rememberPersistedField(persisted: String): PersistedFieldState {
+internal fun rememberPersistedField(persisted: String): PersistedFieldState {
     val state = remember { PersistedFieldState(persisted) }
     LaunchedEffect(persisted) { state.onPersisted(persisted) }
     return state

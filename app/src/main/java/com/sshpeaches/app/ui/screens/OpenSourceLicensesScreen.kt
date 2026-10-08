@@ -58,6 +58,12 @@ fun OpenSourceLicensesScreen() {
                 license = "GPL-3.0 + component licenses",
                 note = "Includes mosh, abseil-cpp, libc++, openssl, protobuf, ncurses, zlib, and libandroid-support for app-bundled runtime.",
                 projectUrl = "https://packages.termux.dev/"
+            ),
+            BundledNotice(
+                component = "Syntax grammars from Visual Studio Code",
+                license = "MIT",
+                note = "TextMate grammars and language configurations for shell, JSON, YAML, INI, Python, JavaScript, XML, Markdown, and Dockerfile, used by the code editor.",
+                projectUrl = "https://github.com/microsoft/vscode"
             )
         )
     }

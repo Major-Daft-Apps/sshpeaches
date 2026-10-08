@@ -100,7 +100,12 @@ fun MainActivityComposeRule.revealSettingsControl(
 
     waitUntil(10_000) { settingsScreenExists() || advancedScreenExists() }
     if (tag !in advancedSettingsControls && advancedScreenExists()) {
-        runCatching { Espresso.pressBack() }
+        // The first Back may only close the keyboard left open by a text field.
+        repeat(3) {
+            if (settingsScreenExists()) return@repeat
+            runCatching { Espresso.pressBack() }
+            waitForIdle()
+        }
         waitUntil(10_000) { settingsScreenExists() }
     }
     categoryTitle?.let(::openSettingsCategory)
@@ -190,11 +195,8 @@ private fun MainActivityComposeRule.revealDrawerNode(tag: String) {
 private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_THEME_MODE_FIELD -> "Appearance"
     UiTestTags.SETTINGS_BACKGROUND_SWITCH -> "Background"
-    UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD,
     UiTestTags.SETTINGS_TERMINAL_BELL_FIELD,
     UiTestTags.SETTINGS_TERMINAL_VOLUME_BUTTONS_SWITCH,
-    UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT,
-    UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT,
     UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH -> "Terminal"
     UiTestTags.SETTINGS_BIOMETRIC_SWITCH,
     UiTestTags.SETTINGS_PIN_STATUS_TEXT,
@@ -214,11 +216,17 @@ private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_SFTP_READ_SIZE_INPUT,
     UiTestTags.SETTINGS_SFTP_MAX_REQUESTS_INPUT,
     UiTestTags.SETTINGS_PARALLEL_DOWNLOADS_INPUT,
-    UiTestTags.SETTINGS_SFTP_FAST_SWITCH -> "Advanced"
+    UiTestTags.SETTINGS_SFTP_FAST_SWITCH,
+    UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD,
+    UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT,
+    UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT -> "Advanced"
     else -> null
 }
 
 private val advancedSettingsControls = setOf(
+    UiTestTags.SETTINGS_TERMINAL_EMULATION_FIELD,
+    UiTestTags.SETTINGS_TERMINAL_MARGIN_INPUT,
+    UiTestTags.SETTINGS_MOSH_SERVER_COMMAND_INPUT,
     UiTestTags.SETTINGS_RESTORE_DEFAULTS_BUTTON,
     UiTestTags.SETTINGS_SFTP_READ_SIZE_INPUT,
     UiTestTags.SETTINGS_SFTP_MAX_REQUESTS_INPUT,

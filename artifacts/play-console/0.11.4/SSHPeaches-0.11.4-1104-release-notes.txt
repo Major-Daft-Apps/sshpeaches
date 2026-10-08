@@ -1,0 +1,6 @@
+What's new in 0.11.4
+
+- Built-in keyboard mode now has its own full keyboard, so typing works even when your phone's keyboard won't open.
+- New code editor for snippets and remote files: VS Code syntax highlighting, line numbers, undo/redo, find, and a symbol row.
+- Quick Connect is always the rightmost top-bar button.
+- Less-used terminal options moved to Advanced settings.

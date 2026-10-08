@@ -17,6 +17,7 @@ import android.text.InputType
 import android.text.Selection
 import android.text.SpannableStringBuilder
 import android.text.TextWatcher
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.AppCompatEditText
@@ -195,6 +196,7 @@ import com.majordaftapps.sshpeaches.app.ui.help.FailureHelpAction
 import com.majordaftapps.sshpeaches.app.ui.help.connectionFailureHelp
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardActionType
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
+import com.majordaftapps.sshpeaches.app.ui.keyboard.InAppKeyboard
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardLayoutDefaults
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardModifier
 import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
@@ -467,7 +469,9 @@ fun ConnectingScreen(
     var isFnRowVisible by rememberSaveable(request?.sessionId, useBuiltInKeyboard) {
         mutableStateOf(false)
     }
-    val supportsSystemKeyboard = true
+    // Built-in mode draws SSHPeaches' own keyboard and never asks for the system one, which some
+    // vendor keyboards would not open for the terminal at all.
+    val supportsSystemKeyboard = !useBuiltInKeyboard
     var showFindDialog by remember(request?.sessionId) { mutableStateOf(false) }
     var findQuery by remember(request?.sessionId) { mutableStateOf("") }
     var findCaseSensitive by remember(request?.sessionId) { mutableStateOf(false) }
@@ -652,6 +656,7 @@ fun ConnectingScreen(
     fun hideSystemKeyboard() {
         if (!supportsSystemKeyboard) {
             keyboardVisibleRequested = false
+            keyboardController?.hide()
             return
         }
         terminalImeBridgeRef?.hideTerminalKeyboard()
@@ -663,7 +668,15 @@ fun ConnectingScreen(
 
     fun showSystemKeyboard() {
         if (!supportsSystemKeyboard) {
-            keyboardVisibleRequested = false
+            keyboardVisibleRequested = true
+            // A tap focuses the terminal view, which some devices answer by opening the system
+            // keyboard on top of ours; close it again.
+            rootView.post {
+                if (isImeShowing() && terminalViewRef?.hasFocus() == true) {
+                    (rootView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+                        ?.hideSoftInputFromWindow(rootView.windowToken, 0)
+                }
+            }
             return
         }
         runCatching { keyboardFocusRequester.requestFocus() }
@@ -674,7 +687,7 @@ fun ConnectingScreen(
 
     fun toggleSystemKeyboard() {
         if (!supportsSystemKeyboard) {
-            keyboardVisibleRequested = false
+            keyboardVisibleRequested = !keyboardVisibleRequested
             return
         }
         // Decide from what is on screen, not keyboardVisibleRequested: that flag stays set when the
@@ -695,8 +708,6 @@ fun ConnectingScreen(
     LaunchedEffect(keyboardVisibleRequested, terminalImeBridgeRef, supportsSystemKeyboard) {
         if (keyboardVisibleRequested && supportsSystemKeyboard) {
             terminalImeBridgeRef?.showTerminalKeyboard()
-        } else if (!supportsSystemKeyboard) {
-            keyboardVisibleRequested = false
         }
     }
     fun handleTerminalAndroidKeyEvent(event: KeyEvent): Boolean {
@@ -1071,8 +1082,8 @@ fun ConnectingScreen(
     }
     LaunchedEffect(state.phase, request?.sessionId, useBuiltInKeyboard) {
         if (showTerminalSession && useBuiltInKeyboard) {
-            // The built-in extra keys sit on top of the system keyboard, so open it as soon as the
-            // terminal is ready; otherwise users only see the extra-key row and cannot type.
+            // Open the in-app keyboard as soon as the terminal is ready; otherwise users only see
+            // the extra-key rows and cannot type.
             keyboardVisibleRequested = true
         } else {
             hideSystemKeyboard()
@@ -1502,9 +1513,7 @@ fun ConnectingScreen(
                 true
             }
             "keyboard" -> {
-                if (supportsSystemKeyboard) {
-                    toggleSystemKeyboard()
-                }
+                toggleSystemKeyboard()
                 true
             }
             "terminal" -> {
@@ -1745,6 +1754,24 @@ fun ConnectingScreen(
         }
     }
 
+    fun handleInAppKeyboardKey(keyCode: Int) {
+        val modifiers = pendingModifiers
+        terminalInput.sendVirtualKey(
+            keyCode = keyCode,
+            ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
+            altDown = modifiers.contains(KeyboardModifier.ALT),
+            shiftDown = modifiers.contains(KeyboardModifier.SHIFT)
+        )
+        if (modifiers.isNotEmpty()) {
+            pendingModifiers = emptySet()
+        }
+    }
+
+    // Back closes the in-app keyboard first, like it does the system one.
+    BackHandler(enabled = showTerminalSession && !supportsSystemKeyboard && keyboardVisibleRequested) {
+        keyboardVisibleRequested = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1771,6 +1798,7 @@ fun ConnectingScreen(
                 activeAliasIcons = activeAliasIcons,
                 onSendCompactKey = ::handleCompactKeyPress,
                 onImeTextInput = ::handleTerminalImeText,
+                onInAppKeyboardKey = ::handleInAppKeyboardKey,
                 keyboardVisibleRequested = keyboardVisibleRequested,
                 supportsSystemKeyboard = supportsSystemKeyboard,
                 keyboardFocusRequester = keyboardFocusRequester,
@@ -2002,6 +2030,7 @@ private fun ConnectingTerminalContent(
     activeAliasIcons: Set<String>,
     onSendCompactKey: (CompactTerminalKey) -> Unit,
     onImeTextInput: (String) -> Unit,
+    onInAppKeyboardKey: (Int) -> Unit,
     keyboardVisibleRequested: Boolean,
     supportsSystemKeyboard: Boolean,
     keyboardFocusRequester: FocusRequester,
@@ -2080,6 +2109,13 @@ private fun ConnectingTerminalContent(
                     onSendKey = onSendCompactKey,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (!supportsSystemKeyboard && keyboardVisibleRequested) {
+                    InAppKeyboard(
+                        onText = onImeTextInput,
+                        onKey = onInAppKeyboardKey,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 

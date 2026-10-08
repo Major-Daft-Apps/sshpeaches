@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+import com.majordaftapps.sshpeaches.app.ui.code.CodeEditorPane
+import com.majordaftapps.sshpeaches.app.ui.code.CodeLanguage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -144,10 +145,14 @@ fun SnippetEditorScreen(
                         .testTag(UiTestTags.SNIPPET_EDITOR_GROUP_INPUT)
                 )
                 Text("Command", style = MaterialTheme.typography.labelLarge)
-                ScriptEditorWithLineNumbers(
-                    value = command,
-                    onValueChange = { command = it },
-                    modifier = Modifier.fillMaxWidth()
+                CodeEditorPane(
+                    text = command,
+                    onTextChange = { command = it },
+                    language = CodeLanguage.SHELL,
+                    editorTestTag = UiTestTags.SNIPPET_EDITOR_COMMAND_INPUT,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(380.dp)
                 )
             }
         }
@@ -213,155 +218,5 @@ fun SnippetEditorScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun ScriptEditorWithLineNumbers(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val scrollState = rememberScrollState()
-    val textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-    val borderColor = MaterialTheme.colorScheme.outlineVariant
-    val surfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-    val minEditorHeight = 200.dp
-    val density = LocalDensity.current
-    val fallbackLineHeightPx = with(density) { textStyle.lineHeight.toPx() }
-    var textLayoutResult by remember(value) { mutableStateOf<TextLayoutResult?>(null) }
-    val lineBlocks = remember(value, textLayoutResult, fallbackLineHeightPx) {
-        buildSnippetLineBlocks(
-            value = value,
-            textLayoutResult = textLayoutResult,
-            fallbackLineHeightPx = fallbackLineHeightPx
-        )
-    }
-    val gutterWidth = remember(lineBlocks.size) {
-        val digits = lineBlocks.size.coerceAtLeast(1).toString().length
-        (digits * 10 + 20).dp
-    }
-
-    Box(
-        modifier = modifier
-            .heightIn(min = 220.dp, max = 520.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .background(surfaceColor, RoundedCornerShape(12.dp))
-            .padding(10.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(gutterWidth)
-                    .heightIn(min = minEditorHeight)
-            ) {
-                lineBlocks.forEachIndexed { index, block ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .offset(y = with(density) { block.topPx.toDp() })
-                            .height(with(density) { block.heightPx.toDp() }),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Text(
-                            text = "${index + 1}",
-                            style = textStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.End
-                        )
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = minEditorHeight)
-            ) {
-                if (value.isEmpty()) {
-                    Text(
-                        "Enter shell command script...",
-                        style = textStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        keyboardType = KeyboardType.Ascii,
-                        imeAction = ImeAction.Default,
-                        autoCorrect = false
-                    ),
-                    singleLine = false,
-                    onTextLayout = { textLayoutResult = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minEditorHeight)
-                        .testTag(UiTestTags.SNIPPET_EDITOR_COMMAND_INPUT)
-                )
-            }
-        }
-    }
-}
-
-private data class SnippetLineBlock(
-    val topPx: Float,
-    val heightPx: Float
-)
-
-private fun buildSnippetLineBlocks(
-    value: String,
-    textLayoutResult: TextLayoutResult?,
-    fallbackLineHeightPx: Float
-): List<SnippetLineBlock> {
-    val logicalLineCount = (value.count { it == '\n' } + 1).coerceAtLeast(1)
-    if (textLayoutResult == null) {
-        return List(logicalLineCount) { index ->
-            SnippetLineBlock(
-                topPx = index * fallbackLineHeightPx,
-                heightPx = fallbackLineHeightPx
-            )
-        }
-    }
-
-    val blocks = mutableListOf<SnippetLineBlock>()
-    var blockStartVisualLine = 0
-    for (visualLine in 0 until textLayoutResult.lineCount) {
-        val lineEndOffset = textLayoutResult.getLineEnd(visualLine, visibleEnd = false)
-        val endsLogicalLine = visualLine == textLayoutResult.lineCount - 1 ||
-            (lineEndOffset > 0 && value.getOrNull(lineEndOffset - 1) == '\n')
-        if (!endsLogicalLine) continue
-
-        val topPx = textLayoutResult.getLineTop(blockStartVisualLine)
-        val bottomPx = textLayoutResult.getLineBottom(visualLine)
-        blocks += SnippetLineBlock(
-            topPx = topPx,
-            heightPx = (bottomPx - topPx).coerceAtLeast(fallbackLineHeightPx)
-        )
-        blockStartVisualLine = visualLine + 1
-    }
-
-    if (blocks.size >= logicalLineCount) return blocks.take(logicalLineCount)
-
-    val trailingTop = blocks.lastOrNull()?.let { it.topPx + it.heightPx } ?: 0f
-    return buildList {
-        addAll(blocks)
-        repeat(logicalLineCount - blocks.size) { index ->
-            add(
-                SnippetLineBlock(
-                    topPx = trailingTop + (index * fallbackLineHeightPx),
-                    heightPx = fallbackLineHeightPx
-                )
-            )
-        }
     }
 }

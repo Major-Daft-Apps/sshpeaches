@@ -4,6 +4,16 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.4 (1104)
+
+Release date: 2026-10-08
+
+- Built-in keyboard mode now draws SSHPeaches' own full keyboard (letters, numbers, two symbol pages, Shift and caps lock, held Backspace repeat, long-press the top row for digits) under the Esc/Ctrl/Fn rows, instead of relying on the phone's keyboard, which on some devices never opened for the terminal. Latched Ctrl, Alt, and Shift from the extra rows apply to its keys; the keyboard key, a tap on the terminal, or Back shows and hides it. Hardware keyboards still work.
+- The snippet editor and the file browser's Edit now use a real code editor (Sora Editor) with Visual Studio Code's syntax grammars: highlighting for shell, JSON, YAML, config/INI, Python, JavaScript, XML, Markdown, and Dockerfile (picked from the file name or shebang), line numbers, auto-indent, bracket matching, undo/redo, find, word wrap, and a row of symbols that are hard to reach on phone keyboards. Colors follow the app's light and dark themes.
+- Quick Connect (▶) is now always the rightmost button in the top bar.
+- Less-used settings moved to Advanced settings: terminal emulation mode, selection mode, terminal margin, Mosh server command, and snippet run timeout.
+- Fixed Redo staying disabled after Undo in the editor.
+
 ## 0.11.3 (1103)
 
 Release date: 2026-10-05

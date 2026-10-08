@@ -68,7 +68,9 @@ docs/user-wiki/developer/Google-Play-Publish-Checklist.md
 /artifacts/0.11.0-enzu/mapping/mapping.txt
 /artifacts/0.11.2-enzu/mapping/mapping.txt
 /artifacts/0.11.3-enzu/mapping/mapping.txt
+/artifacts/0.11.4-enzu/mapping/mapping.txt
 /artifacts/play-console/0.11.0/SSHPeaches-0.11.0-1100-mapping.txt
 /artifacts/play-console/0.11.2/SSHPeaches-0.11.2-1102-mapping.txt
 /artifacts/play-console/0.11.3/SSHPeaches-0.11.3-1103-mapping.txt
+/artifacts/play-console/0.11.4/SSHPeaches-0.11.4-1104-mapping.txt
 *.kate-swp

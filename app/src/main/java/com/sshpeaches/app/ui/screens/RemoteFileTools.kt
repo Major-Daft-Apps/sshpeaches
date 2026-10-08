@@ -44,6 +44,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.majordaftapps.sshpeaches.app.ui.code.CodeEditorPane
+import com.majordaftapps.sshpeaches.app.ui.code.CodeLanguage
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import kotlinx.coroutines.launch
 
@@ -291,19 +293,12 @@ internal fun RemoteTextEditorDialog(
                     original == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                    else -> OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it; status = null },
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrect = false,
-                            keyboardType = KeyboardType.Ascii
-                        ),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)
-                            .testTag(UiTestTags.CONNECTING_SCP_EDITOR_TEXT)
+                    else -> CodeEditorPane(
+                        text = text,
+                        onTextChange = { text = it; status = null },
+                        language = remember(path) { CodeLanguage.detect(path, original.orEmpty()) },
+                        editorTestTag = UiTestTags.CONNECTING_SCP_EDITOR_TEXT,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }

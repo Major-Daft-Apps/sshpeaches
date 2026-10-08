@@ -127,7 +127,7 @@ fun connectionFailureHelp(
             title = "Mosh couldn't start on the server",
             tips = listOf(
                 "Install mosh on the server, for example: sudo apt install mosh.",
-                "If mosh-server isn't on the PATH, set its full path in Settings → Terminal → Mosh server command.",
+                "If mosh-server isn't on the PATH, set its full path in Settings → Advanced settings → Mosh server command.",
                 "Mosh also needs UDP ports 60000-61000 open on the server's firewall."
             ),
             actions = editHost

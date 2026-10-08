@@ -6,6 +6,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -148,6 +150,36 @@ class PlayStoreScreenshotsTest {
         composeRule.navigateDrawer(Routes.THEME_EDITOR)
         waitForTag(UiTestTags.SCREEN_THEME_EDITOR)
         capture("8-theme-editor")
+    }
+
+    @Test
+    fun z1_snippet_editor_light() = captureSnippetEditor(com.majordaftapps.sshpeaches.app.ui.state.ThemeMode.LIGHT, "z1-snippet-light")
+
+    @Test
+    fun z2_snippet_editor_dark() = captureSnippetEditor(com.majordaftapps.sshpeaches.app.ui.state.ThemeMode.DARK, "z2-snippet-dark")
+
+    private fun captureSnippetEditor(mode: com.majordaftapps.sshpeaches.app.ui.state.ThemeMode, name: String) {
+        AppStateSeeder.configureSettings(themeMode = mode)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.navigateDrawer(Routes.SNIPPETS)
+        composeRule.onNodeWithContentDescription("Add snippet").performClick()
+        waitForTag(UiTestTags.SNIPPET_EDITOR_COMMAND_INPUT)
+        Thread.sleep(2_000)
+        composeRule.onNodeWithTag(UiTestTags.SNIPPET_EDITOR_COMMAND_INPUT).performTextReplacement(
+            """#!/usr/bin/env bash
+# Rotate app logs and report disk use
+set -euo pipefail
+LOG_DIR="/var/log/app"
+for f in "${"$"}LOG_DIR"/*.log; do
+  if [ -s "${"$"}f" ]; then
+    gzip -9 "${"$"}f" && echo "rotated ${"$"}{f##*/}"
+  fi
+done
+df -h / | tail -n 1 | awk '{print ${"$"}5}'
+"""
+        )
+        Thread.sleep(1_500)
+        capture(name)
     }
 
     private fun seedLiveHost(name: String): HostConnection {
