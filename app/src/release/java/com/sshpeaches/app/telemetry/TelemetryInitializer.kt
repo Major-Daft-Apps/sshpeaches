@@ -82,6 +82,8 @@ object TelemetryInitializer {
         secrets: Collection<String?> = emptyList()
     ) {
         if (!crashReportsEnabled) return
+        // A cancelled coroutine is normal control flow, never a bug report.
+        if (throwable is java.util.concurrent.CancellationException) return
         val reporter = crashlytics ?: return
         reporter.setCustomKey("action", action)
         context.forEach { (key, value) -> reporter.setCustomKey(key, TelemetrySanitizer.scrub(value, secrets)) }

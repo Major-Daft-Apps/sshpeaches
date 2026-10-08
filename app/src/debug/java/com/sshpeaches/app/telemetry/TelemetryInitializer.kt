@@ -51,6 +51,8 @@ object TelemetryInitializer {
         secrets: Collection<String?> = emptyList()
     ) {
         if (!crashReportsEnabled) return
+        // A cancelled coroutine is normal control flow, never a bug report.
+        if (throwable is java.util.concurrent.CancellationException) return
         Log.e(TAG, "Debug non-fatal [$action] $context", TelemetrySanitizer.sanitize(throwable, secrets))
     }
 

@@ -580,6 +580,9 @@ class AppViewModel(
                 writeQueue.withLock { work() }
                 TelemetryInitializer.logUsageEvent(action)
                 logResult(action, true)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // The screen's scope ended (e.g. it closed mid-save); not an error.
+                throw cancelled
             } catch (t: Throwable) {
                 TelemetryInitializer.recordNonFatal(action, t)
                 UiDebugLog.error(action, t)
