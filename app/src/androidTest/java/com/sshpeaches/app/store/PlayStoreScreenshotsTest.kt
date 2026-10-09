@@ -8,6 +8,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -51,6 +53,10 @@ import org.junit.runner.RunWith
  * so no status bar appears and no device-global setting is changed. Session screenshots connect
  * to the live test SSH server (see LiveBackendConfig) whose sandbox holds the demo files.
  *
+ * Tablet screenshots: pass `-e storeWidth <px> -e storeHeight <px>` with the tablet's full
+ * screen size (9:16). The window then fills the screen, with the status bar hidden for this
+ * activity only and the navigation bar left in the picture, since there is no room beside them.
+ *
  * Output: <app files dir>/store-screenshots/<name>.png
  */
 @RunWith(AndroidJUnit4::class)
@@ -68,9 +74,18 @@ class PlayStoreScreenshotsTest {
 
     @Before
     fun useStoreWindowSize() {
+        val args = InstrumentationRegistry.getArguments()
+        val width = args.getString("storeWidth")?.toInt()
+        val height = args.getString("storeHeight")?.toInt()
         composeRule.runOnUiThread {
-            composeRule.activity.window.setLayout(STORE_WIDTH_PX, STORE_HEIGHT_PX)
-            composeRule.activity.window.setGravity(Gravity.CENTER)
+            val window = composeRule.activity.window
+            if (width != null && height != null) {
+                // Status bar only: hiding the navigation bar shows a "Viewing full screen" prompt.
+                WindowCompat.getInsetsController(window, window.decorView)
+                    .hide(WindowInsetsCompat.Type.statusBars())
+            }
+            window.setLayout(width ?: STORE_WIDTH_PX, height ?: STORE_HEIGHT_PX)
+            window.setGravity(Gravity.CENTER)
         }
         composeRule.waitForIdle()
     }
