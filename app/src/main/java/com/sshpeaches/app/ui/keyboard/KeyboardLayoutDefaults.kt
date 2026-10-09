@@ -68,151 +68,73 @@ object KeyboardLayoutDefaults {
         (1..12).map(::functionKeyAction) +
         textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
 
+    // The keyboard editor's choices, in its groups. Letters and digits (the phone keyboard has
+    // them), the numpad, and lock/system keys that send nothing to a terminal are not offered;
+    // layouts that already use them keep working.
     val modifierPresets: List<KeyboardSlotAction> = listOf(
         modifierAction(KeyboardModifier.CTRL, "Ctrl"),
         modifierAction(KeyboardModifier.ALT, "Alt"),
         modifierAction(KeyboardModifier.SHIFT, "Shift")
     )
 
-    val navigationPresets: List<KeyboardSlotAction> = listOf(
+    val keyPresets: List<KeyboardSlotAction> = listOf(
         keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
         keyAction("Tab", KeyEvent.KEYCODE_TAB),
-        keyAction("Enter", KeyEvent.KEYCODE_ENTER),
-        keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
-        keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME),
-        keyAction("End", KeyEvent.KEYCODE_MOVE_END),
-        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
-        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true),
-        keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
-        keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
-        keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
-        keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right")
-    )
-
-    val functionPresets: List<KeyboardSlotAction> = listOf(
-        functionKeyAction(1),
-        functionKeyAction(2),
-        functionKeyAction(3),
-        functionKeyAction(4),
-        functionKeyAction(5),
-        functionKeyAction(6),
-        functionKeyAction(7),
-        functionKeyAction(8),
-        functionKeyAction(9),
-        functionKeyAction(10),
-        functionKeyAction(11),
-        functionKeyAction(12)
-    )
-
-    val letterPresets: List<KeyboardSlotAction> = ('A'..'Z').map { ch ->
-        val keyCode = KeyEvent.KEYCODE_A + (ch.code - 'A'.code)
-        keyAction(ch.toString(), keyCode)
-    }
-
-    val digitPresets: List<KeyboardSlotAction> = ('0'..'9').map { ch ->
-        val keyCode = KeyEvent.KEYCODE_0 + (ch.code - '0'.code)
-        keyAction(ch.toString(), keyCode)
-    }
-
-    val punctuationPresets: List<KeyboardSlotAction> = listOf(
-        keyAction("`", KeyEvent.KEYCODE_GRAVE),
-        keyAction("~", KeyEvent.KEYCODE_GRAVE, shift = true),
-        keyAction("-", KeyEvent.KEYCODE_MINUS),
-        keyAction("_", KeyEvent.KEYCODE_MINUS, shift = true),
-        keyAction("=", KeyEvent.KEYCODE_EQUALS),
-        keyAction("+", KeyEvent.KEYCODE_EQUALS, shift = true),
-        keyAction("[", KeyEvent.KEYCODE_LEFT_BRACKET),
-        keyAction("{", KeyEvent.KEYCODE_LEFT_BRACKET, shift = true),
-        keyAction("]", KeyEvent.KEYCODE_RIGHT_BRACKET),
-        keyAction("}", KeyEvent.KEYCODE_RIGHT_BRACKET, shift = true),
-        keyAction("\\", KeyEvent.KEYCODE_BACKSLASH),
-        keyAction("|", KeyEvent.KEYCODE_BACKSLASH, shift = true),
-        keyAction(";", KeyEvent.KEYCODE_SEMICOLON),
-        keyAction(":", KeyEvent.KEYCODE_SEMICOLON, shift = true),
-        keyAction("'", KeyEvent.KEYCODE_APOSTROPHE),
-        keyAction("\"", KeyEvent.KEYCODE_APOSTROPHE, shift = true),
-        keyAction(",", KeyEvent.KEYCODE_COMMA),
-        keyAction("<", KeyEvent.KEYCODE_COMMA, shift = true),
-        keyAction(".", KeyEvent.KEYCODE_PERIOD),
-        keyAction(">", KeyEvent.KEYCODE_PERIOD, shift = true),
-        keyAction("/", KeyEvent.KEYCODE_SLASH),
-        keyAction("?", KeyEvent.KEYCODE_SLASH, shift = true)
-    )
-
-    val whitespaceEditingPresets: List<KeyboardSlotAction> = listOf(
-        keyAction("Space", KeyEvent.KEYCODE_SPACE),
-        keyAction("Tab", KeyEvent.KEYCODE_TAB),
+        keyAction("⇧Tab", KeyEvent.KEYCODE_TAB, shift = true),
         keyAction("Enter", KeyEvent.KEYCODE_ENTER),
         keyAction("Bksp", KeyEvent.KEYCODE_DEL, repeatable = true),
         keyAction("Delete", KeyEvent.KEYCODE_FORWARD_DEL, repeatable = true),
-        keyAction("Insert", KeyEvent.KEYCODE_INSERT)
-    )
-
-    val numpadPresets: List<KeyboardSlotAction> = listOf(
-        keyAction("Num0", KeyEvent.KEYCODE_NUMPAD_0),
-        keyAction("Num1", KeyEvent.KEYCODE_NUMPAD_1),
-        keyAction("Num2", KeyEvent.KEYCODE_NUMPAD_2),
-        keyAction("Num3", KeyEvent.KEYCODE_NUMPAD_3),
-        keyAction("Num4", KeyEvent.KEYCODE_NUMPAD_4),
-        keyAction("Num5", KeyEvent.KEYCODE_NUMPAD_5),
-        keyAction("Num6", KeyEvent.KEYCODE_NUMPAD_6),
-        keyAction("Num7", KeyEvent.KEYCODE_NUMPAD_7),
-        keyAction("Num8", KeyEvent.KEYCODE_NUMPAD_8),
-        keyAction("Num9", KeyEvent.KEYCODE_NUMPAD_9),
-        keyAction("Num+", KeyEvent.KEYCODE_NUMPAD_ADD),
-        keyAction("Num-", KeyEvent.KEYCODE_NUMPAD_SUBTRACT),
-        keyAction("Num*", KeyEvent.KEYCODE_NUMPAD_MULTIPLY),
-        keyAction("Num/", KeyEvent.KEYCODE_NUMPAD_DIVIDE),
-        keyAction("Num.", KeyEvent.KEYCODE_NUMPAD_DOT),
-        keyAction("NumEnt", KeyEvent.KEYCODE_NUMPAD_ENTER)
-    )
-
-    val lockSystemPresets: List<KeyboardSlotAction> = listOf(
-        keyAction("Esc", KeyEvent.KEYCODE_ESCAPE),
-        keyAction("CapsLk", KeyEvent.KEYCODE_CAPS_LOCK),
-        keyAction("NumLk", KeyEvent.KEYCODE_NUM_LOCK),
-        keyAction("ScrLk", KeyEvent.KEYCODE_SCROLL_LOCK),
-        keyAction("PrtSc", KeyEvent.KEYCODE_SYSRQ),
-        keyAction("Pause", KeyEvent.KEYCODE_BREAK),
-        keyAction("Meta", KeyEvent.KEYCODE_META_LEFT)
-    )
-
-    val sequencePresets: List<KeyboardSlotAction> = listOf(
-        sequenceAction("C-C", "\u0003"),
-        sequenceAction("C-D", "\u0004"),
-        sequenceAction("C-Z", "\u001A")
-    )
-
-    val iconAliasPresets: List<KeyboardSlotAction> = listOf(
-        snippetPickerAction(label = "Snippets", iconId = "code"),
+        keyAction("Insert", KeyEvent.KEYCODE_INSERT),
+        keyAction("Space", KeyEvent.KEYCODE_SPACE),
         keyAction("Up", KeyEvent.KEYCODE_DPAD_UP, repeatable = true).copy(iconId = "up"),
         keyAction("Down", KeyEvent.KEYCODE_DPAD_DOWN, repeatable = true).copy(iconId = "down"),
         keyAction("Left", KeyEvent.KEYCODE_DPAD_LEFT, repeatable = true).copy(iconId = "left"),
         keyAction("Right", KeyEvent.KEYCODE_DPAD_RIGHT, repeatable = true).copy(iconId = "right"),
-        passwordInjectAction(label = "Password", iconId = "key"),
-        textAction(label = "Swipe Nav", text = "").copy(iconId = "swipe_nav"),
-        textAction(label = "pwd+Enter", text = "pwd\r").copy(iconId = "folder"),
-        textAction(label = "cd+Enter", text = "cd\r").copy(iconId = "home"),
-        textAction(label = "reset+Enter", text = "").copy(iconId = "reset"),
+        keyAction("Home", KeyEvent.KEYCODE_MOVE_HOME, repeatable = true),
+        keyAction("End", KeyEvent.KEYCODE_MOVE_END, repeatable = true),
+        keyAction("PgUp", KeyEvent.KEYCODE_PAGE_UP, repeatable = true),
+        keyAction("PgDn", KeyEvent.KEYCODE_PAGE_DOWN, repeatable = true)
+    ) + (1..12).map(::functionKeyAction)
+
+    val shortcutPresets: List<KeyboardSlotAction> = listOfNotNull(
+        combinationAction("C", ctrl = true),
+        combinationAction("D", ctrl = true),
+        combinationAction("Z", ctrl = true),
+        combinationAction("L", ctrl = true),
+        combinationAction("R", ctrl = true),
+        combinationAction("A", ctrl = true),
+        combinationAction("B", ctrl = true),
+        combinationAction("E", ctrl = true),
+        combinationAction("K", ctrl = true),
+        combinationAction("U", ctrl = true),
+        combinationAction("W", ctrl = true),
+        keyAction("Ctrl-\\", KeyEvent.KEYCODE_BACKSLASH, sequence = "\u001C", ctrl = true),
+        keyAction("Ctrl-←", KeyEvent.KEYCODE_DPAD_LEFT, ctrl = true, repeatable = true),
+        keyAction("Ctrl-→", KeyEvent.KEYCODE_DPAD_RIGHT, ctrl = true, repeatable = true),
+        combinationAction("B", alt = true),
+        combinationAction("F", alt = true),
+        keyAction("Alt-.", KeyEvent.KEYCODE_PERIOD, alt = true),
+        keyAction("Alt-⌫", KeyEvent.KEYCODE_DEL, alt = true, repeatable = true)
+    )
+
+    val symbolPresets: List<KeyboardSlotAction> =
+        listOf("|", "&", ";", "$", "*", "!", "#", "~", "`", "/", "\\", "-", "_", "=", "+",
+            "{", "}", "[", "]", "(", ")", "<", ">", "'", "\"", ":", "?", "@", "%", "^")
+            .map { textAction(it) }
+
+    val actionPresets: List<KeyboardSlotAction> = listOf(
         textAction(label = "Keyboard", text = "").copy(iconId = "keyboard"),
-        sequenceAction(label = "Ctrl-Z", sequence = "\u001A").copy(iconId = "terminal"),
+        textAction(label = "Paste", text = "").copy(iconId = "paste"),
+        snippetPickerAction(label = "Snippets", iconId = "code"),
+        passwordInjectAction(label = "Password", iconId = "key"),
+        textAction(label = "Swipe arrows", text = "").copy(iconId = "swipe_nav"),
+        textAction(label = "Find", text = "").copy(iconId = "search"),
         textAction(label = "Settings", text = "").copy(iconId = "build")
     )
 
-    val comboPresets: List<KeyboardSlotAction> = listOfNotNull(
-        combinationAction("A", ctrl = true),
-        combinationAction("B", ctrl = true),
-        combinationAction("C", ctrl = true),
-        combinationAction("D", ctrl = true),
-        combinationAction("E", ctrl = true),
-        combinationAction("F", ctrl = true),
-        combinationAction("K", ctrl = true),
-        combinationAction("L", ctrl = true),
-        combinationAction("R", ctrl = true),
-        combinationAction("U", ctrl = true),
-        combinationAction("W", ctrl = true),
-        combinationAction("Z", ctrl = true)
-    )
+    /** A custom-text key; [pressEnter] sends Enter after the text, e.g. for `git status`. */
+    fun customTextAction(text: String, pressEnter: Boolean): KeyboardSlotAction =
+        textAction(text = if (pressEnter) "$text\r" else text, label = text)
 
     fun emptyAction(): KeyboardSlotAction = textAction("")
 

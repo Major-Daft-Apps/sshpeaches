@@ -1528,6 +1528,10 @@ fun ConnectingScreen(
                 showFindDialog = true
                 true
             }
+            "paste" -> {
+                terminalInput.pasteFromClipboard()
+                true
+            }
             "fn", "fn_active", "fn_back" -> {
                 isFnRowVisible = !isFnRowVisible
                 true

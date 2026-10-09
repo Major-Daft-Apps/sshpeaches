@@ -20,6 +20,7 @@ import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyGenerationSpec
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 object AppStateSeeder {
@@ -132,6 +133,14 @@ object AppStateSeeder {
         runBlocking {
             SettingsStore.init(appContext)
             SettingsStore.setKeyboardLayout(slots)
+        }
+    }
+
+    fun keyboardLayout(): List<KeyboardSlotAction> {
+        val appContext = context
+        return runBlocking {
+            SettingsStore.init(appContext)
+            SettingsStore.keyboardLayout.first()
         }
     }
 

@@ -146,6 +146,7 @@ object UiTestTags {
     const val KEYBOARD_EDITOR_FN_BUTTON = "keyboard_editor_fn_button"
     const val KEYBOARD_EDITOR_TEXT_INPUT = "keyboard_editor_text_input"
     const val KEYBOARD_EDITOR_USE_TEXT_BUTTON = "keyboard_editor_use_text_button"
+    const val KEYBOARD_EDITOR_PRESS_ENTER = "keyboard_editor_press_enter"
 
     const val THEME_DEFAULT_FIELD = "theme_default_field"
     const val THEME_CREATE_BUTTON = "theme_create_button"

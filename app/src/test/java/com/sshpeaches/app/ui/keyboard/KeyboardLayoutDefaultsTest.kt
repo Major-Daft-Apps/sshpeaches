@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.keyboard
 
+import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,10 +26,46 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
-    fun comboPreset_containsCtrlAandCtrlB() {
-        val labels = KeyboardLayoutDefaults.comboPresets.map { it.label }
-        assertTrue(labels.contains("Ctrl-A"))
-        assertTrue(labels.contains("Ctrl-B"))
+    fun shortcutPresets_coverTheShellEssentials() {
+        val labels = KeyboardLayoutDefaults.shortcutPresets.map { it.label }
+        listOf("Ctrl-C", "Ctrl-D", "Ctrl-Z", "Ctrl-R", "Ctrl-\\", "Ctrl-←", "Ctrl-→", "Alt-B", "Alt-F", "Alt-.", "Alt-⌫")
+            .forEach { assertTrue("missing $it", labels.contains(it)) }
+        val ctrlC = KeyboardLayoutDefaults.shortcutPresets.first { it.label == "Ctrl-C" }
+        assertEquals("\u0003", ctrlC.sequence)
+    }
+
+    @Test
+    fun editorPresets_leaveOutKeysAPhoneKeyboardOrTerminalDoesNotNeed() {
+        val all = KeyboardLayoutDefaults.modifierPresets + KeyboardLayoutDefaults.keyPresets +
+            KeyboardLayoutDefaults.shortcutPresets + KeyboardLayoutDefaults.symbolPresets +
+            KeyboardLayoutDefaults.actionPresets
+        val plainKeyCodes = all.filter { it.type == KeyboardActionType.KEY && !it.ctrl && !it.alt }
+            .mapNotNull { it.keyCode }
+        plainKeyCodes.forEach { code ->
+            assertFalse("letter/digit $code offered", code in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 || code in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z)
+            assertFalse("numpad $code offered", code in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN)
+            assertFalse("lock/system $code offered", code in setOf(
+                KeyEvent.KEYCODE_CAPS_LOCK, KeyEvent.KEYCODE_NUM_LOCK, KeyEvent.KEYCODE_SCROLL_LOCK,
+                KeyEvent.KEYCODE_SYSRQ, KeyEvent.KEYCODE_BREAK, KeyEvent.KEYCODE_META_LEFT
+            ))
+        }
+        val labels = all.map { it.label }
+        assertEquals("duplicate choices", labels.size, labels.toSet().size)
+        // Labels must fit a key without being cut off.
+        (KeyboardLayoutDefaults.keyPresets + KeyboardLayoutDefaults.shortcutPresets + KeyboardLayoutDefaults.symbolPresets)
+            .forEach { assertTrue("${it.label} is too long", it.label.length <= KeyboardLayoutDefaults.COMPACT_KEY_LABEL_MAX_CHARS) }
+        assertTrue(KeyboardLayoutDefaults.keyPresets.any { it.label == "⇧Tab" && it.shift && it.keyCode == KeyEvent.KEYCODE_TAB })
+        assertTrue(KeyboardLayoutDefaults.actionPresets.any { it.iconId == "paste" })
+        assertEquals(30, KeyboardLayoutDefaults.symbolPresets.size)
+    }
+
+    @Test
+    fun customTextAction_canPressEnterAfter() {
+        val plain = KeyboardLayoutDefaults.customTextAction("sudo ", pressEnter = false)
+        assertEquals("sudo ", plain.text)
+        val run = KeyboardLayoutDefaults.customTextAction("git status", pressEnter = true)
+        assertEquals("git status\r", run.text)
+        assertEquals("git status", run.label)
     }
 
     @Test
@@ -153,7 +190,7 @@ class KeyboardLayoutDefaultsTest {
 
         assertEquals("Fn", fn.label)
         assertEquals("fn", fn.iconId)
-        assertFalse(KeyboardLayoutDefaults.iconAliasPresets.any { it.iconId == "fn" })
+        assertFalse(KeyboardLayoutDefaults.actionPresets.any { it.iconId == "fn" })
     }
 
     private fun swipeNavAction() =

@@ -70,6 +70,8 @@ class LiveReconnectTest {
         }
     }
 
+    private val seenSessions = mutableSetOf<String>()
+
     private fun waitForStatus(
         service: SessionService,
         sessionId: String,
@@ -79,7 +81,14 @@ class LiveReconnectTest {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
             val snapshot = service.sessionsFlow().value.firstOrNull { it.hostId == sessionId }
-            checkNotNull(snapshot) { "Session $sessionId disappeared instead of reconnecting" }
+            if (snapshot == null) {
+                // startSession publishes the first status from its coroutine, so a brand-new
+                // session can be missing for a moment; only a session seen before can disappear.
+                check(sessionId !in seenSessions) { "Session $sessionId disappeared instead of reconnecting" }
+                Thread.sleep(200)
+                continue
+            }
+            seenSessions += sessionId
             check(snapshot.status != SessionStatus.ERROR) { "Session failed: ${snapshot.statusMessage}" }
             if (snapshot.status == status) return
             Thread.sleep(200)

@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -324,22 +325,17 @@ private fun KeyActionEditorVertical(
     onCancel: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val comboCtrl = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.ctrl) }
-    val comboAlt = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.alt) }
-    val comboShift = remember(current) { mutableStateOf(current.type == KeyboardActionType.KEY && current.shift) }
     val textDraft = remember(current) {
-        mutableStateOf(if (current.type == KeyboardActionType.TEXT) current.text else "")
-    }
-
-    val applyKeyAction: (KeyboardSlotAction) -> Unit = { base ->
-        onApply(
-            withCombination(
-                base = base,
-                ctrl = comboCtrl.value,
-                alt = comboAlt.value,
-                shift = comboShift.value
-            )
+        mutableStateOf(
+            if (current.type == KeyboardActionType.TEXT && current.iconId.isBlank()) {
+                current.text.removeSuffix("\r")
+            } else {
+                ""
+            }
         )
+    }
+    val pressEnterDraft = remember(current) {
+        mutableStateOf(current.type == KeyboardActionType.TEXT && current.text.endsWith("\r"))
     }
 
     Box(
@@ -368,91 +364,61 @@ private fun KeyActionEditorVertical(
             style = MaterialTheme.typography.bodySmall
         )
 
-        SectionTitle("Fn Layer")
-        Text(
-            "Assign Fn to any main-row slot. Its Back, F1-F12, and keyboard keys stay fixed.",
-            style = MaterialTheme.typography.bodySmall
-        )
-        TextButton(
-            onClick = { onApply(KeyboardLayoutDefaults.fnKeyAction()) },
-            modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_FN_BUTTON)
-        ) {
-            Text("Fn")
-        }
-
-        SectionTitle("Icon Aliases")
-        Text(
-            "Icon entries are direct action aliases in the shell.",
-            style = MaterialTheme.typography.bodySmall
-        )
-        PresetRow(KeyboardLayoutDefaults.iconAliasPresets, onApply)
-
         SectionTitle("Modifiers")
-        PresetRow(KeyboardLayoutDefaults.modifierPresets) { preset ->
-            onApply(preset)
-        }
-
-        SectionTitle("Combination")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModifierToggle(
-                label = "Ctrl",
-                active = comboCtrl.value,
-                onToggle = { comboCtrl.value = !comboCtrl.value }
-            )
-            ModifierToggle(
-                label = "Alt",
-                active = comboAlt.value,
-                onToggle = { comboAlt.value = !comboAlt.value }
-            )
-            ModifierToggle(
-                label = "Shift",
-                active = comboShift.value,
-                onToggle = { comboShift.value = !comboShift.value }
-            )
-        }
         Text(
-            "Pick any base key below. Active combination toggles are applied to that key.",
+            "Ctrl, Alt and Shift apply to the next key you press. Fn swaps the rows for Back, F1-F12 and the keyboard key, which stay fixed.",
             style = MaterialTheme.typography.bodySmall
         )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KeyboardLayoutDefaults.modifierPresets.forEach { preset ->
+                TextButton(onClick = { onApply(preset) }) { Text(preset.label) }
+            }
+            TextButton(
+                onClick = { onApply(KeyboardLayoutDefaults.fnKeyAction()) },
+                modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_FN_BUTTON)
+            ) {
+                Text("Fn")
+            }
+        }
 
-        SectionTitle("Letters")
-        PresetRow(KeyboardLayoutDefaults.letterPresets, applyKeyAction)
+        SectionTitle("Keys")
+        PresetRow(KeyboardLayoutDefaults.keyPresets, onApply)
 
-        SectionTitle("Digits")
-        PresetRow(KeyboardLayoutDefaults.digitPresets, applyKeyAction)
+        SectionTitle("Shortcuts")
+        PresetRow(KeyboardLayoutDefaults.shortcutPresets, onApply)
 
-        SectionTitle("Special Characters")
-        PresetRow(KeyboardLayoutDefaults.punctuationPresets, applyKeyAction)
+        SectionTitle("Symbols")
+        PresetRow(KeyboardLayoutDefaults.symbolPresets, onApply)
 
-        SectionTitle("Whitespace/Editing")
-        PresetRow(KeyboardLayoutDefaults.whitespaceEditingPresets, applyKeyAction)
+        SectionTitle("Actions")
+        PresetRow(KeyboardLayoutDefaults.actionPresets, onApply, showLabels = true)
 
-        SectionTitle("Navigation")
-        PresetRow(KeyboardLayoutDefaults.navigationPresets, applyKeyAction)
-
-        SectionTitle("Function Keys")
-        PresetRow(KeyboardLayoutDefaults.functionPresets, applyKeyAction)
-
-        SectionTitle("Numpad")
-        PresetRow(KeyboardLayoutDefaults.numpadPresets, applyKeyAction)
-
-        SectionTitle("Lock/System")
-        PresetRow(KeyboardLayoutDefaults.lockSystemPresets, applyKeyAction)
-
-        SectionTitle("Text")
+        SectionTitle("Custom text")
+        Text(
+            "Types the text when pressed, for example \"sudo \" or \"git status\".",
+            style = MaterialTheme.typography.bodySmall
+        )
         OutlinedTextField(
             value = textDraft.value,
             onValueChange = { textDraft.value = it },
-            label = { Text("Text payload") },
+            label = { Text("Text") },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(UiTestTags.KEYBOARD_EDITOR_TEXT_INPUT)
         )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = pressEnterDraft.value,
+                onCheckedChange = { pressEnterDraft.value = it },
+                modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_PRESS_ENTER)
+            )
+            Text("Press Enter after", style = MaterialTheme.typography.bodyMedium)
+        }
         TextButton(
             enabled = textDraft.value.isNotBlank(),
             onClick = {
-                onApply(KeyboardLayoutDefaults.textAction(textDraft.value))
+                onApply(KeyboardLayoutDefaults.customTextAction(textDraft.value, pressEnterDraft.value))
             },
             modifier = Modifier.testTag(UiTestTags.KEYBOARD_EDITOR_USE_TEXT_BUTTON)
         ) {
@@ -474,31 +440,6 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.labelLarge)
 }
 
-private fun withCombination(
-    base: KeyboardSlotAction,
-    ctrl: Boolean,
-    alt: Boolean,
-    shift: Boolean
-): KeyboardSlotAction {
-    if (base.type != KeyboardActionType.KEY) return base
-    if (!ctrl && !alt && !shift) return base
-
-    val modifiers = mutableListOf<String>()
-    if (ctrl) modifiers += "Ctrl"
-    if (alt) modifiers += "Alt"
-    if (shift) modifiers += "Shift"
-    val baseLabel = base.label.ifBlank {
-        KeyboardLayoutDefaults.keyTokenForAction(base).ifBlank { "Key" }
-    }
-    val combinedLabel = "${modifiers.joinToString("+")}-$baseLabel"
-    return base.copy(
-        label = combinedLabel,
-        ctrl = base.ctrl || ctrl,
-        alt = base.alt || alt,
-        shift = base.shift || shift
-    )
-}
-
 private fun fullActionLabel(action: KeyboardSlotAction): String {
     if (action.isEmpty()) return "Empty"
     val label = action.label.trim()
@@ -513,22 +454,12 @@ private fun fullActionLabel(action: KeyboardSlotAction): String {
     }
 }
 
-@Composable
-private fun ModifierToggle(
-    label: String,
-    active: Boolean,
-    onToggle: () -> Unit
-) {
-    TextButton(onClick = onToggle) {
-        Text(if (active) "[x] $label" else "[ ] $label")
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PresetRow(
     presets: List<KeyboardSlotAction>,
-    onSelect: (KeyboardSlotAction) -> Unit
+    onSelect: (KeyboardSlotAction) -> Unit,
+    showLabels: Boolean = false
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -539,8 +470,12 @@ private fun PresetRow(
                 val icon = KeyboardIconPack.byId(action.iconId)
                 if (icon != null) {
                     Icon(icon.icon, contentDescription = icon.label, modifier = Modifier.size(16.dp))
-                } else {
-                    Text(action.label)
+                }
+                if (icon == null || showLabels) {
+                    Text(
+                        text = action.label,
+                        modifier = if (icon != null) Modifier.padding(start = 6.dp) else Modifier
+                    )
                 }
             }
         }

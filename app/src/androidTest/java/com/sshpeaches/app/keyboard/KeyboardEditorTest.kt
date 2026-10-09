@@ -6,6 +6,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -54,11 +56,36 @@ class KeyboardEditorTest {
         composeRule.navigateDrawer(Routes.KEYBOARD)
 
         composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0)).performClick()
-        composeRule.onNodeWithText("Fn Layer").assertIsDisplayed()
+        composeRule.onNodeWithText("Modifiers").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.KEYBOARD_EDITOR_FN_BUTTON).assertIsDisplayed().performClick()
 
         composeRule.onNodeWithTag(UiTestTags.keyboardSlot(0))
             .assertContentDescriptionEquals("Fn")
+    }
+
+    @Test
+    fun keyboardEditor_offersTheCuratedGroupsAndAssignsShortcutsAndCustomText() {
+        composeRule.navigateDrawer(Routes.KEYBOARD)
+
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(2)).performClick()
+        listOf("Keys", "Shortcuts", "Symbols", "Actions", "Custom text").forEach {
+            composeRule.onNodeWithText(it).performScrollTo().assertIsDisplayed()
+        }
+        // Letters, the numpad and lock keys are no longer offered.
+        composeRule.onNodeWithText("Letters").assertDoesNotExist()
+        composeRule.onNodeWithText("Numpad").assertDoesNotExist()
+        composeRule.onNodeWithText("CapsLk").assertDoesNotExist()
+        composeRule.onNodeWithText("Ctrl-R").performScrollTo().performClick()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(2)).assertContentDescriptionEquals("Ctrl-R")
+
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(4)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.KEYBOARD_EDITOR_TEXT_INPUT).performScrollTo().performTextInput("uptime")
+        composeRule.onNodeWithTag(UiTestTags.KEYBOARD_EDITOR_PRESS_ENTER).performScrollTo().performClick()
+        composeRule.onNodeWithTag(UiTestTags.KEYBOARD_EDITOR_USE_TEXT_BUTTON).performScrollTo().performClick()
+        composeRule.onNodeWithTag(UiTestTags.keyboardSlot(4)).assertContentDescriptionEquals("uptime")
+        composeRule.waitUntil(5_000) {
+            AppStateSeeder.keyboardLayout().getOrNull(4)?.text == "uptime\r"
+        }
     }
 
     @Test

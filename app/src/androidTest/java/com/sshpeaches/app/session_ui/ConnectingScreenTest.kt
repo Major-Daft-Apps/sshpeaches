@@ -1221,6 +1221,69 @@ class ConnectingScreenTest {
     }
 
     @Test
+    fun keyboardEditorShortcuts_sendTheExpectedTerminalBytes() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        fun preset(label: String) = (KeyboardLayoutDefaults.keyPresets + KeyboardLayoutDefaults.shortcutPresets +
+            KeyboardLayoutDefaults.symbolPresets).first { it.label == label }
+        val expected = linkedMapOf(
+            "⇧Tab" to "\u001B[Z",
+            "Ctrl-\\" to "\u001C",
+            "Ctrl-←" to "\u001B[1;5D",
+            "Ctrl-R" to "\u0012",
+            "Alt-." to "\u001B.",
+            "Alt-B" to "\u001Bb",
+            "Alt-⌫" to "\u001B\u007F",
+            "$" to "$"
+        )
+        val slots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
+            expected.keys.forEachIndexed { index, label -> this[index] = preset(label) }
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = slots,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+
+        expected.entries.forEachIndexed { index, (label, bytes) ->
+            composeRule.runOnIdle { sentPayloads.clear() }
+            composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(index)).performClick()
+            composeRule.runOnIdle {
+                val actual = sentPayloads.fold(ByteArray(0)) { all, payload -> all + payload }
+                    .toString(StandardCharsets.UTF_8)
+                check(actual == bytes) {
+                    "$label sent ${actual.map { it.code }} instead of ${bytes.map { it.code }}"
+                }
+            }
+        }
+    }
+
+    @Test
     fun customKeyboard_fnLayerIsFixedAndBackReturnsToRemappableMainRows() {
         val sentPayloads = mutableListOf<ByteArray>()
         val customSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS.toMutableList().apply {
