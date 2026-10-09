@@ -123,7 +123,8 @@ fun KeyboardEditorScreen(
                     normalizedSlots.chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
                 }
                 val useWideLayout = maxWidth >= KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH
-                if (useWideLayout) {
+                val shouldSplitColumns = useWideLayout && rows.size > 2
+                if (shouldSplitColumns) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
