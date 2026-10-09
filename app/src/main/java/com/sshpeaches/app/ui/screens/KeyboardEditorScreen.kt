@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,8 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +68,7 @@ fun KeyboardEditorScreen(
     val editorIndex = remember { mutableStateOf<Int?>(null) }
     val normalizedSlots = remember(slots) { KeyboardLayoutDefaults.normalizeSlots(slots) }
     val keyBlockHeightPx = remember { mutableIntStateOf(0) }
+    val introHeightPx = remember { mutableIntStateOf(0) }
     val activeEditorIndex = editorIndex.value
 
     BackHandler(enabled = activeEditorIndex != null) {
@@ -102,100 +102,105 @@ fun KeyboardEditorScreen(
                     .fillMaxSize()
                     .testTag(UiTestTags.SCREEN_KEYBOARD)
             ) {
-                Column(
+                BoxWithConstraints(
                     modifier = Modifier
                         .widthIn(max = if (shellLayoutMode == ShellLayoutMode.WIDE) 1400.dp else 980.dp)
                         .fillMaxSize()
                         .align(Alignment.TopCenter)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-            Text("Tap a main-row slot to edit it. The Fn layer (Back, F1-F12, keyboard) is fixed.")
-
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
-                    .onSizeChanged { keyBlockHeightPx.intValue = it.height }
-                    .padding(horizontal = 6.dp, vertical = 6.dp)
-            ) {
-                val rows = remember(normalizedSlots) {
-                    normalizedSlots.chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
-                }
-                val useWideLayout = maxWidth >= KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH
-                val shouldSplitColumns = useWideLayout && rows.size > 2
-                if (shouldSplitColumns) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        KeyboardSlotRows(
-                            rows = rows.take(2),
-                            rowOffset = 0,
-                            onSlotClick = { editorIndex.value = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                        KeyboardSlotRows(
-                            rows = rows.drop(2),
-                            rowOffset = 2,
-                            onSlotClick = { editorIndex.value = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                } else {
-                    KeyboardSlotRows(
-                        rows = rows,
-                        rowOffset = 0,
-                        onSlotClick = { editorIndex.value = it },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-            ) {
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.TopCenter
-                ) {
+                    // The key rows and the keyboard picture share one width, the largest that fits the
+                    // picture on screen below them, but never so narrow the key labels stop fitting
+                    // (short landscape screens scroll instead).
                     val density = LocalDensity.current
+                    val introHeight = with(density) { introHeightPx.intValue.toDp() }
                     val keyBlockHeight = with(density) {
                         if (keyBlockHeightPx.intValue > 0) keyBlockHeightPx.intValue.toDp()
-                        else KEYBOARD_ILLUSTRATION_FALLBACK_HEIGHT
+                        else KEYBOARD_KEY_BLOCK_FALLBACK_HEIGHT
                     }
-                    val maxIllustrationHeight = keyBlockHeight * KEYBOARD_ILLUSTRATION_MAX_HEIGHT_MULTIPLIER
-                    val illustrationWidth = maxWidth.coerceAtMost(KEYBOARD_ILLUSTRATION_MAX_WIDTH)
-                    val naturalHeight = illustrationWidth / KEYBOARD_ILLUSTRATION_ASPECT_RATIO
-                    val illustrationHeight = naturalHeight.coerceIn(
-                        minimumValue = keyBlockHeight,
-                        maximumValue = maxIllustrationHeight
-                    )
+                    val contentWidth = maxWidth - 32.dp
+                    val pictureMaxHeight = maxHeight - 32.dp - introHeight - keyBlockHeight -
+                        KEYBOARD_RESET_BUTTON_HEIGHT - 48.dp
+                    val sharedWidth = minOf(
+                        contentWidth,
+                        KEYBOARD_ILLUSTRATION_MAX_WIDTH,
+                        pictureMaxHeight * KEYBOARD_ILLUSTRATION_ASPECT_RATIO
+                    ).coerceAtLeast(minOf(KEYBOARD_KEY_BLOCK_MIN_WIDTH, contentWidth))
 
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .width(illustrationWidth)
-                            .height(illustrationHeight),
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.keyboard),
-                            contentDescription = "Keyboard illustration",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                        Text(
+                            "Tap a main-row slot to edit it. The Fn layer (Back, F1-F12, keyboard) is fixed.",
+                            modifier = Modifier.onSizeChanged { introHeightPx.intValue = it.height }
                         )
-                    }
-                }
-            }
 
-            TextButton(
-                onClick = onReset,
-                modifier = Modifier.testTag(UiTestTags.KEYBOARD_RESET_BUTTON)
-            ) {
-                Text("Reset layout")
-            }
+                        Column(
+                            modifier = Modifier
+                                .width(sharedWidth)
+                                .align(Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            BoxWithConstraints(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, Color(0xFFFA992A), RoundedCornerShape(8.dp))
+                                    .onSizeChanged { keyBlockHeightPx.intValue = it.height }
+                                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                            ) {
+                                val rows = remember(normalizedSlots) {
+                                    normalizedSlots.chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+                                }
+                                val useWideLayout = maxWidth >= KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH
+                                val shouldSplitColumns = useWideLayout && rows.size > 2
+                                if (shouldSplitColumns) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        KeyboardSlotRows(
+                                            rows = rows.take(2),
+                                            rowOffset = 0,
+                                            onSlotClick = { editorIndex.value = it },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        KeyboardSlotRows(
+                                            rows = rows.drop(2),
+                                            rowOffset = 2,
+                                            onSlotClick = { editorIndex.value = it },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                } else {
+                                    KeyboardSlotRows(
+                                        rows = rows,
+                                        rowOffset = 0,
+                                        onSlotClick = { editorIndex.value = it },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+
+                            Image(
+                                painter = painterResource(id = R.drawable.keyboard),
+                                contentDescription = "Keyboard illustration",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(KEYBOARD_ILLUSTRATION_ASPECT_RATIO)
+                            )
+
+                            TextButton(
+                                onClick = onReset,
+                                modifier = Modifier.testTag(UiTestTags.KEYBOARD_RESET_BUTTON)
+                            ) {
+                                Text("Reset layout")
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -484,7 +489,8 @@ private fun PresetRow(
 }
 
 private const val KEYBOARD_ILLUSTRATION_ASPECT_RATIO = 2160f / 1126f
-private val KEYBOARD_ILLUSTRATION_FALLBACK_HEIGHT = 180.dp
 private val KEYBOARD_ILLUSTRATION_MAX_WIDTH = 980.dp
 private val KEYBOARD_EDITOR_WIDE_LAYOUT_MIN_WIDTH = 600.dp
-private const val KEYBOARD_ILLUSTRATION_MAX_HEIGHT_MULTIPLIER = 2f
+private val KEYBOARD_KEY_BLOCK_FALLBACK_HEIGHT = 76.dp
+private val KEYBOARD_KEY_BLOCK_MIN_WIDTH = 360.dp
+private val KEYBOARD_RESET_BUTTON_HEIGHT = 48.dp
