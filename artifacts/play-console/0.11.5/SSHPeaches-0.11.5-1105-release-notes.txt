@@ -1,0 +1,6 @@
+What's new in 0.11.5
+
+- Fixed Enter sometimes doing nothing with Gboard and other phone keyboards.
+- New Paste option in the terminal's ⋮ menu.
+- Built-in keyboard: taps that slide off a key or land between keys now type the key.
+- Built-in keyboard: opening a session from its notification no longer shows your phone's keyboard underneath it.
