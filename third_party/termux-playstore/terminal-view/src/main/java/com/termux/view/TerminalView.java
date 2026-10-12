@@ -30,6 +30,7 @@ import android.view.autofill.AutofillValue;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Scroller;
 
 import androidx.annotation.NonNull;
@@ -252,7 +253,12 @@ public final class TerminalView extends View {
      *               for communication between {@link TerminalView} and its client.
      */
     public void setTerminalViewClient(TerminalViewClient client) {
+        boolean wasTextEditor = onCheckIsTextEditor();
         this.mClient = client;
+        if (wasTextEditor != onCheckIsTextEditor() && hasFocus()) {
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.restartInput(this);
+        }
     }
 
     /**
@@ -294,6 +300,7 @@ public final class TerminalView extends View {
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        if (!onCheckIsTextEditor()) return null;
         // Ensure that inputType is only set if TerminalView is selected view with the keyboard and
         // an alternate view is not selected, like an EditText. This is necessary if an activity is
         // initially started with the alternate view or if activity is returned to from another app
@@ -518,7 +525,9 @@ public final class TerminalView extends View {
 
     @Override
     public boolean onCheckIsTextEditor() {
-        return true;
+        // Android opens the system keyboard by itself for a focused text editor, e.g. when the app
+        // is brought back from a notification, so an app with its own keyboard must not be one.
+        return mClient == null || mClient.usesSystemKeyboard();
     }
 
     @Override

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Palette
@@ -47,6 +48,7 @@ fun SessionOverflowMenu(
     onSelectProfile: (String) -> Unit,
     arrowKeysEnabled: Boolean,
     onToggleArrowKeys: () -> Unit,
+    onPaste: () -> Unit,
     onInsertPassword: () -> Unit,
     onFind: () -> Unit,
     onSnippets: () -> Unit,
@@ -97,6 +99,15 @@ fun SessionOverflowMenu(
                     )
                 }
             } else {
+                DropdownMenuItem(
+                    text = { Text("Paste") },
+                    onClick = {
+                        close()
+                        onPaste()
+                    },
+                    leadingIcon = { Icon(Icons.Default.ContentPaste, contentDescription = null) },
+                    modifier = Modifier.testTag(UiTestTags.CONNECTING_PASTE_BUTTON)
+                )
                 DropdownMenuItem(
                     text = { Text("Swipe for arrow keys") },
                     onClick = {

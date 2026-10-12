@@ -38,6 +38,7 @@ class SessionOverflowMenuTest {
                     onSelectProfile = { selected.set(it) },
                     arrowKeysEnabled = false,
                     onToggleArrowKeys = { invoked += "arrows" },
+                    onPaste = { invoked += "paste" },
                     onInsertPassword = { invoked += "password" },
                     onFind = { invoked += "find" },
                     onSnippets = { invoked += "snippets" },
@@ -70,6 +71,7 @@ class SessionOverflowMenuTest {
         setMenu()
 
         listOf(
+            UiTestTags.CONNECTING_PASTE_BUTTON,
             UiTestTags.CONNECTING_ARROW_KEYS_BUTTON,
             UiTestTags.CONNECTING_INSERT_PASSWORD_BUTTON,
             UiTestTags.CONNECTING_FIND_BUTTON,
@@ -81,7 +83,7 @@ class SessionOverflowMenuTest {
         }
 
         composeRule.runOnIdle {
-            assertEquals(listOf("arrows", "password", "find", "snippets", "reset"), invoked)
+            assertEquals(listOf("paste", "arrows", "password", "find", "snippets", "reset"), invoked)
         }
     }
 }

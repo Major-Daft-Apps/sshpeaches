@@ -254,6 +254,7 @@ object UiTestTags {
     const val CONNECTING_INSERT_PASSWORD_BUTTON = "connecting_insert_password_button"
     const val CONNECTING_FIND_BUTTON = "connecting_find_button"
     const val CONNECTING_SNIPPETS_BUTTON = "connecting_snippets_button"
+    const val CONNECTING_PASTE_BUTTON = "connecting_paste_button"
     const val CONNECTING_RESET_BUTTON = "connecting_reset_button"
     const val CONNECTING_THEME_BUTTON = "connecting_theme_button"
     const val CONNECTING_THEME_BACK_BUTTON = "connecting_theme_back_button"

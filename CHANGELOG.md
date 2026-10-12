@@ -4,6 +4,13 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.5 (1105)
+
+- Fixed Enter sometimes doing nothing with the phone's keyboard. Gboard types letters directly into the terminal but sends Enter as a key event, which went to whichever part of the screen had focus at that moment; tapping the terminal briefly moves focus, so an Enter pressed then was lost while letters still worked. Keys from the phone's keyboard now always go to the terminal. Also fixed for keyboards that hold the last word back until you press Enter (Enter could be sent before the word) and keyboards that send Enter as an editor action (focus moved off the terminal).
+- New Paste item in the terminal's ⋮ menu.
+- Built-in keyboard: a tap that slides slightly off a key, or lands in the gap between two keys, now types that key instead of being ignored.
+- Built-in keyboard: opening a running session from its notification no longer brings up the phone's keyboard (such as Gboard) underneath the built-in one. The terminal no longer presents itself to Android as a text field when the built-in keyboard is in use, so Android has nothing to open the system keyboard for.
+
 ## 0.11.4 (1104)
 
 Release date: 2026-10-08

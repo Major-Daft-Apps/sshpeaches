@@ -332,6 +332,7 @@ fun ConnectingScreen(
     arrowKeysToggleToken: Int = 0,
     insertPasswordToken: Int = 0,
     snippetsToken: Int = 0,
+    pasteToken: Int = 0,
     onEditHost: (String) -> Unit = {},
     onOpenIdentities: () -> Unit = {},
     onSendProblemReport: suspend (ProblemReport) -> Result<Unit> = { ProblemReportSender.send(it) },
@@ -748,6 +749,8 @@ fun ConnectingScreen(
             override fun shouldEnforceCharBasedInput(): Boolean = true
 
             override fun isTerminalViewSelected(): Boolean = keyboardFocused
+
+            override fun usesSystemKeyboard(): Boolean = !useBuiltInKeyboard
 
             override fun copyModeChanged(copyMode: Boolean) {
                 if (copyMode || !supportsSystemKeyboard || !keyboardVisibleRequested) return
@@ -1568,6 +1571,17 @@ fun ConnectingScreen(
             handledSnippetsToken = snippetsToken
         }
     }
+    var handledPasteToken by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(pasteToken, showTerminalSession) {
+        if (pasteToken > handledPasteToken && showTerminalSession) {
+            handledPasteToken = pasteToken
+            if (!terminalInput.pasteFromClipboard()) {
+                onShowMessage("Nothing to paste")
+            }
+        } else if (pasteToken < handledPasteToken) {
+            handledPasteToken = pasteToken
+        }
+    }
     var handledResetToken by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(resetToken, showTerminalSession) {
         if (resetToken > handledResetToken && showTerminalSession) {
@@ -2191,6 +2205,10 @@ private fun TerminalImeBridge(
                 onImeForwardDelete = {
                     currentTerminalInput.value.sendVirtualKey(KeyEvent.KEYCODE_FORWARD_DEL)
                 }
+                onImeEnter = {
+                    currentOnAndroidKeyEvent.value(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                }
+                onImeKeyEvent = { event -> currentOnAndroidKeyEvent.value(event) }
 
                 var restoring = false
 
@@ -2255,6 +2273,10 @@ private fun TerminalImeBridge(
             bridge.onImeForwardDelete = {
                 currentTerminalInput.value.sendVirtualKey(KeyEvent.KEYCODE_FORWARD_DEL)
             }
+            bridge.onImeEnter = {
+                currentOnAndroidKeyEvent.value(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            }
+            bridge.onImeKeyEvent = { event -> currentOnAndroidKeyEvent.value(event) }
             currentOnBridgeReady.value(bridge)
         },
         modifier = modifier
@@ -2267,6 +2289,8 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
     var onCommittedText: ((String) -> Unit)? = null
     var onImeBackspace: (() -> Unit)? = null
     var onImeForwardDelete: (() -> Unit)? = null
+    var onImeEnter: (() -> Unit)? = null
+    var onImeKeyEvent: ((KeyEvent) -> Boolean)? = null
     private var showWhenWindowFocused = false
 
     fun showTerminalKeyboard() {
@@ -2311,6 +2335,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
         outAttrs.privateImeOptions = TERMINAL_PRIVATE_IME_OPTIONS
         EditorInfoCompat.setContentMimeTypes(outAttrs, TERMINAL_IME_CONTENT_MIME_TYPES)
         val shadow = SpannableStringBuilder()
+        val imeKeysSentDirectly = mutableSetOf<Int>()
         Selection.setSelection(shadow, 0)
         return object : BaseInputConnection(this@TerminalImeBridgeEditText, true) {
             override fun getEditable(): Editable = shadow
@@ -2337,6 +2362,33 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 val committed = super.commitText(text, newCursorPosition)
                 flushPendingText()
                 return committed
+            }
+
+            override fun sendKeyEvent(event: KeyEvent): Boolean {
+                // Some keyboards (Samsung, SwiftKey) still hold the last word as composing text when
+                // they send Enter as a key event; send the word first so Enter doesn't overtake it.
+                if (event.action == KeyEvent.ACTION_DOWN && shadow.isNotEmpty()) {
+                    flushPendingText()
+                }
+                // Gboard types letters with commitText but sends Enter, Backspace and arrows as key
+                // events, which the default delivers to whichever view has focus. Focus passes
+                // through other views (e.g. on every tap of the terminal), so an Enter sent then was
+                // lost while letters still worked. Hand the keys to the terminal directly instead.
+                if (event.action == KeyEvent.ACTION_UP) {
+                    if (imeKeysSentDirectly.remove(event.keyCode)) return true
+                } else if (onImeKeyEvent?.invoke(event) == true) {
+                    if (event.action == KeyEvent.ACTION_DOWN) imeKeysSentDirectly += event.keyCode
+                    return true
+                }
+                return super.sendKeyEvent(event)
+            }
+
+            override fun performEditorAction(actionCode: Int): Boolean {
+                // The default sends an Enter flagged as an editor action, which EditText answers on
+                // key-up by moving focus to the next view, so later keys never reached the terminal.
+                flushPendingText()
+                onImeEnter?.invoke()
+                return true
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {

@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -295,6 +296,76 @@ class ConnectingScreenTest {
     }
 
     @Test
+    fun terminalIme_enterKeyEventSendsPendingCompositionFirst() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        // Keyboards that hold a word as composing text and send Enter as a key event (Samsung,
+        // SwiftKey) must not have the Enter overtake the word: "ls" then Enter, not Enter then "ls".
+        val inputConnection = focusedTerminalInputConnection()
+        composeRule.runOnIdle {
+            sentPayloads.clear()
+            check(inputConnection.setComposingText("ls", 1))
+            // BaseInputConnection.sendKeyEvent always returns false; the event is still dispatched.
+            inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "ls\r") { "Enter overtook the composing text: ${actual.replace("\r", "\\r")}" }
+        }
+    }
+
+    @Test
+    fun terminalIme_enterKeyEventReachesTerminalWhileFocusIsElsewhere() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        // Gboard types letters with commitText but sends Enter as a key event, which Android
+        // delivers to whichever view has focus. Focus passes through other views (for example on
+        // every tap of the terminal), and an Enter sent then was lost while letters still worked.
+        val inputConnection = focusedTerminalInputConnection()
+        composeRule.runOnIdle {
+            sentPayloads.clear()
+            imeBridgeForTest().clearFocus()
+            check(inputConnection.commitText("ls", 1))
+            inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "ls\r") { "Enter was lost while focus was elsewhere: ${actual.replace("\r", "\\r")}" }
+        }
+    }
+
+    @Test
+    fun terminalIme_editorActionSendsEnterOnceAndKeepsBridgeFocus() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        setSshTerminalContent { sentPayloads += it.copyOf() }
+
+        val inputConnection = focusedTerminalInputConnection()
+        composeRule.runOnIdle {
+            sentPayloads.clear()
+            check(inputConnection.commitText("pwd", 1))
+            check(inputConnection.performEditorAction(EditorInfo.IME_ACTION_UNSPECIFIED))
+            check(inputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE))
+        }
+
+        composeRule.runOnIdle {
+            val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(actual == "pwd\r\r") { "Editor action Enter produced: ${actual.replace("\r", "\\r")}" }
+            check(imeBridgeForTest().hasFocus()) {
+                "An editor-action Enter moved focus off the terminal keyboard bridge"
+            }
+        }
+    }
+
+    @Test
     fun terminalIme_reportsShadowSelectionAndSupportsForwardDelete() {
         val sentPayloads = mutableListOf<ByteArray>()
         setSshTerminalContent { sentPayloads += it.copyOf() }
@@ -552,6 +623,15 @@ class ConnectingScreenTest {
         tap("letters")
         tap("backspace")
         composeRule.runOnIdle { check(sent() == "1$/|~\u007F") { "symbols sent ${sent()}" } }
+
+        // A tap that drifts off Enter before lifting still presses it, as on other keyboards.
+        sentPayloads.clear()
+        composeRule.onNodeWithTag(UiTestTags.inAppKey("enter")).performTouchInput {
+            down(center)
+            moveTo(Offset(center.x, -height.toFloat()))
+            up()
+        }
+        composeRule.runOnIdle { check(sent() == "\r") { "drifting Enter sent ${sent()}" } }
 
         // Long-pressing the top row types its digit.
         sentPayloads.clear()
@@ -1064,6 +1144,44 @@ class ConnectingScreenTest {
     }
 
     @Test
+    fun builtInKeyboard_terminalViewIsNotATextEditor() {
+        // Android opens the system keyboard by itself for a focused text editor when the app is
+        // brought back from the session notification, which put Gboard under the built-in keyboard.
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "user@host:~$ ",
+            useBuiltInKeyboard = true,
+            onSendShellBytes = {}
+        )
+        composeRule.runOnIdle {
+            val terminalView = terminalViewForTest()
+            check(!terminalView.onCheckIsTextEditor()) {
+                "Terminal view reports itself as a text editor in built-in keyboard mode"
+            }
+            check(terminalView.onCreateInputConnection(EditorInfo()) == null) {
+                "Terminal view offers the system keyboard an input connection in built-in keyboard mode"
+            }
+        }
+    }
+
+    @Test
+    fun systemKeyboard_terminalViewStaysATextEditor() {
+        setSshTerminalContentWithCtrlKey(
+            shellOutput = "user@host:~$ ",
+            useBuiltInKeyboard = false,
+            onSendShellBytes = {}
+        )
+        composeRule.runOnIdle {
+            val terminalView = terminalViewForTest()
+            check(terminalView.onCheckIsTextEditor()) {
+                "Terminal view stopped being a text editor with the system keyboard"
+            }
+            check(terminalView.onCreateInputConnection(EditorInfo()) != null) {
+                "Terminal view lost its input connection with the system keyboard"
+            }
+        }
+    }
+
+    @Test
     fun terminalActionModeCopy_doesNotFocusImeBridgeInBuiltInKeyboardMode() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val sentPayloads = mutableListOf<ByteArray>()
@@ -1335,6 +1453,64 @@ class ConnectingScreenTest {
         composeRule.onNodeWithText("F1").assertDoesNotExist()
         composeRule.onNodeWithText("Custom").assertIsDisplayed()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(13)).assertIsDisplayed()
+    }
+
+    @Test
+    fun pasteFromMenu_sendsClipboardOrSaysNothingToPaste() {
+        val sentPayloads = mutableListOf<ByteArray>()
+        val pasteToken = mutableIntStateOf(0)
+        val messages = mutableListOf<String>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    onShowMessage = { messages += it },
+                    findRequestToken = 0,
+                    pasteToken = pasteToken.intValue
+                )
+            }
+        }
+
+        seedClipboardForTerminalPaste("menu-paste")
+        composeRule.runOnIdle { pasteToken.intValue = 1 }
+        composeRule.runOnIdle {
+            val sent = sentPayloads.fold(ByteArray(0)) { all, payload -> all + payload }
+                .toString(StandardCharsets.UTF_8)
+            check(sent.contains("menu-paste")) { "Menu Paste sent: $sent" }
+        }
+
+        sentPayloads.clear()
+        val clipboard = InstrumentationRegistry.getInstrumentation().targetContext
+            .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle { clipboard.clearPrimaryClip() }
+        composeRule.runOnIdle { pasteToken.intValue = 2 }
+        composeRule.runOnIdle {
+            check(sentPayloads.isEmpty()) { "Pasting an empty clipboard sent bytes" }
+            check(messages == listOf("Nothing to paste")) { "Empty-clipboard message: $messages" }
+        }
     }
 
     @Test

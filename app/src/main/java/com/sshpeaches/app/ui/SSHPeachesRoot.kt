@@ -512,6 +512,7 @@ fun SSHPeachesRoot(
     val connectingArrowKeysToggleToken = rememberSaveable { mutableIntStateOf(0) }
     val connectingInsertPasswordToken = rememberSaveable { mutableIntStateOf(0) }
     val connectingSnippetsToken = rememberSaveable { mutableIntStateOf(0) }
+    val connectingPasteToken = rememberSaveable { mutableIntStateOf(0) }
     val connectingResetToken = rememberSaveable { mutableIntStateOf(0) }
     // Mirrors the terminal's swipe-arrow state so the ⋮ menu can show a check.
     val connectingArrowKeysEnabled = remember { mutableStateOf(false) }
@@ -767,6 +768,7 @@ fun SSHPeachesRoot(
             connectingArrowKeysToggleToken.intValue = 0
             connectingInsertPasswordToken.intValue = 0
             connectingSnippetsToken.intValue = 0
+            connectingPasteToken.intValue = 0
             connectingResetToken.intValue = 0
         }
     }
@@ -1725,6 +1727,7 @@ fun SSHPeachesRoot(
                 arrowKeysToggleToken = connectingArrowKeysToggleToken.intValue,
                 insertPasswordToken = connectingInsertPasswordToken.intValue,
                 snippetsToken = connectingSnippetsToken.intValue,
+                pasteToken = connectingPasteToken.intValue,
                 resetToken = connectingResetToken.intValue,
                 onArrowKeysEnabledChange = { enabled -> connectingArrowKeysEnabled.value = enabled },
                 confirmPasswordInsert = uiState.confirmPasswordInsert,
@@ -1889,6 +1892,9 @@ fun SSHPeachesRoot(
                                                 arrowKeysEnabled = connectingArrowKeysEnabled.value,
                                                 onToggleArrowKeys = {
                                                     connectingArrowKeysToggleToken.intValue += 1
+                                                },
+                                                onPaste = {
+                                                    connectingPasteToken.intValue += 1
                                                 },
                                                 onInsertPassword = {
                                                     connectingInsertPasswordToken.intValue += 1

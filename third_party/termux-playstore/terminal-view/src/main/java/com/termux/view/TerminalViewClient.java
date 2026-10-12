@@ -39,6 +39,14 @@ public interface TerminalViewClient {
 
     boolean isTerminalViewSelected();
 
+    /**
+     * Whether text comes from the system keyboard. Return false when the app draws its own
+     * keyboard: the view then stops being a text editor, so Android never opens the system one.
+     */
+    default boolean usesSystemKeyboard() {
+        return true;
+    }
+
     void copyModeChanged(boolean copyMode);
 
     boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession session);

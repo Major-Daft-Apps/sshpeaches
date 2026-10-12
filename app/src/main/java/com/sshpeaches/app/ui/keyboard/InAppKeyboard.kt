@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -158,6 +159,19 @@ private const val DOUBLE_TAP_MS = 400L
 private const val KEY_REPEAT_INITIAL_DELAY_MS = 400L
 private const val KEY_REPEAT_INTERVAL_MS = 50L
 private const val KEY_HEIGHT_DP = 42
+private const val KEY_GAP_X_DP = 3
+private const val KEY_GAP_Y_DP = 4
+
+/**
+ * Waits for [pointerId] to lift. Unlike waitForUpOrCancellation, a finger that drifts off the key
+ * before lifting still counts as a press, as on other phone keyboards; null if the pointer vanished.
+ */
+private suspend fun AwaitPointerEventScope.awaitRelease(pointerId: PointerId): PointerInputChange? {
+    while (true) {
+        val change = awaitPointerEvent().changes.firstOrNull { it.id == pointerId } ?: return null
+        if (!change.pressed) return change
+    }
+}
 
 /**
  * @param onText typed characters, including space; the caller applies latched Ctrl/Alt/Shift.
@@ -202,15 +216,12 @@ fun InAppKeyboard(
     Column(
         modifier = modifier
             .background(colors.panel)
-            .padding(horizontal = 3.dp, vertical = 4.dp)
-            .testTag(UiTestTags.IN_APP_KEYBOARD),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = KEY_GAP_X_DP.dp / 2, vertical = KEY_GAP_Y_DP.dp / 2)
+            .testTag(UiTestTags.IN_APP_KEYBOARD)
     ) {
         InAppKeyboardLayouts.rows(page).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
+            // No spacing between keys: each key's touch area includes half the gap around it.
+            Row(modifier = Modifier.fillMaxWidth()) {
                 row.forEach { key ->
                     when (key) {
                         is InAppKey.Gap -> Spacer(Modifier.weight(key.weight))
@@ -331,10 +342,12 @@ private fun RowScope.InAppKeyButton(
         actionStyle -> colors.actionKey
         else -> colors.key
     }
+    // The outer box is the touch target and covers half the gap around the key, so a tap between
+    // two keys still types one; the inner box draws the key.
     Box(
         modifier = Modifier
             .weight(weight)
-            .height(KEY_HEIGHT_DP.dp)
+            .height((KEY_HEIGHT_DP + KEY_GAP_Y_DP).dp)
             .testTag(testTag)
             .semantics {
                 role = Role.Button
@@ -345,12 +358,10 @@ private fun RowScope.InAppKeyButton(
                     true
                 }
             }
-            .clip(shape)
-            .border(1.dp, colors.border, shape)
-            .background(background)
             .pointerInput(repeatable) {
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false).consume()
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
                     pressed = true
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     try {
@@ -365,12 +376,12 @@ private fun RowScope.InAppKeyButton(
                                     delay(KEY_REPEAT_INTERVAL_MS)
                                 }
                             }
-                            waitForUpOrCancellation()?.consume()
+                            awaitRelease(down.id)?.consume()
                             return@awaitEachGesture
                         }
                         val longPress = currentOnLongPress
                         if (longPress == null) {
-                            waitForUpOrCancellation()?.let {
+                            awaitRelease(down.id)?.let {
                                 it.consume()
                                 currentOnPress()
                             }
@@ -378,13 +389,13 @@ private fun RowScope.InAppKeyButton(
                         }
                         var finished = false
                         val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                            waitForUpOrCancellation().also { finished = true }
+                            awaitRelease(down.id).also { finished = true }
                         }
                         when {
                             !finished -> {
                                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                 longPress()
-                                waitForUpOrCancellation()?.consume()
+                                awaitRelease(down.id)?.consume()
                             }
                             up != null -> {
                                 up.consume()
@@ -397,7 +408,11 @@ private fun RowScope.InAppKeyButton(
                         pressed = false
                     }
                 }
-            },
+            }
+            .padding(horizontal = KEY_GAP_X_DP.dp / 2, vertical = KEY_GAP_Y_DP.dp / 2)
+            .clip(shape)
+            .border(1.dp, colors.border, shape)
+            .background(background),
         contentAlignment = Alignment.Center
     ) {
         Text(
