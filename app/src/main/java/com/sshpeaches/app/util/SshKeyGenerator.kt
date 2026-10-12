@@ -101,7 +101,9 @@ object SshKeyGenerator {
         val pem = parsePem(privateKeyMaterial) ?: return null
         val privateParams = loadPrivateKeyParameters(pem, passphrase) ?: return null
 
-        val publicParams = derivePublicParameters(privateParams) ?: return null
+        // Bouncy Castle validates the derived public key and throws on inconsistent keys (an even RSA exponent, a DSA
+        // modulus of 0); callers such as the identity editor's Save button don't catch, so this must not throw.
+        val publicParams = runCatching { derivePublicParameters(privateParams) }.getOrNull() ?: return null
         val publicBlob = runCatching { OpenSSHPublicKeyUtil.encodePublicKey(publicParams) }.getOrNull() ?: return null
         return toOpenSshPublicLine(publicBlob, comment)
     }
@@ -142,8 +144,13 @@ object SshKeyGenerator {
             ECPublicKeyParameters(q, privateParams.parameters)
         }
         is DSAPrivateKeyParameters -> {
-            val y = privateParams.parameters.g.modPow(privateParams.x, privateParams.parameters.p)
-            DSAPublicKeyParameters(y, privateParams.parameters)
+            // OpenSSH only uses 1024-bit DSA; a huge crafted modulus made modPow run for minutes on the UI thread.
+            if (privateParams.parameters.p.bitLength() > MAX_DSA_MODULUS_BITS) {
+                null
+            } else {
+                val y = privateParams.parameters.g.modPow(privateParams.x, privateParams.parameters.p)
+                DSAPublicKeyParameters(y, privateParams.parameters)
+            }
         }
         is Ed25519PrivateKeyParameters -> privateParams.generatePublicKey()
         else -> null
@@ -206,23 +213,7 @@ object SshKeyGenerator {
         return "SHA256:${Base64.getEncoder().withoutPadding().encodeToString(digest)}"
     }
 
-    private fun parsePem(input: String): PemBlock? {
-        val text = input.trim()
-        val match = PEM_REGEX.find(text) ?: return null
-        val type = match.groupValues[1].trim()
-        val bodyText = match.groupValues[2].replace(Regex("\\s"), "")
-        if (bodyText.isBlank()) return null
-        val body = runCatching { Base64.getDecoder().decode(bodyText) }.getOrNull() ?: return null
-        return PemBlock(type = type, body = body)
-    }
+    private fun parsePem(input: String): PemBlock? = PemBlock.parse(input)
 
-    private data class PemBlock(
-        val type: String,
-        val body: ByteArray
-    )
-
-    private val PEM_REGEX = Regex(
-        pattern = "-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \\1-----",
-        options = setOf(RegexOption.DOT_MATCHES_ALL)
-    )
+    private const val MAX_DSA_MODULUS_BITS = 3072
 }

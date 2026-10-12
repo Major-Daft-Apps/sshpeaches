@@ -111,8 +111,7 @@
 						},
 						"6": {
 							"name": "punctuation.definition.tag.end.yaml"
-						},
-						"comment": "https://yaml.org/spec/1.2.2/#rule-c-tag-handle"
+						}
 					},
 					"patterns": [
 						{

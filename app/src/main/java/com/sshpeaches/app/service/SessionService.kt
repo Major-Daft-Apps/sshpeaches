@@ -2236,12 +2236,15 @@ class SessionService : Service() {
             return
         }
 
-        sftp.ls(path)
-            .filterNot { it.name == "." || it.name == ".." }
-            .forEach { child ->
-                val childPath = if (path.endsWith("/")) "$path${child.name}" else "$path/${child.name}"
-                deleteRemotePathRecursively(sftp, childPath)
-            }
+        val children = sftp.ls(path).filterNot { it.name == "." || it.name == ".." }
+        // Names come from the server. One like "../victim" or "a/b" would make the joined path point outside the
+        // folder being deleted, so refuse the whole delete before removing anything.
+        children.firstOrNull { it.name.isEmpty() || it.name.contains('/') || it.name == "." || it.name == ".." }
+            ?.let { child -> throw IOException("Refusing to delete: the server listed an invalid name \"${child.name}\" in $path") }
+        children.forEach { child ->
+            val childPath = if (path.endsWith("/")) "$path${child.name}" else "$path/${child.name}"
+            deleteRemotePathRecursively(sftp, childPath)
+        }
         sftp.rmdir(path)
     }
 
@@ -2872,19 +2875,19 @@ class SessionService : Service() {
                 DEFAULT_MOSH_SERVER_COMMAND
             }
             val command = session.exec(serverCommand)
-            val stdout = command.inputStream.bufferedReader(StandardCharsets.UTF_8)
-            val stderr = command.errorStream.bufferedReader(StandardCharsets.UTF_8)
+            val stdout = AvailableLineReader(command.inputStream.bufferedReader(StandardCharsets.UTF_8))
+            val stderr = AvailableLineReader(command.errorStream.bufferedReader(StandardCharsets.UTF_8))
             val combined = StringBuilder()
             val deadlineMillis = System.currentTimeMillis() + MOSH_BOOTSTRAP_TIMEOUT_MS
             var connect: MoshConnect? = null
             while (connect == null && System.currentTimeMillis() < deadlineMillis) {
-                readLineIfReady(stdout)?.let { line ->
-                    combined.appendLine(line)
+                stdout.nextLine()?.let { line ->
+                    combined.appendBounded(line)
                     connect = parseMoshConnectLine(line)
                 }
                 if (connect == null) {
-                    readLineIfReady(stderr)?.let { line ->
-                        combined.appendLine(line)
+                    stderr.nextLine()?.let { line ->
+                        combined.appendBounded(line)
                         connect = parseMoshConnectLine(line)
                     }
                 }
@@ -2894,6 +2897,9 @@ class SessionService : Service() {
             }
             runCatching { command.close() }
             connect ?: run {
+                // A prompt such as "[sudo] password for x: " never ends with a newline; show it too.
+                stdout.pendingText().takeIf { it.isNotBlank() }?.let { combined.appendBounded(it) }
+                stderr.pendingText().takeIf { it.isNotBlank() }?.let { combined.appendBounded(it) }
                 val detail = combined.toString().trim().ifBlank {
                     "No MOSH CONNECT reply received."
                 }
@@ -3158,9 +3164,40 @@ class SessionService : Service() {
         return MoshConnect(port = port, key = key)
     }
 
-    private fun readLineIfReady(reader: BufferedReader): String? {
-        if (!reader.ready()) return null
-        return runCatching { reader.readLine() }.getOrNull()
+    /**
+     * Returns whole lines from what has already arrived, never waiting for more. readLine() blocked until a newline,
+     * so a password prompt with none hung mosh startup past its deadline.
+     */
+    private class AvailableLineReader(private val reader: BufferedReader) {
+        private val pending = StringBuilder()
+
+        fun nextLine(): String? {
+            while (true) {
+                val newline = pending.indexOf('\n')
+                if (newline >= 0 || pending.length >= MAX_PENDING_LINE_CHARS) {
+                    val end = if (newline >= 0) newline else pending.length
+                    val line = pending.substring(0, end).removeSuffix("\r")
+                    pending.delete(0, if (newline >= 0) end + 1 else end)
+                    return line
+                }
+                if (!runCatching { reader.ready() }.getOrDefault(false)) return null
+                val ch = runCatching { reader.read() }.getOrDefault(-1)
+                if (ch < 0) return null
+                pending.append(ch.toChar())
+            }
+        }
+
+        fun pendingText(): String = pending.toString()
+
+        private companion object {
+            const val MAX_PENDING_LINE_CHARS = 4_096
+        }
+    }
+
+    /** Keeps server text for an error message to the last few kilobytes, however much the server prints. */
+    private fun StringBuilder.appendBounded(line: String) {
+        appendLine(line)
+        if (length > MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS) delete(0, length - MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS)
     }
 
     private fun detectRemoteOsMetadata(hostId: String, client: SSHClient): OsMetadata? {
@@ -4193,6 +4230,7 @@ class SessionService : Service() {
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
+        private const val MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS = 4_096
         private const val MOSH_INPUT_WRITE_TIMEOUT_MS = 1_000L
         private const val MOSH_INPUT_RETRY_DELAY_MS = 50L
         private const val MOSH_INPUT_CHUNK_BYTES = 2 * 1024

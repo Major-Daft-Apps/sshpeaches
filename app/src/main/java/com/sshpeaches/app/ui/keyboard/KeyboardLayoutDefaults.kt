@@ -140,7 +140,9 @@ object KeyboardLayoutDefaults {
 
     fun compactLabel(action: KeyboardSlotAction, fallback: String = ""): String {
         val base = if (action.label.isNotBlank()) action.label else action.text
+        // Never end on half a surrogate pair, which would show an emoji as a broken glyph.
         val compact = base.trim().replace("\n", " ").take(COMPACT_KEY_LABEL_MAX_CHARS)
+            .let { if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it }
         return if (compact.isBlank()) fallback else compact
     }
 

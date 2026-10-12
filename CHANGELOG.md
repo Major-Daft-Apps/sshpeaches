@@ -4,6 +4,23 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.6 (1106)
+
+Fixes from a fuzz-testing sweep:
+
+- Terminal: output a server (or a file you `cat`) can send no longer freezes or crashes the app. Huge scroll and repeat counts (`CSI 9999 S`, `CSI 9999 b`) with side margins took seconds to minutes on the main thread; OSC 104 colour resets with a bad number, attribute changes in origin mode and a wide character right of the margin threw (over SSH that dropped the rest of the output, over Mosh it crashed). Long-pressing a word in one very long wrapped line no longer stalls.
+- Find no longer crashes on Turkish İ in the terminal output.
+- Hardware keyboards: AltGr characters (@ [ { ~ on German and other layouts) no longer get an ESC in front, dead keys (´ ^ `) compose instead of disappearing, and Ctrl+@ / Ctrl+? send NUL and DEL like other terminals.
+- Hosts and port forwards accept IPv6 addresses (::1, fe80::1) and single-word host names (raspberrypi, db).
+- OpenSSH config import works out options the way ssh does: the first value wins, options from several matching Host blocks (including wildcards like `Host *.corp`) are combined, quotes are removed (`User "bob"`), and an invalid Port is reported instead of silently becoming 22.
+- Importing a malformed private key no longer crashes the identity editor, and huge or malformed key files no longer freeze it.
+- Scanning a host QR no longer overwrites an existing host with the same id, rejects invalid ports, and keeps "attach to tmux"; identity QRs without a fingerprint are rejected.
+- SFTP downloads fail with a clear error instead of looping forever on empty server replies or saving a zero-padded file when the file ends early.
+- Recursive delete refuses a server listing that would point outside the folder being deleted.
+- Mosh startup no longer hangs past its timeout on a prompt without a newline (such as a sudo password prompt).
+- "Send report" no longer freezes on long server messages, and reports scrub more addresses and paths.
+- Smaller fixes: the system info panel stays fast on odd command output and no longer shows overflowed sizes; LAN transfer has an overall deadline and can always be cancelled; very large transfer files are refused; XML and Markdown files now get syntax highlighting (their grammars failed to load); OS version labels with a colon survive export; emoji in short key labels are no longer cut in half.
+
 ## 0.11.5 (1105)
 
 Release date: 2026-10-12

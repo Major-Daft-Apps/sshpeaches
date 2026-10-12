@@ -858,6 +858,9 @@ public final class TerminalEmulator {
                                 int left = Math.min(getArg(1, 1, true) - 1, effectiveRightMargin) + effectiveLeftMargin;
                                 int bottom = Math.min(getArg(2, mRows, true) + 1, effectiveBottomMargin - 1) + effectiveTopMargin;
                                 int right = Math.min(getArg(3, mColumns, true) + 1, effectiveRightMargin - 1) + effectiveLeftMargin;
+                                // In origin mode the margins are added after clamping; keep the area on the screen.
+                                bottom = Math.min(bottom, effectiveBottomMargin);
+                                right = Math.min(right, effectiveRightMargin);
                                 if (mArgIndex >= 4) {
                                     if (mArgIndex >= mArgs.length) mArgIndex = mArgs.length - 1;
                                     for (int i = 4; i <= mArgIndex; i++) {
@@ -1855,9 +1858,22 @@ public final class TerminalEmulator {
             }
             break;
             case 'S': { // "${CSI}${N}S" - scroll up ${N} lines (default = 1) (SU).
-                final int linesToScroll = getArg0(1);
-                for (int i = 0; i < linesToScroll; i++)
-                    scrollDownOneLine();
+                final int linesToScrollArg = getArg0(1);
+                if (mLeftMargin != 0 || mRightMargin != mColumns) {
+                    // Nothing goes to history with left/right margins, so move the region once instead of once per
+                    // line: a server sending CSI 9999 S used to make 9999 full-region copies and freeze the app.
+                    final int linesBetweenTopAndBottomMargins = mBottomMargin - mTopMargin;
+                    final int linesToScroll = Math.min(linesBetweenTopAndBottomMargins, linesToScrollArg);
+                    final int width = mRightMargin - mLeftMargin;
+                    mScrollCounter += linesToScroll;
+                    mScreen.blockCopy(mLeftMargin, mTopMargin + linesToScroll, width, linesBetweenTopAndBottomMargins - linesToScroll, mLeftMargin, mTopMargin);
+                    mScreen.blockSet(mLeftMargin, mBottomMargin - linesToScroll, width, linesToScroll, ' ', getStyle());
+                } else {
+                    // Scrolling more lines than the buffer holds only blanks it again.
+                    final int linesToScroll = Math.min(linesToScrollArg, mScreen.mTotalRows);
+                    for (int i = 0; i < linesToScroll; i++)
+                        scrollDownOneLine();
+                }
                 break;
             }
             case 'T':
@@ -1907,7 +1923,9 @@ public final class TerminalEmulator {
                 break;
             case 'b': // Repeat the preceding graphic character Ps times (REP).
                 if (mLastEmittedCodePoint == -1) break;
-                final int numRepeat = getArg0(1);
+                // More than a screenful of repeats only pushes copies into history; cap it so a hostile count cannot
+                // keep the app busy.
+                final int numRepeat = Math.min(getArg0(1), mColumns * mRows);
                 for (int i = 0; i < numRepeat; i++) emitCodePoint(mLastEmittedCodePoint);
                 break;
             case 'c': // Primary Device Attributes (http://www.vt100.net/docs/vt510-rm/DA1) if argument is missing or zero.
@@ -2325,20 +2343,16 @@ public final class TerminalEmulator {
                     mColors.reset();
                     mSession.onColorsChanged();
                 } else {
-                    int lastIndex = 0;
-                    for (int charIndex = 0; ; charIndex++) {
-                        boolean endOfInput = charIndex == textParameter.length();
-                        if (endOfInput || textParameter.charAt(charIndex) == ';') {
-                            try {
-                                int colorToReset = Integer.parseInt(textParameter.substring(lastIndex, charIndex));
-                                mColors.reset(colorToReset);
-                                mSession.onColorsChanged();
-                                if (endOfInput) break;
-                                charIndex++;
-                                lastIndex = charIndex;
-                            } catch (NumberFormatException e) {
-                                // Ignore.
-                            }
+                    // Skip parameters that are not a color number in range; the old loop ran past the end of the
+                    // text on one and threw, which dropped the rest of the server's output.
+                    for (String colorParameter : textParameter.split(";")) {
+                        try {
+                            int colorToReset = Integer.parseInt(colorParameter);
+                            if (colorToReset < 0 || colorToReset >= TextStyle.NUM_INDEXED_COLORS) continue;
+                            mColors.reset(colorToReset);
+                            mSession.onColorsChanged();
+                        } catch (NumberFormatException e) {
+                            // Ignore.
                         }
                     }
                 }
@@ -2691,6 +2705,12 @@ public final class TerminalEmulator {
         } else if (cursorInLastColumn && displayWidth == 2) {
             // The behaviour when a wide character is output with cursor in the last column when
             // autowrap is disabled is not obvious - it's ignored here.
+            return;
+        }
+
+        if (displayWidth == 2 && mCursorCol >= mColumns - 1) {
+            // The cursor can sit right of the right margin (e.g. CUP outside origin mode). A wide character does not
+            // fit in the screen's last column, so drop it as in the no-autowrap case above instead of throwing.
             return;
         }
 

@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.data.ssh
 
+import com.majordaftapps.sshpeaches.app.util.PemBlock
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.spec.PKCS8EncodedKeySpec
@@ -94,19 +95,7 @@ internal object Ed25519IdentityKeyProvider {
         }.getOrNull()
     }
 
-    private fun parsePem(input: String): PemBlock? {
-        val match = PEM_REGEX.find(input.trim()) ?: return null
-        val type = match.groupValues[1].trim()
-        val bodyText = match.groupValues[2].replace(Regex("\\s"), "")
-        if (bodyText.isBlank()) return null
-        val body = runCatching { Base64.getDecoder().decode(bodyText) }.getOrNull() ?: return null
-        return PemBlock(type = type, body = body)
-    }
-
-    private data class PemBlock(
-        val type: String,
-        val body: ByteArray
-    )
+    private fun parsePem(input: String): PemBlock? = PemBlock.parse(input)
 
     private class Ed25519RawKeyProvider(
         private val publicKey: PublicKey,
@@ -142,9 +131,4 @@ internal object Ed25519IdentityKeyProvider {
 
         override fun rawPublicKey(): ByteArray = publicKey.copyOf()
     }
-
-    private val PEM_REGEX = Regex(
-        pattern = "-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \\1-----",
-        options = setOf(RegexOption.DOT_MATCHES_ALL)
-    )
 }

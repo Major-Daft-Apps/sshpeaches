@@ -47,9 +47,7 @@ object HostSystemInfoCollector {
     fun parse(raw: String, nowEpochMillis: Long = System.currentTimeMillis()): HostSystemInfo {
         val freeOutput = extractBlock(raw, FREE_BEGIN, FREE_END)
         val dfOutput = extractBlock(raw, DF_BEGIN, DF_END)?.let(::filterPhysicalDf)
-        val scalarRaw = raw
-            .replace(Regex("$FREE_BEGIN[\\s\\S]*?$FREE_END"), "")
-            .replace(Regex("$DF_BEGIN[\\s\\S]*?$DF_END"), "")
+        val scalarRaw = removeBlocks(removeBlocks(raw, FREE_BEGIN, FREE_END), DF_BEGIN, DF_END)
         val values = linkedMapOf<String, String>()
         scalarRaw.lineSequence().forEach { line ->
             val trimmed = line.trim()
@@ -99,6 +97,25 @@ object HostSystemInfoCollector {
         return "$formatted ${units[unit]}"
     }
 
+    /**
+     * [raw] without each begin..end block. A lazy regex did this but rescanned to the end of the output for every
+     * begin marker without an end, so hostile command output kept the parser busy for minutes.
+     */
+    private fun removeBlocks(raw: String, begin: String, end: String): String {
+        val remaining = StringBuilder()
+        var index = 0
+        while (true) {
+            val start = raw.indexOf(begin, index)
+            if (start < 0) break
+            val stop = raw.indexOf(end, start + begin.length)
+            if (stop < 0) break
+            remaining.append(raw, index, start)
+            index = stop + end.length
+        }
+        remaining.append(raw, index, raw.length)
+        return remaining.toString()
+    }
+
     internal fun extractBlock(raw: String, begin: String, end: String): String? {
         val startToken = "\n$begin\n"
         val endToken = "\n$end"
@@ -141,10 +158,13 @@ object HostSystemInfoCollector {
         return (listOf(header) + body).joinToString("\n")
     }
 
+    // Sizes in KiB that fit in a Long once converted to bytes; only a broken or hostile server sends bigger ones.
+    private val KB_RANGE = 0L..(Long.MAX_VALUE / 1024L)
+
     private fun formatMemory(totalKb: String?, availKb: String?, totalBytes: String?): String? {
-        val totalFromKb = totalKb?.toLongOrNull()?.times(1024L)
-        val availFromKb = availKb?.toLongOrNull()?.times(1024L)
-        val totalFromB = totalBytes?.toLongOrNull()
+        val totalFromKb = totalKb?.toLongOrNull()?.takeIf { it in KB_RANGE }?.times(1024L)
+        val availFromKb = availKb?.toLongOrNull()?.takeIf { it in KB_RANGE }?.times(1024L)
+        val totalFromB = totalBytes?.toLongOrNull()?.takeIf { it >= 0L }
         val total = totalFromKb ?: totalFromB ?: return null
         return if (availFromKb != null) {
             "${formatIecBytes(availFromKb)} available / ${formatIecBytes(total)}"
@@ -160,7 +180,7 @@ object HostSystemInfoCollector {
         val totalKb = parts[0].toLongOrNull()
         val usedKb = parts[1].toLongOrNull()
         val percent = parts.getOrNull(3)
-        if (totalKb == null || usedKb == null) return raw.trim()
+        if (totalKb == null || usedKb == null || totalKb !in KB_RANGE || usedKb !in KB_RANGE) return raw.trim()
         val used = formatIecBytes(usedKb * 1024L)
         val total = formatIecBytes(totalKb * 1024L)
         return if (percent.isNullOrBlank()) "$used used of $total" else "$used used of $total ($percent)"

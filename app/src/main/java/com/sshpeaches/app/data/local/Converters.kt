@@ -75,7 +75,7 @@ object Converters {
         return when {
             raw == "Undetected" -> OsMetadata.Undetected
             raw.startsWith("Known:") -> {
-                val parts = raw.split(":")
+                val parts = raw.split(":", limit = 3)
                 val family = parts.getOrNull(1)?.let { runCatching { OsFamily.valueOf(it) }.getOrNull() }
                 val ver = parts.getOrNull(2)?.takeIf { it.isNotBlank() }
                 if (family != null) OsMetadata.Known(family, ver) else OsMetadata.Undetected

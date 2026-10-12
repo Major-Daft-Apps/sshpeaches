@@ -202,6 +202,17 @@ object SftpPipelinedDownloader {
             // One completion frees one slot. A short DATA reply re-reads the
             // remainder of that request; otherwise the slot is used for the
             // next sequential offset. Never both, never above the window.
+            if (data == null && completed.offset < end) {
+                // EOF inside the range: the file is shorter than stat said (it shrank, or it is a /proc-style
+                // file). Carrying on left zeros in the gap and reported the download complete.
+                throw IOException(
+                    "The remote file ended at ${completed.offset} bytes, before its expected size of $fileSize bytes"
+                )
+            }
+            if (data != null && data.isEmpty()) {
+                // A DATA reply must carry bytes; re-requesting the same offset after empty replies looped forever.
+                throw IOException("The SFTP server sent an empty read reply at offset ${completed.offset}")
+            }
             if (data != null) {
                 if (data.isNotEmpty()) {
                     sink.writeAt(completed.offset, data)

@@ -1,5 +1,6 @@
 package com.majordaftapps.sshpeaches.app.ui.terminal
 
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalEmulator
@@ -182,8 +183,17 @@ class TerminalInputRouter(
         }
 
         val unicode = event.getUnicodeChar(effectiveMetaState)
+        if ((unicode and KeyCharacterMap.COMBINING_ACCENT) != 0) {
+            // A dead key (´ ^ ` on many layouts): leave it unhandled so the view composes it with the next key
+            // instead of the accent being swallowed.
+            return false
+        }
         if (unicode != 0) {
-            sendCodePoint(unicode, controlDown, altDown || leftAltDown)
+            // Right Alt is AltGr on most non-US layouts: it picks the character (@ [ { ~ on a German keyboard), so
+            // only left Alt, or Alt latched from the extra keys, sends the ESC prefix.
+            val escapePrefix = externalAltDown || leftAltDown ||
+                ((metaState and KeyEvent.META_ALT_MASK) != 0 && !rightAltDownFromEvent)
+            sendCodePoint(unicode, controlDown, escapePrefix)
             return true
         }
 
@@ -226,13 +236,13 @@ class TerminalInputRouter(
         return when {
             codePoint in 'a'.code..'z'.code -> codePoint - 'a'.code + 1
             codePoint in 'A'.code..'Z'.code -> codePoint - 'A'.code + 1
-            codePoint == ' '.code || codePoint == '2'.code -> 0
+            codePoint == ' '.code || codePoint == '2'.code || codePoint == '@'.code -> 0
             codePoint == '['.code || codePoint == '3'.code -> 27
             codePoint == '\\'.code || codePoint == '4'.code -> 28
             codePoint == ']'.code || codePoint == '5'.code -> 29
             codePoint == '^'.code || codePoint == '6'.code -> 30
             codePoint == '_'.code || codePoint == '7'.code || codePoint == '/'.code -> 31
-            codePoint == '8'.code -> 127
+            codePoint == '8'.code || codePoint == '?'.code -> 127
             else -> codePoint
         }
     }

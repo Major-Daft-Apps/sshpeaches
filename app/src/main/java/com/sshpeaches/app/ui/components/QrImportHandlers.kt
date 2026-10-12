@@ -25,13 +25,22 @@ fun processHostQrImport(
 ): HostQrImportResult {
     val payload = decodeHostFromQr(contents)
     val imported = payload?.host
-    if (imported == null || imported.host.isBlank() || imported.username.isBlank()) {
+    if (
+        imported == null ||
+        imported.host.isBlank() ||
+        imported.username.isBlank() ||
+        imported.port !in 1..65_535
+    ) {
         return HostQrImportResult.Error("Invalid host QR")
     }
     if (existingHosts.any { it.name.equals(imported.name, ignoreCase = true) }) {
         return HostQrImportResult.Error("Host already exists")
     }
-    val targetId = imported.id.takeIf { it.isNotBlank() } ?: idProvider()
+    // Saving replaces a host with the same id, so a QR whose id is already taken (e.g. by a host renamed since it
+    // was shared) gets a new one instead of overwriting that host.
+    val targetId = imported.id
+        .takeIf { id -> id.isNotBlank() && existingHosts.none { it.id == id } }
+        ?: idProvider()
     return HostQrImportResult.Ready(
         HostQrImportData(
             host = imported,
@@ -69,7 +78,7 @@ fun processIdentityQrImport(
 ): IdentityQrImportResult {
     val payload = decodeIdentityFromQr(contents)
     val imported = payload?.identity
-    if (imported == null) {
+    if (imported == null || imported.fingerprint.isBlank()) {
         return IdentityQrImportResult.Error("Invalid identity QR")
     }
     val existing = existingIdentities.find { it.fingerprint.equals(imported.fingerprint, ignoreCase = true) }
@@ -85,7 +94,9 @@ fun processIdentityQrImport(
             )
         )
     }
-    val targetId = imported.id.takeIf { it.isNotBlank() } ?: idProvider()
+    val targetId = imported.id
+        .takeIf { id -> id.isNotBlank() && existingIdentities.none { it.id == id } }
+        ?: idProvider()
     return IdentityQrImportResult.Ready(
         IdentityQrImportData(
             identity = imported.copy(

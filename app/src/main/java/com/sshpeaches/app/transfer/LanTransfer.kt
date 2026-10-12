@@ -3,7 +3,9 @@ package com.majordaftapps.sshpeaches.app.transfer
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
 import java.io.IOException
+import java.io.InputStream
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -135,6 +137,11 @@ object LanTransfer {
         val host: String = bindAddress.hostAddress.orEmpty()
         val port: Int get() = server.localPort
 
+        // Closed by close() as well: a peer that connects and never reads leaves write() blocked, and a socket
+        // timeout does not cover writes.
+        @Volatile
+        private var activePeer: Socket? = null
+
         /** @return the address that received the payload */
         fun awaitTransfer(timeoutMs: Int): InetAddress {
             server.soTimeout = timeoutMs
@@ -144,6 +151,7 @@ object LanTransfer {
                 if (remaining <= 0) throw SocketTimeoutException("Nobody connected in time.")
                 server.soTimeout = remaining
                 val socket = server.accept()
+                activePeer = socket
                 socket.use {
                     val peer = it.inetAddress
                     if (!allowPeer(peer)) return@use
@@ -162,6 +170,7 @@ object LanTransfer {
 
         override fun close() {
             runCatching { server.close() }
+            runCatching { activePeer?.close() }
         }
     }
 
@@ -177,13 +186,29 @@ object LanTransfer {
         if (!allowPeer(address)) throw IOException("$host isn't on your local network.")
         Socket().use { socket ->
             socket.connect(InetSocketAddress(address, port), timeoutMs)
-            socket.soTimeout = timeoutMs
-            val input = DataInputStream(socket.getInputStream())
-            val size = input.readInt()
+            // One deadline for the whole frame: the socket timeout alone applies per read, so a sender dripping a
+            // byte at a time could hold the receive (and block new ones) indefinitely.
+            val deadline = System.currentTimeMillis() + 2L * timeoutMs
+            val input = socket.getInputStream()
+            val header = ByteArray(4)
+            readFullyBefore(socket, input, header, deadline)
+            val size = DataInputStream(header.inputStream()).readInt()
             if (size <= 0 || size > MAX_FRAME_BYTES) throw IOException("That device sent an invalid transfer.")
             val frame = ByteArray(size)
-            input.readFully(frame)
+            readFullyBefore(socket, input, frame, deadline)
             return decrypt(frame, code)
+        }
+    }
+
+    private fun readFullyBefore(socket: Socket, input: InputStream, buffer: ByteArray, deadline: Long) {
+        var offset = 0
+        while (offset < buffer.size) {
+            val remaining = deadline - System.currentTimeMillis()
+            if (remaining <= 0) throw SocketTimeoutException("The transfer took too long.")
+            socket.soTimeout = remaining.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            val read = input.read(buffer, offset, buffer.size - offset)
+            if (read < 0) throw EOFException("The other device closed the connection.")
+            offset += read
         }
     }
 }

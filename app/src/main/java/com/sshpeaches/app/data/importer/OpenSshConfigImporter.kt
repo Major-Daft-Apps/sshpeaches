@@ -35,12 +35,12 @@ object OpenSshConfigImporter {
     ): OpenSshConfigImportResult {
         val parsed = parseBlocks(contents)
         val warnings = parsed.warnings.toMutableList()
-        val wildcardBlocks = parsed.hostBlocks.filter { block ->
-            block.patterns.any { it == "*" }
-        }
-        val concreteBlocks = parsed.hostBlocks.filter { block ->
-            block.patterns.any { !isPattern(it) }
-        }
+        // Every concrete alias, once, in file order; its options come from every block that matches it.
+        val aliases = parsed.hostBlocks
+            .flatMap { block -> block.patterns.filterNot(::isPattern) }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
 
         val seenHostNames = existingHosts.map { it.name.lowercase() }.toMutableSet()
         val seenForwardKeys = existingPortForwards.map { it.forwardKey() }.toMutableSet()
@@ -48,82 +48,83 @@ object OpenSshConfigImporter {
         val importedForwards = mutableListOf<OpenSshImportedForward>()
         val now = nowProvider()
 
-        for (block in concreteBlocks) {
-            val options = mergedOptions(parsed.globalOptions, wildcardBlocks, block)
-            for (rawAlias in block.patterns) {
-                if (isPattern(rawAlias)) continue
-                val alias = rawAlias.trim()
-                if (alias.isBlank()) continue
-                val hostName = options.first("hostname")
-                    ?.substituteHostAlias(alias)
-                    ?.takeIf { !containsUnresolvedToken(it) }
-                    ?: alias
-                val user = options.first("user")?.takeIf { it.isNotBlank() }
-                if (user == null) {
-                    warnings += "Skipped $alias: missing User."
-                    continue
+        val blockIndex = HostBlockIndex(parsed.hostBlocks)
+        for (alias in aliases) {
+            val options = optionsFor(alias, parsed, blockIndex)
+            val hostName = options.first("hostname")
+                ?.substituteHostAlias(alias)
+                ?.takeIf { !containsUnresolvedToken(it) }
+                ?: alias
+            val user = options.first("user")?.takeIf { it.isNotBlank() }
+            if (user == null) {
+                warnings += "Skipped $alias: missing User."
+                continue
+            }
+            val normalizedName = alias.lowercase()
+            if (!seenHostNames.add(normalizedName)) {
+                warnings += "Skipped $alias: host name already exists."
+                continue
+            }
+            val portValue = options.first("port")
+            val validPort = portValue?.toIntOrNull()?.takeIf { it in 1..65_535 }
+            val port = validPort ?: 22
+            if (portValue != null && validPort == null) {
+                warnings += "Port $portValue for $alias is not valid; using 22."
+            }
+            val identityFiles = options.all("identityfile").distinct()
+            val hostId = idProvider()
+            val noteLines = buildList {
+                add("Imported from OpenSSH config.")
+                if (identityFiles.isNotEmpty()) {
+                    add("IdentityFile entries were not imported as private keys:")
+                    identityFiles.forEach { add("- $it") }
                 }
-                val normalizedName = alias.lowercase()
-                if (!seenHostNames.add(normalizedName)) {
-                    warnings += "Skipped $alias: host name already exists."
-                    continue
-                }
-                val port = options.first("port")?.toIntOrNull()?.takeIf { it in 1..65_535 } ?: 22
-                val identityFiles = options.all("identityfile").distinct()
-                val hostId = idProvider()
-                val noteLines = buildList {
-                    add("Imported from OpenSSH config.")
-                    if (identityFiles.isNotEmpty()) {
-                        add("IdentityFile entries were not imported as private keys:")
-                        identityFiles.forEach { add("- $it") }
-                    }
-                }
-                val host = HostConnection(
-                    id = hostId,
-                    name = alias,
-                    host = hostName,
-                    port = port,
-                    username = user,
-                    preferredAuth = AuthMethod.PASSWORD,
-                    group = "OpenSSH",
-                    createdEpochMillis = now,
-                    updatedEpochMillis = now,
-                    notes = noteLines.joinToString("\n"),
-                    defaultMode = ConnectionMode.SSH
-                )
-                importedHosts += OpenSshImportedHost(
-                    host = host,
-                    alias = alias,
-                    identityFiles = identityFiles
-                )
+            }
+            val host = HostConnection(
+                id = hostId,
+                name = alias,
+                host = hostName,
+                port = port,
+                username = user,
+                preferredAuth = AuthMethod.PASSWORD,
+                group = "OpenSSH",
+                createdEpochMillis = now,
+                updatedEpochMillis = now,
+                notes = noteLines.joinToString("\n"),
+                defaultMode = ConnectionMode.SSH
+            )
+            importedHosts += OpenSshImportedHost(
+                host = host,
+                alias = alias,
+                identityFiles = identityFiles
+            )
 
-                options.all("localforward").forEachIndexed { index, value ->
-                    val parsedForward = parseLocalForward(value)
-                    if (parsedForward == null) {
-                        warnings += "Skipped LocalForward for $alias: $value"
-                        return@forEachIndexed
-                    }
-                    val forward = PortForward(
-                        id = idProvider(),
-                        label = "$alias local ${parsedForward.sourcePort}",
-                        group = "OpenSSH",
-                        type = PortForwardType.LOCAL,
-                        sourceHost = parsedForward.sourceHost,
-                        sourcePort = parsedForward.sourcePort,
-                        destinationHost = parsedForward.destinationHost,
-                        destinationPort = parsedForward.destinationPort,
-                        associatedHosts = listOf(hostId),
-                        enabled = false,
-                        createdEpochMillis = now,
-                        updatedEpochMillis = now
-                    )
-                    val key = forward.forwardKey()
-                    if (!seenForwardKeys.add(key)) {
-                        warnings += "Skipped duplicate LocalForward for $alias: ${index + 1}."
-                        return@forEachIndexed
-                    }
-                    importedForwards += OpenSshImportedForward(forward = forward, hostAlias = alias)
+            options.all("localforward").forEachIndexed { index, value ->
+                val parsedForward = parseLocalForward(value)
+                if (parsedForward == null) {
+                    warnings += "Skipped LocalForward for $alias: $value"
+                    return@forEachIndexed
                 }
+                val forward = PortForward(
+                    id = idProvider(),
+                    label = "$alias local ${parsedForward.sourcePort}",
+                    group = "OpenSSH",
+                    type = PortForwardType.LOCAL,
+                    sourceHost = parsedForward.sourceHost,
+                    sourcePort = parsedForward.sourcePort,
+                    destinationHost = parsedForward.destinationHost,
+                    destinationPort = parsedForward.destinationPort,
+                    associatedHosts = listOf(hostId),
+                    enabled = false,
+                    createdEpochMillis = now,
+                    updatedEpochMillis = now
+                )
+                val key = forward.forwardKey()
+                if (!seenForwardKeys.add(key)) {
+                    warnings += "Skipped duplicate LocalForward for $alias: ${index + 1}."
+                    return@forEachIndexed
+                }
+                importedForwards += OpenSshImportedForward(forward = forward, hostAlias = alias)
             }
         }
 
@@ -186,12 +187,84 @@ object OpenSshConfigImporter {
         )
     }
 
-    private fun mergedOptions(global: OptionSet, wildcardBlocks: List<HostBlock>, block: HostBlock): OptionSet =
+    /**
+     * The options ssh would use for [alias]: the global ones, then every Host block whose patterns match, in file
+     * order. Values are unquoted; for single-valued options the first one wins, as in ssh.
+     */
+    private fun optionsFor(alias: String, parsed: ParsedConfig, blockIndex: HostBlockIndex): OptionSet =
         OptionSet().apply {
-            merge(global)
-            wildcardBlocks.forEach { merge(it.options) }
-            merge(block.options)
+            merge(parsed.globalOptions)
+            blockIndex.candidates(alias)
+                .filter { index -> matchesHostPatterns(alias, parsed.hostBlocks[index].patterns) }
+                .forEach { index -> merge(parsed.hostBlocks[index].options) }
         }
+
+    /**
+     * Finds the blocks that may match an alias without testing every block: blocks of plain names are looked up by
+     * name, and only blocks with wildcards or negations are tested against every alias.
+     */
+    private class HostBlockIndex(blocks: List<HostBlock>) {
+        private val byName = mutableMapOf<String, MutableList<Int>>()
+        private val withPatterns = mutableListOf<Int>()
+
+        init {
+            blocks.forEachIndexed { index, block ->
+                if (block.patterns.any { OpenSshConfigImporter.isPattern(it) }) {
+                    withPatterns += index
+                } else {
+                    block.patterns.map { it.trim().lowercase() }.distinct().forEach { name ->
+                        byName.getOrPut(name) { mutableListOf() } += index
+                    }
+                }
+            }
+        }
+
+        /** Block indexes in file order. */
+        fun candidates(alias: String): List<Int> =
+            (byName[alias.lowercase()].orEmpty() + withPatterns).sorted()
+    }
+
+    /** ssh's rule: the alias matches a positive pattern and none of the negated (!) ones. */
+    private fun matchesHostPatterns(alias: String, patterns: List<String>): Boolean {
+        var matched = false
+        for (pattern in patterns) {
+            if (pattern.startsWith("!")) {
+                if (globMatches(pattern.substring(1), alias)) return false
+            } else if (globMatches(pattern, alias)) {
+                matched = true
+            }
+        }
+        return matched
+    }
+
+    /** Case-insensitive glob with `*` and `?`, in linear time per pattern position (no backtracking blow-up). */
+    private fun globMatches(pattern: String, text: String): Boolean {
+        val p = pattern.lowercase()
+        val t = text.lowercase()
+        var pi = 0
+        var ti = 0
+        var starPattern = -1
+        var starText = 0
+        while (ti < t.length) {
+            when {
+                pi < p.length && (p[pi] == '?' || p[pi] == t[ti]) -> {
+                    pi++
+                    ti++
+                }
+                pi < p.length && p[pi] == '*' -> {
+                    starPattern = pi++
+                    starText = ti
+                }
+                starPattern >= 0 -> {
+                    pi = starPattern + 1
+                    ti = ++starText
+                }
+                else -> return false
+            }
+        }
+        while (pi < p.length && p[pi] == '*') pi++
+        return pi == p.length
+    }
 
     private fun parseDirective(line: String): Directive? {
         var separatorIndex = -1
@@ -347,14 +420,20 @@ object OpenSshConfigImporter {
             values.getOrPut(keyword.lowercase()) { mutableListOf() } += value
         }
 
+        /** ssh uses the first value it finds for an option, with quotes removed (`User "bob"` is bob). */
+        fun first(keyword: String): String? =
+            values[keyword.lowercase()]?.firstOrNull()?.let(::unquote)?.takeIf { it.isNotBlank() }
+
+        fun all(keyword: String): List<String> =
+            values[keyword.lowercase()].orEmpty().map(::unquote).filter { it.isNotBlank() }
+
+        private fun unquote(value: String): String = OpenSshConfigImporter.splitWords(value).joinToString(" ")
+
         fun merge(other: OptionSet) {
             other.values.forEach { (keyword, incoming) ->
                 values.getOrPut(keyword) { mutableListOf() } += incoming
             }
         }
 
-        fun first(keyword: String): String? = values[keyword.lowercase()]?.lastOrNull()
-
-        fun all(keyword: String): List<String> = values[keyword.lowercase()].orEmpty()
     }
 }

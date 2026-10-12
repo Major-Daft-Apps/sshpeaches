@@ -32,6 +32,7 @@ fun encodeHostPayload(
         put("notes", host.notes)
         put("hasPassword", host.hasPassword)
         put("useMosh", host.useMosh)
+        put("attachTmux", host.attachTmux)
         put("preferredIdentityId", host.preferredIdentityId ?: "")
         put("preferredForwardId", host.preferredForwardId ?: "")
         put("startupScript", host.startupScript)

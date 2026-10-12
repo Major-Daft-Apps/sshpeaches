@@ -125,6 +125,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import androidx.window.core.layout.WindowWidthSizeClass
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -3590,12 +3591,27 @@ internal fun decodeTransferPayloadEnvelope(encodedPayload: String): String? {
     }.getOrNull() ?: return null
     val payloadBytes = if (decodedBytes.isGzipPayload()) {
         runCatching {
-            GZIPInputStream(ByteArrayInputStream(decodedBytes)).use { gzip -> gzip.readBytes() }
+            GZIPInputStream(ByteArrayInputStream(decodedBytes)).use { gzip -> gzip.readAtMost(MAX_TRANSFER_PAYLOAD_BYTES) }
         }.getOrNull() ?: return null
     } else {
         decodedBytes
     }
     return payloadBytes.toString(Charsets.UTF_8)
+}
+
+// Far above any real export; stops a small crafted file from inflating into hundreds of megabytes.
+private const val MAX_TRANSFER_PAYLOAD_BYTES = 16 * 1024 * 1024
+
+/** The whole stream, or null if it is longer than [limit] bytes. */
+private fun InputStream.readAtMost(limit: Int): ByteArray? {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) return output.toByteArray()
+        if (output.size() + read > limit) return null
+        output.write(buffer, 0, read)
+    }
 }
 
 private fun ByteArray.isGzipPayload(): Boolean =

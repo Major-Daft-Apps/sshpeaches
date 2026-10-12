@@ -4715,12 +4715,13 @@ private fun computeTerminalFindMatches(
     }
     val searchableText = indexedTranscript?.text ?: text
     if (searchableText.isBlank()) return emptyList()
-    val haystack = if (caseSensitive) searchableText else searchableText.lowercase()
-    val needle = if (caseSensitive) trimmedQuery else trimmedQuery.lowercase()
+    // Compare in place rather than searching a lowercased copy: lowercasing can change the length (Turkish "İ"
+    // becomes two chars), and indexes from the copy then pointed past the end of the real text and crashed.
+    val needle = trimmedQuery
     val matches = mutableListOf<TerminalFindMatch>()
     var startAt = 0
-    while (startAt < haystack.length) {
-        val hit = haystack.indexOf(needle, startAt)
+    while (startAt < searchableText.length) {
+        val hit = searchableText.indexOf(needle, startAt, ignoreCase = !caseSensitive)
         if (hit < 0) break
         val line = searchableText.substring(0, hit).count { it == '\n' } + 1
         val lineStart = searchableText.lastIndexOf('\n', hit - 1).let { idx -> if (idx >= 0) idx + 1 else 0 }

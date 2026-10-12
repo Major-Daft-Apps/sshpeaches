@@ -216,14 +216,27 @@ public final class TerminalBuffer {
         int startRow = y;
         int endRow = y;
 
-        while (startRow > minRow && !getSelectedText(0, startRow - 1, mColumns, y, true, true).contains("\n")) {
+        // Check one row at a time: building the text of the whole range on every step was quadratic, and a long-press
+        // on one line wrapped across thousands of rows froze the app.
+        while (startRow > minRow && joinsNextRow(startRow - 1)) {
             startRow--;
         }
-        while (endRow < mScreenRows - 1 && !getSelectedText(0, y, mColumns, endRow + 1, true, true).contains("\n")) {
+        while (endRow < mScreenRows - 1 && joinsNextRow(endRow)) {
             endRow++;
         }
 
         return new int[] { startRow, endRow };
+    }
+
+    /** Whether getSelectedText(..., true, true) joins this whole row to the next one instead of starting a new line. */
+    private boolean joinsNextRow(int row) {
+        TerminalRow lineObject = mLines[externalToInternalRow(row)];
+        if (lineObject.mLineWrap) return true;
+        int spaceUsed = lineObject.getSpaceUsed();
+        int lastPrintingCharIndex = -1;
+        for (int i = 0; i < spaceUsed; i++)
+            if (lineObject.mText[i] != ' ') lastPrintingCharIndex = i;
+        return lastPrintingCharIndex == spaceUsed - 1;
     }
 
     private boolean isWhitespaceAt(int x, int y) {
