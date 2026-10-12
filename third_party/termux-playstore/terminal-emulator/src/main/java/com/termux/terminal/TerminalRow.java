@@ -39,6 +39,10 @@ public final class TerminalRow {
         final int x2 = line.findStartOfColumn(sourceX2);
         boolean startingFromSecondHalfOfWideChar = (sourceX1 > 0 && line.wideDisplayCharacterStartingAt(sourceX1 - 1));
         final char[] sourceChars = (this == line) ? Arrays.copyOf(line.mText, line.mText.length) : line.mText;
+        // With wide or combining characters around, every setChar() rescans the row, which made each copied row
+        // O(columns^2): scrolling inside left/right margins over a screen of CJK text took seconds. Work on one cell
+        // per column instead and write the row back once; plain rows keep setChar()'s fast path.
+        final String[] cells = mHasNonOneWidthOrSurrogateChars ? toCells() : null;
         int latestNonCombiningWidth = 0;
         for (int i = x1; i < x2; i++) {
             char sourceChar = sourceChars[i];
@@ -54,7 +58,115 @@ public final class TerminalRow {
                 sourceX1 += latestNonCombiningWidth;
                 latestNonCombiningWidth = w;
             }
-            setChar(destinationX, codePoint, line.getStyle(sourceX1));
+            if (cells != null) {
+                setCellChar(cells, destinationX, codePoint, line.getStyle(sourceX1));
+            } else {
+                setChar(destinationX, codePoint, line.getStyle(sourceX1));
+            }
+        }
+        if (cells != null) fromCells(cells);
+    }
+
+    /** setChar() for each column in [startColumn, endColumn), with the same result, in time linear in the row. */
+    public void fillInterval(int startColumn, int endColumn, int codePoint, long style) {
+        if (!mHasNonOneWidthOrSurrogateChars) {
+            for (int column = startColumn; column < endColumn; column++) setChar(column, codePoint, style);
+            return;
+        }
+        String[] cells = toCells();
+        for (int column = startColumn; column < endColumn; column++) setCellChar(cells, column, codePoint, style);
+        fromCells(cells);
+    }
+
+    /** The text of each column; null marks the second half of a wide character. */
+    private String[] toCells() {
+        String[] cells = new String[mColumns];
+        int column = 0;
+        int index = 0;
+        while (index < mSpaceUsed && column < mColumns) {
+            int start = index;
+            int baseWidth = 0;
+            // A column is its base character plus the zero-width characters after it.
+            while (index < mSpaceUsed) {
+                int codePoint = Character.codePointAt(mText, index, mSpaceUsed);
+                int width = WcWidth.width(codePoint);
+                if (width > 0) {
+                    if (baseWidth > 0) break;
+                    baseWidth = width;
+                }
+                index += Character.charCount(codePoint);
+            }
+            cells[column] = new String(mText, start, index - start);
+            if (baseWidth == 2 && column + 1 < mColumns) cells[++column] = null;
+            column++;
+        }
+        for (; column < mColumns; column++) cells[column] = " ";
+        return cells;
+    }
+
+    private void fromCells(String[] cells) {
+        int length = 0;
+        for (String cell : cells) if (cell != null) length += cell.length();
+        char[] text = (length <= mText.length) ? mText : new char[Math.max(length, mText.length + mColumns)];
+        int position = 0;
+        for (String cell : cells) {
+            if (cell == null) continue;
+            cell.getChars(0, cell.length(), text, position);
+            position += cell.length();
+        }
+        mText = text;
+        mSpaceUsed = (short) length;
+    }
+
+    private static int baseWidth(String cell) {
+        return WcWidth.width(cell.codePointAt(0));
+    }
+
+    private boolean isWideCellStart(String[] cells, int column) {
+        return column < mColumns && cells[column] != null && baseWidth(cells[column]) == 2;
+    }
+
+    /** setChar() on a cell array, with the same results, in constant time per call. */
+    private void setCellChar(String[] cells, int columnToSet, int codePoint, long style) {
+        if (columnToSet < 0 || columnToSet >= mStyle.length)
+            throw new IllegalArgumentException("TerminalRow.setChar(): columnToSet=" + columnToSet + ", codePoint=" + codePoint + ", style=" + style);
+
+        mStyle[columnToSet] = style;
+        final int newCodePointDisplayWidth = WcWidth.width(codePoint);
+        if (codePoint >= Character.MIN_SUPPLEMENTARY_CODE_POINT || newCodePointDisplayWidth != 1) {
+            mHasNonOneWidthOrSurrogateChars = true;
+        }
+        final String newText = new String(Character.toChars(codePoint));
+
+        if (newCodePointDisplayWidth <= 0) {
+            // Combining characters join the existing contents of the column (the wide character on its second half).
+            if (cells[columnToSet] == null) columnToSet--;
+            String old = cells[columnToSet];
+            if (old.length() + newText.length() > 15) return; // Protect against too many combining characters.
+            cells[columnToSet] = old + newText;
+            return;
+        }
+
+        // Overwriting the second half of a wide character starting at the previous column:
+        if (cells[columnToSet] == null) setCellChar(cells, columnToSet - 1, ' ', style);
+        // Overwriting the first half of a wide character starting at the next column:
+        if (newCodePointDisplayWidth == 2 && isWideCellStart(cells, columnToSet + 1)) setCellChar(cells, columnToSet + 1, ' ', style);
+
+        final int oldCodePointDisplayWidth = baseWidth(cells[columnToSet]);
+        cells[columnToSet] = newText;
+        if (oldCodePointDisplayWidth == 2 && newCodePointDisplayWidth == 1) {
+            // Replace second half of wide char with a space.
+            cells[columnToSet + 1] = " ";
+        } else if (oldCodePointDisplayWidth == 1 && newCodePointDisplayWidth == 2) {
+            if (columnToSet == mColumns - 1) {
+                throw new IllegalArgumentException("Cannot put wide character in last column");
+            } else if (columnToSet < mColumns - 2) {
+                // The next column becomes the second half; setChar() only removes its base character, so any
+                // combining characters it had stay, now after this one.
+                String next = cells[columnToSet + 1];
+                cells[columnToSet] = newText + next.substring(Character.charCount(next.codePointAt(0)));
+            }
+            cells[columnToSet + 1] = null;
         }
     }
 

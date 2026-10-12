@@ -22,7 +22,6 @@ import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Test
 
 /** Room converters, validators, snippet references and port-forward helpers. */
@@ -75,11 +74,23 @@ class SmallParsersFuzzTest {
         }
     }
 
-    @Ignore("BUG (minor): list items containing ',' (tags/infoCommands from an import file) are split on the Room round trip")
     @Test
     fun stringList_roundTrip_itemWithComma() {
         val list = listOf("ps -eo pid,comm")
         assertEquals(list, Converters.toStringList(Converters.fromStringList(list)))
+    }
+
+    @Test
+    fun stringList_randomListsRoundTrip_andRowsInTheOldFormatStillRead() {
+        val random = Random(Fuzz.DEFAULT_SEED + 51)
+        repeat(5_000) {
+            // A single blank item can't be told apart from an empty list in either format; the app trims them away.
+            val list = List(random.nextInt(0, 5)) { Fuzz.randomString(random, 12) + listOf("", ",", "\"", "[", "x").random(random) }
+                .filter { it.isNotBlank() }
+            assertEquals(list, Converters.toStringList(Converters.fromStringList(list)))
+        }
+        assertEquals(listOf("id-1", "id-2"), Converters.toStringList("id-1,id-2"))
+        assertEquals("id-1,id-2", Converters.fromStringList(listOf("id-1", "id-2")))
     }
 
     @Test

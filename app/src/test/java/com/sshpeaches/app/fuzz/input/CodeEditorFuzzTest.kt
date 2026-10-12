@@ -173,7 +173,7 @@ class CodeEditorFuzzTest {
         )
     }
 
-    @Ignore("Deferred: some single lines exceed sora's 2 s budget in tm4e; the UI does not freeze")
+    @Ignore("Some single lines exceed sora's 2 s budget in tm4e; this runs off the main thread, so the UI does not freeze")
     @Test(timeout = 480_000)
     fun grammars_pathologicalLines_doNotHang() {
         val scopes = CodeLanguage.entries.mapNotNull { it.scopeName }
@@ -227,12 +227,18 @@ class CodeEditorFuzzTest {
         assertDocumentsTokenize(docs)
     }
 
-    /** The bundled YAML grammars use variable-length look-behinds throughout, which joni cannot compile. */
-    @Ignore("Deferred: YAML highlighting needs a joni-compatible YAML grammar")
+    /**
+     * VS Code's newer YAML grammar used variable-length look-behinds throughout, which joni cannot compile, so no YAML
+     * file was highlighted; the app now bundles the TextMate YAML grammar that Eclipse TM4E ships.
+     */
     @Test
     fun grammars_ordinaryYamlDocument_tokenizesWithoutError() {
         assertDocumentsTokenize(
-            mapOf(CodeLanguage.YAML to "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n  labels: {app: web}\n")
+            mapOf(
+                CodeLanguage.YAML to "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n  labels: {app: web}\n" +
+                    "spec:\n  containers:\n    - name: web # comment\n      image: \"nginx:1.27\"\n      args: [\"-g\", 'daemon off;']\n" +
+                    "---\nanchors: &base\n  a: 1\nmerged:\n  <<: *base\nblock: |\n  line one\n  line two\n"
+            )
         )
     }
 
@@ -255,60 +261,13 @@ class CodeEditorFuzzTest {
     }
 
     /**
-     * Fix check for the test above: dropping the string-valued captures entries (VS Code ignores
-     * them) is enough for XML. YAML and Markdown still fail afterwards: their newer VS Code grammars
-     * use look-behinds joni cannot compile ("(?<=^-{3,}\s*+)\G$", "(?<=_\1)"), so those two need
-     * joni-compatible grammar versions. This test asserts the XML fix and prints the rest.
-     */
-    @Test
-    fun grammars_withStringCapturesRemoved_xmlWorks_yamlAndMarkdownNeedRegexFixes() {
-        fun clean(node: Any?): Any? = when (node) {
-            is org.json.JSONObject -> {
-                node.keys().asSequence().toList().forEach { k ->
-                    val v = node.get(k)
-                    if (k in setOf("captures", "beginCaptures", "endCaptures", "whileCaptures") && v is org.json.JSONObject) {
-                        v.keys().asSequence().toList().filter { v.get(it) !is org.json.JSONObject }.forEach { v.remove(it) }
-                    }
-                    clean(v)
-                }
-                node
-            }
-            is org.json.JSONArray -> { for (i in 0 until node.length()) clean(node.get(i)); node }
-            else -> node
-        }
-        val registry = org.eclipse.tm4e.core.registry.Registry(object : org.eclipse.tm4e.core.registry.IRegistryOptions {
-            override fun getGrammarSource(scopeName: String) = grammarPaths[scopeName]?.let { path ->
-                val json = clean(org.json.JSONObject(File(assets, path).readText())).toString()
-                org.eclipse.tm4e.core.registry.IGrammarSource.fromString(
-                    org.eclipse.tm4e.core.registry.IGrammarSource.ContentType.JSON, json
-                )
-            }
-        })
-        val failures = mutableListOf<String>()
-        mapOf(
-            "source.yaml" to "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n",
-            "text.xml" to "<?xml version=\"1.0\"?>\n<!-- note -->\n<a b=\"c\">t</a>\n",
-            "text.html.markdown" to "# Title\n\nSome *text*.\n\n```yaml\na: 1\n```\n"
-        ).forEach { (scope, doc) ->
-            val g = registry.loadGrammar(scope)!!
-            var state: IStateStack? = null
-            doc.lines().forEach { line ->
-                runCatching { state = g.tokenizeLine2(line + "\n", state, Duration.ofSeconds(2)).ruleStack }
-                    .onFailure { failures += "$scope ${Fuzz.show(line)}: $it" }
-            }
-        }
-        println("AFTER-CAPTURES-CLEANUP:\n  " + failures.joinToString("\n  "))
-        assertTrue("XML still failing after cleaning captures:\n  " + failures.joinToString("\n  "), failures.none { it.startsWith("text.xml") })
-    }
-
-    /**
      * BUG reproducer (bundled shell grammar + tm4e in sora-editor 0.23.4): a supplementary character
      * (emoji) right before a quote makes a back-referenced end pattern capture half a surrogate pair,
      * which reaches joni as an unescaped "?" -> TMException "target of repeat operator is not
      * specified". Sora catches it in AsyncIncrementalAnalyzeManager.LooperThread and the analysis
      * thread exits, so highlighting stops for the rest of the editing session.
      */
-    @Ignore("Deferred: tm4e bug in sora-editor 0.23.4; highlighting stops for the rest of the file")
+    @Ignore("tm4e bug in sora-editor 0.23.4; the app shows such a line unhighlighted instead, see SafeTextMateLanguageTest")
     @Test
     fun grammars_emojiBeforeQuote_doNotThrow() {
         val lines = listOf("🌅\"", "echo 🚀\"Deploying\"", "a=🎉\"b\"", "🎉 \"x\"", "echo 🚀'x'", "s = 🎉'x'",
@@ -331,7 +290,7 @@ class CodeEditorFuzzTest {
      * 1 MiB stack overflows. StackOverflowError is an Error, which Sora's LooperThread does not catch
      * (it catches Exception), so it is an uncaught exception on a worker thread -> process crash.
      */
-    @Ignore("Deferred: tm4e recursion in sora-editor 0.23.4 overflows on a 9000-char <<< line")
+    @Ignore("tm4e recursion in sora-editor 0.23.4; the app contains the overflow, see SafeTextMateLanguageTest")
     @Test
     fun shellGrammar_longHereStringRun_doesNotOverflowTheStack() {
         val g = grammar("source.shell")
@@ -341,7 +300,7 @@ class CodeEditorFuzzTest {
         assertTrue("tokenizing 9000 chars of '<<<' threw $err", err == null)
     }
 
-    @Ignore("Deferred: hits the tm4e bugs above and the YAML grammar")
+    @Ignore("Hits the tm4e bugs above, which the app contains (SafeTextMateLanguageTest)")
     @Test(timeout = 300_000)
     fun grammars_randomMultiLineFiles_carryStateWithoutHangOrError() {
         val scopes = CodeLanguage.entries.mapNotNull { it.scopeName }

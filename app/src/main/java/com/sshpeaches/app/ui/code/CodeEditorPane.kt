@@ -58,7 +58,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
-import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
+import io.github.rosemoe.sora.langs.textmate.SafeTextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
@@ -269,7 +269,7 @@ fun CodeEditorPane(
                         ThemeRegistry.getInstance().setTheme(if (dark) CodeEditorAssets.DARK_THEME else CodeEditorAssets.LIGHT_THEME)
                         if (view.tag != Pair(language, dark)) {
                             view.colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
-                            view.setEditorLanguage(language.scopeName?.let { TextMateLanguage.create(it, true) })
+                            view.setEditorLanguage(language.scopeName?.let { SafeTextMateLanguage.create(it, true) })
                             view.tag = Pair(language, dark)
                         }
                         view.setWordwrap(wordWrap)

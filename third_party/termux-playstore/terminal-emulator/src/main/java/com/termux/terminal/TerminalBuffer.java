@@ -516,8 +516,7 @@ public final class TerminalBuffer {
                 "Illegal arguments! blockSet(" + sx + ", " + sy + ", " + w + ", " + h + ", " + val + ", " + mColumns + ", " + mScreenRows + ")");
         }
         for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                setChar(sx + x, sy + y, val, style);
+            allocateFullLineIfNecessary(externalToInternalRow(sy + y)).fillInterval(sx, sx + w, val, style);
     }
 
     public TerminalRow allocateFullLineIfNecessary(int row) {

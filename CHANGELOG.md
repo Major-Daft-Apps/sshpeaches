@@ -8,8 +8,10 @@ All notable SSHPeaches release notes should be tracked here.
 
 Fixes from a fuzz-testing sweep:
 
-- Terminal: output a server (or a file you `cat`) can send no longer freezes or crashes the app. Huge scroll and repeat counts (`CSI 9999 S`, `CSI 9999 b`) with side margins took seconds to minutes on the main thread; OSC 104 colour resets with a bad number, attribute changes in origin mode and a wide character right of the margin threw (over SSH that dropped the rest of the output, over Mosh it crashed). Long-pressing a word in one very long wrapped line no longer stalls.
+- Terminal: output a server (or a file you `cat`) can send no longer freezes or crashes the app. Huge scroll and repeat counts (`CSI 9999 S`, `CSI 9999 b`) with side margins took seconds to minutes on the main thread; OSC 104 colour resets with a bad number, attribute changes in origin mode and a wide character right of the margin threw (over SSH that dropped the rest of the output, over Mosh it crashed). Long-pressing a word in one very long wrapped line no longer stalls, and scrolling inside side margins over wide (CJK) text is fast again.
 - Find no longer crashes on Turkish İ in the terminal output.
+- Code editor: a line the highlighter can't parse (an emoji right before a quote, an unusual heredoc) is shown without colors instead of ending highlighting for the rest of the file, and a very long run of `<<<` no longer crashes the app.
+- Deleting an emoji with keyboards that delete text they already typed now removes just the emoji, not the character before it too.
 - Hardware keyboards: AltGr characters (@ [ { ~ on German and other layouts) no longer get an ESC in front, dead keys (´ ^ `) compose instead of disappearing, and Ctrl+@ / Ctrl+? send NUL and DEL like other terminals.
 - Hosts and port forwards accept IPv6 addresses (::1, fe80::1) and single-word host names (raspberrypi, db).
 - OpenSSH config import works out options the way ssh does: the first value wins, options from several matching Host blocks (including wildcards like `Host *.corp`) are combined, quotes are removed (`User "bob"`), and an invalid Port is reported instead of silently becoming 22.
@@ -19,7 +21,7 @@ Fixes from a fuzz-testing sweep:
 - Recursive delete refuses a server listing that would point outside the folder being deleted.
 - Mosh startup no longer hangs past its timeout on a prompt without a newline (such as a sudo password prompt).
 - "Send report" no longer freezes on long server messages, and reports scrub more addresses and paths.
-- Smaller fixes: the system info panel stays fast on odd command output and no longer shows overflowed sizes; LAN transfer has an overall deadline and can always be cancelled; very large transfer files are refused; XML and Markdown files now get syntax highlighting (their grammars failed to load); OS version labels with a colon survive export; emoji in short key labels are no longer cut in half.
+- Smaller fixes: the system info panel stays fast on odd command output and no longer shows overflowed sizes; LAN transfer has an overall deadline and can always be cancelled; very large transfer files are refused; YAML, XML and Markdown files now get syntax highlighting (their grammars failed to load; YAML uses the TextMate YAML grammar now); OS version labels with a colon survive export; emoji in short key labels are no longer cut in half; tags and info commands with a comma in them survive import.
 
 ## 0.11.5 (1105)
 

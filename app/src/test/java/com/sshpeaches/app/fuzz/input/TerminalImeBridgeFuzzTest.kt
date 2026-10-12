@@ -7,7 +7,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
@@ -197,7 +196,6 @@ class TerminalImeBridgeFuzzTest {
      * (nothing left locally), the bridge sends one backspace per unit, i.e. two for one emoji, and
      * the shell deletes the character before the emoji too.
      */
-    @Ignore("Deferred: only an IME that tracks text already sent to the shell does this; normal keyboards send DEL")
     @Test
     fun deleteSurroundingText_overSentEmoji_sendsOneBackspace() {
         val b = Bridge()

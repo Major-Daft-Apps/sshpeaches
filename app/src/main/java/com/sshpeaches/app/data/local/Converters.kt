@@ -7,20 +7,35 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import org.json.JSONArray
 
 /**
  * Centralized Room converters for enums and small aggregates.
- * Lists are stored as comma-separated strings; IDs are UUIDs so commas are safe.
+ * Lists are stored as comma-separated strings. A list with a comma inside an item (a tag or an info command such as
+ * `ps -eo pid,comm`, from an import) is stored as a JSON array after [LIST_JSON_PREFIX] instead, so it reads back
+ * whole; both forms are read, so existing rows need no migration.
  */
 object Converters {
-    @TypeConverter
-    @JvmStatic
-    fun fromStringList(list: List<String>?): String = list?.joinToString(",") ?: ""
+    private const val LIST_JSON_PREFIX = "\u0002"
 
     @TypeConverter
     @JvmStatic
-    fun toStringList(value: String?): List<String> =
-        if (value.isNullOrBlank()) emptyList() else value.split(",")
+    fun fromStringList(list: List<String>?): String {
+        if (list == null) return ""
+        val commaSafe = list.none { it.contains(',') } && list.firstOrNull()?.startsWith(LIST_JSON_PREFIX) != true
+        return if (commaSafe) list.joinToString(",") else LIST_JSON_PREFIX + JSONArray(list).toString()
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun toStringList(value: String?): List<String> = when {
+        value.isNullOrBlank() -> emptyList()
+        value.startsWith(LIST_JSON_PREFIX) -> runCatching {
+            val array = JSONArray(value.substring(LIST_JSON_PREFIX.length))
+            List(array.length()) { index -> array.getString(index) }
+        }.getOrElse { value.substring(LIST_JSON_PREFIX.length).split(",") }
+        else -> value.split(",")
+    }
 
     @TypeConverter
     @JvmStatic

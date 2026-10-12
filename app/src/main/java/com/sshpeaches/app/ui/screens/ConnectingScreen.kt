@@ -2336,6 +2336,28 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
         EditorInfoCompat.setContentMimeTypes(outAttrs, TERMINAL_IME_CONTENT_MIME_TYPES)
         val shadow = SpannableStringBuilder()
         val imeKeysSentDirectly = mutableSetOf<Int>()
+        // The end of the text already sent to the shell. Keyboards count deletes in UTF-16 units, so an emoji the
+        // IME still remembers is two units; this turns them back into one backspace per character.
+        val sentTail = StringBuilder()
+
+        fun backspacesForSentUnits(units: Int): Int {
+            var remaining = units
+            var backspaces = 0
+            while (remaining > 0 && sentTail.isNotEmpty()) {
+                val removed = Character.charCount(sentTail.codePointBefore(sentTail.length))
+                sentTail.setLength(sentTail.length - removed)
+                remaining -= removed
+                backspaces++
+            }
+            return backspaces + remaining.coerceAtLeast(0)
+        }
+
+        fun forgetSentCodePoints(count: Int) {
+            repeat(count.coerceAtMost(sentTail.length)) {
+                if (sentTail.isEmpty()) return
+                sentTail.setLength(sentTail.length - Character.charCount(sentTail.codePointBefore(sentTail.length)))
+            }
+        }
         Selection.setSelection(shadow, 0)
         return object : BaseInputConnection(this@TerminalImeBridgeEditText, true) {
             override fun getEditable(): Editable = shadow
@@ -2370,6 +2392,10 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 if (event.action == KeyEvent.ACTION_DOWN && shadow.isNotEmpty()) {
                     flushPendingText()
                 }
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    // Any other key may change the shell's line in ways we can't follow.
+                    if (event.keyCode == KeyEvent.KEYCODE_DEL) forgetSentCodePoints(1) else sentTail.clear()
+                }
                 // Gboard types letters with commitText but sends Enter, Backspace and arrows as key
                 // events, which the default delivers to whichever view has focus. Focus passes
                 // through other views (e.g. on every tap of the terminal), so an Enter sent then was
@@ -2387,6 +2413,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 // The default sends an Enter flagged as an editor action, which EditText answers on
                 // key-up by moving focus to the next view, so later keys never reached the terminal.
                 flushPendingText()
+                sentTail.clear()
                 onImeEnter?.invoke()
                 return true
             }
@@ -2396,7 +2423,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 val localBefore = protected.first
                 val localAfter = shadow.length - protected.last
                 val deleted = super.deleteSurroundingText(beforeLength, afterLength)
-                repeat((beforeLength - localBefore).coerceAtLeast(0)) { onImeBackspace?.invoke() }
+                repeat(backspacesForSentUnits(beforeLength - localBefore)) { onImeBackspace?.invoke() }
                 repeat((afterLength - localAfter).coerceAtLeast(0)) { onImeForwardDelete?.invoke() }
                 reportSelection()
                 return deleted
@@ -2407,6 +2434,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 val localBefore = Character.codePointCount(shadow, 0, protected.first)
                 val localAfter = Character.codePointCount(shadow, protected.last, shadow.length)
                 val deleted = super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+                forgetSentCodePoints(beforeLength - localBefore)
                 repeat((beforeLength - localBefore).coerceAtLeast(0)) { onImeBackspace?.invoke() }
                 repeat((afterLength - localAfter).coerceAtLeast(0)) { onImeForwardDelete?.invoke() }
                 reportSelection()
@@ -2495,6 +2523,13 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 reportSelection()
                 if (pending.isNotEmpty()) {
                     onCommittedText?.invoke(pending)
+                    sentTail.append(pending)
+                    val lineStart = maxOf(sentTail.lastIndexOf("\n"), sentTail.lastIndexOf("\r")) + 1
+                    if (lineStart > 0) sentTail.delete(0, lineStart)
+                    if (sentTail.length > MAX_SENT_TAIL_CHARS) {
+                        sentTail.delete(0, sentTail.length - MAX_SENT_TAIL_CHARS)
+                        if (sentTail.isNotEmpty() && sentTail[0].isLowSurrogate()) sentTail.deleteCharAt(0)
+                    }
                 }
             }
 
@@ -5034,6 +5069,7 @@ private fun remoteFileSortLabel(field: RemoteFileSortField): String = when (fiel
 }
 
 private const val TERMINAL_IME_SENTINEL = "\u0001"
+private const val MAX_SENT_TAIL_CHARS = 256
 private const val TERMINAL_CLIPBOARD_SENSITIVE_EXTRA = "android.content.extra.IS_SENSITIVE"
 private const val TERMINAL_CLIPBOARD_SUPPRESS_OVERLAY_EXTRA =
     "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
