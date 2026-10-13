@@ -2,8 +2,6 @@ package com.majordaftapps.sshpeaches.app.widget
 
 import android.content.Context
 import androidx.core.content.edit
-import com.majordaftapps.sshpeaches.app.R
-import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,32 +17,10 @@ object WidgetSessionStore {
         val payload = JSONArray()
         snapshots
             .forEach { snapshot ->
-                val endpoint =
-                    "${snapshot.host.username}@${snapshot.host.host}:${snapshot.host.port}"
+                // Just who and where: the open-connections list doesn't need the mode or the status.
+                val endpoint = "${snapshot.host.username}@${snapshot.host.host}"
                 val title = snapshot.host.name.ifBlank { endpoint }
-                val mode = when (snapshot.mode) {
-                    ConnectionMode.SSH -> context.getString(R.string.widget_mode_terminal)
-                    ConnectionMode.SFTP -> context.getString(R.string.widget_mode_file_browser)
-                    ConnectionMode.SCP -> context.getString(R.string.widget_mode_file_transfer)
-                }
-                val status = when (snapshot.status) {
-                    SessionService.SessionStatus.CONNECTING ->
-                        context.getString(R.string.widget_status_connecting)
-                    SessionService.SessionStatus.ACTIVE ->
-                        context.getString(R.string.widget_status_active)
-                    SessionService.SessionStatus.ERROR ->
-                        context.getString(R.string.widget_status_error)
-                }
-                val subtitle = if (snapshot.host.name.isBlank()) {
-                    context.getString(R.string.widget_session_subtitle, mode, status)
-                } else {
-                    context.getString(
-                        R.string.widget_session_subtitle_with_endpoint,
-                        mode,
-                        status,
-                        endpoint
-                    )
-                }
+                val subtitle = if (snapshot.host.name.isBlank()) "" else endpoint
                 payload.put(
                     JSONObject()
                         .put("sessionId", snapshot.hostId)

@@ -248,21 +248,18 @@ internal object HostWidgets {
         val row = RemoteViews(context.packageName, R.layout.widget_open_session_row)
         row.setTextViewText(R.id.widget_open_session_title, session.title)
         row.setTextViewText(R.id.widget_open_session_subtitle, session.subtitle)
-        val openIntent = createOpenPendingIntent(context, session.sessionId)
-        val openDescription = context.getString(
-            R.string.widget_action_open_session_details,
-            session.title,
-            session.subtitle
+        row.setViewVisibility(
+            R.id.widget_open_session_subtitle,
+            if (session.subtitle.isBlank()) View.GONE else View.VISIBLE
         )
+        val openIntent = createOpenPendingIntent(context, session.sessionId)
+        val label = listOf(session.title, session.subtitle).filter { it.isNotBlank() }.joinToString(". ")
+        val openDescription = context.getString(R.string.widget_action_open_session_details, label)
         row.setContentDescription(R.id.widget_open_session_identity, openDescription)
         row.setContentDescription(R.id.widget_btn_open, openDescription)
         row.setContentDescription(
             R.id.widget_btn_disconnect,
-            context.getString(
-                R.string.widget_action_disconnect_session_details,
-                session.title,
-                session.subtitle
-            )
+            context.getString(R.string.widget_action_disconnect_session_details, label)
         )
         row.setOnClickPendingIntent(R.id.widget_open_session_identity, openIntent)
         row.setOnClickPendingIntent(R.id.widget_btn_open, openIntent)

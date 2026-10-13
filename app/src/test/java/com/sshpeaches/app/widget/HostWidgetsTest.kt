@@ -91,7 +91,7 @@ class HostWidgetsTest {
     }
 
     @Test
-    fun sessionStoreIncludesModeStatusAndEndpointInSubtitle() {
+    fun sessionStoreShowsOnlyUserAtHostUnderTheName() {
         WidgetSessionStore.write(
             context,
             listOf(
@@ -105,10 +105,7 @@ class HostWidgetsTest {
         val stored = WidgetSessionStore.read(context).single()
 
         assertEquals("Production", stored.title)
-        assertEquals(
-            "Upload / download · Active · deploy@example.test:2222",
-            stored.subtitle
-        )
+        assertEquals("deploy@example.test", stored.subtitle)
     }
 
     @Test
@@ -163,7 +160,7 @@ class HostWidgetsTest {
         val session = WidgetSessionStore.WidgetOpenSession(
             sessionId = "host|SCP|session",
             title = "Production",
-            subtitle = "Upload / download · Connecting · deploy@example.test:2222"
+            subtitle = "deploy@example.test"
         )
         val applied = HostWidgets.buildOpenSessionRow(context, session)
             .apply(context, FrameLayout(context))
@@ -174,12 +171,35 @@ class HostWidgetsTest {
             (48 * context.resources.displayMetrics.density).toInt()
 
         assertEquals(session.subtitle, subtitle.text.toString())
+        assertEquals(View.VISIBLE, subtitle.visibility)
+        assertEquals("Open Production. deploy@example.test", open.contentDescription.toString())
         assertTrue(open.contentDescription.toString().contains(session.subtitle))
         assertTrue(disconnect.contentDescription.toString().contains(session.subtitle))
         assertEquals(expectedTargetHeight, open.layoutParams.width)
         assertEquals(expectedTargetHeight, open.layoutParams.height)
         assertEquals(expectedTargetHeight, disconnect.layoutParams.width)
         assertEquals(expectedTargetHeight, disconnect.layoutParams.height)
+    }
+
+    @Test
+    fun unnamedHostSessionShowsUserAtHostOnce() {
+        WidgetSessionStore.write(
+            context,
+            listOf(
+                snapshot(mode = ConnectionMode.SSH, status = SessionService.SessionStatus.CONNECTING)
+                    .let { it.copy(host = it.host.copy(name = "")) }
+            )
+        )
+        val stored = WidgetSessionStore.read(context).single()
+        assertEquals("deploy@example.test", stored.title)
+        assertEquals("", stored.subtitle)
+
+        val applied = HostWidgets.buildOpenSessionRow(context, stored).apply(context, FrameLayout(context))
+        assertEquals(View.GONE, applied.findViewById<TextView>(R.id.widget_open_session_subtitle).visibility)
+        assertEquals(
+            "Disconnect deploy@example.test",
+            applied.findViewById<View>(R.id.widget_btn_disconnect).contentDescription.toString()
+        )
     }
 
     private fun snapshot(
