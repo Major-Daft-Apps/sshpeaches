@@ -4,8 +4,13 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.7 (1107)
+
+Release date: 2026-10-13
+
 - The connecting screen's log reads like `ssh -vv` instead of showing hexdumps: one line per SSH packet with what it negotiates (each side's algorithm proposals, the host key type, services, which login methods the server still accepts, channels and their requests). Packets carrying your password, keyboard-interactive answers or terminal data aren't logged at all.
 - Importing a host that's already saved (from a QR code, an OpenSSH config, an export or a Wi-Fi transfer) no longer resets its OS icon to Unknown when the import doesn't say which OS the host runs.
+- Widget: open connections show just the host's name and `user@host`, without the "Terminal · Active" line.
 - Themed app icons (One UI icon themes, Android 13+ themed icons) show the peach with its segments again instead of a plain white curve. The Peach Light and Peach Dark app icons now have a themed version too.
 
 ## 0.11.6 (1106)

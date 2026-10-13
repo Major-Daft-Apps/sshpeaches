@@ -1,0 +1,6 @@
+What's new in 0.11.7
+
+- Themed app icons (One UI icon themes, Android 13+) show the peach with its segments instead of a white curve.
+- The connection log reads like ssh -vv: what each SSH step negotiates. Passwords and terminal data are never logged.
+- Importing a saved host no longer resets its OS icon.
+- Widget: open connections show just user@host.
