@@ -139,7 +139,7 @@ class SessionLogBusTest {
             delegate = ReleaseLikeLoggerFactory,
             logcatEnabled = false
         ).getLogger("sshj.connection")
-        // On for the connection transcript, so SSHJ's guarded packet dumps reach it.
+        // On for the connection transcript, so SSHJ's guarded packet dumps reach it (to be decoded).
         assertTrue(logger.isDebugEnabled)
         assertTrue(logger.isTraceEnabled)
 
@@ -178,32 +178,67 @@ class SessionLogBusTest {
     }
 
     @Test
-    fun packetDumpsBecomeHexdumpRowsAndHideSecretCarryingPackets() {
-        val kexinit = hexOf(byteArrayOf(20) + "curve25519-sha256,ext-info-c".toByteArray())
-        val dump = packetDumpText("Received packet #{}: {}", arrayOf(3L, kexinit))!!.lines()
-        assertEquals("recv #3 SSH_MSG_KEXINIT, 29 bytes", dump[0])
-        assertEquals("  0000  14 63 75 72 76 65 32 35  .curve25", dump[1])
-        assertEquals("  0018  6e 66 6f 2d 63" + " ".repeat(11) + "nfo-c", dump.last())
-
-        val auth = hexOf(byteArrayOf(50) + "user ssh-connection password secret".toByteArray())
-        assertEquals(
-            "send #7 SSH_MSG_USERAUTH_REQUEST, 36 bytes (contents hidden)",
-            packetDumpText("Encoding packet #{}: {}", arrayOf(7L, auth))
+    fun packetsAreDecodedAndSecretCarryingPacketsAreNotLogged() {
+        val proposal = listOf(
+            "curve25519-sha256,ext-info-c", "ssh-ed25519", "aes128-ctr", "aes128-ctr", "hmac-sha2-256",
+            "hmac-sha2-256", "none", "none", "", ""
         )
-        listOf(61, 94, 95, 98, 60, 123).forEach { id ->
-            val text = packetDumpText("Encoding packet #{}: {}", arrayOf(1L, hexOf(byteArrayOf(id.toByte(), 65, 66))))!!
-            assertTrue(text, text.endsWith("(contents hidden)"))
-        }
-        listOf(94, 95).forEach { id ->
-            val text = packetDumpText("Received packet #{}: {}", arrayOf(1L, hexOf(byteArrayOf(id.toByte(), 65, 66))))!!
-            assertTrue(text, text.endsWith("(contents hidden)"))
-        }
-        assertEquals(SKIP_PACKET_DUMP, packetDumpText("IN #{}: {}", arrayOf(0, "41 42")))
-        assertEquals(null, packetDumpText("Received packet {}", arrayOf("SSH_MSG_KEXINIT")))
+        val kexinit = byteArrayOf(20) + ByteArray(16) + proposal.fold(ByteArray(0)) { acc, it -> acc + sshString(it) } +
+            byteArrayOf(0) + ByteArray(4)
+        assertEquals(
+            listOf(
+                "recv SSH_MSG_KEXINIT (${kexinit.size} bytes)",
+                "  server proposal:",
+                "    KEX algorithms: curve25519-sha256,ext-info-c",
+                "    host key algorithms: ssh-ed25519",
+                "    ciphers ctos: aes128-ctr",
+                "    ciphers stoc: aes128-ctr",
+                "    MACs ctos: hmac-sha2-256",
+                "    MACs stoc: hmac-sha2-256",
+                "    compression ctos: none",
+                "    compression stoc: none"
+            ),
+            packetLogText("Received packet #{}: {}", arrayOf(3L, hexOf(kexinit)))!!.lines()
+        )
+        assertEquals(
+            "send SSH_MSG_SERVICE_REQUEST (17 bytes)\n  service ssh-userauth",
+            packetLogText("Encoding packet #{}: {}", arrayOf(4L, hexOf(byteArrayOf(5) + sshString("ssh-userauth"))))
+        )
+        val failure = byteArrayOf(51) + sshString("publickey,password") + byteArrayOf(0)
+        assertEquals(
+            "recv SSH_MSG_USERAUTH_FAILURE (24 bytes)\n  can continue: publickey,password",
+            packetLogText("Received packet #{}: {}", arrayOf(6L, hexOf(failure)))
+        )
+        val hostKey = sshString("ssh-ed25519") + sshString("k".repeat(32))
+        val reply = byteArrayOf(31) + sshBytes(hostKey) + sshString("q".repeat(32))
+        val replyText = packetLogText("Received packet #{}: {}", arrayOf(5L, hexOf(reply)))!!
+        assertTrue(replyText, replyText.endsWith("\n  host key type ssh-ed25519"))
+        val request = byteArrayOf(98) + ByteArray(4) + sshString("pty-req") + byteArrayOf(1) + sshString("xterm")
+        assertEquals(
+            "send SSH_MSG_CHANNEL_REQUEST (${request.size} bytes)\n  channel 0, request pty-req, want reply true",
+            packetLogText("Encoding packet #{}: {}", arrayOf(9L, hexOf(request)))
+        )
 
-        val big = packetDumpText("Received packet #{}: {}", arrayOf(1L, hexOf(ByteArray(5000) { 20 })))!!.lines()
-        assertEquals("  … 3976 more bytes", big.last())
-        assertEquals(1 + 1024 / 8 + 1, big.size)
+        // Passwords, keyboard-interactive answers, terminal data and unknown messages: not even a line.
+        val auth = hexOf(byteArrayOf(50) + "user ssh-connection password secret".toByteArray())
+        assertEquals(SKIP_PACKET_LOG, packetLogText("Encoding packet #{}: {}", arrayOf(7L, auth)))
+        listOf(50, 60, 61, 94, 95, 123).forEach { id ->
+            val packet = hexOf(byteArrayOf(id.toByte(), 65, 66))
+            assertEquals("$id", SKIP_PACKET_LOG, packetLogText("Encoding packet #{}: {}", arrayOf(1L, packet)))
+            assertEquals("$id", SKIP_PACKET_LOG, packetLogText("Received packet #{}: {}", arrayOf(1L, packet)))
+        }
+        // The client never sends these; if it did, they wouldn't be ours to log.
+        listOf(51, 52, 53).forEach { id ->
+            val packet = hexOf(byteArrayOf(id.toByte(), 65, 66))
+            assertEquals("$id", SKIP_PACKET_LOG, packetLogText("Encoding packet #{}: {}", arrayOf(1L, packet)))
+        }
+        assertEquals(SKIP_PACKET_LOG, packetLogText("IN #{}: {}", arrayOf(0, "41 42")))
+        assertEquals(null, packetLogText("Received packet {}", arrayOf("SSH_MSG_KEXINIT")))
+        // A malformed packet still gets its line, without details.
+        assertEquals(
+            "recv SSH_MSG_KEXINIT (3 bytes)",
+            packetLogText("Received packet #{}: {}", arrayOf(1L, hexOf(byteArrayOf(20, 1, 2))))
+        )
     }
 
     @Test
@@ -225,13 +260,11 @@ class SessionLogBusTest {
             start()
         }
         val transcript = CopyOnWriteArrayList<String>()
-        val dumps = CopyOnWriteArrayList<String>()
         val collector = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
             SessionLogBus.entries
                 .filter { it.hostId == hostId }
                 .collect {
                     transcript += it.message
-                    if (it.packetDump) dumps += it.message
                 }
         }
         val config = DefaultConfig().apply {
@@ -265,20 +298,18 @@ class SessionLogBusTest {
             assertTrue(transcript.any { it.contains("Trying `password` auth") })
             assertTrue(transcript.any { it.contains("`password` auth successful") })
             assertFalse(transcript.any { it.contains(password) })
-            // SSHJ's raw one-line dumps are always reformatted.
+            // SSHJ's raw one-line dumps are always decoded.
             assertFalse(transcript.any { it.startsWith("Encoding packet #") })
             assertFalse(transcript.any { it.startsWith("Received packet #") })
             assertFalse(transcript.any { it.contains(" IN #") })
-            // The stream of packet dumps, with the password packet hidden.
-            assertTrue(dumps.any { it.startsWith("send #") && it.contains("SSH_MSG_KEXINIT") && it.contains("\n  0000  14 ") })
-            assertTrue(dumps.any { it.startsWith("recv #") && it.contains("SSH_MSG_KEXINIT") })
-            assertTrue(dumps.any { it.contains("SSH_MSG_USERAUTH_REQUEST") && it.endsWith("(contents hidden)") })
-            assertTrue("Expected a long, streaming transcript: ${transcript.size}", transcript.sumOf { it.lines().size } >= 150)
-            val passwordHex = password.toByteArray().joinToString(" ") { "%02x".format(it) }
-            val dumpedHex = dumps.joinToString(" ") { dump ->
-                dump.lines().drop(1).joinToString(" ") { row -> row.drop(8).take(8 * 3) }
-            }.replace(Regex(" +"), " ")
-            assertFalse(dumpedHex.contains(passwordHex))
+            // One decoded line per packet; the password packet isn't logged at all, and nothing is a hexdump.
+            assertTrue(transcript.any { it.startsWith("send SSH_MSG_KEXINIT") && it.contains("\n  client proposal:") })
+            assertTrue(transcript.any { it.startsWith("recv SSH_MSG_KEXINIT") && it.contains("KEX algorithms: ") })
+            assertTrue(transcript.any { it.startsWith("send SSH_MSG_SERVICE_REQUEST") && it.endsWith("service ssh-userauth") })
+            assertTrue(transcript.any { it.startsWith("recv SSH_MSG_USERAUTH_SUCCESS") })
+            assertFalse(transcript.any { it.contains("SSH_MSG_USERAUTH_REQUEST") })
+            assertFalse(transcript.any { it.contains(Regex("([0-9a-f]{2} ){8}")) })
+            assertTrue("Expected a long, streaming transcript: ${transcript.size}", transcript.sumOf { it.lines().size } >= 60)
         } finally {
             runCatching { client.disconnect() }
             runCatching { server.stop(true) }
@@ -287,6 +318,11 @@ class SessionLogBusTest {
     }
 
     private fun hexOf(bytes: ByteArray): String = bytes.joinToString(" ") { "%02x".format(it) }
+
+    private fun sshBytes(bytes: ByteArray): ByteArray =
+        java.nio.ByteBuffer.allocate(4).putInt(bytes.size).array() + bytes
+
+    private fun sshString(text: String): ByteArray = sshBytes(text.toByteArray())
 
     private object ReleaseLikeLoggerFactory : LoggerFactory {
         private val delegate = NOPLoggerFactory()

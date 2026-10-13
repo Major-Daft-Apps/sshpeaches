@@ -1974,7 +1974,7 @@ fun ConnectingScreen(
                             "Authentication" to current.auth.name,
                             "Message" to state.message
                         ),
-                        log = logs.filterNot { it.packetDump }.flatMap { it.message.lines() },
+                        log = logs.flatMap { it.message.lines() },
                         secrets = listOf(current.host, current.username)
                     )
                 }

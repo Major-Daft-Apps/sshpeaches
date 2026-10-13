@@ -26,9 +26,6 @@ object SessionLogBus {
         val level: LogLevel,
         val message: String,
         val timestamp: Long = System.currentTimeMillis(),
-        /** A packet dump from the connection transcript. Shown on screen but left out of problem reports: its hex
-         * would carry host names and keys past the scrubber. */
-        val packetDump: Boolean = false,
         /** Strictly increasing across all entries; lets the UI track "entries after X" even after
          * old entries are trimmed from a bounded buffer. */
         val sequence: Long = nextSequence()
@@ -90,8 +87,8 @@ private class SessionLogger(
     override fun getName(): String = delegate.name
 
     // SSHJ's semantic connection events are emitted unguarded. These checks only guard its packet and key dumps, so
-    // they are on while the connection transcript is (packetDumpText hides the packets that carry secrets), and
-    // never for an open session, where every keystroke would be dumped.
+    // they are on while the connection transcript is (packetLogText decodes the packets and drops the ones that carry
+    // secrets), and never for an open session, where every keystroke would be dumped.
     override fun isTraceEnabled(): Boolean = delegate.isTraceEnabled || connectionTranscriptEnabled()
     override fun trace(msg: String?) {
         delegate.trace(msg)
@@ -230,10 +227,10 @@ private class SessionLogger(
     ) {
         val connectionTranscriptActive = connectionTranscriptEnabled()
         if (!shouldPublishSshLog(level, connectionTranscriptActive, diagnosticsEnabled())) return
-        val dump = packetDumpText(message, args)
-        if (dump == SKIP_PACKET_DUMP) return
+        val packetLog = packetLogText(message, args)
+        if (packetLog == SKIP_PACKET_LOG) return
         val text = when {
-            dump != null -> dump
+            packetLog != null -> packetLog
             message == null -> throwable?.message ?: return
             args == null -> message
             else -> MessageFormatter.arrayFormat(message, args).message
@@ -249,61 +246,125 @@ private class SessionLogger(
                 LogLevel.ERROR -> Log.e(LOGCAT_TAG, logcatMessage, throwable)
             }
         }
-        SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text, packetDump = dump != null))
+        SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text))
     }
 }
 
-internal const val SKIP_PACKET_DUMP = ""
+internal const val SKIP_PACKET_LOG = ""
 
 /**
- * Turns SSHJ's one-line packet hex dumps into a header plus hexdump rows, so the connection transcript streams like
- * JuiceSSH's. Packets that can carry secrets or session data (passwords, keyboard-interactive answers, channel
- * requests, terminal data) keep only the header. Returns null for anything that isn't a packet dump, and
- * [SKIP_PACKET_DUMP] for SSHJ's per-channel data dumps, which repeat the CHANNEL_DATA packets.
+ * Turns SSHJ's one-line packet hex dumps into one readable line per packet, like `ssh -vv`: the message type plus
+ * what it negotiates (algorithm lists, service, auth methods that can continue, channel and request types).
+ * Packets that carry anything typed or sent (auth requests, keyboard-interactive answers, terminal data, and any
+ * message type not known to be safe) are not logged at all. Returns null for anything that isn't a packet dump and
+ * [SKIP_PACKET_LOG] for a packet that isn't logged.
  */
-internal fun packetDumpText(format: String?, args: Array<out Any?>?): String? {
+internal fun packetLogText(format: String?, args: Array<out Any?>?): String? {
     val outgoing = when (format) {
         "Encoding packet #{}: {}" -> true
         "Received packet #{}: {}" -> false
-        "IN #{}: {}" -> return SKIP_PACKET_DUMP
+        "IN #{}: {}" -> return SKIP_PACKET_LOG
         else -> return null
     }
-    if (args == null || args.size < 2) return null
-    val hex = args[1]?.toString() ?: return null
+    val hex = args?.getOrNull(1)?.toString() ?: return null
+    val id = hex.take(2).toIntOrNull(16) ?: return null
+    if (id !in LOGGED_MESSAGES || (outgoing && id in INCOMING_ONLY_LOGGED_MESSAGES)) return SKIP_PACKET_LOG
     val size = (hex.length + 1) / 3
-    if (size == 0) return null
-    val id = hex.substring(0, 2).toIntOrNull(16) ?: return null
-    val name = "SSH_MSG_" + Message.fromByte(id.toByte()).name
-    val header = "${if (outgoing) "send" else "recv"} #${args[0]} $name, $size bytes"
-    if (if (outgoing) id !in OUTGOING_DUMPABLE_MESSAGES else id in INCOMING_HIDDEN_MESSAGES) {
-        return "$header (contents hidden)"
-    }
-    val shown = minOf(size, MAX_PACKET_DUMP_BYTES)
-    val bytes = ByteArray(shown) { hex.substring(it * 3, it * 3 + 2).toInt(16).toByte() }
-    return buildString {
-        append(header)
-        for (offset in 0 until shown step PACKET_DUMP_ROW_BYTES) {
-            val end = minOf(offset + PACKET_DUMP_ROW_BYTES, shown)
-            append('\n').append("  ").append(offset.toString(16).padStart(4, '0')).append("  ")
-            for (i in offset until offset + PACKET_DUMP_ROW_BYTES) {
-                append(if (i < end) (bytes[i].toInt() and 0xff).toString(16).padStart(2, '0') + " " else "   ")
-            }
-            append(' ')
-            for (i in offset until end) {
-                val c = bytes[i].toInt() and 0xff
-                append(if (c in 0x20..0x7e) c.toChar() else '.')
-            }
-        }
-        if (size > shown) append('\n').append("  … ${size - shown} more bytes")
-    }
+    val header = "${if (outgoing) "send" else "recv"} SSH_MSG_${Message.fromByte(id.toByte()).name} ($size bytes)"
+    val details = runCatching {
+        val packet = PacketReader(ByteArray(minOf(size, MAX_DECODED_PACKET_BYTES)) {
+            hex.substring(it * 3, it * 3 + 2).toInt(16).toByte()
+        })
+        packet.skip(1)
+        packetDetails(id, outgoing, packet)
+    }.getOrNull().orEmpty()
+    return if (details.isEmpty()) header else header + details.joinToString("") { "\n  $it" }
 }
 
-// Transport, key exchange and channel bookkeeping: nothing the user typed or the session sent.
-private val OUTGOING_DUMPABLE_MESSAGES = setOf(1, 2, 3, 4, 5, 7, 20, 21) + (30..49) + setOf(80, 81, 82, 90, 91, 92, 93, 96, 97, 99, 100)
-// Terminal output.
-private val INCOMING_HIDDEN_MESSAGES = setOf(94, 95)
-private const val PACKET_DUMP_ROW_BYTES = 8
-private const val MAX_PACKET_DUMP_BYTES = 1024
+private fun packetDetails(id: Int, outgoing: Boolean, packet: PacketReader): List<String> = when (id) {
+    1 -> listOf("reason ${packet.uint32()}: ${packet.text()}")
+    5, 6 -> listOf("service ${packet.text()}")
+    7 -> List(packet.uint32().toInt().coerceAtMost(32)) {
+        packet.text().also { packet.string() }
+    }.let { listOf("extensions ${it.joinToString(",")}") }
+    20 -> {
+        packet.skip(16)
+        val side = if (outgoing) "client" else "server"
+        val names = listOf(
+            "KEX algorithms", "host key algorithms", "ciphers ctos", "ciphers stoc", "MACs ctos", "MACs stoc",
+            "compression ctos", "compression stoc"
+        )
+        listOf("$side proposal:") + names.map { "  $it: ${packet.text()}" }
+    }
+    // The ECDH/DH reply (31) and the group-exchange reply (33) start with the host key, whose first field is its
+    // type. 31 is also the group-exchange GROUP message, which holds no key: then nothing is shown.
+    31, 33 -> PacketReader(packet.string()).text()
+        .takeIf { it.matches(KEY_TYPE_PATTERN) }
+        ?.let { listOf("host key type $it") }
+        .orEmpty()
+    51 -> {
+        val methods = packet.text()
+        val partial = packet.boolean()
+        listOf("can continue: $methods" + if (partial) " (partial success)" else "")
+    }
+    80 -> listOf("request ${packet.text()}, want reply ${packet.boolean()}")
+    90 -> listOf("type ${packet.text()}, channel ${packet.uint32()}")
+    91 -> listOf(
+        "channel ${packet.uint32()} -> remote ${packet.uint32()}, window ${packet.uint32()}, max packet ${packet.uint32()}"
+    )
+    92 -> {
+        packet.uint32()
+        listOf("reason ${packet.uint32()}: ${packet.text()}")
+    }
+    98 -> {
+        val channel = packet.uint32()
+        listOf("channel $channel, request ${packet.text()}, want reply ${packet.boolean()}")
+    }
+    else -> emptyList()
+}
+
+/** Reads SSH wire types (RFC 4251) from a packet. Strings are bounded to what the packet holds. */
+private class PacketReader(private val bytes: ByteArray) {
+    private var position = 0
+
+    fun skip(count: Int) {
+        require(position + count <= bytes.size)
+        position += count
+    }
+
+    fun boolean(): Boolean {
+        require(position < bytes.size)
+        return bytes[position++].toInt() != 0
+    }
+
+    fun uint32(): Long {
+        require(position + 4 <= bytes.size)
+        var value = 0L
+        repeat(4) { value = (value shl 8) or (bytes[position++].toLong() and 0xff) }
+        return value
+    }
+
+    fun string(): ByteArray {
+        val length = uint32()
+        require(length <= bytes.size - position)
+        return bytes.copyOfRange(position, position + length.toInt()).also { position += length.toInt() }
+    }
+
+    fun text(): String = String(string(), Charsets.UTF_8)
+        .map { if (it.isISOControl()) '?' else it }
+        .joinToString("")
+        .let { if (it.length > MAX_LOGGED_TEXT_CHARS) it.take(MAX_LOGGED_TEXT_CHARS) + "…" else it }
+}
+
+// Transport, key exchange and channel bookkeeping: nothing the user typed or the session sent. USERAUTH_REQUEST
+// (50), keyboard-interactive (60/61), CHANNEL_DATA (94/95) and anything unknown are never logged.
+private val LOGGED_MESSAGES = setOf(1, 2, 3, 4, 5, 6, 7, 20, 21) + (30..49) + setOf(51, 52, 53) +
+    (80..93) + setOf(96, 97, 98, 99, 100)
+// The server's banner (53) is shown, but nothing the client sends with these ids is ours to log.
+private val INCOMING_ONLY_LOGGED_MESSAGES = setOf(51, 52, 53)
+private const val MAX_DECODED_PACKET_BYTES = 8192
+private const val MAX_LOGGED_TEXT_CHARS = 4096
+private val KEY_TYPE_PATTERN = Regex("[a-z0-9@.+-]{3,64}")
 
 internal fun shouldPublishSshLog(
     level: LogLevel,
