@@ -5,6 +5,7 @@ import com.majordaftapps.sshpeaches.app.data.local.asEntity
 import com.majordaftapps.sshpeaches.app.data.local.asModel
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
+import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import androidx.room.withTransaction
@@ -87,7 +88,9 @@ class RoomAppRepository(
             } else {
                 host.copy(
                     startupScript = existing.startupScript,
-                    hasPassword = existing.hasPassword || host.hasPassword
+                    hasPassword = existing.hasPassword || host.hasPassword,
+                    // QR codes and OpenSSH configs carry no OS: keep the one detected here.
+                    osMetadata = host.osMetadata.takeUnless { it == OsMetadata.Undetected } ?: existing.osMetadata
                 )
             }
             hostDao.upsert(merged.asEntity())
