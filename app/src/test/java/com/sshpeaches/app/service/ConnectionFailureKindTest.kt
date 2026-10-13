@@ -64,6 +64,16 @@ class ConnectionFailureKindTest {
     }
 
     @Test
+    fun sshjNotConnectedIsADroppedConnection() {
+        // What SSHJ throws when the transport died before login or opening the shell (seen in a background
+        // reconnect): retryable, not an unexplained failure.
+        val failure = runCatching { net.schmizz.sshj.SSHClient().startSession() }.exceptionOrNull()!!
+
+        assertEquals(ConnectionFailureKind.NETWORK, failure.connectionFailureKind())
+        assertEquals(null, IllegalStateException("Shell already started").connectionFailureKind())
+    }
+
+    @Test
     fun classifiesWrappedNetworkFailures() {
         val failure = RuntimeException(
             "SSH connection failed",

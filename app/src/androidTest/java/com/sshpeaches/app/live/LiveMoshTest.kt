@@ -183,6 +183,44 @@ class LiveMoshTest {
         }
     }
 
+    /** A plain SSH shell (no Mosh) on the real OpenSSH server, which has a real PTY for `stty`. */
+    @Test
+    fun plainSshReconnectKeepsTheTerminalSize() {
+        assumeTrue("Needs -e liveMoshHost", moshHost != null)
+        val sessionId = "ssh-size"
+        withSessionService { service ->
+            service.startSession(
+                requestedSessionId = sessionId,
+                host = moshHostConnection().copy(useMosh = false),
+                mode = ConnectionMode.SSH,
+                passwordOverride = moshPassword,
+                autoTrustUnknownHostKey = true,
+                hostKeyPromptEnabled = false
+            )
+            try {
+                waitForStatus(service, sessionId, SessionStatus.ACTIVE, timeoutMillis = 60_000)
+                service.resizeShell(sessionId, 70, 20)
+                service.sendShellInput(sessionId, "echo size-\$(stty size | tr ' ' x)-before\r")
+                waitForScreen(service, sessionId, "size-20x70-before", 30_000)
+
+                // A network change drops plain SSH sessions and reconnects them in place, with a new shell.
+                SessionService::class.java.declaredMethods
+                    .first { it.name.startsWith("disconnectForNetworkTransition") }
+                    .apply { isAccessible = true }
+                    .invoke(service, DefaultNetworkTransition.CHANGED)
+                waitForStatus(service, sessionId, SessionStatus.CONNECTING, timeoutMillis = 30_000)
+                waitForStatus(service, sessionId, SessionStatus.ACTIVE, timeoutMillis = 60_000)
+
+                // The screen didn't change size, so it sends no resize: the new shell has to start at its size.
+                // At the default 120x40, tmux drew its status line below the screen and scrolled it every second.
+                service.sendShellInput(sessionId, "echo size-\$(stty size | tr ' ' x)-after\r")
+                waitForScreen(service, sessionId, "size-20x70-after", 30_000)
+            } finally {
+                service.stopSession(sessionId)
+            }
+        }
+    }
+
     @Test
     fun killedMoshClientRecoversOrEndsCleanly() {
         assumeTrue("Needs -e liveMoshHost", moshHost != null)

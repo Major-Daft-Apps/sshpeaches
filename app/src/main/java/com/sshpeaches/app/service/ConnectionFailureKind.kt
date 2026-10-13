@@ -90,6 +90,8 @@ private fun Throwable.networkFailureKind(): ConnectionFailureKind? = when (this)
     is NoRouteToHostException,
     is SocketTimeoutException -> ConnectionFailureKind.UNREACHABLE
     is SocketException -> ConnectionFailureKind.NETWORK
+    // SSHClient.checkConnected(): the transport died between connecting and logging in or opening the shell.
+    is IllegalStateException -> if (message == "Not connected") ConnectionFailureKind.NETWORK else null
     else -> null
 }
 

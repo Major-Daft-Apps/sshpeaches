@@ -1164,11 +1164,12 @@ class SessionService : Service() {
 
     fun resizeShell(hostId: String, columns: Int, rows: Int) {
         if (columns <= 0 || rows <= 0) return
+        val next = columns to rows
+        // Remembered even while the session is reconnecting: the next shell's PTY is opened at this size.
+        val previous = shellSizes.put(hostId, next)
         val connection = activeConnections[hostId] ?: return
         if (connection.mode != ConnectionMode.SSH) return
-        val next = columns to rows
-        if (shellSizes[hostId] == next) return
-        shellSizes[hostId] = next
+        if (previous == next) return
         connection.moshBinding?.let { mosh ->
             serviceScope.launch(Dispatchers.Main) {
                 runCatching {
@@ -2225,6 +2226,8 @@ class SessionService : Service() {
         host: HostConnection? = activeConnections[hostId]?.host
     ) {
         if (error is CancellationException || error is FileTransferCancelledException) return
+        // A host key or password prompt nobody answered in time: nothing went wrong in the app.
+        if (error is ConnectionTimeoutException) return
         if (error.connectionFailureKind() != null) return
         if (generateSequence(error) { it.cause }.take(8).any { it is SFTPException }) return
         TelemetryInitializer.recordNonFatal(action, error, context, telemetrySecrets(hostId, host))
@@ -3605,11 +3608,15 @@ class SessionService : Service() {
         attachTmux: Boolean = false
     ): ShellBinding {
         val session = client.startSession()
+        // A reconnect opens the new shell at the screen's size. The screen only reports a size when it changes,
+        // so a shell left at the default thought it had more rows than the screen: tmux then drew its status
+        // line below the bottom and scrolled the screen up a line on every redraw.
+        val (columns, rows) = shellSizes[hostId] ?: (DEFAULT_SHELL_COLUMNS to DEFAULT_SHELL_ROWS)
         val allocated = runCatching {
             session.allocatePTY(
                 terminalEmulation.ptyName,
-                120,
-                40,
+                columns,
+                rows,
                 0,
                 0,
                 mutableMapOf<PTYMode, Int>()
@@ -4354,6 +4361,8 @@ class SessionService : Service() {
         const val ACTION_OPEN_SESSIONS = "com.majordaftapps.sshpeaches.app.service.ACTION_OPEN_SESSIONS"
         const val EXTRA_HOST_ID = "extra_host_id"
         private const val CONNECTION_ATTEMPT_TIMEOUT_MS = 60_000L
+        private const val DEFAULT_SHELL_COLUMNS = 120
+        private const val DEFAULT_SHELL_ROWS = 40
         private const val MAX_RECONNECT_ATTEMPTS = 8
         private const val MAX_EDITABLE_FILE_BYTES = 1024L * 1024L
         private const val PARTIAL_DOWNLOAD_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
