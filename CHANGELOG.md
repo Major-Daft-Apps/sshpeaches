@@ -6,6 +6,8 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.11.6 (1106)
 
+Release date: 2026-10-13
+
 - Mosh fixes, tested end to end against a real mosh-server:
   - Hosts saved by name work with Mosh (mosh-client only takes an IP address; it failed with "Bad IP address").
   - Typing `exit` ends the session instead of showing a dead screen marked "reconnected".

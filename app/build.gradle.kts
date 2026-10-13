@@ -155,6 +155,7 @@ android {
             if (releaseInstrumentationRequested) {
                 proguardFile("proguard-release-androidtest-rules.pro")
             }
+            testProguardFiles("proguard-release-test-apk-rules.pro")
             if (releaseSigning != null) {
                 signingConfig = releaseSigning
             } else {

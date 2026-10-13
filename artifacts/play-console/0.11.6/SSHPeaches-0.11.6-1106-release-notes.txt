@@ -1,0 +1,8 @@
+What's new in 0.11.6
+
+- A session left in the background no longer stops taking input: dead connections reconnect.
+- Mosh: hosts saved by name work, exit ends the session, network changes don't close it, and closing it stops the server.
+- Fuller, streaming connection log.
+- Built-in keyboard: a single tap no longer opens it.
+- Fixes for terminal output, hardware keyboards, emoji delete, highlighting, SSH config and QR import, SFTP.
+- IPv6 addresses and one-word host names work.
