@@ -6,6 +6,8 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.11.6 (1106)
 
+- Built-in keyboard: a single tap on the terminal shows or hides only the top bar again; it no longer opens the keyboard as well. Double-tap or the keyboard key opens it.
+
 Fixes from a fuzz-testing sweep:
 
 - Terminal: output a server (or a file you `cat`) can send no longer freezes or crashes the app. Huge scroll and repeat counts (`CSI 9999 S`, `CSI 9999 b`) with side margins took seconds to minutes on the main thread; OSC 104 colour resets with a bad number, attribute changes in origin mode and a wide character right of the margin threw (over SSH that dropped the rest of the output, over Mosh it crashed). Long-pressing a word in one very long wrapped line no longer stalls, and scrolling inside side margins over wide (CJK) text is fast again.

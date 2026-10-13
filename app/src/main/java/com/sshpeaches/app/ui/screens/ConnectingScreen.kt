@@ -735,7 +735,9 @@ fun ConnectingScreen(
 
             override fun onSingleTapUp(e: MotionEvent) {
                 onToggleConnectedHostBar()
-                if (useBuiltInKeyboard || keyboardVisibleRequested) {
+                // A single tap only toggles the host bar. It brings back a keyboard the user still wants (the system
+                // one stays requested after Back), but never opens the built-in one: double tap or the keyboard key do.
+                if (keyboardVisibleRequested) {
                     showSystemKeyboard()
                 }
             }

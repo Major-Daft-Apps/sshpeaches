@@ -537,6 +537,7 @@ class ConnectingScreenTest {
     @Test
     fun builtInKeyboard_keyboardKeyAndTapsShowInAppKeyboardNotSystemKeyboard() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        var hostBarToggles = 0
 
         composeRule.setContent {
             MaterialTheme {
@@ -563,7 +564,7 @@ class ConnectingScreenTest {
                     onScpUpload = { _, _ -> },
                     onManageRemotePath = { _, _, _ -> },
                     onRetry = {},
-                    onToggleConnectedHostBar = {},
+                    onToggleConnectedHostBar = { hostBarToggles++ },
                     onOpenSettings = {},
                     findRequestToken = 0
                 )
@@ -581,9 +582,13 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE).performClick()
         waitForInAppKeyboard(shown = true)
 
+        // A single tap only toggles the host bar; it must not open the hidden keyboard as well.
         hideTerminalKeyboardForTest(device)
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_TERMINAL_PANEL).performTouchInput { click() }
-        waitForInAppKeyboard(shown = true)
+        composeRule.waitUntil(10_000) { hostBarToggles == 1 }
+        composeRule.waitForIdle()
+        waitForInAppKeyboard(shown = false)
+        check(!isTerminalKeyboardRequested()) { "A single tap opened the built-in keyboard" }
 
         hideTerminalKeyboardForTest(device)
         doubleTapTerminalPanel()
