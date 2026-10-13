@@ -357,6 +357,8 @@ class SessionService : Service() {
                 DefaultNetworkTransition.VPN_STATE_CHANGED -> "VPN state changed."
             }
             sessionIds.forEach { sessionId ->
+                // Mosh roams across networks by itself; closing it threw that away (and left the server running).
+                if (activeConnections[sessionId]?.moshBinding != null) return@forEach
                 if (requestReconnect(sessionId, cause)) return@forEach
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -671,6 +673,9 @@ class SessionService : Service() {
                     scpBinding = scpBinding,
                     portForwardBindings = activeForwardBindings
                 )
+                // A mosh-client that exited before the session was registered (during the startup script or port
+                // forwards) found nothing to update, leaving a dead session marked ready.
+                moshBinding?.session?.takeIf { !it.isRunning }?.let { handleMoshClientFinished(sessionId, it) }
                 val modeLabel = when (mode) {
                     ConnectionMode.SSH -> if (useMoshTransport) "Mosh session ready" else "Interactive shell session ready"
                     ConnectionMode.SFTP -> "SFTP browser ready"
@@ -815,7 +820,7 @@ class SessionService : Service() {
             runCatching { shellBinding?.session?.close() }
             runCatching { moshBinding?.inputQueue?.close() }
             runCatching { moshBinding?.inputWriterJob?.cancel() }
-            runCatching { moshBinding?.session?.finishIfRunning() }
+            runCatching { moshBinding?.let { shutDownMosh(client, it) } }
             runCatching { sftpBinding?.client?.close() }
             runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { client?.disconnect() }
@@ -978,7 +983,7 @@ class SessionService : Service() {
             runCatching { connection.shellBinding?.session?.close() }
             runCatching { connection.moshBinding?.inputQueue?.close() }
             runCatching { connection.moshBinding?.inputWriterJob?.cancel() }
-            runCatching { connection.moshBinding?.session?.finishIfRunning() }
+            runCatching { connection.moshBinding?.let { shutDownMosh(connection.client, it) } }
             runCatching { connection.sftpBinding?.client?.close() }
             runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { connection.client?.disconnect() }
@@ -2935,18 +2940,40 @@ class SessionService : Service() {
             val deadlineMillis = System.currentTimeMillis() + MOSH_BOOTSTRAP_TIMEOUT_MS
             var connect: MoshConnect? = null
             while (connect == null && System.currentTimeMillis() < deadlineMillis) {
+                var readAny = false
                 stdout.nextLine()?.let { line ->
+                    readAny = true
                     combined.appendBounded(line)
                     connect = parseMoshConnectLine(line)
                 }
                 if (connect == null) {
                     stderr.nextLine()?.let { line ->
+                        readAny = true
                         combined.appendBounded(line)
                         connect = parseMoshConnectLine(line)
                     }
                 }
+                // The command already exited without a MOSH CONNECT line (mosh-server missing, a locale error): no
+                // point waiting out the deadline.
+                if (connect == null && !readAny && command.exitStatus != null) break
                 if (connect == null) {
                     delay(40)
+                }
+            }
+            // mosh-server prints its pid after forking ("[mosh-server detached, pid = 1234]"); keep it so closing
+            // the session can stop the server.
+            var serverPid: Int? = null
+            if (connect != null) {
+                val pidDeadline = System.currentTimeMillis() + MOSH_SERVER_PID_WAIT_MS
+                while (serverPid == null && System.currentTimeMillis() < pidDeadline) {
+                    val line = stderr.nextLine() ?: stdout.nextLine()
+                    if (line != null) {
+                        serverPid = MOSH_SERVER_PID_PATTERN.find(line)?.groupValues?.get(1)?.toIntOrNull()
+                    } else if (command.exitStatus != null) {
+                        break
+                    } else {
+                        delay(20)
+                    }
                 }
             }
             runCatching { command.close() }
@@ -2959,6 +2986,10 @@ class SessionService : Service() {
                 }
                 throw ConnectionFailure("Failed to start mosh-server. $detail", ConnectionFailureKind.MOSH_SERVER)
             }
+            // mosh-client only takes a numeric address, so a host saved by name failed ("Bad IP address"). Use the
+            // address this SSH connection reached, which is also the one mosh-server -s bound to.
+            val address = client.remoteAddress?.hostAddress ?: client.remoteHostname
+            connect!!.copy(address = address, serverPid = serverPid)
         }.also { connect ->
             SessionLogBus.emit(
                 SessionLogBus.Entry(
@@ -2996,13 +3027,13 @@ class SessionService : Service() {
             arrayOf(
                 linkerPath,
                 runtime.clientBinary.absolutePath,
-                host.host,
+                moshConnect.address,
                 moshConnect.port.toString()
             )
         } else {
             arrayOf(
                 "mosh-client",
-                host.host,
+                moshConnect.address,
                 moshConnect.port.toString()
             )
         }
@@ -3117,6 +3148,12 @@ class SessionService : Service() {
             val connection = activeConnections[hostId] ?: return@launch
             val moshBinding = connection.moshBinding ?: return@launch
             if (moshBinding.session !== finishedSession) return@launch
+            if (finishedSession.exitStatus == 0) {
+                // A clean exit: the remote shell ended (exit, Ctrl-D) and mosh-server shut down with it. Restarting
+                // the client against the gone server only showed a dead screen marked "reconnected".
+                closeSessionAfterShellExit(hostId, "Mosh session ended")
+                return@launch
+            }
             SessionLogBus.emit(
                 SessionLogBus.Entry(
                     hostId = hostId,
@@ -3135,6 +3172,28 @@ class SessionService : Service() {
         }
     }
 
+    /**
+     * Ends a Mosh session on both sides. SIGKILL alone left mosh-server and the remote shell running forever (it has
+     * no network timeout by default): SIGTERM lets mosh-client tell the server to shut down, and the server is also
+     * stopped over SSH while that connection still works. SIGKILL follows if the client doesn't exit.
+     */
+    private fun shutDownMosh(client: SSHClient?, binding: MoshBinding) {
+        stopMoshServer(client, binding.moshConnect)
+        val session = binding.session
+        if (!session.isRunning) return
+        runCatching { android.system.Os.kill(session.pid, android.system.OsConstants.SIGTERM) }
+        serviceScope.launch {
+            delay(MOSH_CLIENT_SHUTDOWN_GRACE_MS)
+            withContext(Dispatchers.Main) { session.finishIfRunning() }
+        }
+    }
+
+    private fun stopMoshServer(client: SSHClient?, moshConnect: MoshConnect) {
+        val pid = moshConnect.serverPid ?: return
+        val ssh = client?.takeIf { it.isConnected && it.isAuthenticated } ?: return
+        runRemoteCommand(ssh, "kill $pid 2>/dev/null", timeoutSeconds = 3)
+    }
+
     private fun scheduleMoshReconnect(hostId: String) {
         if (moshReconnectJobs[hostId]?.isActive == true) return
         moshReconnectJobs[hostId] = serviceScope.launch {
@@ -3144,6 +3203,20 @@ class SessionService : Service() {
                     val connection = activeConnections[hostId] ?: break
                     val moshBinding = connection.moshBinding ?: break
                     attempt += 1
+                    // A new mosh-client can't rejoin the old server: it starts again from the first state and
+                    // packet number, which the server ignores (the screen froze and typing went nowhere), and it
+                    // would reuse the session key with the same nonces. Start a new server instead, over the SSH
+                    // connection that started the first one. That opens a new remote shell.
+                    val sshClient = connection.client?.takeIf { it.isConnected && it.isAuthenticated }
+                    if (sshClient == null || attempt > MOSH_RESTART_MAX_ATTEMPTS) {
+                        stopMoshServer(connection.client, moshBinding.moshConnect)
+                        closeSessionAfterShellExit(
+                            hostId,
+                            "Mosh stopped (client exit code ${moshBinding.session.exitStatus}) and could not be " +
+                                "restarted" + if (sshClient == null) " without its SSH connection" else ""
+                        )
+                        return@launch
+                    }
                     if (attempt > 1) {
                         val backoff = min(
                             MOSH_RECONNECT_MAX_DELAY_MS,
@@ -3152,15 +3225,25 @@ class SessionService : Service() {
                         delay(backoff)
                     }
                     val newBinding = runCatching {
+                        stopMoshServer(sshClient, moshBinding.moshConnect)
+                        val moshConnect = startMoshServer(hostId, sshClient)
+                        SessionLogBus.emit(
+                            SessionLogBus.Entry(
+                                hostId = hostId,
+                                level = SessionLogBus.LogLevel.WARN,
+                                message = "Started a new Mosh server; the remote shell is a new one."
+                            )
+                        )
                         startMoshClient(
                             hostId = hostId,
                             host = connection.host,
-                            moshConnect = moshBinding.moshConnect,
+                            moshConnect = moshConnect,
                             terminalEmulation = moshBinding.terminalEmulation,
                             existingInputQueue = moshBinding.inputQueue,
                             existingInputWriterJob = moshBinding.inputWriterJob
                         )
                     }.onFailure { error ->
+                        if (error is CancellationException) throw error
                         SessionLogBus.emit(
                             SessionLogBus.Entry(
                                 hostId = hostId,
@@ -3204,7 +3287,10 @@ class SessionService : Service() {
         if (moshTranscriptPublishJobs[hostId]?.isActive == true) return
         moshTranscriptPublishJobs[hostId] = serviceScope.launch {
             delay(MOSH_SNAPSHOT_PUBLISH_INTERVAL_MS)
-            val transcript = session.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+            // The emulator is written on the main thread; reading it here raced with output and resizes.
+            val transcript = withContext(Dispatchers.Main) {
+                session.emulator?.screen?.transcriptTextWithoutJoinedLines.orEmpty()
+            }
             setShellOutputSnapshot(hostId, transcript)
             moshTranscriptPublishJobs.remove(hostId)
         }
@@ -3215,7 +3301,7 @@ class SessionService : Service() {
         val port = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return null
         val key = match.groupValues.getOrNull(2).orEmpty()
         if (key.isBlank()) return null
-        return MoshConnect(port = port, key = key)
+        return MoshConnect(port = port, key = key, address = "")
     }
 
     /**
@@ -4305,6 +4391,10 @@ class SessionService : Service() {
         private const val MOSH_RECONNECT_BASE_DELAY_MS = 1_000L
         private const val MOSH_RECONNECT_MAX_DELAY_MS = 15_000L
         private val HEX_DIGITS = "0123456789ABCDEF".toCharArray()
+        private val MOSH_SERVER_PID_PATTERN = Regex("""mosh-server detached, pid = (\d+)""")
+        private const val MOSH_SERVER_PID_WAIT_MS = 1_500L
+        private const val MOSH_CLIENT_SHUTDOWN_GRACE_MS = 3_000L
+        private const val MOSH_RESTART_MAX_ATTEMPTS = 3
         private val MOSH_CONNECT_PATTERN = Regex("""MOSH CONNECT\s+(\d+)\s+([A-Za-z0-9+/=]+)""")
     }
 
@@ -4384,8 +4474,13 @@ class SessionService : Service() {
 
     private data class MoshConnect(
         val port: Int,
-        val key: String
-    )
+        val key: String,
+        /** Numeric address mosh-client connects to. */
+        val address: String,
+        val serverPid: Int? = null
+    ) {
+        override fun toString() = "MoshConnect(port=$port, address=$address, serverPid=$serverPid)"
+    }
 
     private data class PasswordResponse(
         val password: String?,

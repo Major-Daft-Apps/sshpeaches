@@ -6,6 +6,13 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.11.6 (1106)
 
+- Mosh fixes, tested end to end against a real mosh-server:
+  - Hosts saved by name work with Mosh (mosh-client only takes an IP address; it failed with "Bad IP address").
+  - Typing `exit` ends the session instead of showing a dead screen marked "reconnected".
+  - Switching networks (Wi-Fi to mobile data, a VPN) no longer closes Mosh sessions; Mosh roams by itself.
+  - Closing a session stops mosh-server and the remote shell; they used to keep running on the server forever.
+  - If the Mosh client is killed, a new mosh-server is started over SSH. Before, the restarted client reused the old session key and froze.
+  - A Mosh client that exits during startup is reported instead of leaving a dead session marked ready; a missing mosh-server is reported at once instead of after 15 seconds; a possible crash from reading the screen off the main thread is gone; the default server command asks for 256 colours.
 - A session left open in the background no longer stops taking input until it is killed. A connection that died silently while the phone slept (no network change) was never noticed: keepalives now expect a reply, so a dead connection reconnects within about a minute, and on returning to the app each open session is checked and reconnected within seconds if the server doesn't answer. Input that stalls for 10 seconds now reconnects too, instead of trying to close the shell over the dead link.
 - The connecting screen streams a fuller log, like JuiceSSH: each SSH packet of the handshake as a hexdump. Packets that carry your password, keyboard-interactive answers, commands or terminal data show only their type and size, and the dumps are left out of Send report.
 - Built-in keyboard: a single tap on the terminal shows or hides only the top bar again; it no longer opens the keyboard as well. Double-tap or the keyboard key opens it.
