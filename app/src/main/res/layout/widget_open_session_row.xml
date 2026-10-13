@@ -10,6 +10,7 @@
     android:padding="6dp">
 
     <ImageView
+        android:id="@+id/widget_open_session_mode_icon"
         android:layout_width="14dp"
         android:layout_height="14dp"
         android:layout_marginStart="8dp"

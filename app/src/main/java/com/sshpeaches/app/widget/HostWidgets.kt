@@ -248,6 +248,13 @@ internal object HostWidgets {
         val row = RemoteViews(context.packageName, R.layout.widget_open_session_row)
         row.setTextViewText(R.id.widget_open_session_title, session.title)
         row.setTextViewText(R.id.widget_open_session_subtitle, session.subtitle)
+        row.setImageViewResource(
+            R.id.widget_open_session_mode_icon,
+            when (session.mode) {
+                ConnectionMode.SSH -> R.drawable.ic_widget_terminal
+                ConnectionMode.SFTP, ConnectionMode.SCP -> R.drawable.ic_widget_cloud_download
+            }
+        )
         row.setViewVisibility(
             R.id.widget_open_session_subtitle,
             if (session.subtitle.isBlank()) View.GONE else View.VISIBLE

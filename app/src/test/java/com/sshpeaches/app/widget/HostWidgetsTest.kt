@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -106,6 +107,7 @@ class HostWidgetsTest {
 
         assertEquals("Production", stored.title)
         assertEquals("deploy@example.test", stored.subtitle)
+        assertEquals(ConnectionMode.SCP, stored.mode)
     }
 
     @Test
@@ -160,7 +162,8 @@ class HostWidgetsTest {
         val session = WidgetSessionStore.WidgetOpenSession(
             sessionId = "host|SCP|session",
             title = "Production",
-            subtitle = "deploy@example.test"
+            subtitle = "deploy@example.test",
+            mode = ConnectionMode.SCP
         )
         val applied = HostWidgets.buildOpenSessionRow(context, session)
             .apply(context, FrameLayout(context))
@@ -172,6 +175,7 @@ class HostWidgetsTest {
 
         assertEquals(session.subtitle, subtitle.text.toString())
         assertEquals(View.VISIBLE, subtitle.visibility)
+        assertEquals(R.drawable.ic_widget_cloud_download, modeIcon(applied))
         assertEquals("Open Production. deploy@example.test", open.contentDescription.toString())
         assertTrue(open.contentDescription.toString().contains(session.subtitle))
         assertTrue(disconnect.contentDescription.toString().contains(session.subtitle))
@@ -196,11 +200,15 @@ class HostWidgetsTest {
 
         val applied = HostWidgets.buildOpenSessionRow(context, stored).apply(context, FrameLayout(context))
         assertEquals(View.GONE, applied.findViewById<TextView>(R.id.widget_open_session_subtitle).visibility)
+        assertEquals(R.drawable.ic_widget_terminal, modeIcon(applied))
         assertEquals(
             "Disconnect deploy@example.test",
             applied.findViewById<View>(R.id.widget_btn_disconnect).contentDescription.toString()
         )
     }
+
+    private fun modeIcon(row: View): Int =
+        shadowOf(row.findViewById<ImageView>(R.id.widget_open_session_mode_icon).drawable).createdFromResId
 
     private fun snapshot(
         mode: ConnectionMode,
