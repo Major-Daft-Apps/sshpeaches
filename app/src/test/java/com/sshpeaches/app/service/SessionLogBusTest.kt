@@ -139,8 +139,9 @@ class SessionLogBusTest {
             delegate = ReleaseLikeLoggerFactory,
             logcatEnabled = false
         ).getLogger("sshj.connection")
-        assertFalse(logger.isDebugEnabled)
-        assertFalse(logger.isTraceEnabled)
+        // On for the connection transcript, so SSHJ's guarded packet dumps reach it.
+        assertTrue(logger.isDebugEnabled)
+        assertTrue(logger.isTraceEnabled)
 
         val entries = async(start = CoroutineStart.UNDISPATCHED) {
             withTimeout(2_000L) {
@@ -157,6 +158,52 @@ class SessionLogBusTest {
             listOf("Sending SSH_MSG_KEXINIT", "Received packet SSH_MSG_KEXINIT"),
             entries.await().map { it.message }
         )
+    }
+
+    @Test
+    fun packetDumpsAreOffOnceTheSessionIsOpen() {
+        var transcript = true
+        val logger = SessionLoggerFactory(
+            hostId = "dump-gating",
+            connectionTranscriptEnabled = { transcript },
+            diagnosticsEnabled = { true },
+            delegate = ReleaseLikeLoggerFactory,
+            logcatEnabled = false
+        ).getLogger("sshj.transport")
+        assertTrue(logger.isTraceEnabled)
+        transcript = false
+        // Not even with diagnostics: an open session's packets carry everything typed.
+        assertFalse(logger.isTraceEnabled)
+        assertFalse(logger.isDebugEnabled)
+    }
+
+    @Test
+    fun packetDumpsBecomeHexdumpRowsAndHideSecretCarryingPackets() {
+        val kexinit = hexOf(byteArrayOf(20) + "curve25519-sha256,ext-info-c".toByteArray())
+        val dump = packetDumpText("Received packet #{}: {}", arrayOf(3L, kexinit))!!.lines()
+        assertEquals("recv #3 SSH_MSG_KEXINIT, 29 bytes", dump[0])
+        assertEquals("  0000  14 63 75 72 76 65 32 35  .curve25", dump[1])
+        assertEquals("  0018  6e 66 6f 2d 63" + " ".repeat(11) + "nfo-c", dump.last())
+
+        val auth = hexOf(byteArrayOf(50) + "user ssh-connection password secret".toByteArray())
+        assertEquals(
+            "send #7 SSH_MSG_USERAUTH_REQUEST, 36 bytes (contents hidden)",
+            packetDumpText("Encoding packet #{}: {}", arrayOf(7L, auth))
+        )
+        listOf(61, 94, 95, 98, 60, 123).forEach { id ->
+            val text = packetDumpText("Encoding packet #{}: {}", arrayOf(1L, hexOf(byteArrayOf(id.toByte(), 65, 66))))!!
+            assertTrue(text, text.endsWith("(contents hidden)"))
+        }
+        listOf(94, 95).forEach { id ->
+            val text = packetDumpText("Received packet #{}: {}", arrayOf(1L, hexOf(byteArrayOf(id.toByte(), 65, 66))))!!
+            assertTrue(text, text.endsWith("(contents hidden)"))
+        }
+        assertEquals(SKIP_PACKET_DUMP, packetDumpText("IN #{}: {}", arrayOf(0, "41 42")))
+        assertEquals(null, packetDumpText("Received packet {}", arrayOf("SSH_MSG_KEXINIT")))
+
+        val big = packetDumpText("Received packet #{}: {}", arrayOf(1L, hexOf(ByteArray(5000) { 20 })))!!.lines()
+        assertEquals("  … 3976 more bytes", big.last())
+        assertEquals(1 + 1024 / 8 + 1, big.size)
     }
 
     @Test
@@ -178,10 +225,14 @@ class SessionLogBusTest {
             start()
         }
         val transcript = CopyOnWriteArrayList<String>()
+        val dumps = CopyOnWriteArrayList<String>()
         val collector = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
             SessionLogBus.entries
                 .filter { it.hostId == hostId }
-                .collect { transcript += it.message }
+                .collect {
+                    transcript += it.message
+                    if (it.packetDump) dumps += it.message
+                }
         }
         val config = DefaultConfig().apply {
             setLoggerFactory(
@@ -214,15 +265,28 @@ class SessionLogBusTest {
             assertTrue(transcript.any { it.contains("Trying `password` auth") })
             assertTrue(transcript.any { it.contains("`password` auth successful") })
             assertFalse(transcript.any { it.contains(password) })
+            // SSHJ's raw one-line dumps are always reformatted.
             assertFalse(transcript.any { it.startsWith("Encoding packet #") })
             assertFalse(transcript.any { it.startsWith("Received packet #") })
             assertFalse(transcript.any { it.contains(" IN #") })
+            // The stream of packet dumps, with the password packet hidden.
+            assertTrue(dumps.any { it.startsWith("send #") && it.contains("SSH_MSG_KEXINIT") && it.contains("\n  0000  14 ") })
+            assertTrue(dumps.any { it.startsWith("recv #") && it.contains("SSH_MSG_KEXINIT") })
+            assertTrue(dumps.any { it.contains("SSH_MSG_USERAUTH_REQUEST") && it.endsWith("(contents hidden)") })
+            assertTrue("Expected a long, streaming transcript: ${transcript.size}", transcript.sumOf { it.lines().size } >= 150)
+            val passwordHex = password.toByteArray().joinToString(" ") { "%02x".format(it) }
+            val dumpedHex = dumps.joinToString(" ") { dump ->
+                dump.lines().drop(1).joinToString(" ") { row -> row.drop(8).take(8 * 3) }
+            }.replace(Regex(" +"), " ")
+            assertFalse(dumpedHex.contains(passwordHex))
         } finally {
             runCatching { client.disconnect() }
             runCatching { server.stop(true) }
             collector.cancelAndJoin()
         }
     }
+
+    private fun hexOf(bytes: ByteArray): String = bytes.joinToString(" ") { "%02x".format(it) }
 
     private object ReleaseLikeLoggerFactory : LoggerFactory {
         private val delegate = NOPLoggerFactory()

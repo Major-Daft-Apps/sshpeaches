@@ -114,6 +114,7 @@ class MainActivity : FragmentActivity() {
             // away), so its cancel was skipped; the app is visible, so cancel here as well.
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 service?.cancelBackgroundSessionStop()
+                service?.checkConnectionsAlive()
             }
             if (service != null) {
                 pendingSessionStart?.let { start ->
@@ -878,6 +879,8 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         sessionServiceState.value?.cancelBackgroundSessionStop()
+        // Sessions may have died silently while the app was in the background or the phone slept.
+        sessionServiceState.value?.checkConnectionsAlive()
         if (appUiBootstrapped) {
             appViewModel.onAppForegrounded()
         }

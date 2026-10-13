@@ -93,6 +93,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
+import net.schmizz.concurrent.Promise
+import net.schmizz.sshj.common.SSHPacket
+import net.schmizz.sshj.connection.ConnectionException
 import net.schmizz.sshj.connection.channel.Channel
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
@@ -178,6 +181,7 @@ class SessionService : Service() {
     private var autoReconnectEnabled: Boolean = true
     /** Completing a session's signal makes its job drop the connection and reconnect. */
     private val reconnectSignals = ConcurrentHashMap<String, CompletableDeferred<String>>()
+    @Volatile private var lastLivenessCheckAtMs = Long.MIN_VALUE / 2
     /** Sessions between losing their connection and getting a new one. */
     private val reconnectingSessions: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val networkAvailable = MutableStateFlow(true)
@@ -904,6 +908,56 @@ class SessionService : Service() {
     fun cancelBackgroundSessionStop() {
         backgroundStopJob?.cancel()
         backgroundStopJob = null
+    }
+
+    /**
+     * Pings each open SSH shell when the app comes back, and drops the connection of any that doesn't answer, which
+     * reconnects it (or ends it, with auto-reconnect off). A connection can die silently while the phone sleeps; the
+     * keepalive notices too, but only after a minute of the user typing into nothing.
+     */
+    fun checkConnectionsAlive() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastLivenessCheckAtMs < LIVENESS_CHECK_MIN_INTERVAL_MS) return
+        lastLivenessCheckAtMs = now
+        activeConnections.forEach { (sessionId, connection) ->
+            val client = connection.client ?: return@forEach
+            if (connection.mode != ConnectionMode.SSH || connection.shellBinding == null) return@forEach
+            if (sessionId in reconnectingSessions) return@forEach
+            serviceScope.launch {
+                val alive = withTimeoutOrNull(LIVENESS_PROBE_TIMEOUT_MS) {
+                    // Sending can block on the transport's write lock, so it runs apart and the timeout covers it.
+                    val reply = CompletableDeferred<Promise<SSHPacket, ConnectionException>?>()
+                    launch(Dispatchers.IO) {
+                        reply.complete(
+                            runCatching {
+                                client.connection.sendGlobalRequest("keepalive@openssh.com", true, ByteArray(0))
+                            }.getOrNull()
+                        )
+                    }
+                    val promise = reply.await() ?: return@withTimeoutOrNull false
+                    // Polled rather than awaited: SSHJ logs an error when an awaited request is refused, and
+                    // OpenSSH refuses keepalives. Once fulfilled, retrieve() returns or throws without waiting.
+                    while (!promise.isFulfilled) delay(LIVENESS_PROBE_POLL_MS)
+                    runCatching { promise.retrieve() }
+                        .fold(onSuccess = { true }, onFailure = ::isGlobalRequestRefusal)
+                } ?: false
+                if (alive || activeConnections[sessionId]?.client !== client) return@launch
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "The server stopped responding."
+                    )
+                )
+                dropDeadConnection(client)
+            }
+        }
+    }
+
+    /** Closes the socket under a connection that stopped responding. Unlike closing the shell or disconnecting, this
+     * can't block on the dead link; the shell reader then fails, which reconnects or ends the session. */
+    private fun dropDeadConnection(client: SSHClient) {
+        runCatching { client.socket?.close() }
     }
 
     fun stopAllSessions() {
@@ -3626,10 +3680,15 @@ class SessionService : Service() {
                 SessionLogBus.Entry(
                     hostId = hostId,
                     level = SessionLogBus.LogLevel.ERROR,
-                    message = "Timed out writing ${payload.size} byte(s) to shell input; closing shell."
+                    message = "Timed out writing ${payload.size} byte(s) to shell input; the connection stalled."
                 )
             )
-            runCatching { shell.close() }
+            // Closing the shell would wait on the same stalled link, so drop the connection under it instead.
+            activeConnections[hostId]
+                ?.takeIf { it.shellBinding?.shell === shell }
+                ?.client
+                ?.let(::dropDeadConnection)
+                ?: runCatching { shell.close() }
         }
         try {
             shell.outputStream.write(payload)
@@ -4229,6 +4288,9 @@ class SessionService : Service() {
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
+        private const val LIVENESS_PROBE_TIMEOUT_MS = 5_000L
+        private const val LIVENESS_PROBE_POLL_MS = 50L
+        private const val LIVENESS_CHECK_MIN_INTERVAL_MS = 2_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
         private const val MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS = 4_096
         private const val MOSH_INPUT_WRITE_TIMEOUT_MS = 1_000L
@@ -4385,4 +4447,11 @@ class SessionService : Service() {
 
     enum class SessionStatus { CONNECTING, ACTIVE, ERROR }
 
+}
+
+/** A server answering a global request with SSH_MSG_REQUEST_FAILURE (as OpenSSH does for keepalives) is alive. */
+internal fun isGlobalRequestRefusal(error: Throwable): Boolean {
+    val message = error.message ?: return false
+    return error is ConnectionException && error.cause == null &&
+        message.startsWith("Global request [") && message.endsWith("] failed")
 }

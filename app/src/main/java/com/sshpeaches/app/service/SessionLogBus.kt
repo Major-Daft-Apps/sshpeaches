@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import net.schmizz.sshj.common.LoggerFactory
+import net.schmizz.sshj.common.Message
 import org.slf4j.Logger
 import org.slf4j.helpers.MarkerIgnoringBase
 import org.slf4j.helpers.MessageFormatter
@@ -25,6 +26,9 @@ object SessionLogBus {
         val level: LogLevel,
         val message: String,
         val timestamp: Long = System.currentTimeMillis(),
+        /** A packet dump from the connection transcript. Shown on screen but left out of problem reports: its hex
+         * would carry host names and keys past the scrubber. */
+        val packetDump: Boolean = false,
         /** Strictly increasing across all entries; lets the UI track "entries after X" even after
          * old entries are trimmed from a bounded buffer. */
         val sequence: Long = nextSequence()
@@ -85,9 +89,10 @@ private class SessionLogger(
 
     override fun getName(): String = delegate.name
 
-    // Keep these capability checks delegated. Forcing them on enables SSHJ's guarded
-    // packet/key hex dumps; its semantic connection events are emitted unguarded.
-    override fun isTraceEnabled(): Boolean = delegate.isTraceEnabled
+    // SSHJ's semantic connection events are emitted unguarded. These checks only guard its packet and key dumps, so
+    // they are on while the connection transcript is (packetDumpText hides the packets that carry secrets), and
+    // never for an open session, where every keystroke would be dumped.
+    override fun isTraceEnabled(): Boolean = delegate.isTraceEnabled || connectionTranscriptEnabled()
     override fun trace(msg: String?) {
         delegate.trace(msg)
         emit(LogLevel.DEBUG, msg)
@@ -113,7 +118,7 @@ private class SessionLogger(
         emit(LogLevel.DEBUG, msg, throwable = t)
     }
 
-    override fun isDebugEnabled(): Boolean = delegate.isDebugEnabled
+    override fun isDebugEnabled(): Boolean = delegate.isDebugEnabled || connectionTranscriptEnabled()
     override fun debug(msg: String?) {
         delegate.debug(msg)
         emit(LogLevel.DEBUG, msg)
@@ -225,7 +230,10 @@ private class SessionLogger(
     ) {
         val connectionTranscriptActive = connectionTranscriptEnabled()
         if (!shouldPublishSshLog(level, connectionTranscriptActive, diagnosticsEnabled())) return
+        val dump = packetDumpText(message, args)
+        if (dump == SKIP_PACKET_DUMP) return
         val text = when {
+            dump != null -> dump
             message == null -> throwable?.message ?: return
             args == null -> message
             else -> MessageFormatter.arrayFormat(message, args).message
@@ -241,9 +249,61 @@ private class SessionLogger(
                 LogLevel.ERROR -> Log.e(LOGCAT_TAG, logcatMessage, throwable)
             }
         }
-        SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text))
+        SessionLogBus.emit(SessionLogBus.Entry(hostId, level, text, packetDump = dump != null))
     }
 }
+
+internal const val SKIP_PACKET_DUMP = ""
+
+/**
+ * Turns SSHJ's one-line packet hex dumps into a header plus hexdump rows, so the connection transcript streams like
+ * JuiceSSH's. Packets that can carry secrets or session data (passwords, keyboard-interactive answers, channel
+ * requests, terminal data) keep only the header. Returns null for anything that isn't a packet dump, and
+ * [SKIP_PACKET_DUMP] for SSHJ's per-channel data dumps, which repeat the CHANNEL_DATA packets.
+ */
+internal fun packetDumpText(format: String?, args: Array<out Any?>?): String? {
+    val outgoing = when (format) {
+        "Encoding packet #{}: {}" -> true
+        "Received packet #{}: {}" -> false
+        "IN #{}: {}" -> return SKIP_PACKET_DUMP
+        else -> return null
+    }
+    if (args == null || args.size < 2) return null
+    val hex = args[1]?.toString() ?: return null
+    val size = (hex.length + 1) / 3
+    if (size == 0) return null
+    val id = hex.substring(0, 2).toIntOrNull(16) ?: return null
+    val name = "SSH_MSG_" + Message.fromByte(id.toByte()).name
+    val header = "${if (outgoing) "send" else "recv"} #${args[0]} $name, $size bytes"
+    if (if (outgoing) id !in OUTGOING_DUMPABLE_MESSAGES else id in INCOMING_HIDDEN_MESSAGES) {
+        return "$header (contents hidden)"
+    }
+    val shown = minOf(size, MAX_PACKET_DUMP_BYTES)
+    val bytes = ByteArray(shown) { hex.substring(it * 3, it * 3 + 2).toInt(16).toByte() }
+    return buildString {
+        append(header)
+        for (offset in 0 until shown step PACKET_DUMP_ROW_BYTES) {
+            val end = minOf(offset + PACKET_DUMP_ROW_BYTES, shown)
+            append('\n').append("  ").append(offset.toString(16).padStart(4, '0')).append("  ")
+            for (i in offset until offset + PACKET_DUMP_ROW_BYTES) {
+                append(if (i < end) (bytes[i].toInt() and 0xff).toString(16).padStart(2, '0') + " " else "   ")
+            }
+            append(' ')
+            for (i in offset until end) {
+                val c = bytes[i].toInt() and 0xff
+                append(if (c in 0x20..0x7e) c.toChar() else '.')
+            }
+        }
+        if (size > shown) append('\n').append("  … ${size - shown} more bytes")
+    }
+}
+
+// Transport, key exchange and channel bookkeeping: nothing the user typed or the session sent.
+private val OUTGOING_DUMPABLE_MESSAGES = setOf(1, 2, 3, 4, 5, 7, 20, 21) + (30..49) + setOf(80, 81, 82, 90, 91, 92, 93, 96, 97, 99, 100)
+// Terminal output.
+private val INCOMING_HIDDEN_MESSAGES = setOf(94, 95)
+private const val PACKET_DUMP_ROW_BYTES = 8
+private const val MAX_PACKET_DUMP_BYTES = 1024
 
 internal fun shouldPublishSshLog(
     level: LogLevel,

@@ -6,6 +6,8 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.11.6 (1106)
 
+- A session left open in the background no longer stops taking input until it is killed. A connection that died silently while the phone slept (no network change) was never noticed: keepalives now expect a reply, so a dead connection reconnects within about a minute, and on returning to the app each open session is checked and reconnected within seconds if the server doesn't answer. Input that stalls for 10 seconds now reconnects too, instead of trying to close the shell over the dead link.
+- The connecting screen streams a fuller log, like JuiceSSH: each SSH packet of the handshake as a hexdump. Packets that carry your password, keyboard-interactive answers, commands or terminal data show only their type and size, and the dumps are left out of Send report.
 - Built-in keyboard: a single tap on the terminal shows or hides only the top bar again; it no longer opens the keyboard as well. Double-tap or the keyboard key opens it.
 
 Fixes from a fuzz-testing sweep:

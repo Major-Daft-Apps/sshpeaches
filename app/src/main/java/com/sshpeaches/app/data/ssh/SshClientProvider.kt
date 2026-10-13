@@ -20,6 +20,8 @@ import java.security.Signature as JcaSignature
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import javax.crypto.KeyAgreement
+import net.schmizz.keepalive.KeepAliveProvider
+import net.schmizz.keepalive.KeepAliveRunner
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.Factory
@@ -52,7 +54,8 @@ object SshClientProvider {
     private val X509_ED25519_PUBLIC_KEY_HEADER = Base64.getDecoder().decode("MCowBQYDK2VwAyEA")
     private val knownHostsWriteLock = Any()
     private val providerInstallLock = Any()
-    private const val KEEPALIVE_INTERVAL_SECONDS = 30
+    private const val KEEPALIVE_INTERVAL_SECONDS = 20
+    private const val KEEPALIVE_MAX_UNANSWERED = 3
     private const val SSH_CHANNEL_WINDOW_SIZE_BYTES = 16L * 1024L * 1024L
     // SSHJ rejects transport packets above 256 KiB. A channel-data payload at
     // that same size becomes larger after SSH/SFTP framing (for example,
@@ -191,6 +194,11 @@ object SshClientProvider {
         ensureCompatibleHostKeyAlgorithmsAvailable()
         val config = DefaultConfig()
         loggerFactory?.let { config.setLoggerFactory(it) }
+        // SSHJ's default heartbeat sends SSH_MSG_IGNORE, which gets no reply, so a connection that died silently (a
+        // NAT entry expired while the phone slept) was never noticed: typing went nowhere until the session was killed.
+        // keepalive@openssh.com wants a reply, and the transport dies after KEEPALIVE_MAX_UNANSWERED misses, which
+        // starts the usual reconnect.
+        config.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
         config.compressionFactories = listOf(NoneCompression.Factory())
         val fastCiphers = preferFastCiphers(config.cipherFactories)
         if (fastCiphers.isNotEmpty()) {
@@ -230,6 +238,7 @@ object SshClientProvider {
             connectTimeout = 10_000
             timeout = 20_000
             connection.keepAlive.keepAliveInterval = KEEPALIVE_INTERVAL_SECONDS
+            (connection.keepAlive as? KeepAliveRunner)?.maxAliveCount = KEEPALIVE_MAX_UNANSWERED
         }
     }
 
