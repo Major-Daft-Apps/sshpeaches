@@ -30,8 +30,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:label="@string/app_name"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@mipmap/ic_launcher_peach_orange_on_cream"
+        android:roundIcon="@mipmap/ic_launcher_peach_orange_on_cream"
         android:theme="@style/Theme.SSHPeaches">
         <meta-data
             android:name="firebase_autoinit_enabled"
@@ -64,13 +64,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/export_share_paths" />
         </provider>
+        <!-- One alias per app icon (AppIconManager enables the chosen one). DefaultLauncherAlias was the 3D icon:
+             it keeps its name and now shows Orange on cream, so those users' launcher icons switch in place. -->
         <activity-alias
             android:name=".DefaultLauncherAlias"
             android:enabled="true"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="@mipmap/ic_launcher_peach_orange_on_cream"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_round"
+            android:roundIcon="@mipmap/ic_launcher_peach_orange_on_cream"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -97,6 +99,97 @@
             android:icon="@mipmap/ic_launcher_peach_dark"
             android:label="@string/app_name"
             android:roundIcon="@mipmap/ic_launcher_peach_dark"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".WhiteOnOrangeLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_white_on_orange"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_white_on_orange"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".CoralOnBlushLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_coral_on_blush"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_coral_on_blush"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".PeachOnPlumLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_peach_on_plum"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_peach_on_plum"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".BlackOnPeachLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_black_on_peach"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_black_on_peach"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".MintOnCharcoalLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_mint_on_charcoal"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_mint_on_charcoal"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".OrangeOnBlackLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_orange_on_black"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_orange_on_black"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".TerminalGreenLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_peach_terminal_green"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_peach_terminal_green"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

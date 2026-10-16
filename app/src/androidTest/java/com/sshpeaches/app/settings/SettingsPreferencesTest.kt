@@ -1,6 +1,11 @@
 package com.majordaftapps.sshpeaches.app.settings
 
+import android.accessibilityservice.AccessibilityService
+import android.content.ComponentName
+import android.content.pm.PackageManager
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
@@ -8,6 +13,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -17,6 +23,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.majordaftapps.sshpeaches.app.AppIconManager
 import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
@@ -30,6 +38,8 @@ import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -115,6 +125,36 @@ class SettingsPreferencesTest {
         } else {
             composeRule.onNodeWithTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH).assertIsOn()
         }
+    }
+
+    @Test
+    fun appIconGridSelectsATileAndSwitchesTheLauncherAlias() {
+        openSettings()
+        composeRule.revealSettingsControl(UiTestTags.SETTINGS_THEME_MODE_FIELD)
+        val orangeOnCream = UiTestTags.settingsAppIconOption("Orange on cream")
+        val terminalGreen = UiTestTags.settingsAppIconOption("Terminal green")
+        composeRule.onNodeWithTag(orangeOnCream).performScrollTo().assertIsSelected()
+        composeRule.onNodeWithContentDescription("Terminal green").assertHasClickAction()
+        composeRule.onNodeWithTag(terminalGreen).performScrollTo().performClick()
+        composeRule.onNodeWithTag(terminalGreen).assertIsSelected()
+        composeRule.onNodeWithTag(orangeOnCream).assertIsNotSelected()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        fun aliasState(option: AppIconOption) = context.packageManager.getComponentEnabledSetting(
+            ComponentName(context, AppIconManager.aliasName(option))
+        )
+        fun switched() =
+            aliasState(AppIconOption.TERMINAL_GREEN) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
+                aliasState(AppIconOption.ORANGE_ON_CREAM) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+
+        // Not while the app is open: switching aliases would close it.
+        Thread.sleep(2_000)
+        assertFalse(switched())
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (!switched() && System.currentTimeMillis() < deadline) Thread.sleep(200)
+        assertTrue(switched())
     }
 
     @Test

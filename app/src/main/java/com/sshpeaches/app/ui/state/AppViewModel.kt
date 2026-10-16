@@ -54,7 +54,7 @@ class AppViewModel(
 
     private val sortMode = MutableStateFlow(SortMode.LAST_USED)
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
-    private val appIconFlow = MutableStateFlow(AppIconOption.DEFAULT)
+    private val appIconFlow = MutableStateFlow(AppIconOption.ORANGE_ON_CREAM)
     private val backgroundSessionsFlow = MutableStateFlow(true)
     private val backgroundSessionTimeoutFlow = MutableStateFlow(BackgroundSessionTimeout.FOREVER)
     private val biometricFlow = MutableStateFlow(false)

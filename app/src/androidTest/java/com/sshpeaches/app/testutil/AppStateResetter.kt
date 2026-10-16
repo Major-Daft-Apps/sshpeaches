@@ -28,7 +28,7 @@ object AppStateResetter {
             SshPeachesDatabase.get(appContext).clearAllTables()
             WorkManager.getInstance(appContext).cancelAllWork()
         }
-        AppIconManager.apply(appContext, AppIconOption.DEFAULT)
+        AppIconManager.apply(appContext, AppIconOption.ORANGE_ON_CREAM)
 
         SecurityManager.init(appContext)
         runCatching { SecurityManager.clearPin() }

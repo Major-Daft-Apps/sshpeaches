@@ -3,6 +3,8 @@ package com.majordaftapps.sshpeaches.app
 import android.app.Application
 import android.app.NotificationManager
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.majordaftapps.sshpeaches.app.appcheck.AppCheckInitializer
 import com.majordaftapps.sshpeaches.app.data.repository.AppContainer
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
@@ -14,7 +16,10 @@ import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -32,7 +37,12 @@ class SSHPeachesApplication : Application() {
         SettingsStore.init(this)
         applyConfiguredNightMode()
         appScope.launch {
+            // Switching launcher aliases closes the screen opened through the old one, so the new icon waits
+            // until the app is in the background.
             SettingsStore.appIcon
+                .combine(ProcessLifecycleOwner.get().lifecycle.currentStateFlow) { option, state -> option to state }
+                .filter { (_, state) -> !state.isAtLeast(Lifecycle.State.STARTED) }
+                .map { (option, _) -> option }
                 .distinctUntilChanged()
                 .collect { option ->
                     AppIconManager.apply(this@SSHPeachesApplication, option)

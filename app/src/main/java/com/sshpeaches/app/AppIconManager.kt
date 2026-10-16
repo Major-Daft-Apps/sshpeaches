@@ -6,20 +6,27 @@ import android.content.pm.PackageManager
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 
 object AppIconManager {
-    private const val DEFAULT_ALIAS = "com.majordaftapps.sshpeaches.app.DefaultLauncherAlias"
-    private const val PEACH_LIGHT_ALIAS = "com.majordaftapps.sshpeaches.app.PeachLightLauncherAlias"
-    private const val PEACH_DARK_ALIAS = "com.majordaftapps.sshpeaches.app.PeachDarkLauncherAlias"
+    fun aliasName(option: AppIconOption): String = "com.majordaftapps.sshpeaches.app." + when (option) {
+        // The 3D icon's alias, kept so launchers swap its icon in place instead of dropping it.
+        AppIconOption.ORANGE_ON_CREAM -> "DefaultLauncherAlias"
+        AppIconOption.PEACH_LIGHT -> "PeachLightLauncherAlias"
+        AppIconOption.PEACH_DARK -> "PeachDarkLauncherAlias"
+        AppIconOption.WHITE_ON_ORANGE -> "WhiteOnOrangeLauncherAlias"
+        AppIconOption.CORAL_ON_BLUSH -> "CoralOnBlushLauncherAlias"
+        AppIconOption.PEACH_ON_PLUM -> "PeachOnPlumLauncherAlias"
+        AppIconOption.BLACK_ON_PEACH -> "BlackOnPeachLauncherAlias"
+        AppIconOption.MINT_ON_CHARCOAL -> "MintOnCharcoalLauncherAlias"
+        AppIconOption.ORANGE_ON_BLACK -> "OrangeOnBlackLauncherAlias"
+        AppIconOption.TERMINAL_GREEN -> "TerminalGreenLauncherAlias"
+    }
 
     fun apply(context: Context, option: AppIconOption) {
         val packageManager = context.packageManager
-        val enabledAlias = when (option) {
-            AppIconOption.DEFAULT -> DEFAULT_ALIAS
-            AppIconOption.PEACH_LIGHT -> PEACH_LIGHT_ALIAS
-            AppIconOption.PEACH_DARK -> PEACH_DARK_ALIAS
-        }
-        listOf(DEFAULT_ALIAS, PEACH_LIGHT_ALIAS, PEACH_DARK_ALIAS).forEach { alias ->
-            val component = ComponentName(context, alias)
-            val desiredState = if (alias == enabledAlias) {
+        // The chosen alias first, so the app always has a launcher entry.
+        val options = listOf(option) + AppIconOption.entries.filter { it != option }
+        options.forEach { candidate ->
+            val component = ComponentName(context, aliasName(candidate))
+            val desiredState = if (candidate == option) {
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
             } else {
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED

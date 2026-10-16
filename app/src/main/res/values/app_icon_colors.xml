@@ -1,0 +1,19 @@
+<resources>
+    <!-- Launcher icon variants: the White Peach artwork recoloured. bg fills the tile and the gaps between segments. -->
+    <color name="app_icon_orange_on_cream_bg">#FBEBD8</color>
+    <color name="app_icon_orange_on_cream_fg">#E8781E</color>
+    <color name="app_icon_white_on_orange_bg">#F28C28</color>
+    <color name="app_icon_white_on_orange_fg">#FFFFFF</color>
+    <color name="app_icon_coral_on_blush_bg">#F9D5CF</color>
+    <color name="app_icon_coral_on_blush_fg">#E8604C</color>
+    <color name="app_icon_peach_on_plum_bg">#3A1F3D</color>
+    <color name="app_icon_peach_on_plum_fg">#FFB07A</color>
+    <color name="app_icon_black_on_peach_bg">#FFB07A</color>
+    <color name="app_icon_black_on_peach_fg">#1A1A1A</color>
+    <color name="app_icon_mint_on_charcoal_bg">#222222</color>
+    <color name="app_icon_mint_on_charcoal_fg">#7FD8BE</color>
+    <color name="app_icon_orange_on_black_bg">#000000</color>
+    <color name="app_icon_orange_on_black_fg">#F5913B</color>
+    <color name="app_icon_terminal_green_bg">#0D0D0D</color>
+    <color name="app_icon_terminal_green_fg">#39FF88</color>
+</resources>

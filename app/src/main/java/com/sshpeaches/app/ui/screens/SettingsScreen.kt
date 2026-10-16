@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,7 +31,6 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -58,17 +56,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.AppIconOption
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
@@ -172,35 +166,6 @@ fun SettingsScreen(
         ThemeMode.SYSTEM to "Automatic",
         ThemeMode.LIGHT to "Light",
         ThemeMode.DARK to "Dark"
-    )
-    val appIconOptions = listOf(
-        AppIconChoice(
-            option = AppIconOption.DEFAULT,
-            title = "Default",
-            description = "Current SSHPeaches icon.",
-            backgroundColorResId = R.color.ic_launcher_background,
-            tintColorResId = null,
-            previewAssetResId = R.drawable.sshpeaches,
-            previewPaddingDp = 2
-        ),
-        AppIconChoice(
-            option = AppIconOption.PEACH_LIGHT,
-            title = "Orange Peach",
-            description = "Orange peach on the light-mode navbar background.",
-            backgroundColorResId = R.color.color_vanilla,
-            tintColorResId = R.color.peachy_orange,
-            previewAssetResId = R.drawable.sshpeaches_activitybar,
-            previewPaddingDp = 15
-        ),
-        AppIconChoice(
-            option = AppIconOption.PEACH_DARK,
-            title = "White Peach",
-            description = "White peach on the dark-mode background.",
-            backgroundColorResId = R.color.color_hard_black,
-            tintColorResId = android.R.color.white,
-            previewAssetResId = R.drawable.sshpeaches_activitybar,
-            previewPaddingDp = 15
-        )
     )
     val timeoutOptions = listOf(
         LockTimeout.IMMEDIATE,
@@ -555,33 +520,7 @@ fun SettingsScreen(
                             }
                         }
                         Text("App Icon", style = MaterialTheme.typography.titleSmall)
-                        appIconOptions.forEach { choice ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onAppIconChange(choice.option) }
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AppIconPreview(choice)
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(start = 12.dp, end = 12.dp)
-                                ) {
-                                    Text(choice.title)
-                                    Text(
-                                        choice.description,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-                                RadioButton(
-                                    selected = currentAppIcon == choice.option,
-                                    onClick = { onAppIconChange(choice.option) },
-                                    modifier = Modifier.testTag(UiTestTags.settingsAppIconOption(choice.title))
-                                )
-                            }
-                        }
+                        AppIconPicker(selected = currentAppIcon, onSelect = onAppIconChange)
                     }
                 }
                 }
@@ -1547,33 +1486,6 @@ internal fun rememberPersistedField(persisted: String): PersistedFieldState {
     val state = remember { PersistedFieldState(persisted) }
     LaunchedEffect(persisted) { state.onPersisted(persisted) }
     return state
-}
-
-private data class AppIconChoice(
-    val option: AppIconOption,
-    val title: String,
-    val description: String,
-    val backgroundColorResId: Int,
-    val tintColorResId: Int?,
-    val previewAssetResId: Int,
-    val previewPaddingDp: Int
-)
-
-@Composable
-private fun AppIconPreview(choice: AppIconChoice) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colorResource(choice.backgroundColorResId)),
-        modifier = Modifier.size(84.dp)
-    ) {
-        Image(
-            painter = painterResource(id = choice.previewAssetResId),
-            contentDescription = null,
-            colorFilter = choice.tintColorResId?.let { ColorFilter.tint(colorResource(it)) },
-            modifier = Modifier
-                .size(84.dp)
-                .padding(choice.previewPaddingDp.dp)
-        )
-    }
 }
 
 @Composable

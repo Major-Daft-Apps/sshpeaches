@@ -23,7 +23,7 @@ data class AppUiState(
     val snippets: List<Snippet> = emptyList(),
     val sortMode: SortMode = SortMode.LAST_USED,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val appIcon: AppIconOption = AppIconOption.DEFAULT,
+    val appIcon: AppIconOption = AppIconOption.ORANGE_ON_CREAM,
     val allowBackgroundSessions: Boolean = true,
     val backgroundSessionTimeout: BackgroundSessionTimeout = BackgroundSessionTimeout.FOREVER,
     val biometricLockEnabled: Boolean = false,
