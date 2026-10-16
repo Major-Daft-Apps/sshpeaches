@@ -53,14 +53,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.majordaftapps.sshpeaches.app.R
+import com.majordaftapps.sshpeaches.app.ui.components.PeachLogo
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
@@ -897,13 +895,11 @@ private fun HomeWelcome(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.sshpeaches),
+        PeachLogo(
             contentDescription = null,
             modifier = Modifier
                 .size(140.dp)
-                .padding(bottom = 20.dp),
-            contentScale = ContentScale.Fit
+                .padding(bottom = 20.dp)
         )
         Text(
             text = "Welcome to SSHPeaches. To begin, create your first resource.",

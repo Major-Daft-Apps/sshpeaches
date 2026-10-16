@@ -129,6 +129,7 @@ import java.io.InputStream
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import com.majordaftapps.sshpeaches.app.ui.components.PeachLogo
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
@@ -3484,14 +3485,7 @@ internal fun AboutDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Image(
-                    painter = painterResource(id = com.majordaftapps.sshpeaches.app.R.drawable.sshpeaches),
-                    contentDescription = "SSHPeaches logo",
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Crop
-                )
+                PeachLogo(modifier = Modifier.size(96.dp))
                 val appVersion = BuildConfig.VERSION_NAME
                 Text(
                     stringResource(id = R.string.about_version, appVersion),

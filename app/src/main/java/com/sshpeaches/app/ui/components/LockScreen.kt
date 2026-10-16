@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -26,15 +25,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.AutoHidePasswordReveal
 import com.majordaftapps.sshpeaches.app.ui.util.TailRevealPasswordVisualTransformation
@@ -108,12 +104,7 @@ private fun LockScreenContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.sshpeaches),
-                contentDescription = "SSHPeaches logo",
-                modifier = Modifier.size(96.dp),
-                contentScale = ContentScale.Fit
-            )
+            PeachLogo(modifier = Modifier.size(96.dp))
             Spacer(modifier = Modifier.height(12.dp))
             Text("SSHPeaches is locked", style = MaterialTheme.typography.headlineSmall)
             Text(

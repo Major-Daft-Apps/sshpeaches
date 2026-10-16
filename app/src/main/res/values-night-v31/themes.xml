@@ -6,9 +6,9 @@
     </style>
 
     <style name="Theme.SSHPeaches.Starting" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">@color/ic_launcher_background</item>
-        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/sshpeaches</item>
+        <item name="android:windowBackground">@color/app_icon_orange_on_cream_bg</item>
+        <item name="windowSplashScreenBackground">@color/app_icon_orange_on_cream_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_peach_orange_on_cream_foreground</item>
         <item name="postSplashScreenTheme">@style/Theme.SSHPeaches</item>
     </style>
 </resources>
