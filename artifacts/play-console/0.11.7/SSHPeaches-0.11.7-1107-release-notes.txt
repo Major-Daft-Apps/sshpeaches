@@ -1,8 +1,9 @@
 What's new in 0.11.7
 
+- 10 new flat app icons in Settings. Orange on cream replaces the 3D icon.
+- Themed icons show the peach's segments, not a white curve.
 - After a reconnect, tmux no longer pushes the screen up a line every second.
 - Reconnects retry instead of failing with "Not connected".
-- Themed app icons (One UI icon themes, Android 13+) show the peach with its segments instead of a white curve.
-- The connection log reads like ssh -vv: what each SSH step negotiates. Passwords and terminal data are never logged.
+- The connection log reads like ssh -vv. Passwords and terminal data are never logged.
 - Importing a saved host no longer resets its OS icon.
 - Widget: open connections show just user@host.
