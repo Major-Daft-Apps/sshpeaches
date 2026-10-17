@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SSHPeaches feature graphic</title><style>
+html,body{margin:0;padding:0}body{width:1024px;height:500px;overflow:hidden}
+.canvas{position:relative;width:1024px;height:500px;overflow:hidden;font-family:"Inter",sans-serif}
+.peach{background:var(--c,#E8781E);-webkit-mask:url("peach-mask-hires.png") center/150% no-repeat;mask:url("peach-mask-hires.png") center/150% no-repeat}
+
+.canvas{background:linear-gradient(180deg,#FBEBD8 0%,#FFFFFF 100%)}
+.brand{position:absolute;left:64px;top:52px;display:flex;align-items:center;gap:14px}
+.brand .peach{width:58px;height:58px}
+.brand b{font-weight:900;font-size:34px;letter-spacing:-1px;color:#111}
+.brand b span{color:#E8781E}
+.cmd{position:absolute;left:64px;top:158px;font-family:"DejaVu Sans Mono",monospace;font-size:72px;letter-spacing:-3px;color:#111;white-space:nowrap}
+.cmd .ps{color:#E8781E}
+.cmd .cur{display:inline-block;width:40px;height:78px;background:#E8781E;vertical-align:-12px;margin-left:18px}
+.sub{position:absolute;left:68px;top:278px;font-family:"DejaVu Sans Mono",monospace;font-size:22px;color:#7A5A44}
+.sub i{font-style:normal;color:#E8781E}
+.list{position:absolute;left:68px;bottom:64px;display:flex;gap:30px;font-size:19px;font-weight:600;color:#2A1A10}
+.list div::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:#E8781E;margin-right:10px;vertical-align:2px}
+.big{position:absolute;right:-120px;top:-40px;width:560px;height:560px;opacity:.10}
+</style></head><body><div class="canvas">
+<div class="big peach"></div>
+<div class="brand"><div class="peach"></div><b>SSH<span>Peaches</span></b></div>
+<div class="cmd"><span class="ps">~$</span> ssh you@anywhere<span class="cur"></span></div>
+<div class="sub"><i>#</i> your servers, from your pocket</div>
+<div class="list"><div>Terminal</div><div>SFTP files</div><div>SSH keys</div><div>Port forwarding</div><div>Snippets</div></div>
+</div></body></html>

@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SSHPeaches feature graphic</title><style>
+html,body{margin:0;padding:0}body{width:1024px;height:500px;overflow:hidden}
+.canvas{position:relative;width:1024px;height:500px;overflow:hidden;font-family:"Inter",sans-serif}
+.peach{background:var(--c,#E8781E);-webkit-mask:url("peach-mask-hires.png") center/150% no-repeat;mask:url("peach-mask-hires.png") center/150% no-repeat}
+
+.canvas{background:linear-gradient(180deg,#FBEBD8 0%,#FFFFFF 100%)}
+.copy{position:absolute;left:64px;top:0;bottom:0;width:440px;display:flex;flex-direction:column;justify-content:center}
+.copy .peach{width:96px;height:96px;margin-left:-4px}
+h1{margin:12px 0 0;font-weight:900;font-size:66px;letter-spacing:-2.5px;line-height:1;color:#111}
+h1 span{color:#E8781E}
+p{margin:16px 0 0;font-size:24px;font-weight:500;color:#2A1A10;line-height:1.35}
+.phone{position:absolute;width:250px;height:444px;border-radius:34px;background:#1A1411;padding:9px;box-sizing:border-box;
+  box-shadow:0 28px 60px rgba(90,45,10,.30),0 6px 16px rgba(90,45,10,.18)}
+.phone img{width:100%;height:100%;border-radius:26px;object-fit:cover;object-position:top;display:block}
+.p1{left:770px;top:70px;transform:rotate(8deg)}
+.p2{left:560px;top:96px;transform:rotate(-6deg)}
+.glow{position:absolute;left:560px;top:40px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(242,140,40,.30),rgba(242,140,40,0) 65%)}
+</style></head><body><div class="canvas">
+<div class="glow"></div>
+<div class="phone p1"><img src="../phone/03-file-browser.png"></div>
+<div class="phone p2"><img src="../phone/01-terminal.png"></div>
+<div class="copy"><div class="peach"></div><h1>SSH<span>Peaches</span></h1>
+<p>Terminal, files, keys and tunnels.<br>Every server, one tap away.</p></div>
+</div></body></html>
