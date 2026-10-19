@@ -1,0 +1,8 @@
+What's new in 0.11.8
+
+- Security fixes for SCP transfers, host key checks, imports, Wi-Fi transfer and the PIN lock.
+- Imports are shown for review first and never overwrite what you have.
+- A smaller font no longer moves the prompt into the line above.
+- Widget crash after updating fixed.
+- Weak, outdated SSH algorithms turned off.
+- Terminal and transfer hardening against hostile servers.

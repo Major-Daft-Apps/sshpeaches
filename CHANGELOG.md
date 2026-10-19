@@ -4,6 +4,37 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.11.8 (1108)
+
+Release date: 2026-10-19
+
+Security fixes from a review of the app's own code:
+
+- SCP downloads and uploads quote file names correctly. A file name containing a `'` could run a command on the server.
+- Importing an export, QR code or Wi-Fi transfer can no longer replace the key of an identity you already have, and any key it does add must match the identity's fingerprint. "Install key on host" always installs the public half of the key the app logs in with.
+- A server whose saved host key is of a different type (an RSA key where an Ed25519 one was saved) now gets the "Host key changed" warning instead of the new-host prompt, and is never trusted automatically. Accepting the change replaces the old key. Revoked (`@revoked`) known-hosts entries are refused.
+- Imports are shown for review before anything is applied (QR code, Wi-Fi, file or shared file), and they only add: an imported host, snippet, forward or identity never overwrites one you have, and a copy whose name clashes is marked "(imported)". Imports no longer change the app lock, crash reports, analytics, diagnostics or the password-insert confirmation, and replace the keyboard layout only when you tick it.
+- A scanned host QR code no longer brings a startup command, or links to your keys or port forwards.
+- Imported port forwards (export, QR code, OpenSSH config) only listen on this phone; the forward editor warns when a forward listens on the network.
+- The PIN lockout after wrong guesses can't be skipped by changing the phone's clock or restarting it.
+- A server can no longer freeze the app by switching the terminal between 80 and 132 columns over and over, flood the log with terminal capability requests, or put hidden line breaks into text you copy.
+- A Wi-Fi transfer is only reported as sent once the other phone has decrypted it; another device connecting first no longer ends it. The transfer also stops when you leave Settings or the app locks.
+- Private keys are loaded in memory for logging in, instead of being written to a temporary file.
+- Diagnostics logs in release builds no longer include what you type (which could be a password).
+- The in-app editor only opens regular files and stops reading at its 1 MB limit; background commands (OS detection, startup scripts) stop reading output after 64 KB or a short wait.
+- A malformed SFTP packet ends that connection instead of crashing the app.
+- Restarting or closing a Mosh session only stops the Mosh server it started.
+- Weak algorithms that OpenSSH also no longer offers are turned off: RC4, 3DES, Blowfish, CAST, IDEA, MD5 and truncated MACs, and Diffie-Hellman group 1. A server that offers nothing better can't be connected to.
+- Android's backup and device-to-device transfer rules now exclude the app's database, files and settings explicitly, not just its top folder.
+- Only `content://` files are accepted for import; key files and export files are size-limited.
+- Bouncy Castle updated to 1.86.
+
+Other fixes:
+
+- Making the terminal font smaller (or rotating to a wider screen) no longer moves the prompt into the line above. The line being typed on keeps its rows when the screen is reflowed, so bash and zsh redraw it in the right place: they used to draw the prompt one row too high, over earlier output, and zsh's `%` end-of-output marker was joined to the prompt.
+
+- The home-screen widget no longer crashes if its labels can't be formatted. Right after the update to 0.11.7, one phone's widget crashed on every update with open sessions until the update settled.
+
 ## 0.11.7 (1107)
 
 Release date: 2026-10-13
