@@ -151,9 +151,16 @@ public class ResizeTest extends TerminalTestCase {
 		withTerminalSized(cols, rows).enterString("111111").assertLinesAre("11111", "1    ", "     ");
 		assertCursorAt(1, 1).assertLineWraps(true, false, false);
 
-		resize(7, rows).assertCursorAt(0, 6).assertLinesAre("111111 ", "       ", "       ").assertLineWraps(false, false, false);
-		resize(cols, rows).assertCursorAt(1, 1).assertLinesAre("11111", "1    ", "     ").assertLineWraps(true, false, false);
+		// The cursor's line keeps the row breaks its output made: a shell redraws that line after a resize relative to
+		// the rows it used, so joining them made it draw over the line above (see ShellRedrawAfterResizeTest).
+		resize(7, rows).assertCursorAt(1, 1).assertLinesAre("11111  ", "1      ", "       ").assertLineWraps(false, false, false);
+		resize(cols, rows).assertCursorAt(1, 1).assertLinesAre("11111", "1    ", "     ").assertLineWraps(false, false, false);
 
+		// Once the cursor has moved on, the wrapped line is history and reflows.
+		withTerminalSized(cols, rows).enterString("111111\r\n").assertLineWraps(true, false, false);
+		resize(7, rows).assertCursorAt(1, 0).assertLinesAre("111111 ", "       ", "       ").assertLineWraps(false, false, false);
+
+		withTerminalSized(cols, rows).enterString("111111");
 		enterString("2").assertLinesAre("11111", "12   ", "     ").assertLineWraps(true, false, false);
 		enterString("123").assertLinesAre("11111", "12123", "     ").assertLineWraps(true, false, false);
 		enterString("W").assertLinesAre("11111", "12123", "W    ").assertLineWraps(true, true, false);
@@ -171,14 +178,17 @@ public class ResizeTest extends TerminalTestCase {
 	}
 
 	public void testResizeWithCombiningCharInLastColumn() {
-		withTerminalSized(3, 3).enterString("ABC\u0302DEF").assertLinesAre("ABC\u0302", "DEF", "   ");
+		// The cursor is moved off the wrapped line first: the cursor's own line keeps its row breaks (see testLineWrap).
+		withTerminalSized(3, 3).enterString("ABC\u0302DEF\033[3;1H").assertLinesAre("ABC\u0302", "DEF", "   ");
 		resize(4, 3).assertLinesAre("ABC\u0302D", "EF  ", "    ");
 
 		// Same as above but with colors:
-		withTerminalSized(3, 3).enterString("\033[37mA\033[35mB\033[33mC\u0302\033[32mD\033[31mE\033[34mF").assertLinesAre("ABC\u0302",
+		withTerminalSized(3, 3).enterString("\033[37mA\033[35mB\033[33mC\u0302\033[32mD\033[31mE\033[34mF\033[3;1H").assertLinesAre("ABC\u0302",
 				"DEF", "   ");
 		resize(4, 3).assertLinesAre("ABC\u0302D", "EF  ", "    ");
-		assertForegroundIndices(effectLine(7, 5, 3, 2), effectLine(1, 4, 4, 4), effectLine(4, 4, 4, 4));
+		// The cursor's row is copied up to the cursor (its first cell, still in the default colour); the rest is new.
+		assertForegroundIndices(effectLine(7, 5, 3, 2), effectLine(1, 4, 4, 4),
+				effectLine(TextStyle.COLOR_INDEX_FOREGROUND, 4, 4, 4));
 	}
 
 	public void testResizeWithLineWrappingContinuing() {

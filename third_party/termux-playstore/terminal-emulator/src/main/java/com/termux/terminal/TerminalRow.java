@@ -19,6 +19,8 @@ public final class TerminalRow {
     private short mSpaceUsed;
     /** If this row has been line wrapped due to text output at the end of line. */
     boolean mLineWrap;
+    /** If {@link #mLineWrap} was set by a resize reflowing the row, not by output reaching the end of the line. */
+    boolean mLineWrapFromResize;
     /** The style bits of each cell in the row. See {@link TextStyle}. */
     final long[] mStyle;
     /** If this row might contain chars with width != 1, used for deactivating fast path */

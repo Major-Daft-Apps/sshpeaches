@@ -200,7 +200,16 @@ public final class TerminalBuffer {
     }
 
     public void setLineWrap(int row) {
-        mLines[externalToInternalRow(row)].mLineWrap = true;
+        TerminalRow line = mLines[externalToInternalRow(row)];
+        line.mLineWrap = true;
+        line.mLineWrapFromResize = false;
+    }
+
+    /** A wrap made by reflowing a row to a new width; see {@link TerminalRow#mLineWrapFromResize}. */
+    private void setLineWrapFromResize(int row) {
+        TerminalRow line = mLines[externalToInternalRow(row)];
+        line.mLineWrap = true;
+        line.mLineWrapFromResize = true;
     }
 
     public boolean getLineWrap(int row) {
@@ -208,7 +217,9 @@ public final class TerminalBuffer {
     }
 
     public void clearLineWrap(int row) {
-        mLines[externalToInternalRow(row)].mLineWrap = false;
+        TerminalRow line = mLines[externalToInternalRow(row)];
+        line.mLineWrap = false;
+        line.mLineWrapFromResize = false;
     }
 
     private int[] getLineBoundsAtLocation(int y) {
@@ -331,6 +342,22 @@ public final class TerminalBuffer {
             int currentOutputExternalRow = 0;
             int currentOutputExternalColumn = 0;
 
+            // The logical line the cursor is on belongs to the shell: it is the prompt or the command being typed,
+            // and after a resize the shell redraws it relative to how it laid it out (moving up as many rows as it
+            // used). Reflowing it moved those rows, so bash and zsh drew the prompt one row too high, over the line
+            // above, and zsh's PROMPT_SP row was joined onto the prompt. Its rows keep the breaks the output made;
+            // breaks an earlier resize made are still rejoined, and the rest of the transcript is reflowed as before.
+            int cursorLineFirstRow = oldCursorRow;
+            while (cursorLineFirstRow > -oldActiveTranscriptRows
+                && isOldLineWrapped(oldLines, oldScreenFirstRow, oldTotalRows, cursorLineFirstRow - 1)) {
+                cursorLineFirstRow--;
+            }
+            int cursorLineLastRow = oldCursorRow;
+            while (cursorLineLastRow < oldScreenRows - 1
+                && isOldLineWrapped(oldLines, oldScreenFirstRow, oldTotalRows, cursorLineLastRow)) {
+                cursorLineLastRow++;
+            }
+
             // Loop over every character in the initial state.
             // Blank lines should be skipped only if at end of transcript (just as is done in the "fast" resize), so we
             // keep track how many blank lines we have skipped if we later on find a non-blank line.
@@ -384,7 +411,7 @@ public final class TerminalBuffer {
 
                     // Line wrap as necessary:
                     if (currentOutputExternalColumn + displayWidth > mColumns) {
-                        setLineWrap(currentOutputExternalRow);
+                        setLineWrapFromResize(currentOutputExternalRow);
                         if (currentOutputExternalRow == mScreenRows - 1) {
                             if (newCursorPlaced) newCursorRow--;
                             scrollDownOneLine(0, mScreenRows, currentStyle);
@@ -410,7 +437,11 @@ public final class TerminalBuffer {
                     }
                 }
                 // Old row has been copied. Check if we need to insert newline if old line was not wrapping:
-                if (externalOldRow != (oldScreenRows - 1) && !oldLine.mLineWrap) {
+                // Kept as a plain break, not a wrap: the shell rewrites these rows, and a wrap flag left on them would
+                // later join its command line to the output below (on the next resize, or when copying).
+                boolean keepRowBreak = oldLine.mLineWrap && !oldLine.mLineWrapFromResize
+                    && externalOldRow >= cursorLineFirstRow && externalOldRow < cursorLineLastRow;
+                if (externalOldRow != (oldScreenRows - 1) && (!oldLine.mLineWrap || keepRowBreak)) {
                     if (currentOutputExternalRow == mScreenRows - 1) {
                         if (newCursorPlaced) newCursorRow--;
                         scrollDownOneLine(0, mScreenRows, currentStyle);
@@ -427,6 +458,13 @@ public final class TerminalBuffer {
 
         // Handle cursor scrolling off screen:
         if (cursor[0] < 0 || cursor[1] < 0) cursor[0] = cursor[1] = 0;
+    }
+
+    private static boolean isOldLineWrapped(TerminalRow[] oldLines, int oldScreenFirstRow, int oldTotalRows, int externalRow) {
+        int internalRow = oldScreenFirstRow + externalRow;
+        internalRow = (internalRow < 0) ? (oldTotalRows + internalRow) : (internalRow % oldTotalRows);
+        TerminalRow line = oldLines[internalRow];
+        return line != null && line.mLineWrap;
     }
 
     /**
