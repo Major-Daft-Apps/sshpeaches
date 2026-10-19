@@ -30,6 +30,23 @@ class LanTransferTest {
     }
 
     @Test
+    fun anotherDeviceConnectingFirstDoesNotEndTheTransfer() {
+        LanTransfer.Sender("hosts", loopback, allowPeer = allowLoopback).use { sender ->
+            val pool = Executors.newSingleThreadExecutor()
+            val sent = pool.submit<InetAddress> { sender.awaitTransfer(20_000) }
+            // A scanner: connects, takes the ciphertext, sends no receipt.
+            java.net.Socket(sender.host, sender.port).use { snoop ->
+                snoop.getInputStream().read(ByteArray(64))
+            }
+            assertFalse("the transfer is still on offer", sent.isDone)
+            val received = LanTransfer.receive(sender.host, sender.port, sender.code, allowPeer = allowLoopback)
+            assertEquals("hosts", received)
+            assertTrue(sent.get(20, TimeUnit.SECONDS).isLoopbackAddress)
+            pool.shutdown()
+        }
+    }
+
+    @Test
     fun aWrongCodeIsReportedAsSuch() {
         LanTransfer.Sender("secret hosts", loopback, allowPeer = allowLoopback).use { sender ->
             val pool = Executors.newSingleThreadExecutor()

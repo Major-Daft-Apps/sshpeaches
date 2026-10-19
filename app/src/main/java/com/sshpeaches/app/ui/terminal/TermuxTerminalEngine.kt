@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.ui.terminal
 
 import android.graphics.Color
 import androidx.core.graphics.toColorInt
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.data.model.TerminalAnsiPalette
 import com.majordaftapps.sshpeaches.app.data.model.TerminalCursorStyle
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
@@ -19,7 +20,13 @@ class TermuxTerminalEngine(
     private val onRequestPasteText: () -> String? = { null },
     private var onBellAction: () -> Unit = {},
     private val onTerminalDiagnostic: (String) -> Unit = {},
-    private val emulatorDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
+    private val emulatorDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    /**
+     * Whether replies the emulator writes while processing incoming output (device attributes, cursor and colour
+     * reports, termcap answers) go to [onWriteToRemote]. Off for an engine that replays output already answered
+     * elsewhere: its replies would reach the shell as input.
+     */
+    private val forwardTerminalReplies: Boolean = true
 ) : TerminalOutput(), TerminalSessionClient {
 
     private val emulator = TerminalEmulator(
@@ -34,12 +41,18 @@ class TermuxTerminalEngine(
     private var terminalBackgroundColor: Int = Color.BLACK
     private var incomingSequenceNumber = 0
     private var outgoingSequenceNumber = 0
+    private var processingIncoming = false
 
     suspend fun appendIncoming(bytes: ByteArray) {
         if (bytes.isEmpty()) return
         withContext(emulatorDispatcher) {
             emitByteDiagnostic(direction = "RX", data = bytes, offset = 0, count = bytes.size)
-            emulator.append(bytes, bytes.size)
+            processingIncoming = true
+            try {
+                emulator.append(bytes, bytes.size)
+            } finally {
+                processingIncoming = false
+            }
         }
     }
 
@@ -76,6 +89,7 @@ class TermuxTerminalEngine(
         if (count <= 0) return
         val end = offset + count
         if (offset < 0 || end > data.size || offset >= end) return
+        if (processingIncoming && !forwardTerminalReplies) return
         emitByteDiagnostic(direction = "TX", data = data, offset = offset, count = count)
         onWriteToRemote(data.copyOfRange(offset, end))
     }
@@ -173,6 +187,12 @@ class TermuxTerminalEngine(
         } else {
             outgoingSequenceNumber += 1
             outgoingSequenceNumber
+        }
+        if (direction == "TX" && !BuildConfig.DEBUG) {
+            // What the user types includes passwords ("Insert password", password prompts), and diagnostics end up
+            // in copied logs and problem reports: release builds log only its size.
+            onTerminalDiagnostic("TERM-EMU TX#$sequence bytes=$count")
+            return
         }
         val previewLength = minOf(count, DIAGNOSTIC_PREVIEW_BYTES)
         val hex = buildString {

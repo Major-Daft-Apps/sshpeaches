@@ -95,6 +95,14 @@ class SshClientProviderTest {
             )
 
             val ciphers = client.transport.config.cipherFactories.map { it.name }
+            val offered = ciphers + client.transport.config.macFactories.map { it.name } +
+                client.transport.config.keyExchangeFactories.map { it.name }
+            listOf("arcfour", "3des-cbc", "blowfish-cbc", "cast128-cbc", "idea-cbc", "hmac-md5", "hmac-sha1-96",
+                "diffie-hellman-group1-sha1").forEach { broken ->
+                assertFalse("$broken is still offered: $offered", offered.any { it.equals(broken, ignoreCase = true) })
+            }
+            assertTrue(offered.contains("aes128-ctr"))
+            assertTrue(offered.contains("hmac-sha2-256"))
             val fastIndex = ciphers.indexOfFirst { name ->
                 name.contains("chacha20-poly1305@openssh.com") ||
                     name.contains("aes128-gcm@openssh.com") ||
@@ -556,6 +564,59 @@ class SshClientProviderTest {
                 autoTrustUnknownHostKey = false
             )
         )
+    }
+
+    @Test
+    fun aKeyOfAnotherTypeForAPinnedHostIsAChangedKeyAndNeverAutoTrusted() {
+        val pinned = generatedEd25519KeyProvider().public
+        val knownHostsFile = temp.newFile("known_hosts_type_switch")
+        assertTrue(
+            SshClientProvider.verifyHostKeyForTesting(knownHostsFile, "server.example", 22, pinned, autoTrustUnknownHostKey = true)
+        )
+        val mitm = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair().public
+
+        // Auto-trust covers unknown hosts only: a pinned host offering another key type is rejected outright.
+        assertFalse(
+            SshClientProvider.verifyHostKeyForTesting(knownHostsFile, "server.example", 22, mitm, autoTrustUnknownHostKey = true)
+        )
+        val prompts = mutableListOf<SshClientProvider.HostKeyPrompt>()
+        assertFalse(
+            SshClientProvider.verifyHostKeyForTesting(
+                knownHostsFile, "server.example", 22, mitm, autoTrustUnknownHostKey = false,
+                onHostKeyPrompt = { prompts += it; false }
+            )
+        )
+        assertTrue("warned as a changed key", prompts.single().keyChanged)
+        assertFalse(knownHostsFile.readText().contains("ssh-rsa"))
+
+        // Accepting the change replaces the saved key, so the old one no longer pins the host.
+        assertTrue(
+            SshClientProvider.verifyHostKeyForTesting(
+                knownHostsFile, "server.example", 22, mitm, autoTrustUnknownHostKey = false,
+                onHostKeyPrompt = { true }
+            )
+        )
+        assertTrue(knownHostsFile.readText().contains("ssh-rsa"))
+        assertFalse(knownHostsFile.readText().contains("ssh-ed25519"))
+    }
+
+    @Test
+    fun revokedKeysAreRejectedAndCertificateAuthoritiesDontPinTheHost() {
+        val key = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair().public
+        val knownHostsFile = temp.newFile("known_hosts_markers")
+        SshClientProvider.verifyHostKeyForTesting(knownHostsFile, "server.example", 22, key, autoTrustUnknownHostKey = true)
+        val line = knownHostsFile.readText().trim()
+        knownHostsFile.writeText("@revoked $line\n")
+        assertFalse(
+            SshClientProvider.verifyHostKeyForTesting(knownHostsFile, "server.example", 22, key, autoTrustUnknownHostKey = false,
+                onHostKeyPrompt = { true })
+        )
+
+        knownHostsFile.writeText("@cert-authority $line\n")
+        val prompts = mutableListOf<SshClientProvider.HostKeyPrompt>()
+        SshClientProvider.verifyHostKeyForTesting(knownHostsFile, "server.example", 22, key, autoTrustUnknownHostKey = false,
+            onHostKeyPrompt = { prompts += it; false })
+        assertFalse("a CA line is not a saved host key", prompts.single().keyChanged)
     }
 
     private fun generatedEd25519KeyProvider(): net.schmizz.sshj.userauth.keyprovider.KeyProvider {

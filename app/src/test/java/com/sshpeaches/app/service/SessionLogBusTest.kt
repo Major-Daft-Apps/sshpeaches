@@ -234,6 +234,9 @@ class SessionLogBusTest {
         }
         assertEquals(SKIP_PACKET_LOG, packetLogText("IN #{}: {}", arrayOf(0, "41 42")))
         assertEquals(null, packetLogText("Received packet {}", arrayOf("SSH_MSG_KEXINIT")))
+        // A dump under a log line this filter doesn't know (a renamed sshj message) is dropped, not printed.
+        assertEquals(SKIP_PACKET_LOG, packetLogText("Sending packet #{}: {}", arrayOf(7L, auth)))
+        assertEquals(null, packetLogText("Connected to {} {}", arrayOf("ab cd", "host")))
         // A malformed packet still gets its line, without details.
         assertEquals(
             "recv SSH_MSG_KEXINIT (3 bytes)",

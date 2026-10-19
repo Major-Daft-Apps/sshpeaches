@@ -15,6 +15,7 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.security.SecureRandom
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
@@ -23,10 +24,12 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * Moves an export payload between two phones on the same local network.
  *
- * The sender serves the payload once, on its LAN address only, and refuses peers that aren't on a
+ * The sender serves the payload on its LAN address only, and refuses peers that aren't on a
  * private network. The payload travels AES-256-GCM encrypted with a key derived (PBKDF2) from a
  * 12-character pairing code that is shown on the sender and typed or scanned on the receiver; the
- * code itself never crosses the network.
+ * code itself never crosses the network. A receiver that decrypted the payload answers with a receipt
+ * only the code's holder can make; the sender keeps serving until it gets one, so another device on
+ * the network can't end the transfer by connecting first.
  */
 object LanTransfer {
     const val SERVICE_TYPE = "_sshpeaches._tcp."
@@ -38,6 +41,9 @@ object LanTransfer {
     private const val IV_BYTES = 12
     private const val KEY_ITERATIONS = 150_000
     private const val MAX_FRAME_BYTES = 32 * 1024 * 1024
+    private const val RECEIPT_BYTES = 32
+    private const val RECEIPT_TIMEOUT_MS = 10_000
+    private val RECEIPT_LABEL = "SSHPEACHES-LAN1 receipt\n".toByteArray(Charsets.US_ASCII)
     private val random = SecureRandom()
 
     class WrongCodeException : IOException("The code doesn't match the one shown on the other phone.")
@@ -91,23 +97,38 @@ object LanTransfer {
         return MAGIC + salt + iv + sealed
     }
 
-    fun decrypt(frame: ByteArray, code: String): String {
+    fun decrypt(frame: ByteArray, code: String): String = decryptWithKey(frame, code).first
+
+    /** The payload and the key it was sealed with (for the receipt). */
+    private fun decryptWithKey(frame: ByteArray, code: String): Pair<String, SecretKeySpec> {
         if (frame.size < MAGIC.size + SALT_BYTES + IV_BYTES + 16 || !frame.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
             throw IOException("That device didn't send an SSHPeaches transfer.")
         }
         var offset = MAGIC.size
         val salt = frame.copyOfRange(offset, offset + SALT_BYTES).also { offset += SALT_BYTES }
         val iv = frame.copyOfRange(offset, offset + IV_BYTES).also { offset += IV_BYTES }
+        val key = deriveKey(code, salt)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, deriveKey(code, salt), GCMParameterSpec(128, iv))
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
         cipher.updateAAD(MAGIC)
         val plain = try {
             cipher.doFinal(frame, offset, frame.size - offset)
         } catch (_: javax.crypto.AEADBadTagException) {
             throw WrongCodeException()
         }
-        return String(plain, Charsets.UTF_8)
+        return String(plain, Charsets.UTF_8) to key
     }
+
+    /** Proof that a receiver decrypted [frame]: an HMAC over it with the frame's key. */
+    private fun receipt(frame: ByteArray, key: SecretKeySpec): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key.encoded, "HmacSHA256"))
+        mac.update(RECEIPT_LABEL)
+        return mac.doFinal(frame)
+    }
+
+    private fun frameKey(frame: ByteArray, code: String): SecretKeySpec =
+        deriveKey(code, frame.copyOfRange(MAGIC.size, MAGIC.size + SALT_BYTES))
 
     private fun deriveKey(code: String, salt: ByteArray): SecretKeySpec {
         val spec = PBEKeySpec(code.toCharArray(), salt, KEY_ITERATIONS, 256)
@@ -130,6 +151,7 @@ object LanTransfer {
         private val allowPeer: (InetAddress) -> Boolean = ::isLocalNetworkAddress
     ) : Closeable {
         private val frame = encrypt(payload, code)
+        private val expectedReceipt = receipt(frame, frameKey(frame, code))
         private val server = ServerSocket().apply {
             reuseAddress = true
             bind(InetSocketAddress(bindAddress, 0), 1)
@@ -142,7 +164,7 @@ object LanTransfer {
         @Volatile
         private var activePeer: Socket? = null
 
-        /** @return the address that received the payload */
+        /** @return the address that received (and decrypted) the payload */
         fun awaitTransfer(timeoutMs: Int): InetAddress {
             server.soTimeout = timeoutMs
             val deadline = System.currentTimeMillis() + timeoutMs
@@ -161,9 +183,13 @@ object LanTransfer {
                         write(frame)
                         flush()
                     }
-                    // Wait for the receiver to finish reading (it closes), so the payload isn't cut off.
-                    runCatching { it.getInputStream().read() }
-                    return peer
+                    // Only a receiver that decrypted the payload can answer with the receipt. Anyone else (a
+                    // scanner, a device that guessed wrong, an older app that just closes) gets ciphertext, and the
+                    // payload stays on offer for the real receiver.
+                    // Decrypting takes the receiver a second or two; don't let a silent peer hold the sender long.
+                    it.soTimeout = RECEIPT_TIMEOUT_MS
+                    val answer = runCatching { readUpTo(it.getInputStream(), RECEIPT_BYTES) }.getOrNull()
+                    if (answer != null && java.security.MessageDigest.isEqual(answer, expectedReceipt)) return peer
                 }
             }
         }
@@ -196,8 +222,22 @@ object LanTransfer {
             if (size <= 0 || size > MAX_FRAME_BYTES) throw IOException("That device sent an invalid transfer.")
             val frame = ByteArray(size)
             readFullyBefore(socket, input, frame, deadline)
-            return decrypt(frame, code)
+            val (payload, key) = decryptWithKey(frame, code)
+            runCatching { socket.getOutputStream().apply { write(receipt(frame, key)); flush() } }
+            return payload
         }
+    }
+
+    /** Up to [count] bytes, fewer if the peer closes first. */
+    private fun readUpTo(input: InputStream, count: Int): ByteArray {
+        val buffer = ByteArray(count)
+        var offset = 0
+        while (offset < count) {
+            val read = input.read(buffer, offset, count - offset)
+            if (read < 0) break
+            offset += read
+        }
+        return buffer.copyOf(offset)
     }
 
     private fun readFullyBefore(socket: Socket, input: InputStream, buffer: ByteArray, deadline: Long) {

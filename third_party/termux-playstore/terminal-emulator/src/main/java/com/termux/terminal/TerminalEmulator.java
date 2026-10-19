@@ -973,7 +973,7 @@ public final class TerminalEmulator {
                                 if (internalBit != -1) {
                                     value = isDecsetInternalBitSet(internalBit) ? 1 : 2; // 1=set, 2=reset.
                                 } else {
-                                    Log.e(LOG_TAG, "Got DECRQM for unrecognized private DEC mode=" + mode);
+                                    if (LOG_ESCAPE_SEQUENCES) Log.e(LOG_TAG, "Got DECRQM for unrecognized private DEC mode=" + mode);
                                     value = 0; // 0=not recognized, 3=permanently set, 4=permanently reset
                                 }
                             }
@@ -1083,55 +1083,45 @@ public final class TerminalEmulator {
                     // respond, as well as http://www.freebsd.org/cgi/man.cgi?query=termcap&sektion=5#CAPABILITIES for
                     // the meaning of e.g. "ku", "kd", "kr", "kl"
 
-                    for (String part : dcs.substring(2).split(";")) {
-                        if (part.length() % 2 == 0) {
-                            StringBuilder transBuffer = new StringBuilder();
-                            char c;
-                            for (int i = 0; i < part.length(); i += 2) {
-                                try {
-                                    c = (char) Long.decode("0x" + part.charAt(i) + "" + part.charAt(i + 1)).longValue();
-                                } catch (NumberFormatException e) {
-                                    Log.w(LOG_TAG, "Invalid device termcap/terminfo encoded name \"" + part + "\"", e);
-                                    continue;
-                                }
-                                transBuffer.append(c);
-                            }
-
-                            String trans = transBuffer.toString();
-                            String responseValue;
-                            switch (trans) {
-                                case "Co":
-                                case "colors":
-                                    responseValue = "256"; // Number of colors.
-                                    break;
-                                case "TN":
-                                case "name":
-                                    responseValue = "xterm";
-                                    break;
-                                default:
-                                    responseValue = KeyHandler.getCodeFromTermcap(trans, isDecsetInternalBitSet(DECSET_BIT_APPLICATION_CURSOR_KEYS),
-                                        isDecsetInternalBitSet(DECSET_BIT_APPLICATION_KEYPAD));
-                                    break;
-                            }
-                            if (responseValue == null) {
-                                switch (trans) {
-                                    case "%1": // Help key - ignore
-                                    case "&8": // Undo key - ignore.
-                                        break;
-                                    default:
-                                        Log.w(LOG_TAG, "Unhandled termcap/terminfo name: '" + trans + "'");
-                                }
-                                // Respond with invalid request:
-                                mSession.write("\033P0+r" + part + "\033\\");
-                            } else {
-                                StringBuilder hexEncoded = new StringBuilder();
-                                for (int j = 0; j < responseValue.length(); j++) {
-                                    hexEncoded.append(String.format("%02X", (int) responseValue.charAt(j)));
-                                }
-                                mSession.write("\033P1+r" + part + "=" + hexEncoded + "\033\\");
-                            }
+                    // The request is server-controlled: decode without exceptions or unconditional logging (each bad
+                    // name used to log a stack trace on the UI thread), answer a bounded number of names, and only
+                    // echo names that are valid hex, so a reply can never carry the server's text back as typed input.
+                    String[] parts = dcs.substring(2).split(";");
+                    int answered = 0;
+                    for (String part : parts) {
+                        if (part.isEmpty()) continue;
+                        if (++answered > MAX_TERMCAP_QUERIES) break;
+                        String trans = decodeHexTermcapName(part);
+                        if (trans == null) {
+                            if (LOG_ESCAPE_SEQUENCES) Log.w(LOG_TAG, "Invalid device termcap/terminfo name");
+                            mSession.write("\033P0+r\033\\");
+                            continue;
+                        }
+                        String responseValue;
+                        switch (trans) {
+                            case "Co":
+                            case "colors":
+                                responseValue = "256"; // Number of colors.
+                                break;
+                            case "TN":
+                            case "name":
+                                responseValue = "xterm";
+                                break;
+                            default:
+                                responseValue = KeyHandler.getCodeFromTermcap(trans, isDecsetInternalBitSet(DECSET_BIT_APPLICATION_CURSOR_KEYS),
+                                    isDecsetInternalBitSet(DECSET_BIT_APPLICATION_KEYPAD));
+                                break;
+                        }
+                        if (responseValue == null) {
+                            if (LOG_ESCAPE_SEQUENCES) Log.w(LOG_TAG, "Unhandled termcap/terminfo name: '" + trans + "'");
+                            // Respond with invalid request:
+                            mSession.write("\033P0+r" + part + "\033\\");
                         } else {
-                            Log.e(LOG_TAG, "Invalid device termcap/terminfo name of odd length: " + part);
+                            StringBuilder hexEncoded = new StringBuilder();
+                            for (int j = 0; j < responseValue.length(); j++) {
+                                hexEncoded.append(String.format("%02X", (int) responseValue.charAt(j)));
+                            }
+                            mSession.write("\033P1+r" + part + "=" + hexEncoded + "\033\\");
                         }
                     }
                 } else {
@@ -1285,7 +1275,7 @@ public final class TerminalEmulator {
                     int externalBit = mArgs[i];
                     int internalBit = mapDecSetBitToInternalBit(externalBit);
                     if (internalBit == -1) {
-                        Log.w(LOG_TAG, "Ignoring request to save/recall decset bit=" + externalBit);
+                        if (LOG_ESCAPE_SEQUENCES) Log.w(LOG_TAG, "Ignoring request to save/recall decset bit=" + externalBit);
                     } else {
                         if (b == 's') {
                             mSavedDecSetFlags |= internalBit;
@@ -1301,6 +1291,22 @@ public final class TerminalEmulator {
             default:
                 parseArg(b);
         }
+    }
+
+    /** Most names answered per XTGETTCAP request; real requests ask for one or a few. */
+    private static final int MAX_TERMCAP_QUERIES = 32;
+
+    /** A hex-encoded termcap/terminfo name, or null if [hex] isn't an even run of hex digits. */
+    static String decodeHexTermcapName(String hex) {
+        if (hex.isEmpty() || hex.length() % 2 != 0) return null;
+        StringBuilder name = new StringBuilder(hex.length() / 2);
+        for (int i = 0; i < hex.length(); i += 2) {
+            int high = Character.digit(hex.charAt(i), 16);
+            int low = Character.digit(hex.charAt(i + 1), 16);
+            if (high < 0 || low < 0) return null;
+            name.append((char) ((high << 4) | low));
+        }
+        return name.toString();
     }
 
     public void doDecSetOrReset(boolean setting, int externalBit) {
@@ -1319,7 +1325,14 @@ public final class TerminalEmulator {
                 // The view may still be physically wider than 80 columns, but the emulator must
                 // honor the logical column mode for applications such as vttest.
                 int newColumns = setting ? 132 : 80;
-                resize(newColumns, mRows, mCellWidthPixels, mCellHeightPixels);
+                if (newColumns != mColumns) {
+                    // The page is erased below anyway. Erase it and drop the scrollback first, so the column change
+                    // has nothing to reflow: a server toggling DECCOLM over a full scrollback otherwise made every
+                    // toggle reflow thousands of lines on the UI thread, freezing the app for seconds each.
+                    blockClear(0, 0, mColumns, mRows);
+                    if (mScreen == mMainBuffer) mMainBuffer.clearTranscript();
+                    resize(newColumns, mRows, mCellWidthPixels, mCellHeightPixels);
+                }
                 // Sets the left, right, top and bottom scrolling margins to their default positions, which is important for
                 // the "reset" utility to really reset the terminal:
                 mLeftMargin = mTopMargin = 0;
@@ -1481,7 +1494,7 @@ public final class TerminalEmulator {
                 // (1) enables this feature for keys except for those with well-known behavior, e.g., Tab, Backarrow and
                 // some special control character cases, e.g., Control-Space to make a NUL.
                 // (2) enables this feature for keys including the exceptions listed.
-                Log.e(LOG_TAG, "(ignored) CSI > MODIFY RESOURCE: " + getArg0(-1) + " to " + getArg1(-1));
+                if (LOG_ESCAPE_SEQUENCES) Log.e(LOG_TAG, "(ignored) CSI > MODIFY RESOURCE: " + getArg0(-1) + " to " + getArg1(-1));
                 break;
             default:
                 parseArg(b);
@@ -2149,7 +2162,7 @@ public final class TerminalEmulator {
                 int firstArg = mArgs[i + 1];
                 if (firstArg == 2) {
                     if (i + 4 > mArgIndex) {
-                        Log.w(LOG_TAG, "Too few CSI" + code + ";2 RGB arguments");
+                        if (LOG_ESCAPE_SEQUENCES) Log.w(LOG_TAG, "Too few CSI" + code + ";2 RGB arguments");
                     } else {
                         int red = getArg(i + 2, 0, false);
                         int green = getArg(i + 3, 0, false);
@@ -2331,7 +2344,7 @@ public final class TerminalEmulator {
                     String clipboardText = new String(Base64.decode(textParameter.substring(startIndex), 0), StandardCharsets.UTF_8);
                     mSession.onCopyTextToClipboard(clipboardText);
                 } catch (Exception e) {
-                    Log.e(LOG_TAG, "OSC Manipulate selection, invalid string '" + textParameter + "");
+                    if (LOG_ESCAPE_SEQUENCES) Log.e(LOG_TAG, "OSC Manipulate selection, invalid string '" + textParameter + "");
                 }
                 break;
             case 104:
@@ -2605,7 +2618,7 @@ public final class TerminalEmulator {
                     codePoint = '␌'; // Form feed.
                     break;
                 case 'd':
-                    codePoint = '\r'; // Carriage return.
+                    codePoint = '␍'; // Carriage return symbol (a real CR stored in a cell would be copied with the text).
                     break;
                 case 'e':
                     codePoint = '␊'; // Linefeed.
@@ -2617,7 +2630,7 @@ public final class TerminalEmulator {
                     codePoint = '±'; // Plus-minus.
                     break;
                 case 'h':
-                    codePoint = '\n'; // Newline.
+                    codePoint = '␤'; // Newline symbol (a real LF stored in a cell would be copied with the text).
                     break;
                 case 'i':
                     codePoint = '␋'; // Vertical tab.

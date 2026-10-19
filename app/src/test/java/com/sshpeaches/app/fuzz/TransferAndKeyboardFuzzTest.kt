@@ -38,7 +38,7 @@ class TransferAndKeyboardFuzzTest {
     private val keyboardLayoutFromJson by lazy { method("keyboardLayoutFromJson", JSONArray::class.java) }
     private val keyboardLayoutToJson by lazy { method("keyboardLayoutToJson", List::class.java) }
     private val terminalProfilesFromJson by lazy { method("terminalProfilesFromJson", JSONArray::class.java) }
-    private val requiresPassphrase by lazy { method("transferPayloadRequiresPassphrase", String::class.java) }
+    private val describePayload by lazy { method("describeTransferPayload", String::class.java) }
 
     // ---------------- envelope ----------------
 
@@ -62,7 +62,7 @@ class TransferAndKeyboardFuzzTest {
         repeat(3_000) {
             val input = if (random.nextInt(5) == 0) Fuzz.randomString(random, 80) else Fuzz.mutateBase64(random, sample)
             Fuzz.guarded("decodeTransferPayloadEnvelope", input) { decodeTransferPayloadEnvelope(input) }
-            Fuzz.guarded("transferPayloadRequiresPassphrase", input) { call<Boolean>(requiresPassphrase, input) }
+            Fuzz.guarded("describeTransferPayload", input) { call<Any?>(describePayload, input) }
         }
     }
 

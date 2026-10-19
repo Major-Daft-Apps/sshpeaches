@@ -61,7 +61,12 @@ object SecurityManager {
     private const val CURRENT_EXPORT_KDF_ITERATIONS = 210_000
     private const val CURRENT_PIN_KDF_ITERATIONS = 210_000
     private const val KEY_PIN_FAILED_ATTEMPTS = "pin_failed_attempts"
+    /** Wall-clock lockout from before 0.11.8; only removed now. */
     private const val KEY_PIN_LOCKOUT_UNTIL = "pin_lockout_until"
+    private const val KEY_PIN_LOCKOUT_UNTIL_ELAPSED = "pin_lockout_until_elapsed"
+    private const val KEY_PIN_LOCKOUT_ARMED_ELAPSED = "pin_lockout_armed_elapsed"
+    private const val KEY_PIN_LOCKOUT_BOOT_COUNT = "pin_lockout_boot_count"
+    private const val KEY_PIN_LOCKOUT_DURATION = "pin_lockout_duration"
     private const val PIN_FREE_ATTEMPTS = 5
     private const val PIN_LOCKOUT_BASE_MS = 30_000L
     private const val PIN_LOCKOUT_MAX_MS = 15 * 60_000L
@@ -232,7 +237,7 @@ object SecurityManager {
         }
         securePrefs.edit(commit = true) {
             remove(KEY_PIN_FAILED_ATTEMPTS)
-            remove(KEY_PIN_LOCKOUT_UNTIL)
+            removePinLockout()
             // Drop the fast legacy hash once the slow vault check works; it was an offline oracle.
             remove(KEY_PIN_HASH)
             remove(KEY_PIN_SALT)
@@ -417,9 +422,13 @@ object SecurityManager {
     }
 
     fun importIdentityKeyPayload(identityId: String, payload: String, passphrase: String) {
+        storeIdentityKey(identityId, decryptIdentityKeyPayload(payload, passphrase))
+    }
+
+    /** The private key in an exported key payload, for checking before it is stored. */
+    fun decryptIdentityKeyPayload(payload: String, passphrase: String): String {
         requireValidSecretPassphrase(passphrase)
-        val plaintext = decryptTransferPayload(payload, passphrase)
-        storeIdentityKey(identityId, plaintext)
+        return decryptTransferPayload(payload, passphrase)
     }
 
     fun exportIdentityKeyPassphrasePayload(identityId: String, passphrase: String): String? {
@@ -496,7 +505,7 @@ object SecurityManager {
             remove(KEY_PIN_SALT)
             remove(KEY_PIN_HASH)
             remove(KEY_PIN_FAILED_ATTEMPTS)
-            remove(KEY_PIN_LOCKOUT_UNTIL)
+            removePinLockout()
             putInt(KEY_STORAGE_VERSION, STORAGE_VERSION_VAULT)
             putString(KEY_VAULT_PIN_SALT, wrappedWithPin.salt)
             putInt(KEY_VAULT_PIN_ITERATIONS, wrappedWithPin.iterations)
@@ -552,7 +561,7 @@ object SecurityManager {
             remove(KEY_PIN_HASH)
             remove(KEY_PIN_SALT)
             remove(KEY_PIN_FAILED_ATTEMPTS)
-            remove(KEY_PIN_LOCKOUT_UNTIL)
+            removePinLockout()
             remove(KEY_STORAGE_VERSION)
             remove(KEY_VAULT_PIN_SALT)
             remove(KEY_VAULT_PIN_ITERATIONS)
@@ -782,11 +791,19 @@ object SecurityManager {
         return MessageDigest.isEqual(expected, actual)
     }
 
+    // Lockouts run on elapsedRealtime: with the wall clock, setting the phone's time forward ended one at once.
     private fun pinLockoutRemainingMillis(securePrefs: SharedPreferences): Long {
-        val until = securePrefs.getLong(KEY_PIN_LOCKOUT_UNTIL, 0L)
-        if (until <= 0L) return 0L
-        // Capped so moving the clock backwards cannot extend a lockout indefinitely.
-        return (until - System.currentTimeMillis()).coerceIn(0L, PIN_LOCKOUT_MAX_MS)
+        val duration = securePrefs.getLong(KEY_PIN_LOCKOUT_DURATION, 0L)
+        if (duration <= 0L) return 0L
+        val lockout = PinLockout(
+            untilElapsedMs = securePrefs.getLong(KEY_PIN_LOCKOUT_UNTIL_ELAPSED, 0L),
+            armedAtElapsedMs = securePrefs.getLong(KEY_PIN_LOCKOUT_ARMED_ELAPSED, 0L),
+            bootCount = securePrefs.getInt(KEY_PIN_LOCKOUT_BOOT_COUNT, -1),
+            durationMs = duration.coerceAtMost(PIN_LOCKOUT_MAX_MS)
+        )
+        val check = checkPinLockout(lockout, SystemClock.elapsedRealtime(), currentBootCount())
+        check.rearmed?.let { rearmed -> securePrefs.edit(commit = true) { putPinLockout(rearmed) } }
+        return check.remainingMs
     }
 
     private fun recordFailedPinAttempt(securePrefs: SharedPreferences) {
@@ -796,10 +813,34 @@ object SecurityManager {
             if (failures >= PIN_FREE_ATTEMPTS) {
                 val doublings = (failures - PIN_FREE_ATTEMPTS).coerceAtMost(10)
                 val delay = (PIN_LOCKOUT_BASE_MS shl doublings).coerceAtMost(PIN_LOCKOUT_MAX_MS)
-                putLong(KEY_PIN_LOCKOUT_UNTIL, System.currentTimeMillis() + delay)
+                putPinLockout(PinLockout.arm(SystemClock.elapsedRealtime(), currentBootCount(), delay))
             }
         }
     }
+
+    private fun SharedPreferences.Editor.putPinLockout(lockout: PinLockout) {
+        putLong(KEY_PIN_LOCKOUT_UNTIL_ELAPSED, lockout.untilElapsedMs)
+        putLong(KEY_PIN_LOCKOUT_ARMED_ELAPSED, lockout.armedAtElapsedMs)
+        putInt(KEY_PIN_LOCKOUT_BOOT_COUNT, lockout.bootCount)
+        putLong(KEY_PIN_LOCKOUT_DURATION, lockout.durationMs)
+        remove(KEY_PIN_LOCKOUT_UNTIL)
+    }
+
+    private fun SharedPreferences.Editor.removePinLockout() {
+        remove(KEY_PIN_LOCKOUT_UNTIL)
+        remove(KEY_PIN_LOCKOUT_UNTIL_ELAPSED)
+        remove(KEY_PIN_LOCKOUT_ARMED_ELAPSED)
+        remove(KEY_PIN_LOCKOUT_BOOT_COUNT)
+        remove(KEY_PIN_LOCKOUT_DURATION)
+    }
+
+    /** How many times the phone has booted, or -1 if unavailable. */
+    private fun currentBootCount(): Int = runCatching {
+        android.provider.Settings.Global.getInt(
+            appContext?.contentResolver ?: return -1,
+            android.provider.Settings.Global.BOOT_COUNT
+        )
+    }.getOrDefault(-1)
 
     private fun setPinConfigured(configured: Boolean) {
         pinConfiguredState.value = configured

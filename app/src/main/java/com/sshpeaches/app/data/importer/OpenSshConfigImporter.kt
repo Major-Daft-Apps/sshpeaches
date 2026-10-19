@@ -349,7 +349,9 @@ object OpenSshConfigImporter {
     private fun parseSourceEndpoint(value: String): Pair<String, Int>? {
         if (value.contains('/')) return null
         val endpoint = parseHostPort(value, defaultHost = "127.0.0.1") ?: return null
-        return endpoint.first.ifBlank { "127.0.0.1" }.normalizeBindHost() to endpoint.second
+        // Imported forwards only listen on this phone, whatever the config's bind address (`*` would expose the port
+        // to the network); the user can widen it in the forward's settings.
+        return "127.0.0.1" to endpoint.second
     }
 
     private fun parseDestinationEndpoint(value: String): Pair<String, Int>? {
@@ -385,9 +387,6 @@ object OpenSshConfigImporter {
 
     private fun containsUnresolvedToken(value: String): Boolean =
         Regex("%[A-Za-z%]").containsMatchIn(value)
-
-    private fun String.normalizeBindHost(): String =
-        if (this == "*") "0.0.0.0" else this
 
     private fun PortForward.forwardKey(): String =
         listOf(type.name, sourceHost, sourcePort.toString(), destinationHost, destinationPort.toString())

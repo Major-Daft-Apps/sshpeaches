@@ -39,6 +39,25 @@ public class DeviceControlStringTest extends TerminalTestCase {
 		assertCapabilityResponse("kB", "\033[Z");
 	}
 
+	public void testInvalidTermcapNamesAreNotEchoedBack() {
+		// The reply goes to the remote as typed input: text that isn't a hex name must never come back in it.
+		withTerminalSized(3, 3);
+		assertEnteringStringGivesResponse("\033P+q;rm -rf ~;\033\\", "\033P0+r\033\\");
+		assertEnteringStringGivesResponse("\033P+qZZ\033\\", "\033P0+r\033\\");
+		assertEnteringStringGivesResponse("\033P+q6\033\\", "\033P0+r\033\\");
+		// A valid but unknown name is echoed in hex, as xterm does.
+		assertEnteringStringGivesResponse("\033P+q" + hexEncode("zz") + "\033\\", "\033P0+r" + hexEncode("zz") + "\033\\");
+	}
+
+	public void testTermcapRequestsAnswerABoundedNumberOfNames() {
+		withTerminalSized(3, 3);
+		StringBuilder request = new StringBuilder("\033P+q");
+		for (int i = 0; i < 500; i++) request.append(hexEncode("Co")).append(';');
+		enterString(request.append("\033\\").toString());
+		String output = mOutput.getOutputAndClear();
+		assertEquals(32, output.split("\033P1\\+r").length - 1);
+	}
+
 	public void testDecrqssReportsDecscl() {
 		withTerminalSized(4, 2);
 		assertEnteringStringGivesResponse("\033P$q\"p\033\\", "\033P1$r64;1\"p\033\\");

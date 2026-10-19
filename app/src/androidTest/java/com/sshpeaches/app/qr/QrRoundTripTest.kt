@@ -68,9 +68,10 @@ class QrRoundTripTest {
         check(imported.data.host.group == host.group)
         check(imported.data.host.notes == host.notes)
         check(imported.data.host.useMosh == host.useMosh)
-        check(imported.data.host.preferredIdentityId == host.preferredIdentityId)
-        check(imported.data.host.preferredForwardId == host.preferredForwardId)
-        check(imported.data.host.startupScript == host.startupScript)
+        // Dropped on import: a QR code from someone else mustn't run commands or attach your keys and forwards.
+        check(imported.data.host.preferredIdentityId == null)
+        check(imported.data.host.preferredForwardId == null)
+        check(imported.data.host.startupScript.isEmpty())
         check(imported.data.host.backgroundBehavior == host.backgroundBehavior)
         check(imported.data.host.terminalProfileId == host.terminalProfileId)
     }

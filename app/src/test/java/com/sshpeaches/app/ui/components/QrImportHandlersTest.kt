@@ -55,6 +55,18 @@ class QrImportHandlersTest {
     }
 
     @Test
+    fun hostImport_dropsTheStartupCommandAndLinksToLocalKeysAndForwards() {
+        val payload = encodeHostPayload(sampleHost(id = "incoming", name = "team-server"), encryptedPasswordPayload = null)
+
+        val ready = (processHostQrImport(payload, emptyList()) as HostQrImportResult.Ready).data
+
+        assertEquals("", ready.host.startupScript)
+        assertEquals(null, ready.host.preferredIdentityId)
+        assertEquals(null, ready.host.preferredForwardId)
+        assertEquals("example.com", ready.host.host)
+    }
+
+    @Test
     fun identityImport_invalidPayload_returnsError() {
         val result = processIdentityQrImport("not-base64", emptyList())
         assertTrue(result is IdentityQrImportResult.Error)

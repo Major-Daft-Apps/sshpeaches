@@ -29,3 +29,9 @@ fun PortForward.legacyLoopbackDestinationHost(selectedHost: HostConnection?): St
         null
     }
 }
+
+/** Whether a forward bound to [bind] only accepts connections from this phone. */
+fun isLoopbackBindAddress(bind: String): Boolean {
+    val value = bind.trim().removePrefix("[").removeSuffix("]").lowercase()
+    return value.isEmpty() || value == "localhost" || value == "::1" || value.startsWith("127.")
+}

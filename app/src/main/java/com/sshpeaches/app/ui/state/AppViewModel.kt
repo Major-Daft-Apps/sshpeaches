@@ -30,6 +30,8 @@ import com.majordaftapps.sshpeaches.app.ui.keyboard.KeyboardSlotAction
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.util.normalizeAssociatedHostIds
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
+import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
+import com.majordaftapps.sshpeaches.app.util.importedKeyMatchesFingerprint
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -1588,15 +1590,37 @@ class AppViewModel(
         }
     }
 
-    fun importIdentityKeyFromPayload(id: String, payload: String, passphrase: String): Boolean {
+    /**
+     * Imports an exported private key into identity [id]. The key must belong to the identity's fingerprint
+     * ([expectedFingerprint], or the saved identity's): otherwise an import naming one of your fingerprints could
+     * swap in someone else's key, which "Install key on host" would then put on your servers.
+     */
+    fun importIdentityKeyFromPayload(
+        id: String,
+        payload: String,
+        passphrase: String,
+        expectedFingerprint: String? = null
+    ): Boolean {
         logAction("importIdentityKeyFromPayload", "identityId=$id, payloadLength=${payload.length}, passphraseLength=${passphrase.length}")
         val ok = runCatching {
-            SecurityManager.importIdentityKeyPayload(id, payload, passphrase)
-            SecurityManager.getIdentityKey(id)?.let { privateKey ->
-                val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(privateKey).orEmpty()
-                if (derivedPublic.isNotBlank()) {
-                    SecurityManager.storeIdentityPublicKey(id, derivedPublic)
-                }
+            val privateKey = SecurityManager.decryptIdentityKeyPayload(payload, passphrase)
+            val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(
+                privateKeyMaterial = privateKey,
+                passphrase = runCatching { SecurityManager.getIdentityKeyPassphrase(id) }.getOrNull()
+            )?.trim().orEmpty()
+            val existing = uiState.value.identities.find { it.id == id }
+            val fingerprint = (expectedFingerprint ?: existing?.fingerprint)?.trim().orEmpty()
+            require(
+                importedKeyMatchesFingerprint(
+                    privateKeyText = privateKey,
+                    derivedPublicKey = derivedPublic,
+                    expectedFingerprint = fingerprint,
+                    identityHasKey = existing?.hasPrivateKey == true
+                )
+            ) { "Imported key does not match the identity's fingerprint." }
+            SecurityManager.storeIdentityKey(id, privateKey)
+            if (derivedPublic.isNotBlank()) {
+                SecurityManager.storeIdentityPublicKey(id, derivedPublic)
             }
             markIdentityHasKeyWithRetry(id, true)
         }.onFailure { t ->
@@ -1638,9 +1662,16 @@ class AppViewModel(
         return ok
     }
 
-    fun importIdentityPublicKey(id: String, publicKey: String): Boolean {
+    /**
+     * Imports an exported public key. With [expectedFingerprint] (an identity you already have) it must be the key
+     * that fingerprint names; "Install key on host" falls back to this key.
+     */
+    fun importIdentityPublicKey(id: String, publicKey: String, expectedFingerprint: String?): Boolean {
         logAction("importIdentityPublicKey", "identityId=$id, keyLength=${publicKey.length}")
         val ok = runCatching {
+            require(expectedFingerprint == null || computeSshPublicKeyFingerprint(publicKey) == expectedFingerprint.trim()) {
+                "Imported public key does not match the identity's fingerprint."
+            }
             SecurityManager.importIdentityPublicKey(id, publicKey.trim())
         }.onFailure { t ->
             UiDebugLog.error("importIdentityPublicKey", t, "identityId=$id")

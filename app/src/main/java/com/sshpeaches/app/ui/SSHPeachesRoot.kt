@@ -157,6 +157,11 @@ import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
 import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
 import com.majordaftapps.sshpeaches.app.ui.components.SessionOverflowMenu
 import com.majordaftapps.sshpeaches.app.ui.components.resolveSessionTerminalProfileId
+import com.majordaftapps.sshpeaches.app.ui.components.TransferImportSummary
+import com.majordaftapps.sshpeaches.app.ui.components.importHostId
+import com.majordaftapps.sshpeaches.app.ui.components.importItemId
+import com.majordaftapps.sshpeaches.app.ui.components.importedItemName
+import com.majordaftapps.sshpeaches.app.ui.components.summarizeTransferPayload
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.adaptive.WideSidebarScaffold
 import com.majordaftapps.sshpeaches.app.ui.adaptive.rememberShellLayoutMode
@@ -285,7 +290,7 @@ data class SSHPeachesRootActions(
     val onImportIdentityKey: (String, String, String) -> Boolean,
     val onImportIdentityKeyPlain: (String, String) -> Boolean,
     val onStoreIdentityPublicKey: (String, String) -> Boolean,
-    val onImportIdentityPublicKey: (String, String) -> Boolean,
+    val onImportIdentityPublicKey: (String, String, String?) -> Boolean,
     val onStoreIdentityKeyPassphrase: (String, String?) -> Boolean,
     val onImportIdentityKeyPassphrasePayload: (String, String, String) -> Boolean,
     /** Returns null on success, or why copying failed. */
@@ -1124,7 +1129,11 @@ fun SSHPeachesRoot(
         }
     }
 
-    fun importTransferPayloadFromQr(encodedPayload: String, passphrase: String?): String {
+    fun importTransferPayloadFromQr(
+        encodedPayload: String,
+        passphrase: String?,
+        includeKeyboardLayout: Boolean
+    ): String {
         val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export payload."
 
         var importedHosts = 0
@@ -1163,11 +1172,18 @@ fun SSHPeachesRoot(
         val localIdentityIds = uiState.identities.map { it.id }.toSet()
         val localForwardIds = uiState.portForwards.map { it.id }.toSet()
         val localSnippetIds = uiState.snippets.map { it.id }.toSet()
+        // Ids already used here or earlier in this import: an imported item never takes one (see importItemId).
+        val takenIdentityIds = localIdentityIds.toMutableSet()
+        val takenForwardIds = localForwardIds.toMutableSet()
+        val takenSnippetIds = localSnippetIds.toMutableSet()
+        val snippetTitles = uiState.snippets.map { it.title }.toMutableList()
+        val hostNames = uiState.hosts.map { it.name }.toMutableList()
         val identityIdMap = mutableMapOf<String, String>()
         val forwardIdMap = mutableMapOf<String, String>()
         val snippetIdMap = mutableMapOf<String, String>()
         val pendingHostPasswordImports = mutableListOf<Pair<String, String>>()
-        val pendingIdentityPublicKeyImports = mutableListOf<Pair<String, String>>()
+        // Identity id, public key, and the fingerprint it must have (null for a new identity).
+        val pendingIdentityPublicKeyImports = mutableListOf<Triple<String, String, String?>>()
         val pendingIdentityKeyImports = mutableListOf<Pair<String, String>>()
         val pendingIdentityKeyPassphraseImports = mutableListOf<Pair<String, String>>()
 
@@ -1179,7 +1195,9 @@ fun SSHPeachesRoot(
 
                 val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
                 val existing = existingIdentityByFingerprint[fingerprint]
-                val targetId = existing?.id ?: exportedId
+                val targetId = existing?.id
+                    ?: importItemId(exportedId, takenIdentityIds) { UUID.randomUUID().toString() }
+                takenIdentityIds += targetId
                 identityIdMap[exportedId] = targetId
 
                 if (existing == null) {
@@ -1208,14 +1226,18 @@ fun SSHPeachesRoot(
                     onToggleFavorite(existing.id)
                 }
 
-                item.optString("publicKey").trim().ifBlank { null }?.let {
-                    pendingIdentityPublicKeyImports += targetId to it
-                }
-                item.optString("keyPayload").trim().ifBlank { null }?.let {
-                    pendingIdentityKeyImports += targetId to it
-                }
-                item.optString("keyPassphrasePayload").trim().ifBlank { null }?.let {
-                    pendingIdentityKeyPassphraseImports += targetId to it
+                // Key material only fills in what an identity lacks, and must match its fingerprint (checked when it is
+                // stored): matching by fingerprint alone let an import name one of your keys and swap in its own.
+                if (existing?.hasPrivateKey != true) {
+                    item.optString("publicKey").trim().ifBlank { null }?.let {
+                        pendingIdentityPublicKeyImports += Triple(targetId, it, existing?.fingerprint)
+                    }
+                    item.optString("keyPayload").trim().ifBlank { null }?.let {
+                        pendingIdentityKeyImports += targetId to it
+                    }
+                    item.optString("keyPassphrasePayload").trim().ifBlank { null }?.let {
+                        pendingIdentityKeyPassphraseImports += targetId to it
+                    }
                 }
             }
         }
@@ -1230,13 +1252,17 @@ fun SSHPeachesRoot(
                 val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
                 val key = snippetTransferKey(title, command)
                 val existing = existingSnippetByKey[key]
-                val targetId = existing?.id ?: exportedId
+                val targetId = existing?.id
+                    ?: importItemId(exportedId, takenSnippetIds) { UUID.randomUUID().toString() }
+                takenSnippetIds += targetId
                 snippetIdMap[exportedId] = targetId
 
                 if (existing == null) {
+                    val importedTitle = importedItemName(title, snippetTitles)
+                    snippetTitles += importedTitle
                     val importedSnippet = Snippet(
                         id = targetId,
-                        title = title,
+                        title = importedTitle,
                         group = item.optString("group").trim().ifBlank { null },
                         createdEpochMillis = optNullableLong(item, "createdEpochMillis")
                             ?: System.currentTimeMillis(),
@@ -1279,7 +1305,9 @@ fun SSHPeachesRoot(
                     destinationPort = destinationPort
                 )
                 val existing = existingForwardByKey[key]
-                val targetId = existing?.id ?: exportedId
+                val targetId = existing?.id
+                    ?: importItemId(exportedId, takenForwardIds) { UUID.randomUUID().toString() }
+                takenForwardIds += targetId
                 forwardIdMap[exportedId] = targetId
 
                 if (existing == null) {
@@ -1327,12 +1355,21 @@ fun SSHPeachesRoot(
                 val defaultMode = runCatching {
                     ConnectionMode.valueOf(item.optString("defaultMode", ConnectionMode.SSH.name))
                 }.getOrDefault(ConnectionMode.SSH)
-                val targetId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
+                val targetId = importHostId(
+                    exportedId = item.optString("id"),
+                    host = host,
+                    port = port,
+                    username = username,
+                    localHosts = uiState.hosts
+                ) { UUID.randomUUID().toString() }
+                val updatesSavedHost = uiState.hosts.any { it.id == targetId }
+                val importedName = if (updatesSavedHost) name else importedItemName(name, hostNames)
+                hostNames += importedName
                 val encryptedPasswordPayload = item.optString("pwdPayload").trim().ifBlank { null }
                 onImportHost(
                     HostConnection(
                         id = targetId,
-                        name = name,
+                        name = importedName,
                         host = host,
                         port = port,
                         username = username,
@@ -1390,13 +1427,6 @@ fun SSHPeachesRoot(
                     settings.optString("backgroundSessionTimeout", uiState.backgroundSessionTimeout.name)
                 )
             }.getOrNull()?.let(onBackgroundSessionTimeoutChange)
-            onBiometricToggle(settings.optBoolean("biometricLockEnabled", uiState.biometricLockEnabled))
-            runCatching {
-                LockTimeout.valueOf(settings.optString("lockTimeout", uiState.lockTimeout.name))
-            }.getOrNull()?.let(onLockTimeoutChange)
-            onCustomLockTimeoutMinutesChange(
-                settings.optInt("customLockTimeoutMinutes", uiState.customLockTimeoutMinutes).coerceIn(1, 180)
-            )
             runCatching {
                 com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation.valueOf(
                     settings.optString("terminalEmulation", uiState.terminalEmulation.name)
@@ -1421,22 +1451,13 @@ fun SSHPeachesRoot(
             onTerminalMarginPxChange(
                 settings.optInt("terminalMarginPx", uiState.terminalMarginPx).coerceIn(0, 128)
             )
-            onCrashReportsToggle(settings.optBoolean("crashReportsEnabled", uiState.crashReportsEnabled))
-            onAnalyticsToggle(settings.optBoolean("analyticsEnabled", uiState.analyticsEnabled))
-            onDiagnosticsToggle(
-                settings.optBoolean("diagnosticsLoggingEnabled", uiState.diagnosticsLoggingEnabled)
-            )
             onUseBuiltInKeyboardToggle(
                 settings.optBoolean("useBuiltInKeyboard", uiState.useBuiltInKeyboard)
             )
-            onConfirmPasswordInsertToggle(
-                settings.optBoolean("confirmPasswordInsert", uiState.confirmPasswordInsert)
-            )
             onAutoReconnectToggle(settings.optBoolean("autoReconnect", uiState.autoReconnect))
-            onUsageReportsToggle(settings.optBoolean("usageReportsEnabled", uiState.usageReportsEnabled))
-            // Host-key policy and the mosh server command are deliberately not imported (a shared
-            // export must not weaken host-key checks or run commands); auto-starting forwards is
-            // harmless, so restore it.
+            // Not imported, because an export from someone else must not change them: the app lock, privacy
+            // (crash reports, analytics, usage, diagnostics), the password-insert confirmation, host-key policy and
+            // the mosh server command. Auto-starting forwards is harmless, so restore it.
             onAutoStartForwardsToggle(settings.optBoolean("autoStartForwards", uiState.autoStartForwards))
             onSnippetRunTimeoutSecondsChange(
                 settings.optInt("snippetRunTimeoutSeconds", uiState.snippetRunTimeoutSeconds).coerceIn(1, 60)
@@ -1478,14 +1499,15 @@ fun SSHPeachesRoot(
                 onImportTerminalProfiles(importedProfiles, importedDefaultProfileId)
             }
 
-            settings.optJSONArray("keyboardLayout")?.let { layout ->
+            // Keys can type any text, whatever their label, so the layout is only replaced when the user ticks it.
+            settings.optJSONArray("keyboardLayout")?.takeIf { includeKeyboardLayout }?.let { layout ->
                 onImportKeyboardLayout(keyboardLayoutFromJson(layout))
                 keyboardLayoutApplied = true
             }
         }
 
-        pendingIdentityPublicKeyImports.forEach { (identityId, publicKey) ->
-            if (!onImportIdentityPublicKey(identityId, publicKey)) {
+        pendingIdentityPublicKeyImports.forEach { (identityId, publicKey, expectedFingerprint) ->
+            if (!onImportIdentityPublicKey(identityId, publicKey, expectedFingerprint)) {
                 metadataImportFailures += 1
             }
         }
@@ -2503,8 +2525,8 @@ fun SSHPeachesRoot(
                                 onSetPin = onSetPin,
                                 onClearPin = onClearPin,
                                 onGenerateExportPayload = { passphrase -> buildExportPayload(uiState, passphrase) },
-                                onTransferPayloadRequiresPassphrase = ::transferPayloadRequiresPassphrase,
                                 onImportFromQrPayload = ::importTransferPayloadFromQr,
+                                onDescribeTransferPayload = ::describeTransferPayload,
                                 onShowMessage = showMessage,
                                 corePermissions = corePermissions,
                                 onManagePermissions = onOpenAppPermissionSettings
@@ -3616,22 +3638,9 @@ private fun decodeTransferPayload(encodedPayload: String): JSONObject? {
     return runCatching { JSONObject(payload) }.getOrNull()
 }
 
-private fun transferPayloadRequiresPassphrase(encodedPayload: String): Boolean {
-    val root = decodeTransferPayload(encodedPayload) ?: return false
-    val hostsRequirePassphrase = root.optJSONArray("hosts")?.let { hosts ->
-        (0 until hosts.length()).any { index ->
-            hosts.optJSONObject(index)?.optString("pwdPayload").orEmpty().isNotBlank()
-        }
-    } ?: false
-    val identitiesRequirePassphrase = root.optJSONArray("identities")?.let { identities ->
-        (0 until identities.length()).any { index ->
-            val item = identities.optJSONObject(index)
-            item?.optString("keyPayload").orEmpty().isNotBlank() ||
-                item?.optString("keyPassphrasePayload").orEmpty().isNotBlank()
-        }
-    } ?: false
-    return hostsRequirePassphrase || identitiesRequirePassphrase
-}
+/** What an export holds, for the review shown before importing it; null if it isn't a valid export. */
+private fun describeTransferPayload(encodedPayload: String): TransferImportSummary? =
+    decodeTransferPayload(encodedPayload)?.let(::summarizeTransferPayload)
 
 private fun optNullableLong(item: JSONObject, key: String): Long? =
     if (item.has(key) && !item.isNull(key)) item.optLong(key) else null

@@ -217,7 +217,9 @@ internal fun RemoteTextEditorDialog(
 ) {
     val scope = rememberCoroutineScope()
     var original by remember(path) { mutableStateOf<String?>(null) }
-    var text by rememberSaveable(path) { mutableStateOf("") }
+    // Not saved state: up to 1 MB of text overflows the saved-state Bundle (TransactionTooLargeException), and the
+    // file is loaded again when the screen is recreated anyway.
+    var text by remember(path) { mutableStateOf("") }
     var loadError by remember(path) { mutableStateOf<String?>(null) }
     var saving by remember(path) { mutableStateOf(false) }
     var status by remember(path) { mutableStateOf<String?>(null) }

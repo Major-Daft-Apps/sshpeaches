@@ -75,6 +75,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.generateForwardQr
 import com.majordaftapps.sshpeaches.app.ui.components.PortForwardQrImportResult
 import com.majordaftapps.sshpeaches.app.ui.components.buildGroupedSections
 import com.majordaftapps.sshpeaches.app.ui.components.processPortForwardQrImport
+import com.majordaftapps.sshpeaches.app.util.isLoopbackBindAddress
 import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
@@ -356,6 +357,13 @@ fun PortForwardScreen(
                     keyboardType = KeyboardType.Ascii
                 )
             )
+            if (!isLoopbackBindAddress(bindState.value)) {
+                Text(
+                    "Other devices on the same network can connect to this port.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
             OutlinedTextField(
                 value = srcPortState.value,
                 onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },

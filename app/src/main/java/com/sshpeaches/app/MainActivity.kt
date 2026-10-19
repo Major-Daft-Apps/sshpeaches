@@ -941,7 +941,9 @@ class MainActivity : FragmentActivity() {
             Intent.ACTION_VIEW, Intent.ACTION_SEND -> {
                 @Suppress("DEPRECATION")
                 val uri = intent.data ?: intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-                if (uri == null || uri.scheme !in setOf("content", "file")) {
+                // content:// only. Any app can start this activity, and a file:// URI would have the app read files
+                // from its own private storage as if they were an import.
+                if (uri == null || uri.scheme != "content") {
                     UiDebugLog.result("handleImportFileIntent", false, "no-file")
                     return
                 }

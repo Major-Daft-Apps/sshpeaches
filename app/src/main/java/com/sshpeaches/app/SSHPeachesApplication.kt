@@ -50,6 +50,8 @@ class SSHPeachesApplication : Application() {
         }
         AppCheckInitializer.initialize(this)
         TelemetryInitializer.initialize(this)
+        // After telemetry, so the crash reporter's handler is the one it falls back to.
+        SshThreadCrashGuard.install()
         runCatching {
             WorkManager.getInstance(this).cancelUniqueWork("sshpeaches_uptime_checks")
         }

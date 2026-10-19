@@ -361,6 +361,8 @@ fun ConnectingScreen(
     val terminalEngine = remember(request?.sessionId, clipboardManager) {
         TermuxTerminalEngine(
             onWriteToRemote = { payload -> currentOnSendShellBytes.value(payload) },
+            // This engine replays the session's output for display; the session answered it already.
+            forwardTerminalReplies = false,
             onCopyToClipboard = { _ -> },
             onRequestPasteText = { null },
             onTerminalDiagnostic = { message ->
@@ -1065,7 +1067,7 @@ fun ConnectingScreen(
                         )
                     )
                 }
-                terminalEngine.appendIncoming(delta.toByteArray(StandardCharsets.UTF_8))
+                replayTerminalOutput(terminalEngine, delta, request.sessionId)
             }
         } else {
             if (diagnosticsLoggingEnabled) {
@@ -1079,7 +1081,7 @@ fun ConnectingScreen(
             }
             terminalEngine.reset()
             if (snapshot.isNotEmpty()) {
-                terminalEngine.appendIncoming(snapshot.toByteArray(StandardCharsets.UTF_8))
+                replayTerminalOutput(terminalEngine, snapshot, request.sessionId)
             }
         }
         lastShellSnapshot = snapshot
@@ -2558,6 +2560,26 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
 
     private fun inputMethodManager(): InputMethodManager? =
         context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+}
+
+/**
+ * Replays session output into the display engine. The output is server-controlled: a parser error here must not
+ * crash the app (the session's own engine already catches them), so it is only logged.
+ */
+private suspend fun replayTerminalOutput(engine: TermuxTerminalEngine, output: String, sessionId: String) {
+    try {
+        engine.appendIncoming(output.toByteArray(StandardCharsets.UTF_8))
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (error: RuntimeException) {
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = sessionId,
+                level = SessionLogBus.LogLevel.DEBUG,
+                message = "TERM-REPLAY skipped output the terminal couldn't parse: ${error.javaClass.simpleName}"
+            )
+        )
+    }
 }
 
 private fun InputContentInfo.readTerminalText(context: Context, flags: Int): String? {

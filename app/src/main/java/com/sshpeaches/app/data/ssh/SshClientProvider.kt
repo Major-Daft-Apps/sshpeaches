@@ -200,11 +200,15 @@ object SshClientProvider {
         // starts the usual reconnect.
         config.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
         config.compressionFactories = listOf(NoneCompression.Factory())
-        val fastCiphers = preferFastCiphers(config.cipherFactories)
+        val fastCiphers = preferFastCiphers(config.cipherFactories.filterNot { isBrokenAlgorithm(it.name) })
         if (fastCiphers.isNotEmpty()) {
             config.cipherFactories = fastCiphers
         }
-        val compatibleKex = androidCompatibleKeyExchangeFactories(config.keyExchangeFactories, keyExchangeAvailability)
+        config.macFactories = config.macFactories.filterNot { isBrokenAlgorithm(it.name) }
+        val compatibleKex = androidCompatibleKeyExchangeFactories(
+            config.keyExchangeFactories.filterNot { isBrokenAlgorithm(it.name) },
+            keyExchangeAvailability
+        )
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
@@ -289,6 +293,23 @@ object SshClientProvider {
             compareBy<Factory.Named<Cipher>> { factory -> cipherPriority(factory.name) }
                 .thenBy { factory -> factories.indexOf(factory) }
         )
+    }
+
+    /**
+     * Algorithms sshj still offers that OpenSSH's client dropped years ago: RC4, 64-bit block ciphers (Sweet32),
+     * MD5 and truncated MACs, and 1024-bit Diffie-Hellman group 1 (Logjam). A server that offers nothing better
+     * is too old to connect to safely.
+     */
+    internal fun isBrokenAlgorithm(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower.startsWith("arcfour") ||
+            lower.startsWith("3des") ||
+            lower.startsWith("blowfish") ||
+            lower.startsWith("cast128") ||
+            lower.startsWith("idea") ||
+            lower.startsWith("hmac-md5") ||
+            lower.contains("-96") ||
+            lower == "diffie-hellman-group1-sha1"
     }
 
     private fun cipherPriority(name: String): Int {
@@ -794,14 +815,14 @@ object SshClientProvider {
                 return false
             }
             val adjustedHost = adjustKnownHostName(hostname, port)
-            var matchingTypeSeen = false
-            readKnownHostEntries().forEach { entry ->
-                if (entry.keyType == keyType && entry.appliesTo(adjustedHost)) {
-                    matchingTypeSeen = true
-                    if (entry.keyBlob.contentEquals(keyBlob)) return true
-                }
-            }
-            return if (matchingTypeSeen) {
+            val entries = readKnownHostEntries().filter { it.appliesTo(adjustedHost) }
+            if (entries.any { it.marker == KnownHostMarker.REVOKED && it.matches(keyType, keyBlob) }) return false
+            // Any key already saved for this host pins it, whatever its type: a server presenting a key of
+            // another type (say ssh-rsa where ed25519 was saved) is a changed key, not a new host. Counting only
+            // same-type keys let a man in the middle get a plain "trust new host?" prompt, or none with auto-trust.
+            val hostKeys = entries.filter { it.marker == KnownHostMarker.NONE }
+            if (hostKeys.any { it.matches(keyType, keyBlob) }) return true
+            return if (hostKeys.isNotEmpty()) {
                 hostKeyChangedAction(adjustedHost, normalizedKey)
             } else {
                 hostKeyUnverifiableAction(adjustedHost, normalizedKey)
@@ -811,7 +832,7 @@ object SshClientProvider {
         override fun findExistingAlgorithms(hostname: String, port: Int): List<String> {
             val adjustedHost = adjustKnownHostName(hostname, port)
             return readKnownHostEntries()
-                .filter { entry -> entry.appliesTo(adjustedHost) }
+                .filter { entry -> entry.marker == KnownHostMarker.NONE && entry.appliesTo(adjustedHost) }
                 .map { entry -> entry.keyType.toString() }
                 .distinct()
         }
@@ -862,7 +883,7 @@ object SshClientProvider {
                     }
                     val line = knownHostLine(hostname, keyType, keyBlob)
                     if (replaceExisting) {
-                        replaceHostKeyLine(hostname, keyType, line)
+                        replaceHostKeyLines(hostname, line)
                     } else {
                         appendHostKeyLine(line)
                     }
@@ -915,12 +936,13 @@ object SshClientProvider {
             file.appendText(line + System.lineSeparator(), StandardCharsets.UTF_8)
         }
 
-        private fun replaceHostKeyLine(hostname: String, keyType: KeyType, line: String) {
+        /** Replaces every key saved for [hostname] (the user accepted a changed key) with [line]. */
+        private fun replaceHostKeyLines(hostname: String, line: String) {
             file.parentFile?.mkdirs()
             val existing = if (file.exists()) file.readLines(StandardCharsets.UTF_8) else emptyList()
             val filtered = existing.filterNot { existingLine ->
                 val entry = parseKnownHostEntry(existingLine) ?: return@filterNot false
-                entry.keyType == keyType && entry.appliesTo(hostname)
+                entry.marker == KnownHostMarker.NONE && entry.appliesTo(hostname)
             }
             file.writeText(
                 (filtered + line).joinToString(System.lineSeparator()) + System.lineSeparator(),
@@ -969,11 +991,16 @@ object SshClientProvider {
         return "SHA256:$value"
     }
 
+    private enum class KnownHostMarker { NONE, REVOKED, CERT_AUTHORITY }
+
     private data class KnownHostEntry(
         val hostPart: String,
         val keyType: KeyType,
-        val keyBlob: ByteArray
+        val keyBlob: ByteArray,
+        val marker: KnownHostMarker = KnownHostMarker.NONE
     ) {
+        fun matches(type: KeyType, blob: ByteArray): Boolean = keyType == type && keyBlob.contentEquals(blob)
+
         fun appliesTo(hostname: String): Boolean {
             return hostPart.split(',').any { candidate ->
                 candidate.equals(hostname, ignoreCase = true)
@@ -985,14 +1012,21 @@ object SshClientProvider {
         val trimmed = line.trim()
         if (trimmed.isBlank() || trimmed.startsWith("#")) return null
         val parts = trimmed.split(Regex("\\s+"))
-        val offset = if (parts.firstOrNull()?.startsWith("@") == true) 1 else 0
+        val markerText = parts.firstOrNull()?.takeIf { it.startsWith("@") }
+        val marker = when (markerText?.lowercase()) {
+            null -> KnownHostMarker.NONE
+            "@revoked" -> KnownHostMarker.REVOKED
+            "@cert-authority" -> KnownHostMarker.CERT_AUTHORITY
+            else -> return null
+        }
+        val offset = if (markerText != null) 1 else 0
         if (parts.size <= offset + 2) return null
         val hostPart = parts[offset]
         val keyType = KeyType.fromString(parts[offset + 1]).takeIf { it != KeyType.UNKNOWN } ?: return null
         val keyBlob = runCatching { Base64.getDecoder().decode(parts[offset + 2]) }.getOrNull()
             ?.takeIf { it.isNotEmpty() }
             ?: return null
-        return KnownHostEntry(hostPart, keyType, keyBlob)
+        return KnownHostEntry(hostPart, keyType, keyBlob, marker)
     }
 
     private fun adjustKnownHostName(hostname: String, port: Int): String {

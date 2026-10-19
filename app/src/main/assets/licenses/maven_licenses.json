@@ -1922,10 +1922,10 @@
     ]
   },
   {
-    "coordinate": "org.bouncycastle:bcpkix-jdk18on:1.75",
+    "coordinate": "org.bouncycastle:bcpkix-jdk18on:1.86",
     "group": "org.bouncycastle",
     "artifact": "bcpkix-jdk18on",
-    "version": "1.75",
+    "version": "1.86",
     "displayName": "Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs",
     "projectUrl": "https://www.bouncycastle.org/java.html",
     "licenses": [
@@ -1936,10 +1936,10 @@
     ]
   },
   {
-    "coordinate": "org.bouncycastle:bcprov-jdk18on:1.77",
+    "coordinate": "org.bouncycastle:bcprov-jdk18on:1.86",
     "group": "org.bouncycastle",
     "artifact": "bcprov-jdk18on",
-    "version": "1.77",
+    "version": "1.86",
     "displayName": "Bouncy Castle Provider",
     "projectUrl": "https://www.bouncycastle.org/java.html",
     "licenses": [
@@ -1950,10 +1950,10 @@
     ]
   },
   {
-    "coordinate": "org.bouncycastle:bcutil-jdk18on:1.75",
+    "coordinate": "org.bouncycastle:bcutil-jdk18on:1.86",
     "group": "org.bouncycastle",
     "artifact": "bcutil-jdk18on",
-    "version": "1.75",
+    "version": "1.86",
     "displayName": "Bouncy Castle ASN.1 Extension and Utility APIs",
     "projectUrl": "https://www.bouncycastle.org/java.html",
     "licenses": [

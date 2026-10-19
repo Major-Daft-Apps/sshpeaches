@@ -193,6 +193,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Bouncy Castle's bcprov, bcpkix and bcutil each ship the same license file.
+            excludes += "/META-INF/LICENSE.md"
         }
     }
     sourceSets {
@@ -277,7 +279,11 @@ dependencies {
     implementation(platform("io.github.Rosemoe.sora-editor:bom:0.23.4"))
     implementation("io.github.Rosemoe.sora-editor:editor")
     implementation("io.github.Rosemoe.sora-editor:language-textmate")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
+    // sshj 0.40.0 pulls bcpkix/bcutil 1.80, which have known advisories (CVE-2026-5588 and others); keep all three on one
+    // current release.
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
+    implementation("org.bouncycastle:bcutil-jdk18on:1.86")
     implementation("com.google.zxing:core:3.5.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

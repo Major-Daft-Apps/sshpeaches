@@ -7,7 +7,6 @@ import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
-import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,26 +114,28 @@ object IdentityKeyInstaller {
     }
 
     private fun resolvePublicKey(identityId: String, identityPassphraseOverride: String?): String? {
-        val storedPublic = runCatching { SecurityManager.getIdentityPublicKey(identityId) }.getOrNull()
+        // The key installed must be the one the app logs in with, so derive it from the private key when there is
+        // one. A stored public key is only a fallback (e.g. an encrypted key without its passphrase): it can come
+        // from an import and needn't match.
+        val privateKey = runCatching { SecurityManager.getIdentityKey(identityId) }.getOrNull()
+            ?.takeIf { it.isNotBlank() }
+        if (privateKey != null) {
+            val passphrase = identityPassphraseOverride?.takeIf { it.isNotBlank() }
+                ?: runCatching { SecurityManager.getIdentityKeyPassphrase(identityId) }.getOrNull()
+            val derived = SshKeyGenerator.derivePublicKeyFromPrivate(
+                privateKeyMaterial = privateKey,
+                passphrase = passphrase
+            )?.trim()
+            if (!derived.isNullOrBlank()) {
+                runCatching { SecurityManager.storeIdentityPublicKey(identityId, derived) }
+                return derived
+            }
+        }
+        return runCatching { SecurityManager.getIdentityPublicKey(identityId) }.getOrNull()
             ?.lineSequence()
             ?.firstOrNull { it.trim().isNotBlank() }
             ?.trim()
-        if (!storedPublic.isNullOrBlank()) return storedPublic
-
-        val privateKey = runCatching { SecurityManager.getIdentityKey(identityId) }.getOrNull()
             ?.takeIf { it.isNotBlank() }
-            ?: return null
-        val passphrase = identityPassphraseOverride?.takeIf { it.isNotBlank() }
-            ?: runCatching { SecurityManager.getIdentityKeyPassphrase(identityId) }.getOrNull()
-        val derived = SshKeyGenerator.derivePublicKeyFromPrivate(
-            privateKeyMaterial = privateKey,
-            passphrase = passphrase
-        )?.trim()
-        if (!derived.isNullOrBlank()) {
-            runCatching { SecurityManager.storeIdentityPublicKey(identityId, derived) }
-            return derived
-        }
-        return null
     }
 
     private fun authenticate(
@@ -181,29 +182,18 @@ object IdentityKeyInstaller {
                 "AUTH_IDENTITY_ATTEMPT hostId=${host.id} identityId=${authIdentityId.safeId()} " +
                     "hasPassphrase=${!passphrase.isNullOrBlank()}"
             )
-            var tempFile: File? = null
             try {
                 val keyProvider = Ed25519IdentityKeyProvider.load(
                     client = client,
                     privateKeyMaterial = privateKey,
                     publicKeyMaterial = publicKey,
                     passphrase = passphrase
-                ) ?: run {
-                    val file = writeTempIdentityKey(host.id, privateKey)
-                    tempFile = file
-                    if (passphrase.isNullOrBlank()) {
-                        client.loadKeys(file.absolutePath)
-                    } else {
-                        client.loadKeys(file.absolutePath, passphrase.toCharArray())
-                    }
-                }
+                ) ?: client.loadPrivateKeyFromMemory(privateKey, passphrase)
                 client.authPublickey(host.username, keyProvider)
                 if (client.isAuthenticated) return
             } catch (error: Throwable) {
                 lastError = error
                 debug("AUTH_IDENTITY_ERROR hostId=${host.id} identityId=${authIdentityId.safeId()} error=${error.safeSummary(host)}")
-            } finally {
-                tempFile?.let { runCatching { it.delete() } }
             }
         }
         debug("AUTH_IDENTITY_FAIL hostId=${host.id} hadError=${lastError != null}")
@@ -224,13 +214,6 @@ object IdentityKeyInstaller {
             ?: SecurityManager.getHostPassword(host.id)
             ?: error("Password is required to authenticate with ${host.name}.")
         client.authPasswordOrInteractive(host.username, password)
-    }
-
-    private fun writeTempIdentityKey(hostId: String, privateKey: String): File {
-        val file = File.createTempFile("identity_copy_${hostId}_", ".pem")
-        val normalized = privateKey.trim().let { if (it.endsWith("\n")) it else "$it\n" }
-        file.writeText(normalized, Charsets.UTF_8)
-        return file
     }
 
     private fun buildAuthorizedKeyInstallCommand(publicKey: String): String {

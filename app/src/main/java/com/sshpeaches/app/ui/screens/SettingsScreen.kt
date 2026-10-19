@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -69,6 +72,7 @@ import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAN
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.adaptive.ShellLayoutMode
 import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
+import com.majordaftapps.sshpeaches.app.ui.components.TransferImportSummary
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.permissions.CorePermissionStatus
 import com.majordaftapps.sshpeaches.app.ui.state.BackgroundSessionTimeout
@@ -149,8 +153,8 @@ fun SettingsScreen(
     onSetPin: (String) -> Unit,
     onClearPin: () -> Unit,
     onGenerateExportPayload: (String?) -> String?,
-    onTransferPayloadRequiresPassphrase: (String) -> Boolean = { false },
-    onImportFromQrPayload: (String, String?) -> String = { _, _ -> "Invalid export payload." },
+    onImportFromQrPayload: (String, String?, Boolean) -> String = { _, _, _ -> "Invalid export payload." },
+    onDescribeTransferPayload: (String) -> TransferImportSummary? = { null },
     onShowMessage: (String) -> Unit = {},
     corePermissions: List<CorePermissionStatus> = emptyList(),
     onManagePermissions: () -> Unit = {},
@@ -199,11 +203,11 @@ fun SettingsScreen(
     val transferWorking = remember { mutableStateOf(false) }
 
     // Import runs PBKDF2 per protected item (about 1-2 s each), so keep it off the main thread.
-    fun runImport(contents: String, passphrase: String?) {
+    fun runImport(contents: String, passphrase: String?, includeKeyboardLayout: Boolean) {
         transferWorking.value = true
         scope.launch {
                 val message = withContext(Dispatchers.Default) {
-                    runCatching { onImportFromQrPayload(contents, passphrase) }
+                    runCatching { onImportFromQrPayload(contents, passphrase, includeKeyboardLayout) }
                         .getOrElse {
                             TelemetryInitializer.recordNonFatal("import", it)
                             "Import failed: ${it.message ?: it.javaClass.simpleName}"
@@ -218,7 +222,8 @@ fun SettingsScreen(
         val exportToFile = rememberSaveable { mutableStateOf(false) }
         val exportToWifi = rememberSaveable { mutableStateOf(false) }
         val exportToShare = rememberSaveable { mutableStateOf(false) }
-        val incomingImport = remember { mutableStateOf<Pair<String, String>?>(null) } // name to contents
+        val importReview = remember { mutableStateOf<ImportReview?>(null) }
+        val importKeyboardLayout = remember { mutableStateOf(false) }
         val transferChooser = rememberSaveable { mutableStateOf<String?>(null) } // "export" / "import"
         val showWifiReceive = rememberSaveable { mutableStateOf(false) }
         val wifiReceiving = remember { mutableStateOf(false) }
@@ -233,18 +238,36 @@ fun SettingsScreen(
         val exportConfirmPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
         val exportPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
         val pendingImportPayload = remember { mutableStateOf<String?>(null) }
+        val pendingImportKeyboardLayout = remember { mutableStateOf(false) }
         val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
         val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
         val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
         val advertiser = remember { LanTransferAdvertiser(context) }
 
-        fun handleReceivedPayload(contents: String) {
-            if (onTransferPayloadRequiresPassphrase(contents)) {
-                pendingImportPayload.value = contents
+        // Every import (QR code, Wi-Fi, file, shared file) is shown for review first: a QR code or file can come
+        // from anyone, and used to be applied the moment it was scanned.
+        fun handleReceivedPayload(contents: String, source: String) {
+            scope.launch {
+                val summary = withContext(Dispatchers.Default) {
+                    runCatching { onDescribeTransferPayload(contents) }.getOrNull()
+                }
+                if (summary == null) {
+                    onShowMessage("Invalid export payload.")
+                    return@launch
+                }
+                importKeyboardLayout.value = false
+                importReview.value = ImportReview(source = source, contents = contents, summary = summary)
+            }
+        }
+
+        fun confirmImport(review: ImportReview, includeKeyboardLayout: Boolean) {
+            if (review.summary.hasProtectedSecrets) {
+                pendingImportPayload.value = review.contents
+                pendingImportKeyboardLayout.value = includeKeyboardLayout
                 importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
                 importPassphraseError.value = null
             } else {
-                runImport(contents, null)
+                runImport(review.contents, null, includeKeyboardLayout)
             }
         }
 
@@ -283,7 +306,7 @@ fun SettingsScreen(
                 wifiReceiving.value = false
                 result.onSuccess { contents ->
                     showWifiReceive.value = false
-                    handleReceivedPayload(contents)
+                    handleReceivedPayload(contents, "another phone over Wi-Fi")
                 }.onFailure { error ->
                     wifiReceiveError.value = when (error) {
                         is LanTransfer.WrongCodeException -> error.message
@@ -337,6 +360,24 @@ fun SettingsScreen(
             }
         }
 
+        // A Wi-Fi send blocks in accept(), which coroutine cancellation doesn't interrupt: close the socket when the
+        // user leaves Settings or the app locks, or the payload would stay on offer (and advertised) for minutes.
+        DisposableEffect(Unit) {
+            onDispose {
+                advertiser.stop()
+                // Cleared first, so the send treats the closed socket as a cancel rather than an error.
+                wifiSender.value?.also { wifiSender.value = null }?.close()
+            }
+        }
+        LaunchedEffect(isLocked) {
+            if (isLocked) {
+                wifiSender.value?.let { sender ->
+                    wifiSender.value = null
+                    advertiser.stop()
+                    sender.close()
+                }
+            }
+        }
         LaunchedEffect(incomingImportUri, isLocked) {
             val uriText = incomingImportUri ?: return@LaunchedEffect
             if (isLocked) return@LaunchedEffect
@@ -347,18 +388,7 @@ fun SettingsScreen(
                         ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
                         ?: uri.lastPathSegment
                         ?: "export file"
-                    val contents = context.contentResolver.openInputStream(uri)?.use { input ->
-                        // Exports are small; refuse anything absurd rather than read it into memory.
-                        val buffer = java.io.ByteArrayOutputStream()
-                        val chunk = ByteArray(64 * 1024)
-                        while (true) {
-                            val read = input.read(chunk)
-                            if (read < 0) break
-                            buffer.write(chunk, 0, read)
-                            require(buffer.size() <= MAX_IMPORT_FILE_BYTES) { "too large" }
-                        }
-                        buffer.toString(Charsets.UTF_8.name())
-                    }.orEmpty()
+                    val contents = context.contentResolver.openInputStream(uri)?.use(::readImportFile).orEmpty()
                     name to contents
                 }.getOrNull()
             }
@@ -366,7 +396,7 @@ fun SettingsScreen(
             if (read == null || read.second.isBlank()) {
                 onShowMessage("Couldn't read that file.")
             } else {
-                incomingImport.value = read
+                handleReceivedPayload(read.second, "\"${read.first}\"")
             }
         }
 
@@ -379,7 +409,7 @@ fun SettingsScreen(
             } else if (contents.isBlank()) {
                 onShowMessage("QR scan cancelled.")
             } else {
-                handleReceivedPayload(contents)
+                handleReceivedPayload(contents, "the scanned QR code")
             }
         }
         val createExportFileLauncher = rememberLauncherForActivityResult(
@@ -414,19 +444,13 @@ fun SettingsScreen(
                 // Document providers can be slow (cloud storage), so read off the main thread.
                 val contents = withContext(Dispatchers.IO) {
                     runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            input.readBytes().toString(Charsets.UTF_8)
-                        }
+                        context.contentResolver.openInputStream(uri)?.use(::readImportFile)
                     }.getOrNull().orEmpty()
                 }
                 if (contents.isBlank()) {
                     onShowMessage("Unable to read export file.")
-                } else if (onTransferPayloadRequiresPassphrase(contents)) {
-                    pendingImportPayload.value = contents
-                    importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
-                    importPassphraseError.value = null
                 } else {
-                    runImport(contents, null)
+                    handleReceivedPayload(contents, "the selected file")
                 }
             }
         }
@@ -1036,27 +1060,16 @@ fun SettingsScreen(
                 }
             )
         }
-        incomingImport.value?.takeIf { !isLocked }?.let { (name, contents) ->
-            AlertDialog(
-                onDismissRequest = { incomingImport.value = null },
-                modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_DIALOG),
-                title = { Text("Import this file?") },
-                text = {
-                    Text(
-                        "\"$name\" will be imported into SSHPeaches. Hosts, keys, and settings in it are " +
-                            "merged with what you have; newer local changes are kept."
-                    )
+        importReview.value?.takeIf { !isLocked }?.let { review ->
+            ImportReviewDialog(
+                review = review,
+                includeKeyboardLayout = importKeyboardLayout.value,
+                onIncludeKeyboardLayoutChange = { importKeyboardLayout.value = it },
+                onConfirm = {
+                    importReview.value = null
+                    confirmImport(review, importKeyboardLayout.value)
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            incomingImport.value = null
-                            handleReceivedPayload(contents)
-                        },
-                        modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_CONFIRM)
-                    ) { Text("Import") }
-                },
-                dismissButton = { TextButton(onClick = { incomingImport.value = null }) { Text("Cancel") } }
+                onDismiss = { importReview.value = null }
             )
         }
         wifiSend.value?.let { sending ->
@@ -1332,7 +1345,7 @@ fun SettingsScreen(
                         return@TextButton
                     }
                     ExportPassphraseCache.transfer = passphrase
-                    runImport(payload, passphrase)
+                    runImport(payload, passphrase, pendingImportKeyboardLayout.value)
                     pendingImportPayload.value = null
                     importPassphraseError.value = null
                 }) { Text("Import") }
@@ -1523,3 +1536,93 @@ private data class WifiSendState(val host: String, val port: Int, val code: Stri
 
 private const val WIFI_TRANSFER_TIMEOUT_MS = 5 * 60 * 1000
 private const val MAX_IMPORT_FILE_BYTES = 32 * 1024 * 1024
+
+/** An export file's text. Exports are small: refuse anything absurd rather than read it all into memory. */
+private fun readImportFile(input: java.io.InputStream): String {
+    val buffer = java.io.ByteArrayOutputStream()
+    val chunk = ByteArray(64 * 1024)
+    while (true) {
+        val read = input.read(chunk)
+        if (read < 0) break
+        buffer.write(chunk, 0, read)
+        require(buffer.size() <= MAX_IMPORT_FILE_BYTES) { "too large" }
+    }
+    return buffer.toString(Charsets.UTF_8.name())
+}
+
+private data class ImportReview(val source: String, val contents: String, val summary: TransferImportSummary)
+
+@Composable
+private fun ImportReviewDialog(
+    review: ImportReview,
+    includeKeyboardLayout: Boolean,
+    onIncludeKeyboardLayoutChange: (Boolean) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val summary = review.summary
+    fun count(n: Int, one: String, many: String) = if (n == 1) "1 $one" else "$n $many"
+    val items = buildList {
+        if (summary.hosts > 0) add(count(summary.hosts, "host", "hosts"))
+        if (summary.identities > 0) add(count(summary.identities, "identity", "identities"))
+        if (summary.snippets > 0) add(count(summary.snippets, "snippet", "snippets"))
+        if (summary.portForwards > 0) {
+            add(count(summary.portForwards, "port forward", "port forwards") + " (off until you turn them on)")
+        }
+        if (summary.terminalProfiles > 0) add(count(summary.terminalProfiles, "terminal theme", "terminal themes"))
+        if (summary.hasSettings) add("Appearance, terminal and transfer settings")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_DIALOG),
+        title = { Text("Import into SSHPeaches?") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("From ${review.source}:")
+                if (items.isEmpty()) {
+                    Text("Nothing to import.")
+                } else {
+                    items.forEach { Text("• $it") }
+                }
+                Text(
+                    "Only import exports you made or got from someone you trust. Nothing you already have is " +
+                        "overwritten, and your app lock, privacy and host-key settings stay as they are."
+                )
+                if (summary.hasKeyboardLayout) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = includeKeyboardLayout,
+                                role = Role.Checkbox,
+                                onValueChange = onIncludeKeyboardLayoutChange
+                            )
+                            .testTag(UiTestTags.SETTINGS_IMPORT_KEYBOARD_LAYOUT_CHECKBOX)
+                    ) {
+                        Checkbox(checked = includeKeyboardLayout, onCheckedChange = null)
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("Also replace my keyboard layout")
+                            Text(
+                                "Its keys can type any text into your sessions, whatever they're labelled.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = items.isNotEmpty(),
+                modifier = Modifier.testTag(UiTestTags.SETTINGS_INCOMING_IMPORT_CONFIRM)
+            ) { Text("Import") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}

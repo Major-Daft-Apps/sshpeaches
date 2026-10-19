@@ -43,7 +43,9 @@ fun processHostQrImport(
         ?: idProvider()
     return HostQrImportResult.Ready(
         HostQrImportData(
-            host = imported,
+            // A scanned QR code can come from anyone: a startup command would run on the server at every connect
+            // without being seen, and identity/forward ids would attach this host to your own keys and forwards.
+            host = imported.copy(startupScript = "", preferredIdentityId = null, preferredForwardId = null),
             targetId = targetId,
             encryptedPasswordPayload = payload.encryptedPasswordPayload
         )
@@ -123,7 +125,8 @@ fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
     return if (imported == null) {
         PortForwardQrImportResult.Error("Invalid port forward QR")
     } else {
-        PortForwardQrImportResult.Ready(imported)
+        // Like every import, a scanned forward only listens on this phone; the user can widen it when saving.
+        PortForwardQrImportResult.Ready(imported.copy(sourceHost = "127.0.0.1"))
     }
 }
 

@@ -264,7 +264,8 @@ internal fun packetLogText(format: String?, args: Array<out Any?>?): String? {
         "Encoding packet #{}: {}" -> true
         "Received packet #{}: {}" -> false
         "IN #{}: {}" -> return SKIP_PACKET_LOG
-        else -> return null
+        // Fail closed: a dump this filter doesn't recognise (say sshj renames a log line) could hold a password.
+        else -> return if (args.orEmpty().any(::looksLikeHexDump)) SKIP_PACKET_LOG else null
     }
     val hex = args?.getOrNull(1)?.toString() ?: return null
     val id = hex.take(2).toIntOrNull(16) ?: return null
@@ -280,6 +281,15 @@ internal fun packetLogText(format: String?, args: Array<out Any?>?): String? {
     }.getOrNull().orEmpty()
     return if (details.isEmpty()) header else header + details.joinToString("") { "\n  $it" }
 }
+
+/** sshj's packet dumps: space-separated hex byte pairs ("05 00 00 00 0c 73 73 68 ..."). */
+private fun looksLikeHexDump(arg: Any?): Boolean {
+    val text = (arg as? CharSequence ?: return false).take(HEX_DUMP_PROBE_CHARS)
+    return HEX_DUMP_PREFIX.containsMatchIn(text)
+}
+
+private val HEX_DUMP_PREFIX = Regex("^\\s*[0-9a-fA-F]{2}(\\s[0-9a-fA-F]{2}){7}")
+private const val HEX_DUMP_PROBE_CHARS = 64
 
 private fun packetDetails(id: Int, outgoing: Boolean, packet: PacketReader): List<String> = when (id) {
     1 -> listOf("reason ${packet.uint32()}: ${packet.text()}")

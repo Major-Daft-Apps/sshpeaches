@@ -60,6 +60,28 @@ public class HostileOutputTest extends TerminalTestCase {
         assertTrue("CSI 9999 b took " + repeatMs + "ms", repeatMs < 5000);
     }
 
+    public void testColumnModeTogglesOverAFullScrollbackStayFast() {
+        mTerminal = new TerminalEmulator(mOutput, 80, 24, INITIAL_CELL_WIDTH_PIXELS, INITIAL_CELL_HEIGHT_PIXELS, 5000, null);
+        byte[] wide = (WIDE_SCREEN + "\r\n").getBytes(StandardCharsets.UTF_8);
+        for (int i = 0; i < 250; i++) mTerminal.append(wide, wide.length);
+        StringBuilder toggles = new StringBuilder();
+        for (int i = 0; i < 200; i++) toggles.append("\033[?3h\033[?3l");
+        byte[] bytes = toggles.toString().getBytes(StandardCharsets.UTF_8);
+        long ms = millis(() -> mTerminal.append(bytes, bytes.length));
+        assertTrue("200 DECCOLM toggles took " + ms + "ms", ms < 2000);
+        assertEquals(80, mTerminal.mColumns);
+    }
+
+    public void testLineDrawingCarriageReturnAndNewlineAreSymbolsNotControls() {
+        // A real CR or LF stored in a cell is invisible but copied with a selection, so a line that looks harmless
+        // could paste as several commands.
+        withTerminalSized(10, 2).enterString("ls\033(0dh\033(B");
+        String selected = mTerminal.getScreen().getSelectedText(0, 0, 9, 0);
+        assertFalse(selected.contains("\r"));
+        assertFalse(selected.contains("\n"));
+        assertTrue(selected.startsWith("ls␍␤"));
+    }
+
     public void testScrollUpWithMarginsMovesRegion() {
         withTerminalSized(5, 3);
         enterString("abcde\r\nfghij\r\nklmno\033[?69h\033[2;4s\033[1S");

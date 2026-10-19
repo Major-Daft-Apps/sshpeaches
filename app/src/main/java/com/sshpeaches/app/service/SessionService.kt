@@ -20,6 +20,7 @@ import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
 import com.majordaftapps.sshpeaches.app.MainActivity
 import com.majordaftapps.sshpeaches.app.R
@@ -50,6 +51,8 @@ import com.majordaftapps.sshpeaches.app.util.legacyLoopbackDestinationHost
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
 import com.majordaftapps.sshpeaches.app.widget.WidgetSessionStore
 import com.majordaftapps.sshpeaches.app.util.parseSnippetReference
+import com.majordaftapps.sshpeaches.app.util.scpRemotePathArgument
+import com.majordaftapps.sshpeaches.app.data.ssh.loadPrivateKeyFromMemory
 import com.majordaftapps.sshpeaches.app.util.selectedHostId
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
@@ -617,7 +620,9 @@ class SessionService : Service() {
                         client!!.startSession().use { shell ->
                             val cmd = shell.exec(startupCommand)
                             cmd.join(12, TimeUnit.SECONDS)
-                            val output = runCatching { cmd.inputStream.bufferedReader().readText() }.getOrNull()
+                            val output = runCatching {
+                                collectCommandOutput(cmd, cmd.inputStream, REMOTE_OUTPUT_DRAIN_MS)
+                            }.getOrNull()
                             if (!output.isNullOrBlank()) {
                                 SessionLogBus.emit(
                                     SessionLogBus.Entry(
@@ -1022,7 +1027,9 @@ class SessionService : Service() {
                     client.startSession().use { session ->
                         val command = session.exec(shortcut)
                         command.join(8, TimeUnit.SECONDS)
-                        val output = runCatching { command.inputStream.bufferedReader().readText() }.getOrNull()
+                        val output = runCatching {
+                            collectCommandOutput(command, command.inputStream, REMOTE_OUTPUT_DRAIN_MS)
+                        }.getOrNull()
                         if (!output.isNullOrBlank()) {
                             SessionLogBus.emit(
                                 SessionLogBus.Entry(
@@ -1829,14 +1836,16 @@ class SessionService : Service() {
             }
             withTransferListener(scp, buildTransferListener(transfer)) {
                 val downloadClient = scp.newSCPDownloadClient()
+                // Quoted here: sshj's SingleQuote mode lets a ' in the name end the quote and run the rest.
+                val remoteArgument = scpRemotePathArgument(source)
                 if (destinationUri != null) {
-                    downloadClient.copy(source, ContentUriDestFile(destinationUri), EscapeMode.SingleQuote)
+                    downloadClient.copy(remoteArgument, ContentUriDestFile(destinationUri), EscapeMode.NoEscape)
                 } else {
                     destinationFile.parentFile?.mkdirs()
                     downloadClient.copy(
-                        source,
+                        remoteArgument,
                         FileSystemFile(destinationFile),
-                        EscapeMode.SingleQuote
+                        EscapeMode.NoEscape
                     )
                 }
             }
@@ -1899,7 +1908,8 @@ class SessionService : Service() {
                         )
                     }
                     withTransferListener(scp, buildTransferListener(transfer)) {
-                        scp.upload(sourceFile, destination)
+                        scp.newSCPUploadClient()
+                            .copy(sourceFile, scpRemotePathArgument(destination), EscapeMode.NoEscape)
                     }
                 } finally {
                     sourceFile.cleanup()
@@ -1916,7 +1926,8 @@ class SessionService : Service() {
                     )
                 }
                 withTransferListener(scp, buildTransferListener(transfer)) {
-                    scp.upload(sourceFile.absolutePath, destination)
+                    scp.newSCPUploadClient()
+                        .copy(FileSystemFile(sourceFile), scpRemotePathArgument(destination), EscapeMode.NoEscape)
                 }
                 sourceFile.absolutePath
             }
@@ -2174,17 +2185,35 @@ class SessionService : Service() {
     suspend fun readRemoteTextFile(hostId: String, path: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val sftp = activeConnections[hostId]?.sftpBinding?.client ?: error("The file browser isn't connected.")
-            val size = sftp.stat(path).size
-            require(size <= MAX_EDITABLE_FILE_BYTES) {
-                "This file is larger than ${MAX_EDITABLE_FILE_BYTES / 1024} KB. Download it to edit it."
+            val attributes = sftp.stat(path)
+            // Devices, pipes and /proc entries report a size of 0 and never end (/dev/zero): only regular files.
+            require(attributes.type == net.schmizz.sshj.sftp.FileMode.Type.REGULAR) {
+                "Only regular files can be edited here."
             }
-            val bytes = sftp.open(path).use { file -> file.RemoteFileInputStream().use { it.readBytes() } }
+            val tooLarge = "This file is larger than ${MAX_EDITABLE_FILE_BYTES / 1024} KB. Download it to edit it."
+            require(attributes.size <= MAX_EDITABLE_FILE_BYTES) { tooLarge }
+            // The size is the server's word: stop reading at the limit whatever it said.
+            val bytes = sftp.open(path).use { file ->
+                file.RemoteFileInputStream().use { input -> readAtMost(input, MAX_EDITABLE_FILE_BYTES.toInt()) }
+            } ?: throw IllegalArgumentException(tooLarge)
             require(bytes.none { it == 0.toByte() }) { "This looks like a binary file, so it can't be edited here." }
             String(bytes, StandardCharsets.UTF_8)
         }.onFailure { error ->
             if (error !is IllegalArgumentException && error !is IllegalStateException) {
                 reportUnexpected("editor_read", hostId, error)
             }
+        }
+    }
+
+    /** Everything [input] holds, or null if that is more than [limit] bytes. */
+    private fun readAtMost(input: java.io.InputStream, limit: Int): ByteArray? {
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(32 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return output.toByteArray()
+            output.write(buffer, 0, read)
+            if (output.size() > limit) return null
         }
     }
 
@@ -2838,7 +2867,6 @@ class SessionService : Service() {
         val publicKey = runCatching {
             SecurityManager.getIdentityPublicKey(identityId)
         }.getOrNull()
-        var tempKeyFile: File? = null
         return try {
             UiDebugLog.action(
                 "SessionService.authenticateWithIdentity",
@@ -2846,7 +2874,7 @@ class SessionService : Service() {
                     "required=$required, hasPassphrase=${!keyPassphrase.isNullOrBlank()}, " +
                     "hasPublicKey=${!publicKey.isNullOrBlank()}"
             )
-            var providerSource = "sshj-file"
+            var providerSource = "sshj-memory"
             val keyProvider = Ed25519IdentityKeyProvider.load(
                 client = client,
                 privateKeyMaterial = privateKey,
@@ -2854,15 +2882,7 @@ class SessionService : Service() {
                 passphrase = keyPassphrase
             )?.also {
                 providerSource = "ed25519-pkcs8-direct"
-            } ?: run {
-                val file = writeIdentityKeyTempFile(host.id, privateKey)
-                tempKeyFile = file
-                if (keyPassphrase.isNullOrBlank()) {
-                    client.loadKeys(file.absolutePath)
-                } else {
-                    client.loadKeys(file.absolutePath, keyPassphrase.toCharArray())
-                }
-            }
+            } ?: client.loadPrivateKeyFromMemory(privateKey, keyPassphrase)
             val keyType = runCatching { keyProvider.type.toString() }.getOrDefault("unknown")
             UiDebugLog.result(
                 "SessionService.identityKeyProvider",
@@ -2889,24 +2909,7 @@ class SessionService : Service() {
                 throw ConnectionFailure("Identity authentication failed.", ConnectionFailureKind.AUTH_KEY, authError)
             }
             false
-        } finally {
-            tempKeyFile?.delete()
         }
-    }
-
-    private fun writeIdentityKeyTempFile(hostId: String, privateKey: String): File {
-        val file = File.createTempFile("ssh_identity_${hostId}_", ".pem", cacheDir)
-        file.writeText(
-            privateKey.trim().let { key ->
-                if (key.endsWith("\n")) key else "$key\n"
-            },
-            Charsets.UTF_8
-        )
-        file.setReadable(false, false)
-        file.setWritable(false, false)
-        file.setReadable(true, true)
-        file.setWritable(true, true)
-        return file
     }
 
     private fun Throwable.safeIdentityAuthSummary(host: HostConnection): String {
@@ -3194,7 +3197,7 @@ class SessionService : Service() {
     private fun stopMoshServer(client: SSHClient?, moshConnect: MoshConnect) {
         val pid = moshConnect.serverPid ?: return
         val ssh = client?.takeIf { it.isConnected && it.isAuthenticated } ?: return
-        runRemoteCommand(ssh, "kill $pid 2>/dev/null", timeoutSeconds = 3)
+        runRemoteCommand(ssh, moshServerStopCommand(pid), timeoutSeconds = 3)
     }
 
     private fun scheduleMoshReconnect(hostId: String) {
@@ -3364,17 +3367,17 @@ class SessionService : Service() {
             when {
                 uname.equals("Darwin", ignoreCase = true) -> OsMetadata.Known(
                     family = OsFamily.MAC,
-                    versionLabel = unameVersion.ifBlank { null }
+                    versionLabel = osVersionLabel(unameVersion)
                 )
                 uname.contains("FreeBSD", ignoreCase = true) ||
                     uname.contains("OpenBSD", ignoreCase = true) ||
                     uname.contains("NetBSD", ignoreCase = true) -> OsMetadata.Known(
                     family = OsFamily.BSD,
-                    versionLabel = unameVersion.ifBlank { null }
+                    versionLabel = osVersionLabel(unameVersion)
                 )
                 uname.contains("Linux", ignoreCase = true) -> OsMetadata.Known(
                     family = OsFamily.GENERIC,
-                    versionLabel = unameVersion.ifBlank { null }
+                    versionLabel = osVersionLabel(unameVersion)
                 )
                 else -> {
                     val windowsVer = runRemoteCommand(client, "cmd.exe /c ver", timeoutSeconds = 2).orEmpty()
@@ -3487,27 +3490,14 @@ class SessionService : Service() {
         if (privateKey.isNullOrBlank()) return false
         val keyPassphrase = runCatching { SecurityManager.getIdentityKeyPassphrase(identityId) }.getOrNull()
         val publicKey = runCatching { SecurityManager.getIdentityPublicKey(identityId) }.getOrNull()
-        var tempKeyFile: File? = null
-        return try {
-            val keyProvider = Ed25519IdentityKeyProvider.load(
-                client = client,
-                privateKeyMaterial = privateKey,
-                publicKeyMaterial = publicKey,
-                passphrase = keyPassphrase
-            ) ?: run {
-                val file = writeIdentityKeyTempFile(host.id, privateKey)
-                tempKeyFile = file
-                if (keyPassphrase.isNullOrBlank()) {
-                    client.loadKeys(file.absolutePath)
-                } else {
-                    client.loadKeys(file.absolutePath, keyPassphrase.toCharArray())
-                }
-            }
-            client.authPublickey(host.username, keyProvider)
-            client.isAuthenticated
-        } finally {
-            tempKeyFile?.delete()
-        }
+        val keyProvider = Ed25519IdentityKeyProvider.load(
+            client = client,
+            privateKeyMaterial = privateKey,
+            publicKeyMaterial = publicKey,
+            passphrase = keyPassphrase
+        ) ?: client.loadPrivateKeyFromMemory(privateKey, keyPassphrase)
+        client.authPublickey(host.username, keyProvider)
+        return client.isAuthenticated
     }
 
     private fun runRemoteCommand(
@@ -3520,16 +3510,22 @@ class SessionService : Service() {
                 client.startSession().use { session ->
                     val cmd = session.exec(command)
                     cmd.join(timeoutSeconds, TimeUnit.SECONDS)
-                    val stdout = runCatching { cmd.inputStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull().orEmpty()
+                    val stdout = runCatching {
+                        collectCommandOutput(cmd, cmd.inputStream, REMOTE_OUTPUT_DRAIN_MS)
+                    }.getOrNull().orEmpty()
                     if (stdout.isNotBlank()) {
                         stdout
                     } else {
-                        runCatching { cmd.errorStream.bufferedReader(StandardCharsets.UTF_8).readText() }.getOrNull()
+                        runCatching { collectCommandOutput(cmd, cmd.errorStream, REMOTE_OUTPUT_DRAIN_MS) }.getOrNull()
                     }
                 }
             }
         }.getOrNull()
     }
+
+    /** A server-reported OS version as shown on host cards and saved in exports: short, one line, printable. */
+    private fun osVersionLabel(raw: String): String? =
+        raw.filter { !it.isISOControl() }.trim().take(MAX_OS_VERSION_LABEL_LENGTH).ifBlank { null }
 
     private fun parseOsRelease(raw: String?): OsMetadata? {
         if (raw.isNullOrBlank()) return null
@@ -3550,11 +3546,11 @@ class SessionService : Service() {
         return when {
             family != null -> OsMetadata.Known(
                 family = family,
-                versionLabel = version.takeIf { it.isNotBlank() }
+                versionLabel = osVersionLabel(version)
             )
             id.isNotBlank() || like.contains("linux", ignoreCase = true) -> OsMetadata.Known(
                 family = OsFamily.GENERIC,
-                versionLabel = version.takeIf { it.isNotBlank() }
+                versionLabel = osVersionLabel(version)
             )
             else -> null
         }
@@ -3948,11 +3944,16 @@ class SessionService : Service() {
         val sequenceMap = if (direction == "RX") shellReadSequence else shellWriteSequence
         val seq = (sequenceMap[hostId] ?: 0) + 1
         sequenceMap[hostId] = seq
-        val previewSize = minOf(size, SHELL_DIAG_PREVIEW_BYTES)
-        val hex = payload.toHexPreview(previewSize)
-        val ascii = payload.toAsciiPreview(previewSize)
-        val truncated = if (size > previewSize) " (+${size - previewSize} bytes)" else ""
-        val line = "SHELL-DIAG $direction#$seq bytes=$size hex=$hex ascii=\"$ascii\"$truncated"
+        val line = if (direction == "TX" && !BuildConfig.DEBUG) {
+            // Typed input includes passwords, and diagnostics end up in copied logs and problem reports.
+            "SHELL-DIAG $direction#$seq bytes=$size"
+        } else {
+            val previewSize = minOf(size, SHELL_DIAG_PREVIEW_BYTES)
+            val hex = payload.toHexPreview(previewSize)
+            val ascii = payload.toAsciiPreview(previewSize)
+            val truncated = if (size > previewSize) " (+${size - previewSize} bytes)" else ""
+            "SHELL-DIAG $direction#$seq bytes=$size hex=$hex ascii=\"$ascii\"$truncated"
+        }
         SessionLogBus.emit(
             SessionLogBus.Entry(
                 hostId = hostId,
@@ -4365,6 +4366,9 @@ class SessionService : Service() {
         private const val DEFAULT_SHELL_ROWS = 40
         private const val MAX_RECONNECT_ATTEMPTS = 8
         private const val MAX_EDITABLE_FILE_BYTES = 1024L * 1024L
+        /** How long to keep reading a background command's output after it ran (or timed out). */
+        private const val REMOTE_OUTPUT_DRAIN_MS = 2_000L
+        private const val MAX_OS_VERSION_LABEL_LENGTH = 32
         private const val PARTIAL_DOWNLOAD_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         // Attach to (or create) tmux session "sshpeaches"; without tmux, fall back to the login shell.
         // Wrapped in sh -c so it works whatever the user's login shell is (fish included).

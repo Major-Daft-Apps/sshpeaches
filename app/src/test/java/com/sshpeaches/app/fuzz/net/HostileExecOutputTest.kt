@@ -107,9 +107,9 @@ class HostileExecOutputTest {
         assertTrue("report for a ${message.length}-char mosh failure took ${elapsed}ms on the caller's (main) thread", elapsed < 500)
     }
 
-    /** runRemoteCommand reads the whole exec output with readText(); size it before parsing. */
+    /** runRemoteCommand keeps at most REMOTE_COMMAND_OUTPUT_LIMIT bytes, however much the server sends. */
     @Test
-    fun remoteCommandOutputReachesTheParserInFull() {
+    fun remoteCommandOutputIsCutAtTheLimit() {
         val chunk = "BEGIN_FREE\n".repeat(1024).toByteArray()
         val (service, ssh) = connect { _, stdout, _ ->
             repeat(96) { stdout.write(chunk) }
@@ -120,6 +120,6 @@ class HostileExecOutputTest {
         )
         method.isAccessible = true
         val raw = Fuzz.withinMillis(20_000, "runRemoteCommand") { method.invoke(service, ssh, "info", 8L) as String? }
-        assertEquals(96 * chunk.size, raw?.length ?: -1)
+        assertEquals(com.majordaftapps.sshpeaches.app.service.REMOTE_COMMAND_OUTPUT_LIMIT, raw?.length ?: -1)
     }
 }

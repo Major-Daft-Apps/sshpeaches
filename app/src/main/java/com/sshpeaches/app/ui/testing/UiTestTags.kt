@@ -218,6 +218,7 @@ object UiTestTags {
     const val SETTINGS_EXPORT_SHARE_BUTTON = "settings_export_share_button"
     const val SETTINGS_INCOMING_IMPORT_DIALOG = "settings_incoming_import_dialog"
     const val SETTINGS_INCOMING_IMPORT_CONFIRM = "settings_incoming_import_confirm"
+    const val SETTINGS_IMPORT_KEYBOARD_LAYOUT_CHECKBOX = "settings_import_keyboard_layout_checkbox"
     const val SETTINGS_IMPORT_WIFI_BUTTON = "settings_import_wifi_button"
     const val SETTINGS_TRANSFER_METHOD_DIALOG = "settings_transfer_method_dialog"
     const val SETTINGS_WIFI_SEND_DIALOG = "settings_wifi_send_dialog"

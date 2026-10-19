@@ -90,6 +90,9 @@ class WifiTransferTest {
             served.get(60, TimeUnit.SECONDS)
             pool.shutdown()
         }
+        // Nothing is applied until the user has reviewed what the transfer holds.
+        waitForTag(UiTestTags.SETTINGS_INCOMING_IMPORT_DIALOG, timeoutMs = 20_000)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCOMING_IMPORT_CONFIRM).performClick()
         composeRule.waitUntil(30_000) {
             composeRule.onAllNodesWithText("Import complete", substring = true).fetchSemanticsNodes().isNotEmpty()
         }

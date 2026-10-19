@@ -100,9 +100,8 @@ import com.majordaftapps.sshpeaches.app.util.IdentityKeyAlgorithm
 import com.majordaftapps.sshpeaches.app.util.IdentityKeyGenerationSpec
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
+import com.majordaftapps.sshpeaches.app.util.sshKeyTextFingerprint
 import com.majordaftapps.sshpeaches.app.util.isValidFingerprint
-import java.security.MessageDigest
-import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -241,7 +240,7 @@ fun IdentitiesScreen(
             // Document providers can be slow (cloud storage), so read off the main thread.
             val keyText = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    context.contentResolver.openInputStream(uri)?.use(::readKeyFile)
                 }.getOrNull()
             }
             if (keyText.isNullOrBlank()) {
@@ -281,13 +280,17 @@ fun IdentitiesScreen(
                 onShowMessage("Invalid key format")
                 return@launch
             }
-            val success = onImportIdentityKeyPlain(targetId, sanitized)
-            if (success) {
-                val comment = items.firstOrNull { it.id == targetId }?.label.orEmpty()
-                val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(sanitized, comment).orEmpty()
-                if (derivedPublic.isNotBlank()) {
-                    onStoreIdentityPublicKey(targetId, derivedPublic)
+            val comment = items.firstOrNull { it.id == targetId }?.label.orEmpty()
+            // Parsing a crafted key can take a while: keep it off the main thread.
+            val success = withContext(Dispatchers.Default) {
+                val imported = onImportIdentityKeyPlain(targetId, sanitized)
+                if (imported) {
+                    val derivedPublic = SshKeyGenerator.derivePublicKeyFromPrivate(sanitized, comment).orEmpty()
+                    if (derivedPublic.isNotBlank()) {
+                        onStoreIdentityPublicKey(targetId, derivedPublic)
+                    }
                 }
+                imported
             }
             onShowMessage(if (success) "Private key imported" else "Failed to import key")
         }
@@ -1569,7 +1572,7 @@ fun IdentitiesScreen(
                             importPassphraseError.value = if (SecurityManager.isLocked()) {
                                 "Unlock the app, then import again."
                             } else {
-                                "Incorrect passphrase, or the payload is damaged."
+                                "Incorrect passphrase, the payload is damaged, or the key doesn't match this identity."
                             }
                         }
                     }
@@ -1677,10 +1680,24 @@ private fun HostConnection.copyKeyDestinationLabel(): String {
     return "$displayName (${username.trim()}@${host.trim()})"
 }
 
+// Far above any real key file (a 16384-bit RSA key is about 13 KB).
+private const val MAX_KEY_FILE_BYTES = 1024 * 1024
+
+/** A key file's text, or null when it's too large to be a key. */
+private fun readKeyFile(input: java.io.InputStream): String? {
+    val buffer = java.io.ByteArrayOutputStream()
+    val chunk = ByteArray(16 * 1024)
+    while (true) {
+        val read = input.read(chunk)
+        if (read < 0) break
+        buffer.write(chunk, 0, read)
+        if (buffer.size() > MAX_KEY_FILE_BYTES) return null
+    }
+    return buffer.toString(Charsets.UTF_8.name())
+}
+
 private fun computeFingerprintFromKeyMaterial(keyText: String): String {
     val publicFingerprint = computeSshPublicKeyFingerprint(keyText)
     if (!publicFingerprint.isNullOrBlank()) return publicFingerprint
-    val digest = MessageDigest.getInstance("SHA-256").digest(keyText.toByteArray())
-    val encoded = Base64.getEncoder().withoutPadding().encodeToString(digest)
-    return "SHA256:$encoded"
+    return sshKeyTextFingerprint(keyText)
 }
