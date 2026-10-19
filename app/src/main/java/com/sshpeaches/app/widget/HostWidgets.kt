@@ -206,15 +206,15 @@ internal object HostWidgets {
         row.setTextViewText(R.id.widget_host_subtitle, endpoint)
         row.setContentDescription(
             R.id.widget_btn_ssh,
-            context.getString(R.string.widget_action_ssh_for_host, title, endpoint)
+            context.widgetLabel(R.string.widget_action_ssh_for_host, title, endpoint)
         )
         row.setContentDescription(
             R.id.widget_btn_upload,
-            context.getString(R.string.widget_action_upload_for_host, title, endpoint)
+            context.widgetLabel(R.string.widget_action_upload_for_host, title, endpoint)
         )
         row.setContentDescription(
             R.id.widget_btn_download,
-            context.getString(R.string.widget_action_download_for_host, title, endpoint)
+            context.widgetLabel(R.string.widget_action_download_for_host, title, endpoint)
         )
         row.setOnClickPendingIntent(
             R.id.widget_btn_ssh,
@@ -241,6 +241,14 @@ internal object HostWidgets {
         return row
     }
 
+    /**
+     * A formatted accessibility label that can't take the widget down. Right after the 0.11.7 update one phone ran the
+     * new code against the previous version's strings ("Open %1$s. %2$s", given one argument), and every widget update
+     * crashed with MissingFormatArgumentException until the update settled.
+     */
+    private fun Context.widgetLabel(@androidx.annotation.StringRes id: Int, vararg args: String): String =
+        runCatching { getString(id, *args) }.getOrElse { args.filter(String::isNotBlank).joinToString(", ") }
+
     internal fun buildOpenSessionRow(
         context: Context,
         session: WidgetSessionStore.WidgetOpenSession
@@ -261,12 +269,12 @@ internal object HostWidgets {
         )
         val openIntent = createOpenPendingIntent(context, session.sessionId)
         val label = listOf(session.title, session.subtitle).filter { it.isNotBlank() }.joinToString(". ")
-        val openDescription = context.getString(R.string.widget_action_open_session_details, label)
+        val openDescription = context.widgetLabel(R.string.widget_action_open_session_details, label)
         row.setContentDescription(R.id.widget_open_session_identity, openDescription)
         row.setContentDescription(R.id.widget_btn_open, openDescription)
         row.setContentDescription(
             R.id.widget_btn_disconnect,
-            context.getString(R.string.widget_action_disconnect_session_details, label)
+            context.widgetLabel(R.string.widget_action_disconnect_session_details, label)
         )
         row.setOnClickPendingIntent(R.id.widget_open_session_identity, openIntent)
         row.setOnClickPendingIntent(R.id.widget_btn_open, openIntent)
