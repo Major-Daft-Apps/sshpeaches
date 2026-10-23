@@ -44,6 +44,16 @@ class ConnectionFailureKindTest {
     }
 
     @Test
+    fun sshjTimeoutsWaitingForTheServerAreNetworkFailures() {
+        // What 0.11.7 reported from reconnects in the background: key exchange, login and opening the shell timing
+        // out. They must be retried like a socket timeout, not end the session as an unknown error.
+        val timeout = java.util.concurrent.TimeoutException("Timeout expired: 30000 MILLISECONDS")
+        assertEquals(ConnectionFailureKind.UNREACHABLE, TransportException(timeout).connectionFailureKind())
+        assertEquals(ConnectionFailureKind.UNREACHABLE, ConnectionException(timeout).connectionFailureKind())
+        assertTrue(TransportException(timeout).connectionFailureKind()!!.isNetwork)
+    }
+
+    @Test
     fun classifiesSocketAndDnsFailuresBySpecificCause() {
         mapOf(
             UnknownHostException("unknown host") to ConnectionFailureKind.UNKNOWN_HOST,

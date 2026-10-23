@@ -88,7 +88,11 @@ private fun Throwable.networkFailureKind(): ConnectionFailureKind? = when (this)
             ConnectionFailureKind.UNREACHABLE
         }
     is NoRouteToHostException,
-    is SocketTimeoutException -> ConnectionFailureKind.UNREACHABLE
+    is SocketTimeoutException,
+    // SSHJ's own wait for a reply (key exchange, login, opening a channel), wrapped in a TransportException or
+    // ConnectionException: the server stopped answering. Unclassified, it ended a reconnect after one try (and was
+    // reported as a crash) when the network was only slow or asleep. The app's prompt timeouts are a different type.
+    is java.util.concurrent.TimeoutException -> ConnectionFailureKind.UNREACHABLE
     is SocketException -> ConnectionFailureKind.NETWORK
     // SSHClient.checkConnected(): the transport died between connecting and logging in or opening the shell.
     is IllegalStateException -> if (message == "Not connected") ConnectionFailureKind.NETWORK else null

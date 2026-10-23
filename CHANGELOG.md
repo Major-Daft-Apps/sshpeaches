@@ -4,6 +4,8 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+- A reconnect that times out waiting for the server (a slow or sleeping network, often in the background) tries again instead of ending the session after one or two attempts, and is no longer sent as a crash report.
+
 ## 0.11.8 (1108)
 
 Release date: 2026-10-19
