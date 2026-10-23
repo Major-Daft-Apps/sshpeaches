@@ -54,6 +54,13 @@ class ConnectionFailureKindTest {
     }
 
     @Test
+    fun aConnectionClosedBeforeTheServerBannerIsANetworkFailure() {
+        val closed = TransportException("Server closed connection during identification exchange")
+        assertEquals(ConnectionFailureKind.NETWORK, closed.connectionFailureKind())
+        assertNull(TransportException("Something else went wrong").connectionFailureKind())
+    }
+
+    @Test
     fun classifiesSocketAndDnsFailuresBySpecificCause() {
         mapOf(
             UnknownHostException("unknown host") to ConnectionFailureKind.UNKNOWN_HOST,

@@ -155,6 +155,9 @@ class SessionService : Service() {
     private val remoteDirectoriesState = remoteDirectories.asStateFlow()
     private val fileTransferProgressState = fileTransferProgress.asStateFlow()
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
+    /** When each shell last sent anything, for [checkUnansweredInput]. */
+    private val lastShellOutputAtMs = ConcurrentHashMap<String, Long>()
+    private val unansweredInputChecks = ConcurrentHashMap<String, Job>()
     private val shellReadSequence = ConcurrentHashMap<String, Int>()
     private val shellWriteSequence = ConcurrentHashMap<String, Int>()
     private val pendingShellOutputChunks = ConcurrentHashMap<String, StringBuilder>()
@@ -929,38 +932,59 @@ class SessionService : Service() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastLivenessCheckAtMs < LIVENESS_CHECK_MIN_INTERVAL_MS) return
         lastLivenessCheckAtMs = now
-        activeConnections.forEach { (sessionId, connection) ->
-            val client = connection.client ?: return@forEach
-            if (connection.mode != ConnectionMode.SSH || connection.shellBinding == null) return@forEach
-            if (sessionId in reconnectingSessions) return@forEach
-            serviceScope.launch {
-                val alive = withTimeoutOrNull(LIVENESS_PROBE_TIMEOUT_MS) {
-                    // Sending can block on the transport's write lock, so it runs apart and the timeout covers it.
-                    val reply = CompletableDeferred<Promise<SSHPacket, ConnectionException>?>()
-                    launch(Dispatchers.IO) {
-                        reply.complete(
-                            runCatching {
-                                client.connection.sendGlobalRequest("keepalive@openssh.com", true, ByteArray(0))
-                            }.getOrNull()
-                        )
-                    }
-                    val promise = reply.await() ?: return@withTimeoutOrNull false
-                    // Polled rather than awaited: SSHJ logs an error when an awaited request is refused, and
-                    // OpenSSH refuses keepalives. Once fulfilled, retrieve() returns or throws without waiting.
-                    while (!promise.isFulfilled) delay(LIVENESS_PROBE_POLL_MS)
-                    runCatching { promise.retrieve() }
-                        .fold(onSuccess = { true }, onFailure = ::isGlobalRequestRefusal)
-                } ?: false
-                if (alive || activeConnections[sessionId]?.client !== client) return@launch
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = sessionId,
-                        level = SessionLogBus.LogLevel.WARN,
-                        message = "The server stopped responding."
+        activeConnections.keys.forEach(::probeConnection)
+    }
+
+    /**
+     * Typing into a connection that died silently went nowhere until the keepalive gave up, over a minute later. A
+     * shell answers input at once (the echo, a new prompt), so when nothing at all comes back within
+     * [UNANSWERED_INPUT_GRACE_MS], the connection is probed; one that doesn't answer reconnects. Input that gets no
+     * echo (a password prompt) costs one small request the server answers.
+     */
+    private fun checkUnansweredInput(sessionId: String) {
+        if (sessionId in reconnectingSessions) return
+        if (unansweredInputChecks[sessionId]?.isActive == true) return
+        val sentAt = SystemClock.elapsedRealtime()
+        unansweredInputChecks[sessionId] = serviceScope.launch {
+            delay(UNANSWERED_INPUT_GRACE_MS)
+            if ((lastShellOutputAtMs[sessionId] ?: Long.MIN_VALUE) >= sentAt) return@launch
+            probeConnection(sessionId)
+        }
+    }
+
+    /** Pings one open SSH shell's server, and drops the connection if it doesn't answer. */
+    private fun probeConnection(sessionId: String) {
+        val connection = activeConnections[sessionId] ?: return
+        val client = connection.client ?: return
+        if (connection.mode != ConnectionMode.SSH || connection.shellBinding == null) return
+        if (sessionId in reconnectingSessions) return
+        serviceScope.launch {
+            val alive = withTimeoutOrNull(LIVENESS_PROBE_TIMEOUT_MS) {
+                // Sending can block on the transport's write lock, so it runs apart and the timeout covers it.
+                val reply = CompletableDeferred<Promise<SSHPacket, ConnectionException>?>()
+                launch(Dispatchers.IO) {
+                    reply.complete(
+                        runCatching {
+                            client.connection.sendGlobalRequest("keepalive@openssh.com", true, ByteArray(0))
+                        }.getOrNull()
                     )
+                }
+                val promise = reply.await() ?: return@withTimeoutOrNull false
+                // Polled rather than awaited: SSHJ logs an error when an awaited request is refused, and
+                // OpenSSH refuses keepalives. Once fulfilled, retrieve() returns or throws without waiting.
+                while (!promise.isFulfilled) delay(LIVENESS_PROBE_POLL_MS)
+                runCatching { promise.retrieve() }
+                    .fold(onSuccess = { true }, onFailure = ::isGlobalRequestRefusal)
+            } ?: false
+            if (alive || activeConnections[sessionId]?.client !== client) return@launch
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.WARN,
+                    message = "The server stopped responding."
                 )
-                dropDeadConnection(client)
-            }
+            )
+            dropDeadConnection(client)
         }
     }
 
@@ -1157,7 +1181,9 @@ class SessionService : Service() {
             UiDebugLog.result("sendShellBytes", false, "shell-not-available hostId=$hostId")
             return
         }
-        if (!shellBinding.inputQueue.trySend(bytes.copyOf()).isSuccess) {
+        if (shellBinding.inputQueue.trySend(bytes.copyOf()).isSuccess) {
+            checkUnansweredInput(hostId)
+        } else {
             UiDebugLog.result("sendShellBytes", false, "input-queue-closed hostId=$hostId")
             SessionLogBus.emit(
                 SessionLogBus.Entry(
@@ -3707,6 +3733,7 @@ class SessionService : Service() {
                 return@launch
             }
             if (read == 0) continue
+            lastShellOutputAtMs[hostId] = SystemClock.elapsedRealtime()
 
             val payload = buffer.copyOf(read)
             outputProcessor.process(payload)
@@ -3821,6 +3848,8 @@ class SessionService : Service() {
     }
 
     private fun clearShellOutputForHost(hostId: String) {
+        unansweredInputChecks.remove(hostId)?.cancel()
+        lastShellOutputAtMs.remove(hostId)
         shellOutputPublishJobs.remove(hostId)?.cancel()
         moshTranscriptPublishJobs.remove(hostId)?.cancel()
         pendingShellSnapshots.remove(hostId)
@@ -4388,6 +4417,7 @@ class SessionService : Service() {
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
         private const val LIVENESS_PROBE_TIMEOUT_MS = 5_000L
+        private const val UNANSWERED_INPUT_GRACE_MS = 3_000L
         private const val LIVENESS_PROBE_POLL_MS = 50L
         private const val LIVENESS_CHECK_MIN_INTERVAL_MS = 2_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L

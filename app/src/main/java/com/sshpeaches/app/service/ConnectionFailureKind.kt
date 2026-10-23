@@ -96,6 +96,10 @@ private fun Throwable.networkFailureKind(): ConnectionFailureKind? = when (this)
     is SocketException -> ConnectionFailureKind.NETWORK
     // SSHClient.checkConnected(): the transport died between connecting and logging in or opening the shell.
     is IllegalStateException -> if (message == "Not connected") ConnectionFailureKind.NETWORK else null
+    // The connection closed before the server sent its SSH banner: mobile networks and middleboxes drop connections
+    // like this, and so does a server or load balancer that is restarting. Unclassified, a reconnect gave up at once.
+    is TransportException ->
+        if (message == "Server closed connection during identification exchange") ConnectionFailureKind.NETWORK else null
     else -> null
 }
 
