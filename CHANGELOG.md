@@ -11,6 +11,7 @@ Release date: 2026-10-23
 - A reconnect that times out waiting for the server (a slow or sleeping network, often in the background) tries again instead of ending the session after one or two attempts, and is no longer sent as a crash report.
 - A reconnect whose connection is closed before the server answers ("Server closed connection during identification exchange", common on mobile networks and while a server restarts) tries again instead of failing at once.
 - A connection that dies silently is noticed within seconds of typing: when nothing comes back from the server for 3 seconds after a key, the app checks the connection and reconnects if it's gone. It used to take over a minute, with every key going nowhere.
+- Closing a Mosh session, or one whose Mosh client stopped, ends its mosh-server again on servers whose `ps` has no `-p` option (busybox: Alpine, many routers and NAS boxes). 0.11.8's check that the process was still mosh-server always failed there, so the server was left running.
 
 ## 0.11.8 (1108)
 

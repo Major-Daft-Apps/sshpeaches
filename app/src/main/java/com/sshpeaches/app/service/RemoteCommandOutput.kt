@@ -51,6 +51,10 @@ internal fun collectCommandOutput(
 /**
  * Stops the mosh-server started with [pid], if that is still what runs under it: this runs at close and before a
  * restart, maybe long after the server exited, and a reused pid could belong to any of the user's processes.
+ * The name comes from /proc (Linux, including busybox, whose ps has no -p), else `ps -p` (macOS, BSD), else a scan
+ * of plain `ps` output.
  */
 internal fun moshServerStopCommand(pid: Int): String =
-    "case \"$(ps -p $pid -o comm= 2>/dev/null)\" in *mosh-server*) kill $pid 2>/dev/null;; esac"
+    "c=\"$(cat /proc/$pid/comm 2>/dev/null || ps -p $pid -o comm= 2>/dev/null || " +
+        "ps -o pid,comm 2>/dev/null | awk '\$1 == $pid { print \$2 }')\"; " +
+        "case \"\$c\" in *mosh-server*) kill $pid 2>/dev/null;; esac"
