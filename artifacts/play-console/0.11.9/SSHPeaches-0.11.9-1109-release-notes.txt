@@ -2,4 +2,5 @@ What's new in 0.11.9
 
 - On a bad connection, a session that stopped responding is noticed within seconds of typing and reconnects, instead of over a minute later.
 - Reconnects keep trying when the server is slow to answer or drops the connection before logging in, instead of giving up.
+- Closing a Mosh session stops the server's mosh-server again on servers like Alpine.
 - Fewer false crash reports from reconnects in the background.
