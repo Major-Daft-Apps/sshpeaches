@@ -80,7 +80,7 @@ class SftpResumableDownloadSshdTest {
             } catch (_: IOException) {
             }
         }
-        assertTrue("partial data kept after a failure", partial.dataFile.exists())
+        assertTrue("partial data kept after a failure", partial.dataFile!!.exists())
 
         val resumedFrom = AtomicLong(-1)
         val firstReport = AtomicLong(-1)
@@ -100,7 +100,7 @@ class SftpResumableDownloadSshdTest {
         }
         assertTrue("resumed from a saved position, got ${resumedFrom.get()}", resumedFrom.get() > 0L)
         assertTrue("progress continues from the resumed bytes", firstReport.get() > resumedFrom.get())
-        assertArrayEquals(payload, partial.dataFile.readBytes())
+        assertArrayEquals(payload, partial.dataFile!!.readBytes())
     }
 
     @Test
@@ -125,7 +125,7 @@ class SftpResumableDownloadSshdTest {
             SftpResumableDownloader.download(sftp, "/video.mp4", partial, settings, onResume = { _, _ -> resumed = true })
         }
         assertFalse(resumed)
-        assertArrayEquals(changed, partial.dataFile.readBytes())
+        assertArrayEquals(changed, partial.dataFile!!.readBytes())
     }
 
     @Test
@@ -141,7 +141,7 @@ class SftpResumableDownloadSshdTest {
                 )
             }
         }
-        assertFalse(partial.dataFile.exists())
+        assertFalse(partial.dataFile!!.exists())
     }
 
     private companion object {

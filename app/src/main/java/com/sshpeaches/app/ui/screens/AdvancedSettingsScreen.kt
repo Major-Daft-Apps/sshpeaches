@@ -86,9 +86,9 @@ fun AdvancedSettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("SFTP downloads", style = MaterialTheme.typography.titleMedium)
+                    Text("SFTP transfers", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Keep many read requests in flight so high-latency links stay busy. Larger chunks mean fewer round trips; parallel downloads share the existing session.",
+                        "Each transfer splits the file into chunks and moves them over several connections of its own, so browsing never waits for it. Keeping requests in flight keeps high-latency links busy.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(
@@ -106,7 +106,7 @@ fun AdvancedSettingsScreen(
                         },
                         label = { Text("Read size") },
                         supportingText = {
-                            Text("Bytes per SFTP read (--sftp-read-size). Default 262144 (256 KiB).")
+                            Text("Bytes per SFTP read (--sftp-read-size). Default 261120 (255 KiB), the most OpenSSH sends.")
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -127,9 +127,9 @@ fun AdvancedSettingsScreen(
                             sftpMaxRequestsState.value = clamped.toString()
                             onSftpMaxRequestsChange(clamped)
                         },
-                        label = { Text("Outstanding requests") },
+                        label = { Text("Requests in flight") },
                         supportingText = {
-                            Text("SFTP reads kept in flight (--sftp-max-requests). Default 128.")
+                            Text("Reads each connection keeps in flight, up to 8 MiB (--sftp-max-requests). Default 32.")
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -150,9 +150,9 @@ fun AdvancedSettingsScreen(
                             parallelDownloadsState.value = clamped.toString()
                             onParallelDownloadsChange(clamped)
                         },
-                        label = { Text("Parallel downloads") },
+                        label = { Text("Connections per transfer") },
                         supportingText = {
-                            Text("Concurrent file transfers on one session (--parallel-downloads). Default 4.")
+                            Text("Connections a download or upload uses at once (--parallel-downloads). Default 4.")
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -162,7 +162,7 @@ fun AdvancedSettingsScreen(
                     )
                     AdvancedSettingsToggleRow(
                         title = "Fast SFTP preset",
-                        description = "Apply --sftp-fast: 262144-byte reads, 128 outstanding requests, 4 parallel downloads.",
+                        description = "Apply --sftp-fast: 261120-byte reads, 32 requests in flight, 4 connections per transfer.",
                         checked = sftpTransferSettings.sftpFast,
                         onCheckedChange = { enabled ->
                             if (enabled) onApplySftpFastPreset()

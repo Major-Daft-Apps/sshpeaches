@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.hierynomus.sshj.key.BaseKeyAlgorithm
 import com.hierynomus.sshj.key.KeyAlgorithm
+import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import java.io.File
 import java.math.BigInteger
@@ -98,6 +99,27 @@ object SshClientProvider {
             onHostKeyPrompt = onHostKeyPrompt,
             keyExchangeAvailability = testJcaAlgorithmAvailability(testingUnavailableKeyExchangeAlgorithms)
         )
+    }
+
+    /**
+     * Loads and sets up the SSH and crypto classes before the first connection needs them: on a cold start that took
+     * over a second, all of it before the first byte went to the server. Builds a client without connecting.
+     */
+    fun warmUp(context: Context) {
+        runCatching {
+            createClient(
+                context = context,
+                host = HostConnection(
+                    id = "warm-up",
+                    name = "warm-up",
+                    host = "localhost",
+                    username = "warm-up",
+                    preferredAuth = AuthMethod.PASSWORD
+                ),
+                autoTrustUnknownHostKey = false
+            ).close()
+            KeyPairGenerator.getInstance("X25519").generateKeyPair()
+        }
     }
 
     internal fun setTestingUnavailableKeyExchangeAlgorithms(

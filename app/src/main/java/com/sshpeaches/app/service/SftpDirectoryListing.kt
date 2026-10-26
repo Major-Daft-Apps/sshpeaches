@@ -39,8 +39,7 @@ internal fun loadSftpDirectory(
         .asSequence()
         .filterNot { it.name == "." || it.name == ".." }
         .map { item ->
-            val attributes = item.attributes
-            val isSymbolicLink = attributes.type == FileMode.Type.SYMLINK
+            val isSymbolicLink = item.attributes.type == FileMode.Type.SYMLINK
             val linkTargetPath = if (isSymbolicLink && resolveSymbolicLinks) {
                 runCatching { canonicalize(item.path) }.getOrNull()
             } else {
@@ -49,28 +48,42 @@ internal fun loadSftpDirectory(
             val linkTargetAttributes = linkTargetPath?.let { targetPath ->
                 runCatching { stat(targetPath) }.getOrNull()
             }
-            RemoteDirectoryEntry(
-                name = item.name,
-                isDirectory = item.isDirectory(),
-                sizeBytes = attributes.size,
-                absolutePath = item.path,
-                modifiedAtEpochMillis = attributes
-                    .takeIf { it.has(FileAttributes.Flag.ACMODTIME) }
-                    ?.mtime
-                    ?.times(1000L),
-                permissionSummary = buildPermissionSummary(attributes),
-                isSymbolicLink = isSymbolicLink,
-                linkTargetPath = linkTargetPath,
-                linkTargetIsDirectory =
-                    linkTargetAttributes?.type == FileMode.Type.DIRECTORY,
-                isBrokenLink =
-                    isSymbolicLink && resolveSymbolicLinks && linkTargetPath == null
-            )
+            remoteDirectoryEntry(item, resolveSymbolicLinks, linkTargetPath, linkTargetAttributes)
         }
         .sortedWith(REMOTE_DIRECTORY_ENTRY_COMPARATOR)
         .toList()
     return LoadedSftpDirectory(path = resolvedPath, entries = entries)
 }
+
+internal fun remoteDirectoryEntry(
+    item: RemoteResourceInfo,
+    resolveSymbolicLinks: Boolean,
+    linkTargetPath: String?,
+    linkTargetAttributes: FileAttributes?
+): RemoteDirectoryEntry {
+    val attributes = item.attributes
+    val isSymbolicLink = attributes.type == FileMode.Type.SYMLINK
+    return RemoteDirectoryEntry(
+        name = item.name,
+        isDirectory = item.isDirectory(),
+        sizeBytes = attributes.size,
+        absolutePath = item.path,
+        modifiedAtEpochMillis = attributes
+            .takeIf { it.has(FileAttributes.Flag.ACMODTIME) }
+            ?.mtime
+            ?.times(1000L),
+        permissionSummary = buildPermissionSummary(attributes),
+        isSymbolicLink = isSymbolicLink,
+        linkTargetPath = linkTargetPath,
+        linkTargetIsDirectory =
+            linkTargetAttributes?.type == FileMode.Type.DIRECTORY,
+        isBrokenLink =
+            isSymbolicLink && resolveSymbolicLinks && linkTargetPath == null
+    )
+}
+
+internal fun List<RemoteDirectoryEntry>.sortedForBrowsing(): List<RemoteDirectoryEntry> =
+    sortedWith(REMOTE_DIRECTORY_ENTRY_COMPARATOR)
 
 private val REMOTE_DIRECTORY_ENTRY_COMPARATOR = Comparator<RemoteDirectoryEntry> { left, right ->
     when {

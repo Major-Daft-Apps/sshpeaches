@@ -53,6 +53,8 @@ Check:
 - Session is still active.
 - For SCP, select source and destination before copy actions.
 
+Transfers log in to the server again, on up to four extra connections (**Settings** -> **Advanced** -> **Connections per transfer**), so browsing never waits for them. If the server refuses a second login (it allows one connection per user, or asks for a one-time code), transfers share the session's own connection instead, and are slower. The session log says when that happens.
+
 ## Background sessions not staying alive
 
 Verify:

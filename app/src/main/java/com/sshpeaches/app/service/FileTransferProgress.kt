@@ -28,7 +28,9 @@ data class FileTransferProgress(
     val hasStarted: Boolean = false,
     val status: FileTransferStatus = FileTransferStatus.ACTIVE,
     val errorMessage: String? = null,
-    val completedAtEpochMillis: Long? = null
+    val completedAtEpochMillis: Long? = null,
+    /** Transfers waiting behind this one in the session's queue. */
+    val queuedTransfers: Int = 0
 ) {
     val isActive: Boolean
         get() = status == FileTransferStatus.ACTIVE
@@ -73,11 +75,12 @@ data class FileTransferProgress(
     fun statusMessage(): String {
         terminalMessage?.let { return it }
         val name = fileName.ifBlank { "file" }
-        return if (!hasStarted) {
+        val status = if (!hasStarted) {
             "$actionLabel $name: transferring..."
         } else {
             "$actionLabel $name: ${progressSummary()}"
         }
+        return if (queuedTransfers > 0) "$status ($queuedTransfers more queued)" else status
     }
 
     fun progressSummary(): String {

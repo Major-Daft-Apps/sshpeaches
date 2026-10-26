@@ -4,6 +4,19 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+Faster file transfers and browsing:
+
+- Downloads and uploads split the file into chunks and move them over up to four connections at once, like a download manager (aria2c, IDM). Measured on the test emulator, a 134 MB download went from about 5 MB/s to 15 MB/s, and uploads from 6.5 to 17 MB/s; at 150 ms latency uploads went from 3 to 12 MB/s. The number of connections is under **Advanced** -> **Connections per transfer**.
+- You can browse, open folders, rename, delete and edit while a file transfers: transfers run on connections of their own. Listing a folder during a download used to wait for the download to finish (27 seconds in the test); now it takes under half a second. In the SFTP console, commands keep working during `get` and `put`.
+- Starting another download or upload while one runs queues it; the progress card says how many are waiting. Cancel stops the running transfer and the queued ones.
+- The file browser downloads and uploads with SFTP instead of SCP, so its transfers resume and use several connections too. A download writes straight into the chosen file instead of the app's cache, so it no longer sits at 100% while the file is copied.
+- A transfer whose connection drops reconnects and carries on from where that chunk stopped, several times before giving up. A connection that stops answering without closing (a dead network) is noticed within 30 seconds instead of hanging the transfer.
+- Folders list faster: the app sends its requests together instead of waiting for each reply, and looks up every symbolic link in one go. A 500-file folder at 150 ms latency lists in 0.7 s instead of 1.7 s.
+- Connecting is faster: the first connection after the app starts no longer spends over a second loading encryption code before contacting the server, a known server OS is no longer looked up again before the session opens, and connection logging stops once you're logged in.
+- Reads ask for 255 KiB, the most OpenSSH's server sends; asking for 256 KiB made every reply come back short and cost a second request.
+- The progress display redraws the screen 4 times a second instead of 10, and the file list is no longer re-sorted on every redraw.
+- If the server refuses a second login (it allows one connection per user, or asks for a one-time code), transfers share the session's connection as before, and the session log says so.
+
 ## 0.11.9 (1109)
 
 Release date: 2026-10-23

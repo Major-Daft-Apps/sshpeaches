@@ -110,7 +110,7 @@ class HostileSftpServerFuzzTest {
             }
         }
         if (outcome.isSuccess) {
-            val saved = partial.dataFile.readBytes()
+            val saved = partial.dataFile!!.readBytes()
             val zeroTail = saved.drop(10_000).all { it == 0.toByte() }
             fail("download succeeded with ${saved.size} bytes; bytes after the 10000 the server sent are ${if (zeroTail) "all zero padding" else "garbage"}")
         }

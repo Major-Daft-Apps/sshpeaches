@@ -164,8 +164,8 @@ class SftpPipelinedDownloaderTest {
     @Test
     fun defaultsMatchRequestedKnobs() {
         val defaults = SftpTransferSettings()
-        assertEquals(262144, defaults.sftpReadSize)
-        assertEquals(128, defaults.sftpMaxRequests)
+        assertEquals(261120, defaults.sftpReadSize)
+        assertEquals(32, defaults.sftpMaxRequests)
         assertEquals(4, defaults.parallelDownloads)
         assertTrue(defaults.sftpFast)
     }
@@ -173,8 +173,8 @@ class SftpPipelinedDownloaderTest {
     @Test
     fun sftpFastPresetSelectsDefaultKnobValues() {
         val fast = SftpTransferSettings.fastPreset()
-        assertEquals(262144, fast.sftpReadSize)
-        assertEquals(128, fast.sftpMaxRequests)
+        assertEquals(261120, fast.sftpReadSize)
+        assertEquals(32, fast.sftpMaxRequests)
         assertEquals(4, fast.parallelDownloads)
         val custom = SftpTransferSettings(
             sftpReadSize = 32,

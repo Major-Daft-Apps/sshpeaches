@@ -1611,9 +1611,9 @@ fun SSHPeachesRoot(
 
             else -> effectiveQuickConnectState
         }
-        val logs = request?.let { current ->
-            sessionLogs.filter { it.hostId == current.sessionId }
-        } ?: emptyList()
+        val logs = remember(sessionLogs, request?.sessionId) {
+            request?.let { current -> sessionLogs.filter { it.hostId == current.sessionId } } ?: emptyList()
+        }
         val shellOutput = request?.let { current ->
             shellOutputs[current.sessionId].orEmpty()
         }.orEmpty()

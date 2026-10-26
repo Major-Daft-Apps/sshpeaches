@@ -28,6 +28,8 @@ interface OutstandingSftpRead {
 
 interface SftpOffsetSink {
     fun writeAt(offset: Long, data: ByteArray)
+    fun writeAt(offset: Long, data: ByteArray, length: Int) =
+        writeAt(offset, if (length == data.size) data else data.copyOf(length))
     fun force() {}
 }
 
@@ -41,14 +43,16 @@ data class SftpByteRange(
         get() = (endExclusive - start).coerceAtLeast(0L)
 }
 
-internal class FileChannelOffsetSink(
+class FileChannelOffsetSink(
     private val channel: FileChannel
 ) : SftpOffsetSink {
     private val writeLock = Any()
 
-    override fun writeAt(offset: Long, data: ByteArray) {
-        if (data.isEmpty()) return
-        val buffer = ByteBuffer.wrap(data)
+    override fun writeAt(offset: Long, data: ByteArray) = writeAt(offset, data, data.size)
+
+    override fun writeAt(offset: Long, data: ByteArray, length: Int) {
+        if (length <= 0) return
+        val buffer = ByteBuffer.wrap(data, 0, length)
         var position = offset
         synchronized(writeLock) {
             while (buffer.hasRemaining()) {

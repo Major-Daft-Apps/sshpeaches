@@ -55,8 +55,8 @@ class SftpPipelinedDownloadSshdTest {
         val connectCount = AtomicInteger(0)
         val authCount = AtomicInteger(0)
         val settings = SftpTransferSettings.fastPreset()
-        assertEquals(262144, settings.sftpReadSize)
-        assertEquals(128, settings.sftpMaxRequests)
+        assertEquals(261120, settings.sftpReadSize)
+        assertEquals(32, settings.sftpMaxRequests)
         assertEquals(4, settings.parallelDownloads)
         assertEquals(
             4,

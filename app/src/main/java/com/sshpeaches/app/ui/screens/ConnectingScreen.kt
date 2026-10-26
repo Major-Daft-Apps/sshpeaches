@@ -418,7 +418,6 @@ fun ConnectingScreen(
     var sftpConsoleRevision by remember(request?.sessionId) { mutableStateOf(0L) }
     var pendingSftpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var pendingSftpUploadBasePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
-    val scpActivityLines = remember(request?.sessionId) { mutableStateListOf<String>() }
     var scpRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf(".") }
     var scpPendingListPath by remember(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpPendingListBaselineToken by remember(request?.sessionId) { mutableStateOf<Long?>(null) }
@@ -530,8 +529,8 @@ fun ConnectingScreen(
         }
     }
 
+    // A tap while a folder is still loading opens the newly tapped one; the service drops the older listing.
     fun browseScpPath(target: String, recordHistory: Boolean = true, clearSelection: Boolean = true, clearStatus: Boolean = true) {
-        if (scpPendingListPath != null) return
         val normalized = target.trim().ifBlank { "." }
         scpRemotePath = normalized
         scpLastListedPath = normalized
@@ -601,14 +600,6 @@ fun ConnectingScreen(
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SFTP
     val showScpTransferSession =
         state.phase == QuickConnectPhase.SUCCESS && request?.mode == ConnectionMode.SCP
-    val scpTransferActive =
-        request?.mode == ConnectionMode.SCP &&
-            activeFileTransfer?.mode == ConnectionMode.SCP &&
-            activeFileTransfer.isActive
-    val sftpTransferActive =
-        request?.mode == ConnectionMode.SFTP &&
-            activeFileTransfer?.mode == ConnectionMode.SFTP &&
-            activeFileTransfer.isActive
     val activeTransferMessage = activeFileTransfer?.statusMessage()
     val userFacingStateMessage = when {
         !activeTransferMessage.isNullOrBlank() -> activeTransferMessage
@@ -846,7 +837,6 @@ fun ConnectingScreen(
         sftpLastRenderedDirectoryKey = ""
         sftpConsoleLines.clear()
         sftpConsoleRevision = 0L
-        scpActivityLines.clear()
         scpPendingListPath = null
         scpPendingListBaselineToken = null
         scpVisibleEntries = emptyList()
@@ -1196,16 +1186,6 @@ fun ConnectingScreen(
             scpPendingLinkPathFallback = null
         }
         scpVisibleEntries = snapshot.entries
-        scpActivityLines.clear()
-        scpActivityLines += "Listing ${snapshot.path}:"
-        if (snapshot.entries.isEmpty()) {
-            scpActivityLines += "(empty)"
-        } else {
-            snapshot.entries.forEach { entry ->
-                val marker = if (entry.isDirectory) "d" else "-"
-                scpActivityLines += "$marker ${entry.sizeBytes} ${entry.name}"
-            }
-        }
         scpPendingListPath = null
         scpPendingListBaselineToken = null
     }
@@ -1226,8 +1206,6 @@ fun ConnectingScreen(
                 scpPendingLinkPathTarget == failedPendingPath && !linkFallback.isNullOrBlank()
             scpPendingListPath = null
             scpPendingListBaselineToken = null
-            scpActivityLines.clear()
-            scpActivityLines += latest
             scpTransferStatus = latest
             when {
                 shouldRestoreManualPath -> {
@@ -1309,17 +1287,6 @@ fun ConnectingScreen(
         sftpConsoleLines.clear()
         sftpConsoleLines.addAll(updated)
         sftpConsoleRevision += 1L
-    }
-
-    fun appendScpActivity(line: String, clearFirst: Boolean = false) {
-        if (clearFirst) {
-            scpActivityLines.clear()
-        }
-        scpActivityLines += line
-        val overflow = scpActivityLines.size - 500
-        if (overflow > 0) {
-            repeat(overflow) { scpActivityLines.removeAt(0) }
-        }
     }
 
     fun resolveRemotePath(current: String, raw: String): String {
@@ -1872,7 +1839,6 @@ fun ConnectingScreen(
                 showScpDeleteDialog = showScpDeleteDialog,
                 onShowScpDeleteDialogChange = { showScpDeleteDialog = it },
                 activeFileTransfer = activeFileTransfer,
-                scpTransferActive = scpTransferActive,
                 context = context,
                 hideKeyboard = { keyboardController?.hide() },
                 onCopyRemotePath = { clipboardManager.setText(AnnotatedString(it)) },
@@ -1894,7 +1860,6 @@ fun ConnectingScreen(
                 logs = logs,
                 context = context,
                 activeFileTransfer = activeFileTransfer,
-                sftpTransferActive = sftpTransferActive,
                 sftpTransferStatus = sftpTransferStatus,
                 sftpPath = sftpPath,
                 onSftpPathChange = { sftpPath = it },
@@ -2803,7 +2768,6 @@ private fun ConnectingScpContent(
     showScpDeleteDialog: Boolean,
     onShowScpDeleteDialogChange: (Boolean) -> Unit,
     activeFileTransfer: FileTransferProgress?,
-    scpTransferActive: Boolean,
     context: Context,
     hideKeyboard: () -> Unit,
     onCopyRemotePath: (String) -> Unit,
@@ -2827,18 +2791,19 @@ private fun ConnectingScpContent(
     var foldersFirst by rememberSaveable(sessionId) { mutableStateOf(true) }
     val sortField = RemoteFileSortField.entries.firstOrNull { it.name == sortFieldName }
         ?: RemoteFileSortField.NAME
-    val remoteItems = sortRemoteDirectoryEntries(
-        entries = (remoteDirectory?.entries ?: scpVisibleEntries).let { entries ->
-            if (showHiddenFiles) entries else entries.filterNot { it.name.startsWith(".") }
-        },
-        field = sortField,
-        ascending = sortAscending,
-        foldersFirst = foldersFirst
-    )
+    val sourceEntries = remoteDirectory?.entries ?: scpVisibleEntries
+    val remoteItems = remember(sourceEntries, showHiddenFiles, sortField, sortAscending, foldersFirst) {
+        sortRemoteDirectoryEntries(
+            entries = if (showHiddenFiles) sourceEntries else sourceEntries.filterNot { it.name.startsWith(".") },
+            field = sortField,
+            ascending = sortAscending,
+            foldersFirst = foldersFirst
+        )
+    }
     val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
     val scpListingInProgress = scpPendingListPath != null
-    val canGoBack = scpPathHistoryIndex > 0 && !scpListingInProgress
-    val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex && !scpListingInProgress
+    val canGoBack = scpPathHistoryIndex > 0
+    val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex
     val colorScheme = MaterialTheme.colorScheme
     val entryPathFor: (RemoteDirectoryEntry) -> String = { entry ->
         entry.absolutePath.ifBlank { resolveChildPath(effectiveRemotePath, entry.name) }
@@ -2855,11 +2820,11 @@ private fun ConnectingScpContent(
         pendingUploadDestination.isNotBlank() &&
             parentPath(pendingUploadDestination.trim()).trimEnd('/').ifBlank { "/" } ==
             effectiveRemotePath.trimEnd('/').ifBlank { "/" }
+    // Transfers run on connections of their own and queue behind each other, so nothing here waits for them.
     val canDownloadSelected = selectedEntry != null &&
         !selectedEntry.isDirectory &&
-        !scpTransferActive &&
         !scpListingInProgress
-    val canMutateSelection = selectedEntry != null && !scpTransferActive && !scpListingInProgress
+    val canMutateSelection = selectedEntry != null && !scpListingInProgress
     val deleteProtectedSelection = selectedEntry != null &&
         isProtectedRemoteSystemDirectory(
             path = selectedPath,
@@ -2867,8 +2832,7 @@ private fun ConnectingScpContent(
         )
     val canMoveSelection = canMutateSelection && !deleteProtectedSelection
     val canDeleteSelection = canMutateSelection && !deleteProtectedSelection
-    val canChooseUploadSource = !scpTransferActive &&
-        !scpListingInProgress
+    val canChooseUploadSource = !scpListingInProgress
     val pendingScpDownloadRemotePathForResult =
         rememberSaveable(sessionId) { mutableStateOf(pendingScpDownloadRemotePath) }
     val scpDownloadDocumentPicker =
@@ -2905,7 +2869,6 @@ private fun ConnectingScpContent(
         }
 
     fun submitScpPathJump() {
-        if (scpListingInProgress) return
         val targetPath = scpRemotePath.trim().ifBlank { "." }
         hideKeyboard()
         if (targetPath == effectiveRemotePath) {
@@ -2978,25 +2941,22 @@ private fun ConnectingScpContent(
                 )
                 FileBrowserToolbarButton(
                     onClick = { browseScpPath(parentPath(effectiveRemotePath), true, true, true) },
-                    enabled = !scpListingInProgress,
                     imageVector = Icons.Default.ArrowUpward,
                     contentDescription = "Up",
-                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface
+                    tint = colorScheme.onSurface
                 )
                 FileBrowserToolbarButton(
                     onClick = { browseScpPath(scpHomePath ?: ".", true, true, true) },
-                    enabled = !scpListingInProgress,
                     imageVector = Icons.Default.Home,
                     contentDescription = "Home",
-                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface,
+                    tint = colorScheme.onSurface,
                     modifier = Modifier.testTag(UiTestTags.connectingScpAction("home"))
                 )
                 FileBrowserToolbarButton(
                     onClick = { browseScpPath(effectiveRemotePath, false, true, true) },
-                    enabled = !scpListingInProgress,
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
-                    tint = if (scpListingInProgress) colorScheme.onSurfaceVariant else colorScheme.onSurface,
+                    tint = colorScheme.onSurface,
                     modifier = Modifier.testTag(UiTestTags.connectingScpAction("refresh"))
                 )
                 Spacer(modifier = Modifier.weight(1f))
@@ -3130,7 +3090,7 @@ private fun ConnectingScpContent(
                         )
                         DropdownMenuItem(
                             text = { Text("Edit") },
-                            enabled = selectedEntry != null && !selectedEntry.isDirectory && !scpTransferActive,
+                            enabled = selectedEntry != null && !selectedEntry.isDirectory,
                             onClick = {
                                 onScpActionsExpandedChange(false)
                                 editorPath = selectedPath
@@ -3168,7 +3128,7 @@ private fun ConnectingScpContent(
                         )
                         DropdownMenuItem(
                             text = { Text("New folder") },
-                            enabled = !scpTransferActive && !scpListingInProgress,
+                            enabled = !scpListingInProgress,
                             onClick = {
                                 onScpActionsExpandedChange(false)
                                 onScpNewFolderValueChange("")
@@ -3187,7 +3147,6 @@ private fun ConnectingScpContent(
                 .fillMaxWidth()
                 .testTag(UiTestTags.CONNECTING_SCP_REMOTE_DIR_INPUT),
             singleLine = true,
-            enabled = !scpListingInProgress,
             textStyle = MaterialTheme.typography.bodyMedium,
             placeholder = { Text("Remote path", style = MaterialTheme.typography.bodyMedium) },
             keyboardOptions = KeyboardOptions(
@@ -3198,14 +3157,14 @@ private fun ConnectingScpContent(
             ),
             keyboardActions = KeyboardActions(onGo = { submitScpPathJump() }, onDone = { submitScpPathJump() }),
             trailingIcon = {
-                IconButton(enabled = !scpListingInProgress, onClick = { submitScpPathJump() }) {
+                IconButton(onClick = { submitScpPathJump() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, "Go to path")
                 }
             }
         )
         RemoteBreadcrumbBar(
             path = effectiveRemotePath,
-            enabled = !scpListingInProgress,
+            enabled = true,
             onNavigate = { target -> browseScpPath(target, true, true, true) }
         )
         Text(
@@ -3271,7 +3230,7 @@ private fun ConnectingScpContent(
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable(enabled = !scpListingInProgress) {
+                                .clickable {
                                     when {
                                         item.isBrokenLink -> {
                                             onScpSelectedPathChange(absolute)
@@ -3635,7 +3594,6 @@ private fun ConnectingSftpContent(
     logs: List<SessionLogBus.Entry>,
     context: Context,
     activeFileTransfer: FileTransferProgress?,
-    sftpTransferActive: Boolean,
     sftpTransferStatus: String?,
     sftpPath: String,
     onSftpPathChange: (String) -> Unit,
@@ -3702,7 +3660,6 @@ private fun ConnectingSftpContent(
                 appendSftpConsole("Save location selection cancelled.")
                 return@rememberLauncherForActivityResult
             }
-            beginSftpCommandWait(false)
             onSftpDownload(remote, uri.toString())
             appendSftpConsole("Downloading $remote -> $uri")
         }
@@ -3719,12 +3676,12 @@ private fun ConnectingSftpContent(
             }
             val localName = queryUriDisplayName(context, uri) ?: "upload.bin"
             val remote = inferRemoteDestination(localName, remoteBase)
-            beginSftpCommandWait(false)
             onSftpUpload(uri.toString(), remote)
             appendSftpConsole("Uploading $localName -> $remote")
         }
     val consoleScrollState = rememberScrollState()
-    val sftpBusy = sftpCommandRunning || sftpTransferActive
+    // Transfers run on connections of their own, so the console keeps taking commands while they do.
+    val sftpBusy = sftpCommandRunning
 
     fun resolveLocalPath(raw: String): String {
         val candidate = File(raw)
@@ -3741,10 +3698,6 @@ private fun ConnectingSftpContent(
     fun runSftpCommand(input: String) {
         val command = input.trim()
         if (command.isEmpty()) return
-        if (sftpTransferActive) {
-            appendSftpConsole("A file transfer is already running for this session.")
-            return
-        }
         if (sftpCommandRunning) {
             appendSftpConsole("A command is already running. Wait for its server response.")
             return
@@ -3828,7 +3781,6 @@ private fun ConnectingSftpContent(
                         sftpDownloadDocumentPicker.launch(remote.substringAfterLast('/').ifBlank { "download.bin" })
                     } else {
                         val local = resolveLocalPath(explicitLocal)
-                        beginSftpCommandWait(false)
                         onSftpDownload(remote, local)
                         appendSftpConsole("Downloading $remote -> $local")
                     }
@@ -3845,7 +3797,6 @@ private fun ConnectingSftpContent(
                     val remote = args.getOrNull(1)?.takeIf { it.isNotBlank() }?.let {
                         resolveRemotePath(effectiveSftpPath, it)
                     } ?: inferRemoteDestination(local, effectiveSftpPath)
-                    beginSftpCommandWait(false)
                     onSftpUpload(local, remote)
                     appendSftpConsole("Uploading $local -> $remote")
                 }
@@ -3929,23 +3880,29 @@ private fun ConnectingSftpContent(
     }
     // Safety net so a lost or unrecognized server response cannot leave the console refusing
     // every later command. File transfers report their own completion and may run long.
-    LaunchedEffect(sftpCommandRunning, sftpCommandStartLogSequence, activeFileTransfer?.status) {
+    LaunchedEffect(sftpCommandRunning, sftpCommandStartLogSequence) {
         if (!sftpCommandRunning) return@LaunchedEffect
-        if (activeFileTransfer?.isTerminal == false) return@LaunchedEffect
         delay(SFTP_COMMAND_RESPONSE_TIMEOUT_MS)
         appendSftpConsole("No response from the server; the command's result is unknown.")
         finishSftpCommandWait()
     }
-    LaunchedEffect(
-        activeFileTransfer?.operationId,
-        activeFileTransfer?.status,
-        sftpCommandRunning
-    ) {
-        val transfer = activeFileTransfer ?: return@LaunchedEffect
-        if (sftpCommandRunning && transfer.isTerminal) {
-            appendSftpConsole(transfer.statusMessage())
-            finishSftpCommandWait()
-        }
+    // Each transfer's outcome, from the service's log: with a queue, a transfer can finish while the next one is
+    // already showing, so its end never appears as the shown transfer's state.
+    var lastTransferLogSequence by rememberSaveable(sessionId) { mutableStateOf(logs.lastOrNull()?.sequence ?: 0L) }
+    LaunchedEffect(logs.lastOrNull()?.sequence) {
+        val newest = logs.lastOrNull()?.sequence ?: return@LaunchedEffect
+        logs.filter { it.sequence > lastTransferLogSequence }
+            .map { it.message }
+            .filter { message ->
+                message.startsWith("SFTP download complete:") ||
+                    message.startsWith("SFTP upload complete:") ||
+                    message.startsWith("SFTP download failed:") ||
+                    message.startsWith("SFTP upload failed:") ||
+                    message.startsWith("SFTP download cancelled") ||
+                    message.startsWith("SFTP upload cancelled")
+            }
+            .forEach(appendSftpConsole)
+        lastTransferLogSequence = newest
     }
     LaunchedEffect(sftpConsoleRevision) {
         if (sftpConsoleLines.isNotEmpty()) {
@@ -4602,7 +4559,13 @@ private fun FileTransferStatusStrip(
                                 onCancel()
                             }
                         ) {
-                            Text(if (cancellationRequested) "Cancelling…" else "Cancel transfer")
+                            Text(
+                                when {
+                                    cancellationRequested -> "Cancelling…"
+                                    transfer.queuedTransfers > 0 -> "Cancel all"
+                                    else -> "Cancel transfer"
+                                }
+                            )
                         }
                     }
                 }
@@ -4660,10 +4623,13 @@ private fun isSuccessfulTransferStatus(status: String): Boolean {
         status.startsWith("Folder created", ignoreCase = true)
 }
 
+private val remoteModifiedTimeFormat = ThreadLocal.withInitial {
+    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+}
+
 private fun formatRemoteModifiedTime(timestampMillis: Long?): String {
     if (timestampMillis == null || timestampMillis <= 0L) return "Unknown"
-    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-        .format(Date(timestampMillis))
+    return remoteModifiedTimeFormat.get()!!.format(Date(timestampMillis))
 }
 
 @Composable
