@@ -14,6 +14,7 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus
 import com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest
+import com.majordaftapps.sshpeaches.app.testutil.TransferSettingsOverride
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
@@ -210,6 +211,7 @@ class LiveNetworkResilienceTest {
 
     private fun withSessionService(block: (SessionService) -> Unit) {
         val context = instrumentation.targetContext
+        TransferSettingsOverride.apply(context)
         val connected = CountDownLatch(1)
         var service: SessionService? = null
         val connection = object : ServiceConnection {

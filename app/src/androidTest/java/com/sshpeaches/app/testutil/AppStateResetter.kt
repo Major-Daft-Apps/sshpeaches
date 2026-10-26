@@ -28,6 +28,7 @@ object AppStateResetter {
             SshPeachesDatabase.get(appContext).clearAllTables()
             WorkManager.getInstance(appContext).cancelAllWork()
         }
+        TransferSettingsOverride.apply(appContext)
         AppIconManager.apply(appContext, AppIconOption.ORANGE_ON_CREAM)
 
         SecurityManager.init(appContext)

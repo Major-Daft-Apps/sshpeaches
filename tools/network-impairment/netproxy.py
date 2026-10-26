@@ -51,26 +51,42 @@ class Conn:
         if p.startswith('stall_after:') and server_to_client is not None and self.down >= int(p.split(':')[1]): return True
         return False
     async def pump(self, r, w, s2c):
-        try:
-            while not self.dead:
-                data = await r.read(16384)
-                if not data: break
-                if s2c and self.policy.startswith('stall_after:'):
-                    limit = int(self.policy.split(':')[1]); room = max(0, limit - self.down)
-                    if len(data) > room and room >= 0:
-                        head, data_rest = data[:room], data[room:]
-                        if head:
-                            self.down += len(head); w.write(head); await w.drain()
-                        data = data_rest
-                        if data:
+        # Reading and writing run apart, so a delay adds latency without capping throughput: each chunk is written
+        # delay_ms after it arrived, as on a real slow link, while later chunks keep arriving.
+        queue = asyncio.Queue()
+        async def reader():
+            try:
+                while not self.dead:
+                    data = await r.read(65536)
+                    if not data: break
+                    d = state.get('delay_ms', 0) + random.uniform(0, state.get('jitter_ms', 0))
+                    await queue.put((time.monotonic() + d / 1000, data))
+            except Exception: pass
+            await queue.put(None)
+        async def writer():
+            try:
+                while not self.dead:
+                    item = await queue.get()
+                    if item is None: break
+                    due, data = item
+                    if s2c and self.policy.startswith('stall_after:'):
+                        limit = int(self.policy.split(':')[1]); room = max(0, limit - self.down)
+                        if len(data) > room:
+                            head, data = data[:room], data[room:]
+                            if head:
+                                self.down += len(head); w.write(head); await w.drain()
                             log('stall_after reached (%d)' % self.down)
-                while self.stalled(s2c) and not self.dead: await asyncio.sleep(0.05)
-                d = state.get('delay_ms', 0) + random.uniform(0, state.get('jitter_ms', 0))
-                if d: await asyncio.sleep(d / 1000)
-                if s2c: self.down += len(data)
-                w.write(data); await w.drain()
-        except Exception: pass
-        finally: self.abort()
+                    while self.stalled(s2c) and not self.dead: await asyncio.sleep(0.05)
+                    wait = due - time.monotonic()
+                    if wait > 0: await asyncio.sleep(wait)
+                    if s2c: self.down += len(data)
+                    w.write(data); await w.drain()
+            except Exception: pass
+        try:
+            await asyncio.gather(reader(), writer())
+        finally:
+            self.abort()
+
 async def handle(cr, cw):
     if state.get('mode') == 'refuse':
         cw.transport.abort(); log('refused'); return
