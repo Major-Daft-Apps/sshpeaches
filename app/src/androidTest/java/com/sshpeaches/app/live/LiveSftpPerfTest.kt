@@ -174,6 +174,91 @@ class LiveSftpPerfTest {
         Log.i("NetScenario", "== sftp-perf\n" + results.joinToString("\n"))
     }
 
+    private fun linkRate(kBps: Int) {
+        gen++
+        Log.i("NetCtl", JSONObject().put("mode", "pass").put("new_conn", "pass").put("delay_ms", 20)
+            .put("rate_kBps", kBps).put("gen", gen).toString())
+        Thread.sleep(1_500)
+    }
+
+    /** Waits for the transfer like [waitTransfer], noting every retry message it shows. */
+    private fun waitTransferNotingRetries(service: SessionService, id: String, timeoutMs: Long, retries: MutableList<String>): Double {
+        val start = System.nanoTime()
+        var last: String? = null
+        check(waitFor(timeoutMs) {
+            val p = service.fileTransferProgressFlow().value[id]
+            check(p?.status != FileTransferStatus.FAILED) { "transfer failed: ${p?.errorMessage}; retries: $retries" }
+            if (p?.retryMessage != null && p.retryMessage != last) retries += "%.0fs %s".format(secondsSince(start), p.retryMessage)
+            last = p?.retryMessage
+            p?.status == FileTransferStatus.SUCCEEDED
+        }) { "transfer did not finish within ${timeoutMs / 1000}s; retries: $retries" }
+        return secondsSince(start)
+    }
+
+    /**
+     * A download over a slow link (300 KB/s, shared by every connection), at full settings, long enough for a starved
+     * keepalive (60 s) to show. No retries are expected: the link is slow, not broken. Uploads are covered by
+     * SftpSlowLinkTest: an upload held back by a slow link kills the test emulator's Wi-Fi.
+     */
+    @Test
+    fun slowLinkDownloadDoesntDrop() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        val local = File(instrumentation.targetContext.cacheDir, "slow-down.bin")
+        withSessionService { service ->
+            val id = "slow-link"
+            try {
+                latency(0)
+                openSftp(service, id, ConnectionMode.SCP)
+                val retries = mutableListOf<String>()
+                linkRate(300)
+                local.delete()
+                service.scpDownloadFile(id, "$dir/mid32.bin", local.absolutePath)
+                Thread.sleep(100)
+                val down = waitTransferNotingRetries(service, id, 600_000, retries)
+                note("slow link: download 32 MiB in %.0f s = %.0f KB/s; retries: $retries".format(down, local.length() / 1e3 / down))
+                check(retries.isEmpty()) { "retries on a link that works: $retries" }
+            } finally {
+                linkRate(0)
+                latency(0)
+                service.stopSession(id)
+                local.delete()
+            }
+        }
+        Log.i("NetScenario", "== slow-link\n" + results.joinToString("\n"))
+    }
+
+    /** A file browser left alone for 100 s must stay connected: no status change, and it still lists. */
+    @Test
+    fun idleBrowserStaysConnected() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        withSessionService { service ->
+            latency(0)
+            val id = "idle-browser"
+            try {
+                openSftp(service, id, ConnectionMode.SCP)
+                check(waitFor(30_000) { service.sessionsFlow().value.firstOrNull { it.hostId == id }?.status == SessionStatus.ACTIVE })
+                val changes = mutableListOf<String>()
+                var last = ""
+                val start = System.nanoTime()
+                while (secondsSince(start) < 100) {
+                    val s = service.sessionsFlow().value.firstOrNull { it.hostId == id }
+                    val now = "${s?.status} ${s?.statusMessage}"
+                    if (now != last) {
+                        changes += "%.1fs %s".format(secondsSince(start), now)
+                        last = now
+                    }
+                    Thread.sleep(100)
+                }
+                note("idle 100 s, status changes: ${changes.joinToString(" | ")}")
+                note("list after idling %.2f s".format(timeListing(service, id, "$dir/sub1")))
+                check(changes.size == 1) { "the idle session changed state: $changes" }
+            } finally {
+                service.stopSession(id)
+            }
+        }
+        Log.i("NetScenario", "== idle-browser\n" + results.joinToString("\n"))
+    }
+
     /**
      * One short download (mid32.bin, 32 MiB) and upload (16 MiB) at full settings, short enough for the test
      * emulator's network to survive. Ignores the emulator throttle.

@@ -193,14 +193,30 @@ class SftpSegmentedTransfer(
         wakeGeneration += 1
     }
 
+    /** A connection a worker is using: when it last moved bytes, and why the transfer cut it, if it did. */
+    private class LeaseState {
+        @Volatile var lastProgressAt = System.currentTimeMillis()
+        @Volatile var moved = false
+        @Volatile var cutReason: String? = null
+    }
+
     private val failure = AtomicReference<Throwable?>(null)
     private val cancelled = AtomicBoolean(false)
     private val firstOpened = AtomicBoolean(false)
     private val firstOpenLock = Any()
-    private val activeLeases = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<SftpTransferLease, Boolean>())
-    private val failureLock = Any()
-    private var consecutiveFailures = 0
-    private var bytesAtLastFailure = -1L
+    private val activeLeases = java.util.concurrent.ConcurrentHashMap<SftpTransferLease, LeaseState>()
+
+    /**
+     * Cuts every connection in use, saying [reason]: their route is gone (the network changed), so waiting for them
+     * to fail by themselves would only delay the transfer. Their workers reconnect at once, without counting a
+     * failure.
+     */
+    fun cutConnections(reason: String) {
+        activeLeases.forEach { (lease, state) ->
+            state.cutReason = reason
+            runCatching { lease.discard() }
+        }
+    }
 
     private fun stopped(): Boolean = cancelled.get() || failure.get() != null || isCancelled().also { if (it) cancelled.set(true) }
 
@@ -230,9 +246,7 @@ class SftpSegmentedTransfer(
     fun run() {
         val workerCount = workers.coerceAtLeast(1).coerceAtMost(maxOf(1, queue.size))
         var lastCheckpoint = 0L
-        var lastMoved = queue.bytesDone()
-        var lastMovedAt = System.currentTimeMillis()
-        lastProgressAt = lastMovedAt
+        lastProgressAt = System.currentTimeMillis()
         reportedBytes = queue.bytesDone()
         var rounds = 0
         try {
@@ -250,15 +264,14 @@ class SftpSegmentedTransfer(
                         }
                         reportProgress()
                         val now = System.currentTimeMillis()
-                        val moved = queue.bytesDone()
-                        if (moved != lastMoved || activeLeases.isEmpty()) {
-                            lastMoved = moved
-                            lastMovedAt = now
-                        } else if (now - lastMovedAt >= stallTimeoutMs) {
-                            // Nothing moved for a long while: a request is stuck on a connection that died without
-                            // saying so. Dropping the connections fails those requests, and the workers retry.
-                            lastMovedAt = now
-                            activeLeases.toList().forEach { runCatching { it.discard() } }
+                        // A connection that moved nothing for a long while has a request stuck on a link that died
+                        // without saying so: cutting it fails the request, and its worker reconnects. Only that
+                        // connection: the others are moving.
+                        activeLeases.forEach { (lease, state) ->
+                            if (state.cutReason == null && now - state.lastProgressAt >= stallTimeoutMs) {
+                                state.cutReason = "No data for ${stallTimeoutMs / 1000} s"
+                                runCatching { lease.discard() }
+                            }
                         }
                         if (now - lastCheckpoint >= checkpointIntervalMs) {
                             lastCheckpoint = now
@@ -292,31 +305,39 @@ class SftpSegmentedTransfer(
             if (left > 0) runCatching { thread.join(left) }
         }
         if (threads.any { it.isAlive }) {
-            activeLeases.toList().forEach { runCatching { it.discard() } }
+            activeLeases.keys.toList().forEach { runCatching { it.discard() } }
             threads.forEach { runCatching { it.join(CANCEL_DRAIN_MS) } }
         }
     }
 
     private fun workerLoop() {
+        // Failures in a row on this worker's connections with nothing moved in between: the wait before each retry
+        // grows with them. Counted per worker, so one event that drops every connection isn't counted once each.
+        var failures = 0
         while (!stopped()) {
             if (firstOpened.get() && queue.isDrained()) return
             val lease = try {
                 leases.acquire { stopped() || (firstOpened.get() && queue.isDrained()) } ?: return
             } catch (error: Throwable) {
-                if (!recordFailure(error)) return
+                failures += 1
+                if (!recordFailure(error, failures, null)) return
                 continue
             }
-            activeLeases += lease
+            val state = LeaseState()
+            activeLeases[lease] = state
             var healthy = false
             try {
                 openWorkerIo(lease.sftp).use { io ->
-                    transferChunks(io, lease)
+                    transferChunks(io, lease, state)
                 }
                 healthy = true
             } catch (error: Throwable) {
-                recordFailure(error)
+                if (state.moved) failures = 0
+                val cut = state.cutReason
+                if (cut == null) failures += 1
+                recordFailure(error, failures.coerceAtLeast(1), cut)
             } finally {
-                activeLeases -= lease
+                activeLeases.remove(lease)
                 if (healthy) lease.release() else lease.discard()
             }
         }
@@ -332,30 +353,24 @@ class SftpSegmentedTransfer(
         }
     }
 
-    /** Returns whether the worker should try again. */
-    private fun recordFailure(error: Throwable): Boolean {
+    /**
+     * Returns whether the worker should try again, after waiting. A connection the transfer cut itself ([cutReason])
+     * is reconnected at once: nothing failed.
+     */
+    private fun recordFailure(error: Throwable, attempt: Int, cutReason: String?): Boolean {
         if (stopped()) return false
         if (error.isPermanentSftpFailure()) {
             failure.compareAndSet(null, error)
             return false
         }
-        val attempt = synchronized(failureLock) {
-            val moved = queue.bytesDone()
-            if (moved != bytesAtLastFailure) {
-                bytesAtLastFailure = moved
-                consecutiveFailures = 0
-            }
-            consecutiveFailures += 1
-            consecutiveFailures
-        }
         if (attempt >= maxAttempts || System.currentTimeMillis() - lastProgressAt >= giveUpAfterMs) {
             failure.compareAndSet(null, error)
             return false
         }
-        val delayMs = retryDelayMs(attempt)
+        val delayMs = if (cutReason != null) 0L else retryDelayMs(attempt)
         synchronized(progressLock) {
             retrying.set(true)
-            runCatching { onRetrying(retryReason(error, delayMs)) }
+            runCatching { onRetrying(cutReason?.let { "$it, reconnecting" } ?: retryReason(error, delayMs)) }
         }
         val wakeAt = System.currentTimeMillis() + delayMs
         val generation = wakeGeneration
@@ -376,8 +391,18 @@ class SftpSegmentedTransfer(
         var contiguous = next
     }
 
-    private fun transferChunks(io: SftpSegmentIo, lease: SftpTransferLease) {
-        val maxRequests = (inFlightBytes(lease) / requestSize.coerceAtLeast(1)).toInt().coerceIn(1, MAX_REQUESTS)
+    private fun transferChunks(io: SftpSegmentIo, lease: SftpTransferLease, state: LeaseState) {
+        val size = requestSize.coerceAtLeast(1)
+        val ceilingRequests = (inFlightBytes(lease) / size).toInt().coerceIn(1, MAX_REQUESTS)
+        val floorRequests = (MIN_IN_FLIGHT_BYTES / size).toInt().coerceIn(1, ceilingRequests)
+        // In flight follows this connection's own speed: about IN_FLIGHT_SECONDS of data, between the floor and the
+        // ceiling, starting at the floor and growing as replies come back. A full ceiling on a slow link queued over
+        // a minute of data ahead of everything else on the connection, keepalive replies included, and the
+        // connection was declared dead while working fine.
+        var maxRequests = floorRequests
+        var rate = 0.0
+        var rateSince = System.nanoTime()
+        var rateBytes = 0L
         val inflight = ArrayDeque<Pair<SftpSegmentIo.Pending, Cursor>>()
         val owned = LinkedHashMap<Int, Cursor>()
         var cursor: Cursor? = null
@@ -414,6 +439,20 @@ class SftpSegmentedTransfer(
                     // A reply must move bytes; asking again for the same offset after empty replies looped forever.
                     throw SftpTransferIntegrityException("The SFTP server sent an empty reply at offset ${request.offset}")
                 }
+                state.lastProgressAt = System.currentTimeMillis()
+                state.moved = true
+                rateBytes += moved
+                val elapsed = (System.nanoTime() - rateSince) / 1e9
+                if (elapsed >= RATE_SAMPLE_SECONDS) {
+                    val sample = rateBytes / elapsed
+                    rate = if (rate == 0.0) sample else rate * 0.7 + sample * 0.3
+                    rateSince = System.nanoTime()
+                    rateBytes = 0
+                    // Grows at most fourfold a sample, so a fast link opens up within a few seconds.
+                    maxRequests = (rate * IN_FLIGHT_SECONDS / size).toInt()
+                        .coerceAtMost(maxRequests * 4)
+                        .coerceIn(floorRequests, ceilingRequests)
+                }
                 chunk.spans[request.offset] = request.offset + moved
                 while (true) {
                     chunk.contiguous = chunk.spans.remove(chunk.contiguous) ?: break
@@ -433,6 +472,9 @@ class SftpSegmentedTransfer(
 
     companion object {
         const val GIVE_UP_AFTER_MS = 15L * 60_000L
+        private const val MIN_IN_FLIGHT_BYTES = 256L shl 10
+        private const val IN_FLIGHT_SECONDS = 3.0
+        private const val RATE_SAMPLE_SECONDS = 0.5
         const val MAX_RETRY_DELAY_MS = 15_000L
         private const val MAX_ROUNDS = 100
         private const val ROUND_PAUSE_MS = 1_000L

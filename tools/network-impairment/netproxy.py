@@ -4,6 +4,8 @@
 # 127.0.0.1:56422). It is steered through netctl.json in NETPROXY_DIR (default: this script's directory), which
 # netctl-watch.sh fills from the NETCTL lines the test logs; it re-reads the file every 100 ms:
 #   delay_ms / jitter_ms : added one-way delay per chunk, each direction
+#   rate_kBps : bandwidth of the link in KB/s per direction, shared by all connections (0: unlimited). The proxy
+#     reads only as fast as it forwards, so the sender is held back like on a real slow link.
 #   mode: pass | stall (stop forwarding, keep sockets) | refuse (close new conns)
 #   reset: true closes every open connection once per new control message
 #   once: the new_conn policy applies only to the first connection after the message
@@ -15,6 +17,18 @@ LISTEN_HOST, LISTEN_PORT = os.environ.get('NETPROXY_LISTEN', '127.0.0.1:56323').
 UP_HOST, UP_PORT = os.environ.get('NETPROXY_UPSTREAM', '127.0.0.1:56422').rsplit(':', 1)
 state = {'delay_ms': 0, 'jitter_ms': 0, 'mode': 'pass', 'new_conn': 'pass', 'gen': 0}
 conns = set(); seen_epoch = 0; once_epoch = -1
+# One token bucket per direction (True: server to client), in bytes.
+buckets = {True: [0.0, time.monotonic()], False: [0.0, time.monotonic()]}
+async def take_bandwidth(s2c, n):
+    rate = state.get('rate_kBps', 0) * 1000
+    if rate <= 0: return
+    bucket = buckets[s2c]
+    while True:
+        now = time.monotonic()
+        bucket[0] = min(rate * 0.25, bucket[0] + (now - bucket[1]) * rate); bucket[1] = now
+        if bucket[0] >= n or bucket[0] >= rate * 0.25:
+            bucket[0] -= n; return
+        await asyncio.sleep(max(0.005, (n - bucket[0]) / rate))
 # Every new control message (its gen differs from the last one read) starts a new epoch; resets and once-policies key
 # on the epoch, since tests restart their gen numbering.
 epoch = 0; last_file_gen = None
@@ -53,7 +67,8 @@ class Conn:
     async def pump(self, r, w, s2c):
         # Reading and writing run apart, so a delay adds latency without capping throughput: each chunk is written
         # delay_ms after it arrived, as on a real slow link, while later chunks keep arriving.
-        queue = asyncio.Queue()
+        # Bounded, so a slow link holds the sender back instead of the proxy buffering everything.
+        queue = asyncio.Queue(maxsize=16)
         async def reader():
             try:
                 while not self.dead:
@@ -79,6 +94,7 @@ class Conn:
                     while self.stalled(s2c) and not self.dead: await asyncio.sleep(0.05)
                     wait = due - time.monotonic()
                     if wait > 0: await asyncio.sleep(wait)
+                    await take_bandwidth(s2c, len(data))
                     if s2c: self.down += len(data)
                     w.write(data); await w.drain()
             except Exception: pass

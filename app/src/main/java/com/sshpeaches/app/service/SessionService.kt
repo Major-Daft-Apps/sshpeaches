@@ -105,6 +105,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.schmizz.concurrent.Promise
+import net.schmizz.keepalive.KeepAliveRunner
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.common.SSHPacket
 import net.schmizz.sshj.connection.ConnectionException
@@ -374,9 +375,15 @@ class SessionService : Service() {
             sessionIds.forEach { sessionId ->
                 // Mosh roams across networks by itself; closing it threw that away (and left the server running).
                 if (activeConnections[sessionId]?.moshBinding != null) return@forEach
-                // Transfer connections ran over the old route: drop them so transfers retry on new ones now, instead
-                // of noticing after the stall timeout. The transfers themselves carry on.
-                activeConnections[sessionId]?.transferPool?.dropAll()
+                // On a new route (another network, a VPN), transfer connections ran over the old one: cut them so
+                // transfers reconnect now instead of after the stall timeout. A lost network may come back with the
+                // same route and the same connections, so transfers just retry at once when it does; cutting
+                // healthy connections on every "losing" notice (Samsung's Wi-Fi switching sends them while Wi-Fi
+                // works) failed transfers that were fine.
+                if (transition != DefaultNetworkTransition.LOST) {
+                    activeTransfersFor(sessionId).forEach { it.engine?.cutConnections(cause.removeSuffix(".")) }
+                    activeConnections[sessionId]?.transferPool?.dropAll()
+                }
                 activeTransfersFor(sessionId).forEach { it.engine?.wakeUp() }
                 if (requestReconnect(sessionId, cause)) return@forEach
                 SessionLogBus.emit(
@@ -1943,6 +1950,9 @@ class SessionService : Service() {
             autoTrustUnknownHostKey = false,
             onHostKeyPrompt = null
         )
+        // A transfer keeps its connection's link full, so keepalive replies can wait behind data: allow two minutes
+        // of missed replies. The transfer's own stall watchdog notices a dead link sooner.
+        (client.connection.keepAlive as? KeepAliveRunner)?.maxAliveCount = TRANSFER_KEEPALIVE_MAX_UNANSWERED
         try {
             client.connect(host.host, host.port)
             if (host.preferredAuth != AuthMethod.PASSWORD) {
@@ -4343,6 +4353,7 @@ class SessionService : Service() {
         private const val TRANSFER_NOTIFICATION_UPDATE_INTERVAL_MS = 1_000L
         private const val FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS = 250_000_000L
         private const val PARTIAL_DOWNLOAD_SUFFIX = ".part"
+        private const val TRANSFER_KEEPALIVE_MAX_UNANSWERED = 6
         private const val COPY_BUFFER_BYTES = 1 shl 20
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
