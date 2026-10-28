@@ -14,9 +14,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus
+import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest
 import java.io.File
 import java.io.InputStream
@@ -96,10 +98,24 @@ class LiveSftpPerfTest {
         service.listSftpDirectory(id, path)
         check(waitFor(120_000) {
             val now = service.remoteDirectoryFlow().value[id]
-            now != null && now !== before && now.path.trimEnd('/').endsWith(path.substringAfterLast('/')) &&
+            now != null && now !== before && now.complete && now.path.trimEnd('/').endsWith(path.substringAfterLast('/')) &&
                 now.entries.size >= minEntries
         }) { "listing of $path never arrived" }
         return secondsSince(start)
+    }
+
+    /** Seconds until the first entries of [path] show, which for a big folder is before it is fully listed. */
+    private fun timeFirstEntries(service: SessionService, id: String, path: String): Double {
+        val before = service.remoteDirectoryFlow().value[id]
+        val start = System.nanoTime()
+        service.listSftpDirectory(id, path)
+        check(waitFor(120_000) {
+            val now = service.remoteDirectoryFlow().value[id]
+            now != null && now !== before && now.entries.isNotEmpty() && now.path.trimEnd('/').endsWith(path.substringAfterLast('/'))
+        }) { "listing of $path never arrived" }
+        val seconds = secondsSince(start)
+        check(waitFor(120_000) { service.remoteDirectoryFlow().value[id]?.complete == true }) { "$path never finished" }
+        return seconds
     }
 
     private fun waitTransfer(service: SessionService, id: String, timeoutMs: Long): Double {
@@ -156,6 +172,131 @@ class LiveSftpPerfTest {
         }
         bigLocal.delete(); uploadLocal.delete()
         Log.i("NetScenario", "== sftp-perf\n" + results.joinToString("\n"))
+    }
+
+    /**
+     * One short download (mid32.bin, 32 MiB) and upload (16 MiB) at full settings, short enough for the test
+     * emulator's network to survive. Ignores the emulator throttle.
+     */
+    @Test
+    fun shortTransferTimings() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        val context = instrumentation.targetContext
+        val local = File(context.cacheDir, "perf-mid32.bin")
+        val upload = File(context.cacheDir, "perf-up16.bin").apply {
+            outputStream().use { out -> val chunk = ByteArray(1 shl 20) { it.toByte() }; repeat(16) { out.write(chunk) } }
+        }
+        withSessionService { service ->
+            latency(0)
+            val id = "short-transfer"
+            try {
+                openSftp(service, id, ConnectionMode.SCP)
+                local.delete()
+                val downloadStart = System.nanoTime()
+                service.scpDownloadFile(id, "$dir/mid32.bin", local.absolutePath)
+                Thread.sleep(100)
+                waitTransfer(service, id, 300_000)
+                val down = secondsSince(downloadStart)
+                note("download 32 MiB in %.2f s = %.1f MB/s".format(down, local.length() / 1e6 / down))
+                val uploadStart = System.nanoTime()
+                service.scpUploadFile(id, upload.absolutePath, "$dir/up16.bin")
+                Thread.sleep(100)
+                waitTransfer(service, id, 300_000)
+                val up = secondsSince(uploadStart)
+                note("upload 16 MiB in %.2f s = %.1f MB/s".format(up, upload.length() / 1e6 / up))
+            } finally {
+                service.stopSession(id)
+                local.delete()
+                upload.delete()
+            }
+        }
+        Log.i("NetScenario", "== short-transfer\n" + results.joinToString("\n"))
+    }
+
+    /**
+     * Listing big folders: huge/ (20,000 files) and links/ (3,000 symbolic links: to files, to folders, broken), in
+     * the file browser (which resolves links) and the console, at 0 and 150 ms round trip. Light on traffic, unlike
+     * the transfer timings.
+     */
+    @Test
+    fun largeFolderListingTimings() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        withSessionService { service ->
+            for (oneWay in listOf(0, 75)) {
+                latency(oneWay)
+                for (mode in listOf(ConnectionMode.SCP, ConnectionMode.SFTP)) {
+                    val id = "list-perf-$oneWay-${mode.name}"
+                    try {
+                        openSftp(service, id, mode)
+                        val label = if (mode == ConnectionMode.SCP) "browser" else "console"
+                        note("rtt ${oneWay * 2} ms $label: list huge/ (20000) %.2f s".format(timeListing(service, id, "$dir/huge", 20_000)))
+                        note("rtt ${oneWay * 2} ms $label: list links/ (3000 links) %.2f s".format(timeListing(service, id, "$dir/links", 3_000)))
+                        if (mode == ConnectionMode.SCP) {
+                            note("rtt ${oneWay * 2} ms $label: huge/ first entries shown %.2f s".format(timeFirstEntries(service, id, "$dir/huge")))
+                            note("rtt ${oneWay * 2} ms $label: links/ first entries shown %.2f s".format(timeFirstEntries(service, id, "$dir/links")))
+                        }
+                    } finally {
+                        service.stopSession(id)
+                        Thread.sleep(1_000)
+                    }
+                }
+            }
+            latency(0)
+        }
+        Log.i("NetScenario", "== listing-perf\n" + results.joinToString("\n"))
+    }
+
+    /**
+     * Lists folders on another server, only lists: -e homeHost/homePort/homeUser, -e homeKeyB64 (a base64 private
+     * key the server accepts) and -e homePaths (comma-separated absolute paths). Each folder is listed twice in the
+     * file browser and in the console; only entry counts and times are logged.
+     */
+    @Test
+    fun otherServerListingTimings() {
+        assumeTrue("needs -e homeHost", args.getString("homeHost") != null)
+        val privateKey = String(android.util.Base64.decode(args.getString("homeKeyB64")!!, android.util.Base64.DEFAULT))
+        val identity = Identity(
+            id = "listing-key", label = "Listing test key", fingerprint = "", username = args.getString("homeUser")!!,
+            createdEpochMillis = System.currentTimeMillis(), hasPrivateKey = true
+        )
+        AppStateSeeder.seedIdentity(identity, privateKey)
+        val paths = args.getString("homePaths")!!.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        withSessionService { service ->
+            for (mode in listOf(ConnectionMode.SCP, ConnectionMode.SFTP)) {
+                val id = "other-${mode.name}"
+                val label = if (mode == ConnectionMode.SCP) "browser" else "console"
+                val start = System.nanoTime()
+                service.startSession(
+                    requestedSessionId = id,
+                    host = HostConnection(
+                        id = id, name = id, host = args.getString("homeHost")!!,
+                        port = args.getString("homePort")!!.toInt(), username = identity.username!!,
+                        preferredAuth = AuthMethod.IDENTITY, preferredIdentityId = identity.id
+                    ),
+                    mode = mode, autoTrustUnknownHostKey = true, hostKeyPromptEnabled = false
+                )
+                try {
+                    check(waitFor(120_000) {
+                        val s = service.sessionsFlow().value.firstOrNull { it.hostId == id }
+                        check(s?.status != SessionStatus.ERROR) { "session failed: ${s?.statusMessage}" }
+                        service.remoteDirectoryFlow().value[id] != null
+                    }) { "no first listing" }
+                    note("$label: connect -> first listing %.2f s".format(secondsSince(start)))
+                    for (path in paths) {
+                        repeat(2) { round ->
+                            val seconds = timeListing(service, id, path)
+                            val count = service.remoteDirectoryFlow().value[id]?.entries?.size ?: -1
+                            val links = service.remoteDirectoryFlow().value[id]?.entries?.count { it.isSymbolicLink } ?: -1
+                            note("$label: $path ($count entries, $links links) #${round + 1} %.2f s".format(seconds))
+                        }
+                    }
+                } finally {
+                    service.stopSession(id)
+                    Thread.sleep(1_000)
+                }
+            }
+        }
+        Log.i("NetScenario", "== other-server-listing\n" + results.joinToString("\n"))
     }
 
     private fun sha256(input: InputStream): String = input.use { stream ->

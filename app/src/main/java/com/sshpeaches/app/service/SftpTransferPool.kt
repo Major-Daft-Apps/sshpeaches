@@ -27,7 +27,8 @@ internal class SftpTransferPool(
 
     private class Connection(val ssh: SSHClient, val sftp: SFTPClient) {
         var idleSince = 0L
-        val healthy: Boolean get() = ssh.isConnected && ssh.isAuthenticated
+        @Volatile var dropped = false
+        val healthy: Boolean get() = !dropped && ssh.isConnected && ssh.isAuthenticated
     }
 
     private val lock = Object()
@@ -81,13 +82,15 @@ internal class SftpTransferPool(
                         when {
                             // Some servers allow only a few logins per user: make do with the ones that worked.
                             all.isNotEmpty() || opening > 0 -> limit = maxOf(1, all.size + opening)
+                            // Every connection is gone (the network dropped): the next attempt may open them all.
+                            everOpened -> {
+                                limit = Int.MAX_VALUE
+                                lock.notifyAll()
+                                throw error
+                            }
                             !everOpened -> {
                                 useSessionConnection = true
                                 onFallback(error)
-                            }
-                            else -> {
-                                lock.notifyAll()
-                                throw error
                             }
                         }
                         lock.notifyAll()
@@ -106,6 +109,23 @@ internal class SftpTransferPool(
                 }
             }
         }
+    }
+
+    /**
+     * Drops every connection, in use or idle: after the network changes they run over a route that is gone, and
+     * would only be noticed as dead after the stall timeout. Transfers using them retry on new connections at once.
+     * Also forgets a lowered connection limit and a fallback to the session's connection, which a flaky moment may
+     * have caused.
+     */
+    fun dropAll() {
+        val toClose = synchronized(lock) {
+            limit = Int.MAX_VALUE
+            if (!everOpened) useSessionConnection = false
+            all.forEach { it.dropped = true }
+            idle.clear()
+            all.toList().also { all.clear() }
+        }
+        toClose.forEach(::closeQuietly)
     }
 
     /** Opens one connection in the background so the first transfer starts without waiting for a login. */

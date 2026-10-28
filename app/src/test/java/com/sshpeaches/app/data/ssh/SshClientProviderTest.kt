@@ -103,6 +103,9 @@ class SshClientProviderTest {
             }
             assertTrue(offered.contains("aes128-ctr"))
             assertTrue(offered.contains("hmac-sha2-256"))
+            // Native AES before the Java ChaCha20, which capped transfers at a few MB/s per connection.
+            assertEquals("aes128-gcm@openssh.com", ciphers.first())
+            assertTrue(ciphers.indexOf("chacha20-poly1305@openssh.com") > ciphers.indexOf("aes256-ctr"))
             val fastIndex = ciphers.indexOfFirst { name ->
                 name.contains("chacha20-poly1305@openssh.com") ||
                     name.contains("aes128-gcm@openssh.com") ||

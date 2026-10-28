@@ -147,7 +147,9 @@ object SftpResumableDownloader {
         settings: SftpTransferSettings,
         onBytesTransferred: (Long) -> Unit = {},
         isCancelled: () -> Boolean = { false },
-        onResume: (alreadyDownloaded: Long, size: Long) -> Unit = { _, _ -> }
+        onResume: (alreadyDownloaded: Long, size: Long) -> Unit = { _, _ -> },
+        onRetrying: (String?) -> Unit = {},
+        onStart: (SftpSegmentedTransfer) -> Unit = {}
     ): Long {
         val resolved = settings.sanitized()
         val saved = partial.load(remotePath, size, mtime)
@@ -176,8 +178,9 @@ object SftpResumableDownloader {
                 openIo = { sftp, _ -> SftpSegmentReader.open(sftp, remotePath, sink) },
                 isCancelled = isCancelled,
                 onProgress = onBytesTransferred,
-                onCheckpoint = { chunks -> partial.save(remotePath, size, mtime, chunks) }
-            ).run()
+                onCheckpoint = { chunks -> partial.save(remotePath, size, mtime, chunks) },
+                onRetrying = onRetrying
+            ).also(onStart).run()
         } catch (error: Throwable) {
             if (error is SftpTransferCancelledException || error is SftpDownloadCancelledException || isCancelled()) {
                 partial.delete()

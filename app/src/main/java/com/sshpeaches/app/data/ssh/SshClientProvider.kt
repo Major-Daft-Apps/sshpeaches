@@ -334,12 +334,18 @@ object SshClientProvider {
             lower == "diffie-hellman-group1-sha1"
     }
 
+    /**
+     * AES first: sshj runs it through Android's native crypto (BoringSSL, with the CPU's AES instructions), at about
+     * 200 MB/s on the test emulator. ChaCha20-Poly1305 has no native implementation in sshj and ran in Java at 4 MB/s
+     * in a debug build, which capped every transfer. It stays for servers that offer neither AES mode.
+     */
     private fun cipherPriority(name: String): Int {
         val lower = name.lowercase()
         return when {
-            lower.contains("chacha20") -> 0
+            lower.contains("aes128-gcm") -> 0
             lower.contains("gcm") -> 1
             lower.contains("ctr") -> 2
+            lower.contains("chacha20") -> 3
             lower.endsWith("-cbc") || lower.contains("-cbc") -> 10
             else -> 5
         }

@@ -617,7 +617,7 @@ fun SettingsScreen(
                     )
                     SettingsToggleRow(
                         title = "Reconnect automatically",
-                        description = "When the network drops or changes (for example Wi-Fi to mobile data), SSH terminals reconnect instead of closing. Turn on Attach to tmux on a host to also get your shell back.",
+                        description = "When the network drops or changes (for example Wi-Fi to mobile data), SSH terminals and the file browser reconnect instead of closing. Turn on Attach to tmux on a host to also get your shell back.",
                         checked = autoReconnect,
                         onCheckedChange = onAutoReconnectToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_AUTO_RECONNECT_SWITCH)

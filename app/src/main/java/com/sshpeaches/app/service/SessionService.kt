@@ -105,6 +105,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.schmizz.concurrent.Promise
+import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.common.SSHPacket
 import net.schmizz.sshj.connection.ConnectionException
 import net.schmizz.sshj.connection.channel.Channel
@@ -151,6 +152,8 @@ class SessionService : Service() {
     private val activeFileTransfers = ConcurrentHashMap<String, CopyOnWriteArrayList<ActiveFileTransfer>>()
     private val transferQueues = ConcurrentHashMap<String, Mutex>()
     private val listingGenerations = ConcurrentHashMap<String, AtomicLong>()
+    private val lastRequestedListings = ConcurrentHashMap<String, String>()
+    private val bulkLinkLookupUnavailable: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val sessionSnapshotsState = sessionSnapshots.asStateFlow()
     private val hostKeyPromptsState = hostKeyPrompts.asStateFlow()
     private val passwordPromptsState = passwordPrompts.asStateFlow()
@@ -284,6 +287,8 @@ class SessionService : Service() {
     private val defaultNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             networkAvailable.value = true
+            // Transfers waiting out a retry delay try again now.
+            activeFileTransfers.values.flatten().forEach { it.engine?.wakeUp() }
             networkTransitionTracker.onAvailable(
                 network = network,
                 isVpn = networkIsVpn(network)
@@ -369,6 +374,10 @@ class SessionService : Service() {
             sessionIds.forEach { sessionId ->
                 // Mosh roams across networks by itself; closing it threw that away (and left the server running).
                 if (activeConnections[sessionId]?.moshBinding != null) return@forEach
+                // Transfer connections ran over the old route: drop them so transfers retry on new ones now, instead
+                // of noticing after the stall timeout. The transfers themselves carry on.
+                activeConnections[sessionId]?.transferPool?.dropAll()
+                activeTransfersFor(sessionId).forEach { it.engine?.wakeUp() }
                 if (requestReconnect(sessionId, cause)) return@forEach
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -388,8 +397,8 @@ class SessionService : Service() {
     }
 
     /**
-     * Asks an active plain-SSH session to reconnect. False when it can't (setting off, Mosh, file
-     * browser, or not connected yet), so the caller falls back to closing it.
+     * Asks an active SSH or file browser session to reconnect. False when it can't (setting off, Mosh, or not
+     * connected yet), so the caller falls back to closing it.
      */
     private fun requestReconnect(sessionId: String, reason: String): Boolean {
         if (!autoReconnectEnabled) return false
@@ -466,7 +475,8 @@ class SessionService : Service() {
             var sessionHost = host
             // Plain SSH shells reconnect in place after the network drops or changes; the screen,
             // terminal contents, and the password that worked are kept for the new connection.
-            val reconnectable = mode == ConnectionMode.SSH && !useMoshTransport
+            // Plain SSH shells and the file browser reconnect in place; Mosh roams by itself.
+            val reconnectable = !useMoshTransport
             var reconnectReason: String? = null
             var reconnectAttempt = 0
             var reusableTerminalEngine: TermuxTerminalEngine? = null
@@ -600,37 +610,67 @@ class SessionService : Service() {
                             )
                         }
                     }
-                    ConnectionMode.SFTP -> {
-                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SFTP subsystem...")
-                        sftpBinding = SftpBinding(client!!.newSFTPClient())
-                        transferPool = newTransferPool(sessionId, sessionHost, lastGoodPassword, !sawLoginChallenge.get(), client!!)
-                        refreshSftpDirectoryListing(
-                            hostId = sessionId,
-                            sftp = sftpBinding!!.client,
-                            path = ".",
-                            resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode),
-                            generation = nextListingGeneration(sessionId)
+                    ConnectionMode.SFTP, ConnectionMode.SCP -> {
+                        updateSessionSnapshot(
+                            sessionId, sessionHost, mode, SessionStatus.CONNECTING,
+                            if (mode == ConnectionMode.SFTP) "Opening SFTP subsystem..." else "Preparing file browser..."
                         )
-                    }
-                    ConnectionMode.SCP -> {
-                        updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Preparing file browser...")
-                        sftpBinding = SftpBinding(client!!.newSFTPClient())
-                        transferPool = newTransferPool(sessionId, sessionHost, lastGoodPassword, !sawLoginChallenge.get(), client!!)
-                        refreshSftpDirectoryListing(
-                            hostId = sessionId,
-                            sftp = sftpBinding!!.client,
-                            path = ".",
-                            resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode),
-                            generation = nextListingGeneration(sessionId)
-                        )
-                        SessionLogBus.emit(
-                            SessionLogBus.Entry(
-                                hostId = sessionId,
-                                level = SessionLogBus.LogLevel.INFO,
-                                message = "File browser ready. Browse remote files and download them."
+                        val browserClient = client!!
+                        sftpBinding = SftpBinding(browserClient.newSFTPClient())
+                        // The browser's connection dying is otherwise only noticed at the next folder opened.
+                        browserClient.transport.setDisconnectListener { reason, _ ->
+                            if (reason != DisconnectReason.BY_APPLICATION) {
+                                requestReconnect(sessionId, "Connection lost.")
+                            }
+                        }
+                        // One pool for the session's life: transfers keep their connections while the browser's
+                        // own connection reconnects.
+                        if (transferPool == null) {
+                            transferPool = newTransferPool(
+                                sessionId = sessionId,
+                                host = sessionHost,
+                                password = { lastGoodPassword },
+                                canLogInAgain = { !sawLoginChallenge.get() },
+                                sessionClient = { client }
                             )
-                        )
+                        }
+                        // A reconnect comes back to the folder the browser was showing, or last asked for.
+                        val listingPath = if (reconnectReason == null) {
+                            "."
+                        } else {
+                            lastRequestedListings[sessionId] ?: remoteDirectories.value[sessionId]?.path ?: "."
+                        }
+                        try {
+                            refreshSftpDirectoryListing(
+                                hostId = sessionId,
+                                sftp = sftpBinding!!.client,
+                                path = listingPath,
+                                resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode),
+                                generation = nextListingGeneration(sessionId),
+                                client = browserClient
+                            )
+                        } catch (error: SFTPException) {
+                            // That folder is gone or no longer ours to read: show the home folder instead.
+                            if (listingPath == ".") throw error
+                            refreshSftpDirectoryListing(
+                                hostId = sessionId,
+                                sftp = sftpBinding!!.client,
+                                path = ".",
+                                resolveSymbolicLinks = shouldResolveSftpLinkMetadata(mode),
+                                generation = nextListingGeneration(sessionId),
+                                client = browserClient
+                            )
+                        }
                     }
+                }
+                if (mode == ConnectionMode.SCP && reconnectReason == null) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = sessionId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "File browser ready. Browse remote files and download them."
+                        )
+                    )
                 }
                 val startupCommand = resolveStartupCommand(host.startupScript, availableSnippets)
                 if (startupCommand.isNotBlank() && mode == ConnectionMode.SSH) {
@@ -707,6 +747,8 @@ class SessionService : Service() {
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
                 // Log in for transfers now, so the first one starts at once.
                 transferPool?.let { pool -> serviceScope.launch { pool.warmUp() } }
+                // Reconnected: the server answers again, so transfers waiting out a retry delay go now.
+                if (reconnectReason != null) activeTransfersFor(sessionId).forEach { it.engine?.wakeUp() }
                 TelemetryInitializer.breadcrumb("session active mode=$mode mosh=$useMoshTransport tmux=${sessionHost.attachTmux}")
                 TelemetryInitializer.setState("open_sessions", activeJobs.size.toString())
                 UiDebugLog.result("startSession", true, "sessionId=$sessionId, mode=$mode")
@@ -780,10 +822,13 @@ class SessionService : Service() {
                 runCatching { shellBinding?.resizeQueue?.close() }
                 runCatching { shellBinding?.shell?.close() }
                 runCatching { shellBinding?.session?.close() }
+                runCatching { sftpBinding?.client?.close() }
                 runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
+                runCatching { client?.socket?.close() }
                 runCatching { client?.disconnect() }
                 client = null
                 shellBinding = null
+                sftpBinding = null
                 activeForwardBindings = emptyList()
                 reconnectAttempt += 1
                 reconnectReason = retryReason
@@ -853,6 +898,8 @@ class SessionService : Service() {
             activeConnections.remove(sessionId)
             transferQueues.remove(sessionId)
             listingGenerations.remove(sessionId)
+            lastRequestedListings.remove(sessionId)
+            bulkLinkLookupUnavailable.remove(sessionId)
             clearHostKeyPromptsForHost(sessionId, trust = false)
             clearPasswordPromptsForHost(sessionId, password = null)
             clearRuntimeSessionPassword(sessionId)
@@ -1245,7 +1292,9 @@ class SessionService : Service() {
         val resolveSymbolicLinks =
             shouldResolveSftpLinkMetadata(activeConnections[hostId]?.mode)
         val generation = nextListingGeneration(hostId)
+        lastRequestedListings[hostId] = targetPath
         serviceScope.launch {
+            awaitBrowserConnection(hostId)
             val listed = runWithSftpClient(hostId) { sftp ->
                 try {
                     refreshSftpDirectoryListing(
@@ -1256,10 +1305,12 @@ class SessionService : Service() {
                         generation = generation
                     )
                 } catch (error: Exception) {
+                    // The connection died under the listing: reconnecting lists this folder again.
+                    if (error.isFatalSftpTransportFailure() && requestReconnect(hostId, "Connection lost.")) return@runWithSftpClient
                     if (isLatestListing(hostId, generation)) throw error
                 }
             }
-            if (!listed && isLatestListing(hostId, generation)) {
+            if (!listed && isLatestListing(hostId, generation) && hostId !in reconnectingSessions) {
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = hostId,
@@ -1268,6 +1319,20 @@ class SessionService : Service() {
                     )
                 )
                 UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
+            }
+        }
+    }
+
+    private suspend fun awaitTransferPool(hostId: String): SftpTransferPool {
+        awaitBrowserConnection(hostId)
+        return activeConnections[hostId]?.transferPool ?: throw IOException("SFTP session is not connected.")
+    }
+
+    /** Waits while the session reconnects, so an operation started then runs on the new connection, not fails. */
+    private suspend fun awaitBrowserConnection(hostId: String) {
+        withTimeoutOrNull(RECONNECT_NETWORK_WAIT_MS + CONNECTION_ATTEMPT_TIMEOUT_MS) {
+            while (hostId in reconnectingSessions || activeConnections[hostId] == null && activeJobs.containsKey(hostId)) {
+                delay(200)
             }
         }
     }
@@ -1398,7 +1463,8 @@ class SessionService : Service() {
                 status = status,
                 errorMessage = errorMessage?.takeIf { it.isNotBlank() },
                 completedAtEpochMillis = System.currentTimeMillis(),
-                queuedTransfers = 0
+                queuedTransfers = 0,
+                retryMessage = null
             ).also { transfer.latestProgress = it }
         }
         // Release the transfer before showing its end, so a new transfer started from that state
@@ -1421,7 +1487,7 @@ class SessionService : Service() {
     private fun launchFileTransfer(
         transfer: ActiveFileTransfer,
         operationName: String,
-        block: () -> String
+        block: suspend () -> String
     ) {
         val job = serviceScope.launch(start = CoroutineStart.LAZY) {
             try {
@@ -1550,8 +1616,8 @@ class SessionService : Service() {
             UiDebugLog.result(operationName, false, "blank-remote-path hostId=$hostId")
             return
         }
-        val pool = activeConnections[hostId]?.transferPool
-        if (pool == null) {
+        // A session still connecting, or reconnecting, gets the transfer once it's back.
+        if (!activeJobs.containsKey(hostId)) {
             publishFileTransferFailure(
                 hostId, mode, FileTransferDirection.DOWNLOAD, fileName, source, destinationLabel,
                 "SFTP session is not connected."
@@ -1568,6 +1634,7 @@ class SessionService : Service() {
             destinationLabel = destinationLabel
         )
         launchFileTransfer(transfer, operationName) {
+            val pool = awaitTransferPool(hostId)
             val destinationUri = localPath.toContentUriOrNull()
             val destinationFile = if (destinationUri == null) resolveDestinationFile(hostId, source, localPath) else null
             val resolvedLabel = destinationUri?.let(::describeUri) ?: destinationFile!!.absolutePath
@@ -1603,7 +1670,9 @@ class SessionService : Service() {
                     settings = settings,
                     onBytesTransferred = progress,
                     isCancelled = cancelled,
-                    onResume = onResume
+                    onResume = onResume,
+                    onRetrying = retryPublisher(transfer),
+                    onStart = { transfer.engine = it }
                 )
             }
             if (destinationFile != null) {
@@ -1679,8 +1748,8 @@ class SessionService : Service() {
             UiDebugLog.result(operationName, false, "invalid-paths hostId=$hostId")
             return
         }
-        val pool = activeConnections[hostId]?.transferPool
-        if (pool == null) {
+        // A session still connecting, or reconnecting, gets the transfer once it's back.
+        if (!activeJobs.containsKey(hostId)) {
             publishFileTransferFailure(
                 hostId, mode, FileTransferDirection.UPLOAD, fileName, source, destination,
                 "SFTP session is not connected."
@@ -1697,6 +1766,7 @@ class SessionService : Service() {
             destinationLabel = destination
         )
         launchFileTransfer(transfer, operationName) {
+            val pool = awaitTransferPool(hostId)
             openUploadSource(source).use { local ->
                 updateActiveFileTransfer(transfer) {
                     it.copy(
@@ -1722,8 +1792,9 @@ class SessionService : Service() {
                         SftpSegmentWriter.open(sftp, destination, local.channel, create = first, permissions = local.permissions)
                     },
                     isCancelled = { transfer.cancellationRequested.get() },
-                    onProgress = transferProgressPublisher(transfer, local.size)
-                ).run()
+                    onProgress = transferProgressPublisher(transfer, local.size),
+                    onRetrying = retryPublisher(transfer)
+                ).also { transfer.engine = it }.run()
                 local.modifiedAtSeconds?.let { mtime ->
                     runCatching {
                         activeConnections[hostId]?.sftpBinding?.client?.setattr(
@@ -1807,6 +1878,16 @@ class SessionService : Service() {
     private fun transferHostKey(hostId: String): String =
         activeConnections[hostId]?.host?.let { "${it.username}@${it.host}:${it.port}" } ?: hostId
 
+    /** Shows why a transfer is waiting to retry, and clears it once bytes move again. */
+    private fun retryPublisher(transfer: ActiveFileTransfer): (String?) -> Unit = { message ->
+        updateActiveFileTransfer(transfer) { it.copy(retryMessage = message) }
+        if (message != null) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(hostId = transfer.sessionId, level = SessionLogBus.LogLevel.WARN, message = message)
+            )
+        }
+    }
+
     private fun transferProgressPublisher(transfer: ActiveFileTransfer, totalBytes: Long?): (Long) -> Unit {
         val throttle = FileTransferProgressThrottle(updateIntervalNanos = FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS)
         return { transferred ->
@@ -1822,18 +1903,18 @@ class SessionService : Service() {
     private fun newTransferPool(
         sessionId: String,
         host: HostConnection,
-        password: String?,
-        canLogInAgain: Boolean,
-        sessionClient: SSHClient
+        password: () -> String?,
+        canLogInAgain: () -> Boolean,
+        sessionClient: () -> SSHClient?
     ): SftpTransferPool = SftpTransferPool(
         maxConnections = { sftpTransferSettings.sanitized().parallelDownloads },
         openConnection = {
-            if (!canLogInAgain) {
+            if (!canLogInAgain()) {
                 throw IOException("logging in needed answers to the server's questions")
             }
-            openTransferConnection(host, password)
+            openTransferConnection(host, password())
         },
-        sessionClient = { sessionClient.takeIf { it.isConnected } },
+        sessionClient = { sessionClient()?.takeIf { it.isConnected } },
         schedule = { delayMs, action ->
             serviceScope.launch {
                 delay(delayMs)
@@ -1907,6 +1988,7 @@ class SessionService : Service() {
             return
         }
         serviceScope.launch {
+            awaitBrowserConnection(hostId)
             val ok = runWithSftpClient(hostId) { sftp ->
                 measureOperation("manageRemotePath:$normalizedOperation", hostId) {
                     when (normalizedOperation) {
@@ -1954,13 +2036,41 @@ class SessionService : Service() {
         sftp: SFTPClient,
         path: String,
         resolveSymbolicLinks: Boolean,
-        generation: Long? = null
+        generation: Long? = null,
+        client: SSHClient? = activeConnections[hostId]?.client
     ) {
+        val bulkLookup = client?.takeIf { resolveSymbolicLinks && hostId !in bulkLinkLookupUnavailable }?.let { ssh ->
+            { directory: String, names: List<String> ->
+                runCatching { lookUpLinksInBulk(ssh, directory, names) }.getOrNull().also { result ->
+                    // An SFTP-only account: don't try again for every folder of this session.
+                    if (result == null) bulkLinkLookupUnavailable += hostId
+                }
+            }
+        }
         measureOperation("sftpListDirectory", hostId, thresholdMs = 200L) {
             val directory = loadSftpDirectoryPipelined(
                 sftp = sftp,
                 requestedPath = path,
-                resolveSymbolicLinks = resolveSymbolicLinks
+                resolveSymbolicLinks = resolveSymbolicLinks,
+                // The file browser shows a big folder as it arrives; the console prints only the whole listing.
+                onPartial = if (resolveSymbolicLinks) {
+                    { partial ->
+                        if (generation == null || isLatestListing(hostId, generation)) {
+                            setRemoteDirectorySnapshot(
+                                hostId,
+                                RemoteDirectorySnapshot(
+                                    path = partial.path,
+                                    entries = partial.entries,
+                                    refreshToken = SystemClock.elapsedRealtimeNanos(),
+                                    complete = false
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+                bulkLinkLookup = bulkLookup
             )
             if (generation != null && !isLatestListing(hostId, generation)) return@measureOperation
             setRemoteDirectorySnapshot(
@@ -2046,6 +2156,7 @@ class SessionService : Service() {
 
     /** Reads a small remote text file for the in-app editor. */
     suspend fun readRemoteTextFile(hostId: String, path: String): Result<String> = withContext(Dispatchers.IO) {
+        awaitBrowserConnection(hostId)
         runCatching {
             val sftp = activeConnections[hostId]?.sftpBinding?.client ?: error("The file browser isn't connected.")
             val attributes = sftp.stat(path)
@@ -2082,6 +2193,7 @@ class SessionService : Service() {
 
     /** Replaces a remote file's contents (keeping its permissions) with [text]. */
     suspend fun writeRemoteTextFile(hostId: String, path: String, text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        awaitBrowserConnection(hostId)
         runCatching {
             val sftp = activeConnections[hostId]?.sftpBinding?.client ?: error("The file browser isn't connected.")
             val bytes = text.toByteArray(StandardCharsets.UTF_8)
@@ -2157,11 +2269,11 @@ class SessionService : Service() {
     }
 
     private fun closeSftpSessionForTransportFailure(hostId: String, error: Throwable) {
-        if (!error.isFatalSftpTransportFailure() ||
-            activeConnections[hostId]?.mode != ConnectionMode.SFTP
-        ) {
+        val mode = activeConnections[hostId]?.mode
+        if (!error.isFatalSftpTransportFailure() || mode == null || mode == ConnectionMode.SSH) {
             return
         }
+        if (requestReconnect(hostId, "Connection lost.")) return
         SessionLogBus.emit(
             SessionLogBus.Entry(
                 hostId = hostId,
@@ -4282,6 +4394,10 @@ class SessionService : Service() {
         @Volatile
         var running = false
 
+        /** The chunked transfer moving the file, once it has started; woken when the network comes back. */
+        @Volatile
+        var engine: SftpSegmentedTransfer? = null
+
         @Volatile
         var latestProgress: FileTransferProgress = initialProgress
 
@@ -4359,7 +4475,9 @@ class SessionService : Service() {
     data class RemoteDirectorySnapshot(
         val path: String,
         val entries: List<RemoteDirectoryEntry>,
-        val refreshToken: Long = 0L
+        val refreshToken: Long = 0L,
+        /** False while a big folder is still being read: [entries] is what has arrived so far. */
+        val complete: Boolean = true
     )
 
     data class RemoteDirectoryEntry(

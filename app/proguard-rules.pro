@@ -1,9 +1,16 @@
 # Production release shrinker rules.
 
-# Pipelined SFTP downloads invoke sshj's protected async READ helpers.
+# Chunked SFTP transfers call sshj's protected async READ and WRITE helpers, and send a CLOSE without waiting for
+# its reply through RemoteResource's engine and handle, all looked up by name (SshjRemoteFileAccess). Renamed, every
+# download and upload failed in release builds.
 -keepclassmembers class net.schmizz.sshj.sftp.RemoteFile {
     protected net.schmizz.concurrent.Promise asyncRead(long, int);
     protected int checkReadResponse(net.schmizz.sshj.sftp.Response, byte[], int);
+    protected net.schmizz.concurrent.Promise asyncWrite(long, byte[], int, int);
+}
+-keepclassmembers class net.schmizz.sshj.sftp.RemoteResource {
+    protected final net.schmizz.sshj.sftp.SFTPEngine requester;
+    protected final byte[] handle;
 }
 
 # SshClientProvider replaces Android's "BC" provider with the bundled Bouncy Castle provider,

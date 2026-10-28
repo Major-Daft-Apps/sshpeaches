@@ -11,10 +11,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.service.FileTransferStatus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus
 import com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest
 import com.majordaftapps.sshpeaches.app.testutil.TransferSettingsOverride
+import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
@@ -209,6 +212,131 @@ class LiveNetworkResilienceTest {
         }
     }
 
+    /** The file browser on the test server, with mid32.bin (32 MiB) in [PERF_DIR]. */
+    private fun browserScenario(name: String, body: (SessionService, String, Timeline) -> Unit) {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        val id = "net-$name"
+        withSessionService { service ->
+            netctl()
+            val host = HostConnection(
+                id = id, name = name, host = args.getString("netHost")!!, port = args.getString("netPort")!!.toInt(),
+                username = args.getString("netUser")!!, preferredAuth = AuthMethod.PASSWORD, hasPassword = false
+            )
+            val timeline = Timeline(service, id)
+            try {
+                service.startSession(
+                    requestedSessionId = id, host = host, mode = ConnectionMode.SCP,
+                    passwordOverride = args.getString("netPassword"), autoTrustUnknownHostKey = true,
+                    hostKeyPromptEnabled = false
+                )
+                check(waitUntil(60_000) { status(service, id)?.status == SessionStatus.ACTIVE }) { "never connected" }
+                timeline.note("file browser connected")
+                body(service, id, timeline)
+            } finally {
+                netctl()
+                timeline.stop(name)
+                service.stopSession(id)
+                Thread.sleep(1_000)
+            }
+        }
+    }
+
+    private fun waitUntil(timeoutMs: Long, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            Thread.sleep(100)
+        }
+        return false
+    }
+
+    private fun sha256(file: File): String = file.inputStream().use { input ->
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(1 shl 16)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
+        digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /** Starts downloading mid32.bin, runs [disrupt] once a quarter of it has arrived, and waits for the result. */
+    private fun downloadThrough(
+        service: SessionService,
+        id: String,
+        t: Timeline,
+        target: File,
+        disrupt: (() -> Unit)?
+    ): FileTransferStatus {
+        target.delete()
+        service.scpDownloadFile(id, "$PERF_DIR/mid32.bin", target.absolutePath)
+        var sawRetry = false
+        if (disrupt != null) {
+            check(waitUntil(120_000) {
+                val p = service.fileTransferProgressFlow().value[id]
+                (p?.bytesTransferred ?: 0) > (8L shl 20) || p?.isTerminal == true
+            }) { "download never started" }
+            disrupt()
+        }
+        check(waitUntil(300_000) {
+            val p = service.fileTransferProgressFlow().value[id]
+            if (p?.retryMessage != null && !sawRetry) {
+                sawRetry = true
+                t.note("transfer: ${p.retryMessage}")
+            }
+            p?.isTerminal == true
+        }) { "download never finished" }
+        val p = checkNotNull(service.fileTransferProgressFlow().value[id])
+        t.note("download ${p.status}${p.errorMessage?.let { ": $it" } ?: ""}")
+        return p.status
+    }
+
+    private fun downloadSurvives(service: SessionService, id: String, t: Timeline, disrupt: () -> Unit) {
+        val context = instrumentation.targetContext
+        val disrupted = File(context.cacheDir, "net-disrupted.bin")
+        val clean = File(context.cacheDir, "net-clean.bin")
+        try {
+            check(downloadThrough(service, id, t, disrupted, disrupt) == FileTransferStatus.SUCCEEDED) { "download gave up" }
+            check(waitUntil(120_000) { status(service, id)?.status == SessionStatus.ACTIVE }) { "the browser didn't come back" }
+            netctl()
+            check(downloadThrough(service, id, t, clean, null) == FileTransferStatus.SUCCEEDED) { "clean download failed" }
+            check(sha256(disrupted) == sha256(clean)) { "the disrupted download differs from a clean one" }
+            t.note("disrupted download matches a clean one")
+        } finally {
+            disrupted.delete()
+            clean.delete()
+        }
+    }
+
+    @Test fun t01_downloadSurvivesHardDrop() = browserScenario("download-hard-drop") { service, id, t ->
+        downloadSurvives(service, id, t) { t.note("every connection reset"); netctl(reset = true) }
+    }
+
+    @Test fun t02_downloadWaitsOutOutage() = browserScenario("download-outage-45s") { service, id, t ->
+        downloadSurvives(service, id, t) {
+            t.note("connections reset; new ones refused for 45 s"); netctl(mode = "refuse", reset = true)
+            Thread.sleep(45_000)
+            t.note("server back"); netctl()
+        }
+    }
+
+    @Test fun t03_browserReconnectsInPlace() = browserScenario("browser-reconnect") { service, id, t ->
+        service.listSftpDirectory(id, PERF_DIR)
+        check(waitUntil(60_000) { service.remoteDirectoryFlow().value[id]?.path == PERF_DIR }) { "never listed $PERF_DIR" }
+        val tokenBefore = service.remoteDirectoryFlow().value[id]?.refreshToken
+        t.note("connection reset"); netctl(reset = true)
+        // Nothing else lists here, so a new listing is the reconnect's (it can be done before netctl returns).
+        check(waitUntil(120_000) {
+            service.remoteDirectoryFlow().value[id]?.let { it.refreshToken != tokenBefore && it.complete } == true &&
+                status(service, id)?.status == SessionStatus.ACTIVE
+        }) { "never reconnected and listed again" }
+        check(service.remoteDirectoryFlow().value[id]?.path == PERF_DIR) {
+            "came back to ${service.remoteDirectoryFlow().value[id]?.path}, not $PERF_DIR"
+        }
+        t.note("RECOVERED: back in $PERF_DIR")
+    }
+
     private fun withSessionService(block: (SessionService) -> Unit) {
         val context = instrumentation.targetContext
         TransferSettingsOverride.apply(context)
@@ -227,5 +355,9 @@ class LiveNetworkResilienceTest {
         } finally {
             context.unbindService(connection)
         }
+    }
+
+    private companion object {
+        const val PERF_DIR = "/home/mosher/perf"
     }
 }

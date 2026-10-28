@@ -2802,6 +2802,8 @@ private fun ConnectingScpContent(
     }
     val effectiveRemotePath = remoteDirectory?.path ?: scpLastListedPath
     val scpListingInProgress = scpPendingListPath != null
+    // A big folder shows as it arrives; the bar stays until all of it (and its links) is in.
+    val scpFolderStillLoading = scpListingInProgress || remoteDirectory?.complete == false
     val canGoBack = scpPathHistoryIndex > 0
     val canGoForward = scpPathHistoryIndex < scpPathHistory.lastIndex
     val colorScheme = MaterialTheme.colorScheme
@@ -3178,7 +3180,7 @@ private fun ConnectingScpContent(
             color = colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall
         )
-        if (scpListingInProgress) {
+        if (scpFolderStillLoading) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
                 color = colorScheme.primary,
@@ -3196,7 +3198,7 @@ private fun ConnectingScpContent(
             if (remoteItems.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (scpListingInProgress) "Loading folder…" else "This folder is empty.",
+                        text = if (scpFolderStillLoading) "Loading folder…" else "This folder is empty.",
                         color = colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )

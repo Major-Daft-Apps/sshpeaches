@@ -159,9 +159,9 @@ class SftpTransferIntegrityException(message: String) : IOException(message)
 
 /**
  * Moves the chunks of [queue] with up to [workers] connections from [leases], each keeping several requests in
- * flight. A connection that fails is dropped and its chunk is finished on another one; the transfer fails only after
- * [maxAttempts] failures in a row with nothing moved in between, or at once on an error the server reports (no such
- * file, permission denied).
+ * flight. A connection that fails is dropped and its chunk is finished on another one, retrying like a download
+ * manager: waits grow to 15 s, [wakeUp] (the network or the server is back) retries at once, and the transfer gives up only after
+ * [giveUpAfterMs] without a byte moved, or at once on an error the server reports (no such file, permission denied).
  */
 class SftpSegmentedTransfer(
     private val queue: SftpChunkQueue,
@@ -173,12 +173,26 @@ class SftpSegmentedTransfer(
     private val isCancelled: () -> Boolean = { false },
     private val onProgress: (bytesDone: Long) -> Unit = {},
     private val onCheckpoint: (List<SftpPartialDownload.RangeState>) -> Unit = {},
-    private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
-    private val retryDelayMs: (attempt: Int) -> Long = { attempt -> 1_000L shl (attempt - 1).coerceIn(0, 3) },
+    private val maxAttempts: Int = Int.MAX_VALUE,
+    private val giveUpAfterMs: Long = GIVE_UP_AFTER_MS,
+    private val retryDelayMs: (attempt: Int) -> Long = { attempt ->
+        minOf(MAX_RETRY_DELAY_MS, 1_000L shl (attempt - 1).coerceIn(0, 5))
+    },
+    /** Called with what went wrong while the transfer waits to retry, and with null once bytes move again. */
+    private val onRetrying: (String?) -> Unit = {},
     private val progressIntervalMs: Long = 100L,
     private val checkpointIntervalMs: Long = 500L,
     private val stallTimeoutMs: Long = STALL_TIMEOUT_MS
 ) {
+    @Volatile private var lastProgressAt = System.currentTimeMillis()
+    @Volatile private var wakeGeneration = 0
+    private val retrying = AtomicBoolean(false)
+
+    /** Ends every retry wait now: the network came back, so there's no point waiting out the delay. */
+    fun wakeUp() {
+        wakeGeneration += 1
+    }
+
     private val failure = AtomicReference<Throwable?>(null)
     private val cancelled = AtomicBoolean(false)
     private val firstOpened = AtomicBoolean(false)
@@ -202,11 +216,14 @@ class SftpSegmentedTransfer(
             val now = queue.bytesDone()
             if (now == reportedBytes) return
             reportedBytes = now
+            lastProgressAt = System.currentTimeMillis()
             try {
                 onProgress(now)
+                if (retrying.getAndSet(false)) onRetrying(null)
             } catch (error: Throwable) {
                 failure.compareAndSet(null, error)
             }
+            Unit
         }
     }
 
@@ -215,6 +232,7 @@ class SftpSegmentedTransfer(
         var lastCheckpoint = 0L
         var lastMoved = queue.bytesDone()
         var lastMovedAt = System.currentTimeMillis()
+        lastProgressAt = lastMovedAt
         reportedBytes = queue.bytesDone()
         var rounds = 0
         try {
@@ -257,7 +275,8 @@ class SftpSegmentedTransfer(
                 failure.get()?.let { throw it }
                 if (queue.isComplete() && firstOpened.get()) break
                 // Every worker stopped with chunks left: the last of them failed at about the same time.
-                if (rounds >= maxAttempts) throw IOException("The transfer stopped before the whole file was moved")
+                if (rounds >= MAX_ROUNDS) throw IOException("The transfer stopped before the whole file was moved")
+                Thread.sleep(ROUND_PAUSE_MS)
             }
         } finally {
             runCatching { reportProgress() }
@@ -329,12 +348,18 @@ class SftpSegmentedTransfer(
             consecutiveFailures += 1
             consecutiveFailures
         }
-        if (attempt >= maxAttempts) {
+        if (attempt >= maxAttempts || System.currentTimeMillis() - lastProgressAt >= giveUpAfterMs) {
             failure.compareAndSet(null, error)
             return false
         }
-        val wakeAt = System.currentTimeMillis() + retryDelayMs(attempt)
-        while (System.currentTimeMillis() < wakeAt) {
+        val delayMs = retryDelayMs(attempt)
+        synchronized(progressLock) {
+            retrying.set(true)
+            runCatching { onRetrying(retryReason(error, delayMs)) }
+        }
+        val wakeAt = System.currentTimeMillis() + delayMs
+        val generation = wakeGeneration
+        while (System.currentTimeMillis() < wakeAt && wakeGeneration == generation) {
             if (stopped()) return false
             try {
                 Thread.sleep(50)
@@ -407,7 +432,17 @@ class SftpSegmentedTransfer(
     }
 
     companion object {
-        const val DEFAULT_MAX_ATTEMPTS = 5
+        const val GIVE_UP_AFTER_MS = 15L * 60_000L
+        const val MAX_RETRY_DELAY_MS = 15_000L
+        private const val MAX_ROUNDS = 100
+        private const val ROUND_PAUSE_MS = 1_000L
+
+        private fun retryReason(error: Throwable, delayMs: Long): String {
+            val cause = generateSequence(error) { it.cause }.take(6)
+                .mapNotNull { it.message?.lineSequence()?.firstOrNull()?.takeIf(String::isNotBlank) }
+                .firstOrNull() ?: error.javaClass.simpleName
+            return "Connection lost ($cause), retrying in ${(delayMs + 999) / 1000} s"
+        }
         const val MAX_REQUESTS = 256
         const val STALL_TIMEOUT_MS = 30_000L
         private const val CANCEL_DRAIN_MS = 3_000L

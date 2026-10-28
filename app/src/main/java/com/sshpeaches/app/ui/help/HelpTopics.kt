@@ -114,7 +114,8 @@ val helpTopics: List<HelpTopic> = listOf(
         steps = listOf(
             "SSH terminals reconnect on their own and keep the screen. This is Settings → Background Sessions → Reconnect automatically.",
             "The shell itself restarts on the server, so turn on Attach to tmux in the host's settings to land back in the same shell.",
-            "Mosh sessions and the file browser don't reconnect; open them again."
+            "The file browser reconnects too and comes back to the folder you were in. Downloads and uploads carry on: they retry for up to 15 minutes and pick up where they stopped.",
+            "Mosh sessions roam between networks by themselves."
         ),
         destination = HelpDestination.SETTINGS,
         keywords = listOf("reconnect", "reconnecting", "wifi", "mobile data", "tmux", "disconnected", "dropped")
