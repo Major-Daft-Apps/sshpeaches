@@ -4,7 +4,11 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
-Faster file transfers and browsing:
+## 0.12.0 (1200)
+
+Release date: 2026-10-28
+
+Faster, sturdier file transfers and browsing:
 
 - Downloads and uploads split the file into chunks and move them over up to four connections at once, like a download manager (aria2c, IDM). Measured on the test emulator, a 134 MB download went from about 5 MB/s to 15 MB/s, and uploads from 6.5 to 17 MB/s; at 150 ms latency uploads went from 3 to 12 MB/s. The number of connections is under **Advanced** -> **Connections per transfer**.
 - Connections now prefer AES-GCM, which runs in Android's own native crypto (like HTTPS), over ChaCha20-Poly1305, which the SSH library runs in Java: on the test emulator that encrypts about 200 MB/s instead of 4, which had capped every transfer at a few MB/s per connection. ChaCha20 is still used with servers that offer no AES mode.
