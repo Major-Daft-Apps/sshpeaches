@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
@@ -96,6 +98,7 @@ private enum class SettingsCategory(
     BACKGROUND("Background", "Session lifetime while backgrounded"),
     TERMINAL("Terminal", "Emulation, custom keyboard, margins, bell, and Mosh"),
     SECURITY("Security", "PIN, biometrics, and host key policy"),
+    BOOST("Boost", "Faster file browsing, transfers and terminals over UDP"),
     AUTOMATION("Automation", "Snippets and port forward defaults"),
     DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
     TRANSFER("Transfer", "Export and import via QR or file"),
@@ -130,6 +133,8 @@ fun SettingsScreen(
     onConfirmPasswordInsertToggle: (Boolean) -> Unit,
     autoReconnect: Boolean,
     onAutoReconnectToggle: (Boolean) -> Unit,
+    boost: Boolean = false,
+    onBoostToggle: (Boolean) -> Unit = {},
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,
     analyticsEnabled: Boolean,
@@ -851,6 +856,14 @@ fun SettingsScreen(
                 }
             }
                 }
+                if (SettingsCategory.BOOST in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Boost", style = MaterialTheme.typography.titleMedium)
+                    BoostToggleRow(checked = boost, onCheckedChange = onBoostToggle)
+                }
+            }
+                }
                 if (SettingsCategory.AUTOMATION in visibleCategories) {
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1528,6 +1541,91 @@ private fun SettingsToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             modifier = modifier.align(Alignment.CenterVertically)
+        )
+    }
+}
+
+/** The Boost switch, with an info button that explains what it does on the server. */
+@Composable
+private fun BoostToggleRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    var showInfo by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text("Boost")
+            Text(
+                text = "Browse, transfer and use the terminal over a faster UDP connection to a helper the app runs on the server. The terminal survives dropped and changing networks. Falls back to SFTP and SSH when it can't.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        IconButton(
+            onClick = { showInfo = true },
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .testTag(UiTestTags.SETTINGS_BOOST_INFO_BUTTON)
+        ) {
+            Icon(Icons.Outlined.Info, contentDescription = "More information about Boost")
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .testTag(UiTestTags.SETTINGS_BOOST_SWITCH)
+        )
+    }
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            modifier = Modifier.testTag(UiTestTags.SETTINGS_BOOST_INFO_DIALOG),
+            title = { Text("Boost") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Boost moves folder listings, downloads and uploads off the SSH connection onto QUIC, " +
+                            "the UDP protocol behind HTTP/3, the way download managers do. Files still move in " +
+                            "chunks over many streams at once, without SSH's own overhead."
+                    )
+                    Text(
+                        "It also runs SSH terminals through the helper (Advanced settings → Boost terminal), like " +
+                            "Mosh without installing anything: when the network drops or changes (Wi-Fi to mobile " +
+                            "data), the terminal reconnects by itself and your shell and running programs carry on, " +
+                            "with what they printed meanwhile. Port forwards still go over SSH."
+                    )
+                    Text(
+                        "When a session opens, the app copies a small helper program (about 6 MB, only the first " +
+                            "time) into ~/.cache/sshpeaches/boost on the server over your SSH login, checks it, and " +
+                            "starts it there. It works on Linux servers with x86_64 or ARM64 processors."
+                    )
+                    Text(
+                        "The helper runs as your user and answers only this app: a one-time key and a certificate " +
+                            "the app checks, both handed over through SSH. For the file browser it only lists " +
+                            "folders and reads or writes the files you're transferring, and quits with the session " +
+                            "or after 10 idle minutes. For a terminal it runs your login shell, which stays until " +
+                            "you close the session, or for 12 hours without the app (a shell in tmux or screen " +
+                            "survives longer)."
+                    )
+                    Text(
+                        "The server has to accept incoming UDP on that port: by default one in 60000-61000, the " +
+                            "range mosh uses, so a firewall open for mosh works (Advanced settings → Boost ports " +
+                            "changes it). If UDP is blocked, the helper is reached over TCP on the same port instead " +
+                            "(Advanced settings → Boost TCP fallback). If neither works, or the server isn't one it " +
+                            "supports, the app uses normal SFTP and SSH, as it does with Boost off."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfo = false }) { Text("Close") }
+            }
         )
     }
 }

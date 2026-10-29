@@ -274,6 +274,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-svg:2.7.0")
     implementation("com.hierynomus:sshj:0.40.0")
+    // File boost client (QUIC), built from tools/boost with gomobile: arm64-v8a and x86_64 only.
+    implementation(files("libs/boostclient.aar"))
     // Code editor for snippets and remote files (LGPL-2.1). 0.23.4 is built with Kotlin 1.9.22 like this app.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("io.github.Rosemoe.sora-editor:bom:0.23.4"))

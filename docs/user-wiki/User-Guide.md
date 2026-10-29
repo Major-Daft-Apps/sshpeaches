@@ -152,9 +152,35 @@ Settings includes:
   - lock timeout
   - host key prompt controls
 - Port forward auto-start
+- Boost (see below)
 - Diagnostics/privacy toggles
 - Restore defaults
 - Transfer data via QR (include identities/settings options)
+
+### Boost
+
+**Settings** -> **Boost** -> **Boost** (off by default; the info button explains it) moves the file browser's
+listings, downloads and uploads, and SSH terminals, off SSH onto QUIC, the UDP protocol behind HTTP/3. With it off,
+nothing changes.
+
+When a session opens, the app copies a small helper (about 6 MB, once per app version) into
+`~/.cache/sshpeaches/boost` on the server over your SSH login, checks its SHA-256, and starts it. It needs a Linux
+server with an x86_64 or ARM64 processor. The helper runs as your user and answers only this app (a one-time key and a
+certificate fingerprint handed over through SSH).
+
+- **File browser:** the helper lists folders and reads or writes only the files you're transferring, and quits when
+  the session ends or after 10 idle minutes. A download that fails over Boost carries on over SFTP from where it
+  stopped.
+- **Terminal** (**Advanced** -> **Boost terminal**, on by default): the helper runs your login shell, like Mosh
+  without installing anything. When the network drops or changes, the terminal reconnects by itself and the same
+  shell carries on, with what it printed meanwhile; keys typed while it's away are sent once it's back. The SSH
+  connection (still used for port forwards) reconnects in the background while the terminal stays usable. The shell
+  lasts until you close the session, or 12 hours without the app. Hosts set to attach tmux keep using SSH.
+
+The helper listens on one port in **Settings** -> **Advanced** -> **Boost ports** (default `60000-61000`, the range
+mosh uses, so a firewall open for mosh lets it through; leave it blank for any port). If UDP doesn't get through, it is
+reached over TCP on the same port (**Boost TCP fallback**). If neither works, or the server isn't supported, the app
+uses SFTP and SSH and the session log says why.
 
 ## About, Help, and licenses
 

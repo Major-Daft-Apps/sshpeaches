@@ -181,6 +181,12 @@ object UiTestTags {
     const val SETTINGS_BUILTIN_KEYBOARD_SWITCH = "settings_built_in_keyboard_switch"
     const val SETTINGS_CONFIRM_PASSWORD_INSERT_SWITCH = "settings_confirm_password_insert_switch"
     const val SETTINGS_AUTO_RECONNECT_SWITCH = "settings_auto_reconnect_switch"
+    const val SETTINGS_BOOST_SWITCH = "settings_boost_switch"
+    const val SETTINGS_BOOST_INFO_BUTTON = "settings_boost_info_button"
+    const val SETTINGS_BOOST_INFO_DIALOG = "settings_boost_info_dialog"
+    const val SETTINGS_BOOST_TERMINAL_SWITCH = "settings_boost_terminal_switch"
+    const val SETTINGS_BOOST_TCP_FALLBACK_SWITCH = "settings_boost_tcp_fallback_switch"
+    const val SETTINGS_BOOST_PORTS_INPUT = "settings_boost_ports_input"
     fun settingsCategory(name: String): String =
         "settings_category_" + name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
     const val SETTINGS_SCROLL_CONTAINER = "settings_scroll_container"

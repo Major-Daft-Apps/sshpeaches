@@ -16,6 +16,7 @@ If you installed SSHPeaches from F-Droid or Google Play, this repository include
 
 - Open SSH terminal sessions
 - Browse and transfer files with SFTP
+- Boost file transfers and terminals over QUIC (UDP, opt-in): faster browsing, and terminals that survive network changes like Mosh
 - Copy files with SCP
 - Save hosts for one-tap reuse
 - Manage SSH identities and private keys

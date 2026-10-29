@@ -83,6 +83,7 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineStart
@@ -155,6 +156,9 @@ class SessionService : Service() {
     private val listingGenerations = ConcurrentHashMap<String, AtomicLong>()
     private val lastRequestedListings = ConcurrentHashMap<String, String>()
     private val bulkLinkLookupUnavailable: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val fileBoosts = ConcurrentHashMap<String, BoostHelper>()
+    private val fileBoostStarts = ConcurrentHashMap<String, Job>()
+    private val fileBoostLastStart = ConcurrentHashMap<String, Long>()
     private val sessionSnapshotsState = sessionSnapshots.asStateFlow()
     private val hostKeyPromptsState = hostKeyPrompts.asStateFlow()
     private val passwordPromptsState = passwordPrompts.asStateFlow()
@@ -162,6 +166,12 @@ class SessionService : Service() {
     private val remoteDirectoriesState = remoteDirectories.asStateFlow()
     private val fileTransferProgressState = fileTransferProgress.asStateFlow()
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
+    /** Boost terminals kept while their session's SSH connection reconnects: typing and output carry on meanwhile. */
+    private val keptBoostShells = ConcurrentHashMap<String, ShellBinding>()
+    /** Hosts where a Boost terminal couldn't start lately, so connecting there doesn't wait on it again for a while. */
+    private val boostTerminalUnavailableUntil = ConcurrentHashMap<String, Long>()
+    /** The last state each Boost terminal reported, so a run of reconnect attempts is logged once. */
+    private val boostTerminalStates = ConcurrentHashMap<String, String>()
     /** When each shell last sent anything, for [checkUnansweredInput]. */
     private val lastShellOutputAtMs = ConcurrentHashMap<String, Long>()
     private val unansweredInputChecks = ConcurrentHashMap<String, Job>()
@@ -210,7 +220,15 @@ class SessionService : Service() {
         }
         collectorScope.launch {
             SettingsStore.sftpTransferSettings.collect { settings ->
+                val before = sftpTransferSettings
                 sftpTransferSettings = settings
+                // A new port range applies to the next boost started (the field saves as it's typed).
+                if (before.boost != settings.boost || before.boostTcpFallback != settings.boostTcpFallback) {
+                    activeConnections.keys.forEach { sessionId ->
+                        stopFileBoost(sessionId)
+                        if (settings.boost) startFileBoost(sessionId, force = true)
+                    }
+                }
             }
         }
         collectorScope.launch {
@@ -288,6 +306,8 @@ class SessionService : Service() {
     private val defaultNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             networkAvailable.value = true
+            // Boost terminals reattach now instead of after their next retry delay.
+            kickBoostShells()
             // Transfers waiting out a retry delay try again now.
             activeFileTransfers.values.flatten().forEach { it.engine?.wakeUp() }
             networkTransitionTracker.onAvailable(
@@ -383,6 +403,10 @@ class SessionService : Service() {
                 if (transition != DefaultNetworkTransition.LOST) {
                     activeTransfersFor(sessionId).forEach { it.engine?.cutConnections(cause.removeSuffix(".")) }
                     activeConnections[sessionId]?.transferPool?.dropAll()
+                    // The file browser's helper connection ran over the old route: start it again on the new one.
+                    stopFileBoost(sessionId)
+                    // A Boost terminal reattaches over the new route by itself; this saves it waiting to notice.
+                    boostShellFor(sessionId)?.kick()
                 }
                 activeTransfersFor(sessionId).forEach { it.engine?.wakeUp() }
                 if (requestReconnect(sessionId, cause)) return@forEach
@@ -607,14 +631,31 @@ class SessionService : Service() {
                                 terminalEmulation = terminalEmulation
                             )
                         } else {
-                            updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
-                            shellBinding = openShell(
-                                sessionId,
-                                client!!,
-                                terminalEmulation,
-                                reusableTerminalEngine,
-                                attachTmux = sessionHost.attachTmux
-                            )
+                            // A Boost terminal kept through the reconnect carries on as it was; only SSH was new.
+                            val kept = keptBoostShells.remove(sessionId)
+                            shellBinding = if (kept != null && (kept.channel as? BoostTerminalChannel)?.alive == true) {
+                                kept
+                            } else {
+                                kept?.let(::closeShellBinding)
+                                updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Starting shell...")
+                                openBoostShell(sessionId, sessionHost, client!!, terminalEmulation, reusableTerminalEngine)
+                                    ?: openShell(
+                                        sessionId,
+                                        client!!,
+                                        terminalEmulation,
+                                        reusableTerminalEngine,
+                                        attachTmux = sessionHost.attachTmux
+                                    )
+                            }
+                            // An SSH shell's reader notices SSH dying; a Boost terminal's never does, so listen for it
+                            // (port forwards need it back).
+                            if (shellBinding?.channel is BoostTerminalChannel) {
+                                client!!.transport.setDisconnectListener { reason, _ ->
+                                    if (reason != DisconnectReason.BY_APPLICATION) {
+                                        requestReconnect(sessionId, "Connection lost.")
+                                    }
+                                }
+                            }
                         }
                     }
                     ConnectionMode.SFTP, ConnectionMode.SCP -> {
@@ -754,6 +795,10 @@ class SessionService : Service() {
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
                 // Log in for transfers now, so the first one starts at once.
                 transferPool?.let { pool -> serviceScope.launch { pool.warmUp() } }
+                if (mode != ConnectionMode.SSH) {
+                    stopFileBoost(sessionId)
+                    startFileBoost(sessionId, force = true)
+                }
                 // Reconnected: the server answers again, so transfers waiting out a retry delay go now.
                 if (reconnectReason != null) activeTransfersFor(sessionId).forEach { it.engine?.wakeUp() }
                 TelemetryInitializer.breadcrumb("session active mode=$mode mosh=$useMoshTransport tmux=${sessionHost.attachTmux}")
@@ -811,25 +856,23 @@ class SessionService : Service() {
             val retryReason: String? = attempt.fold(
                 onSuccess = { reason -> reason },
                 onFailure = { error ->
+                    // While a Boost terminal lives, SSH (needed only for port forwards then) keeps trying.
                     val retryable = reconnectReason != null &&
                         error !is CancellationException &&
                         error.connectionFailureKind()?.isNetwork == true &&
-                        reconnectAttempt < MAX_RECONNECT_ATTEMPTS
+                        (reconnectAttempt < MAX_RECONNECT_ATTEMPTS || boostShellFor(sessionId)?.alive == true)
                     if (retryable) reconnectReason else null
                 }
             )
             if (retryReason != null && autoReconnectEnabled && currentCoroutineContext().isActive) {
                 reconnectingSessions.add(sessionId)
                 reusableTerminalEngine = shellBinding?.terminalEngine ?: reusableTerminalEngine
+                // A live Boost terminal doesn't need SSH: keep it, so the screen stays usable and its shell carries on.
+                shellBinding?.takeIf { (it.channel as? BoostTerminalChannel)?.alive == true }?.let { keptBoostShells[sessionId] = it }
                 activeConnections.remove(sessionId)
-                runCatching { shellBinding?.outputReaderJob?.cancel() }
-                runCatching { shellBinding?.inputWriterJob?.cancel() }
-                runCatching { shellBinding?.resizeWriterJob?.cancel() }
-                runCatching { shellBinding?.inputQueue?.close() }
-                runCatching { shellBinding?.resizeQueue?.close() }
-                runCatching { shellBinding?.shell?.close() }
-                runCatching { shellBinding?.session?.close() }
+                shellBinding?.takeUnless { keptBoostShells[sessionId] === it }?.let(::closeShellBinding)
                 runCatching { sftpBinding?.client?.close() }
+                stopFileBoost(sessionId)
                 runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
                 runCatching { client?.socket?.close() }
                 runCatching { client?.disconnect() }
@@ -888,13 +931,8 @@ class SessionService : Service() {
             break
             }
             cancelFileTransfer(sessionId)
-            runCatching { shellBinding?.resizeQueue?.close() }
-            runCatching { shellBinding?.inputQueue?.close() }
-            runCatching { shellBinding?.resizeWriterJob?.cancel() }
-            runCatching { shellBinding?.inputWriterJob?.cancel() }
-            runCatching { shellBinding?.outputReaderJob?.cancel() }
-            runCatching { shellBinding?.shell?.close() }
-            runCatching { shellBinding?.session?.close() }
+            shellBinding?.let(::closeShellBinding)
+            keptBoostShells.remove(sessionId)?.let(::closeShellBinding)
             runCatching { moshBinding?.inputQueue?.close() }
             runCatching { moshBinding?.inputWriterJob?.cancel() }
             runCatching { moshBinding?.let { shutDownMosh(client, it) } }
@@ -907,6 +945,8 @@ class SessionService : Service() {
             listingGenerations.remove(sessionId)
             lastRequestedListings.remove(sessionId)
             bulkLinkLookupUnavailable.remove(sessionId)
+            stopFileBoost(sessionId)
+            fileBoostLastStart.remove(sessionId)
             clearHostKeyPromptsForHost(sessionId, trust = false)
             clearPasswordPromptsForHost(sessionId, password = null)
             clearRuntimeSessionPassword(sessionId)
@@ -921,6 +961,8 @@ class SessionService : Service() {
             return
         }
         job.invokeOnCompletion { completionError ->
+            keptBoostShells.remove(sessionId)?.let(::closeShellBinding)
+            boostTerminalStates.remove(sessionId)
             if (activeJobs.remove(sessionId, job)) {
                 activeConnections.remove(sessionId)
                 clearRuntimeSessionPassword(sessionId)
@@ -937,6 +979,8 @@ class SessionService : Service() {
 
     fun stopSession(hostId: String) {
         UiDebugLog.action("stopSession", "hostId=$hostId")
+        // Closing the session ends a Boost terminal's shell on the server too.
+        keptBoostShells.remove(hostId)?.let(::closeShellBinding)
         reconnectSignals.remove(hostId)
         reconnectingSessions.remove(hostId)
         cancelFileTransfer(hostId)
@@ -1062,6 +1106,12 @@ class SessionService : Service() {
 
     /** Closes the socket under a connection that stopped responding. Unlike closing the shell or disconnecting, this
      * can't block on the dead link; the shell reader then fails, which reconnects or ends the session. */
+    /** Tests: drops the session's SSH connection the way a dead network does. */
+    @androidx.annotation.VisibleForTesting
+    internal fun dropSshConnectionForTests(sessionId: String) {
+        activeConnections[sessionId]?.client?.let(::dropDeadConnection)
+    }
+
     private fun dropDeadConnection(client: SSHClient) {
         runCatching { client.socket?.close() }
     }
@@ -1073,20 +1123,33 @@ class SessionService : Service() {
         UiDebugLog.result("stopAllSessions", true)
     }
 
+    /** Stops a terminal's I/O loops and ends its remote end. */
+    private fun closeShellBinding(binding: ShellBinding) {
+        runCatching { binding.resizeQueue.close() }
+        runCatching { binding.inputQueue.close() }
+        runCatching { binding.resizeWriterJob.cancel() }
+        runCatching { binding.inputWriterJob.cancel() }
+        runCatching { binding.outputReaderJob.cancel() }
+        runCatching { binding.channel.close() }
+    }
+
+    /** The session's Boost terminal, whether its SSH connection is up or reconnecting. */
+    private fun boostShellFor(sessionId: String): BoostTerminalChannel? =
+        (activeConnections[sessionId]?.shellBinding ?: keptBoostShells[sessionId])?.channel as? BoostTerminalChannel
+
+    private fun kickBoostShells() {
+        (activeConnections.keys + keptBoostShells.keys).toSet().forEach { boostShellFor(it)?.kick() }
+    }
+
     private fun closeConnectionResources(hostId: String, connection: ActiveConnection, trigger: String) {
         measureOperation("closeConnectionResources/$trigger", hostId, thresholdMs = 200L) {
-            runCatching { connection.shellBinding?.resizeQueue?.close() }
-            runCatching { connection.shellBinding?.inputQueue?.close() }
-            runCatching { connection.shellBinding?.resizeWriterJob?.cancel() }
-            runCatching { connection.shellBinding?.inputWriterJob?.cancel() }
-            runCatching { connection.shellBinding?.outputReaderJob?.cancel() }
-            runCatching { connection.shellBinding?.shell?.close() }
-            runCatching { connection.shellBinding?.session?.close() }
+            connection.shellBinding?.let(::closeShellBinding)
             runCatching { connection.moshBinding?.inputQueue?.close() }
             runCatching { connection.moshBinding?.inputWriterJob?.cancel() }
             runCatching { connection.moshBinding?.let { shutDownMosh(connection.client, it) } }
             runCatching { connection.sftpBinding?.client?.close() }
             runCatching { connection.transferPool?.close() }
+            stopFileBoost(hostId)
             runCatching { connection.portForwardBindings.forEach { closePortForwardBinding(it) } }
             runCatching { connection.client?.disconnect() }
         }
@@ -1174,7 +1237,8 @@ class SessionService : Service() {
     fun remoteDirectoryFlow(): StateFlow<Map<String, RemoteDirectorySnapshot>> = remoteDirectoriesState
     fun fileTransferProgressFlow(): StateFlow<Map<String, FileTransferProgress>> = fileTransferProgressState
     fun resolveTerminalEmulator(hostId: String): TerminalEmulator? {
-        val connection = activeConnections[hostId] ?: return null
+        val connection = activeConnections[hostId]
+            ?: return keptBoostShells[hostId]?.terminalEngine?.emulator()
         return connection.shellBinding?.terminalEngine?.emulator()
             ?: connection.moshBinding?.session?.emulator
     }
@@ -1227,7 +1291,11 @@ class SessionService : Service() {
         if (bytes.isEmpty()) return
         val connection = activeConnections[hostId]
         if (connection == null) {
-            UiDebugLog.result("sendShellBytes", false, "session-not-active hostId=$hostId")
+            // SSH is reconnecting under a Boost terminal, which takes input meanwhile.
+            val kept = keptBoostShells[hostId]
+            if (kept == null || !kept.inputQueue.trySend(bytes.copyOf()).isSuccess) {
+                UiDebugLog.result("sendShellBytes", false, "session-not-active hostId=$hostId")
+            }
             return
         }
         connection.moshBinding?.let { mosh ->
@@ -1273,7 +1341,10 @@ class SessionService : Service() {
         val next = columns to rows
         // Remembered even while the session is reconnecting: the next shell's PTY is opened at this size.
         val previous = shellSizes.put(hostId, next)
-        val connection = activeConnections[hostId] ?: return
+        val connection = activeConnections[hostId] ?: run {
+            keptBoostShells[hostId]?.takeIf { previous != next }?.resizeQueue?.trySend(next)
+            return
+        }
         if (connection.mode != ConnectionMode.SSH) return
         if (previous == next) return
         connection.moshBinding?.let { mosh ->
@@ -1328,6 +1399,171 @@ class SessionService : Service() {
                 UiDebugLog.result("listSftpDirectory", false, "sftp-not-active hostId=$hostId")
             }
         }
+    }
+
+    /**
+     * Starts file boost for a file browser session when the setting is on: in the background, so the browser works
+     * over SFTP meanwhile. [force] skips the wait between attempts.
+     */
+    private fun startFileBoost(sessionId: String, force: Boolean = false) {
+        val settings = sftpTransferSettings
+        if (!settings.boost || !BoostHelper.clientAvailable) return
+        val connection = activeConnections[sessionId] ?: return
+        if (connection.mode == ConnectionMode.SSH) return
+        val ssh = connection.client ?: return
+        if (fileBoostStarts[sessionId]?.isActive == true) return
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - (fileBoostLastStart[sessionId] ?: Long.MIN_VALUE / 2) < FILE_BOOST_RETRY_MS) return
+        fileBoostLastStart[sessionId] = now
+        fileBoostStarts[sessionId] = serviceScope.launch {
+            val result = runCatching {
+                ssh.newSFTPClient().use { sftp -> BoostHelper.start(this@SessionService, ssh, sftp, settings.boostTcpFallback, settings.boostPortRange) }
+            }
+            result.onSuccess { boost ->
+                if (activeConnections[sessionId]?.client !== ssh || !sftpTransferSettings.boost) {
+                    boost.close()
+                    return@onSuccess
+                }
+                fileBoosts.put(sessionId, boost)?.close()
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "Boost on (${boost.transport.uppercase()})."
+                    )
+                )
+            }.onFailure { error ->
+                val reason = (error as? BoostUnavailable)?.message ?: (error.message ?: error.javaClass.simpleName)
+                Log.i(FILE_BOOST_TAG, "Boost unavailable for $sessionId", error)
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "Boost isn't available: $reason. Using SFTP."
+                    )
+                )
+            }
+        }
+    }
+
+    private fun stopFileBoost(sessionId: String) {
+        fileBoostStarts.remove(sessionId)?.cancel()
+        fileBoosts.remove(sessionId)?.let { boost -> serviceScope.launch { boost.close() } }
+    }
+
+    /** The session's working file boost, if any; a broken one is dropped and a new one started for next time. */
+    private fun fileBoostFor(sessionId: String): BoostHelper? {
+        val boost = fileBoosts[sessionId] ?: return null
+        if (!boost.broken) return boost
+        if (fileBoosts.remove(sessionId, boost)) serviceScope.launch { boost.close() }
+        startFileBoost(sessionId)
+        return null
+    }
+
+    /** A boost operation failed: unless the helper refused the request itself, the connection is suspect. */
+    private fun fileBoostFailed(sessionId: String, boost: BoostHelper, error: Throwable, what: String) {
+        if (error.message?.startsWith(com.majordaftapps.sshpeaches.boost.boostclient.Boostclient.RemoteErrorPrefix) != true) {
+            boost.markBroken()
+        }
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = sessionId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Boost $what failed (${error.message ?: error.javaClass.simpleName}); using SFTP."
+            )
+        )
+    }
+
+    /**
+     * Downloads [source] over file boost into [channel] (whose descriptor is [descriptor]), resuming from and saving
+     * to [partial] like the SFTP download, so either can carry on from the other.
+     */
+    private fun boostDownload(
+        boost: BoostHelper,
+        source: String,
+        size: Long,
+        mtime: Long,
+        partial: SftpPartialDownload,
+        channel: java.nio.channels.FileChannel,
+        descriptor: java.io.FileDescriptor,
+        progress: (Long) -> Unit,
+        cancelled: () -> Boolean
+    ) {
+        val (resolved, _) = boost.allowRead(source)
+        try {
+            val saved = partial.load(source, size, mtime)
+            if (saved == null) partial.deleteState()
+            val queue = SftpChunkQueue(saved ?: SftpChunkQueue.plan(size, boostStreams()))
+            val current = channel.size()
+            if (current > size) channel.truncate(size) else if (current < size && size > 0L) {
+                channel.write(java.nio.ByteBuffer.allocate(1), size - 1)
+            }
+            partial.save(source, size, mtime, queue.snapshot())
+            runBoostTransfer(queue, progress, cancelled, onCheckpoint = { partial.save(source, size, mtime, it) }) { chunks, onChunk, stop ->
+                android.os.ParcelFileDescriptor.dup(descriptor).use { dup ->
+                    boost.download(resolved, dup.fd, chunks, boostStreams(), onChunk, stop)
+                }
+            }
+            partial.deleteState()
+        } catch (error: Throwable) {
+            if (cancelled() || error is FileTransferCancelledException) partial.delete()
+            throw error
+        } finally {
+            boost.forget(resolved)
+        }
+    }
+
+    private fun boostStreams() = BoostHelper.streamsForTests.takeIf { it > 0 } ?: FILE_BOOST_STREAMS
+
+    /** Uploads [local] to [destination] over file boost. */
+    private fun boostUpload(boost: BoostHelper, destination: String, local: UploadSource, progress: (Long) -> Unit, cancelled: () -> Boolean) {
+        val resolved = boost.allowWrite(destination, local.permissions)
+        try {
+            val queue = SftpChunkQueue(SftpChunkQueue.plan(local.size, boostStreams()))
+            runBoostTransfer(queue, progress, cancelled, onCheckpoint = {}) { chunks, onChunk, stop ->
+                android.os.ParcelFileDescriptor.dup(local.descriptor).use { dup ->
+                    boost.upload(resolved, dup.fd, chunks, boostStreams(), onChunk, stop)
+                }
+            }
+        } finally {
+            boost.forget(resolved)
+        }
+    }
+
+    /**
+     * Runs one boost transfer of [queue]'s chunks: progress and checkpoints from the helper's per-chunk reports
+     * (which arrive on Go's threads, so they're serialized here), cancellation polled.
+     */
+    private fun runBoostTransfer(
+        queue: SftpChunkQueue,
+        progress: (Long) -> Unit,
+        cancelled: () -> Boolean,
+        onCheckpoint: (List<SftpPartialDownload.RangeState>) -> Unit,
+        run: (chunks: String, onChunk: (Int, Long) -> Unit, stop: () -> Boolean) -> Unit
+    ) {
+        val chunks = org.json.JSONArray(queue.snapshot().map { org.json.JSONArray(listOf(it.start, it.end, it.done)) }).toString()
+        val lock = Any()
+        var callbackError: Throwable? = null
+        var lastCheckpoint = 0L
+        run(chunks, { index, done ->
+            synchronized(lock) {
+                queue.advance(index, done)
+                try {
+                    progress(queue.bytesDone())
+                } catch (error: Throwable) {
+                    callbackError = error
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastCheckpoint >= 500L) {
+                    lastCheckpoint = now
+                    onCheckpoint(queue.snapshot())
+                }
+            }
+        }, { cancelled() || synchronized(lock) { callbackError != null } })
+        onCheckpoint(queue.snapshot())
+        synchronized(lock) { callbackError }?.let { throw it }
+        if (cancelled()) throw FileTransferCancelledException()
+        if (!queue.isComplete()) throw IOException("Boost stopped before the whole file was moved")
     }
 
     private suspend fun awaitTransferPool(hostId: String): SftpTransferPool {
@@ -1665,7 +1901,17 @@ class SessionService : Service() {
                     )
                 )
             }
-            fun downloadInto(partial: SftpPartialDownload, channel: java.nio.channels.FileChannel) {
+            fun downloadInto(partial: SftpPartialDownload, channel: java.nio.channels.FileChannel, descriptor: java.io.FileDescriptor) {
+                fileBoostFor(hostId)?.let { boost ->
+                    try {
+                        boostDownload(boost, source, size, attributes.mtime, partial, channel, descriptor, progress, cancelled)
+                        return
+                    } catch (error: Throwable) {
+                        if (cancelled() || error is FileTransferCancelledException) throw error
+                        // SFTP carries on from the chunks file boost finished.
+                        fileBoostFailed(hostId, boost, error, "download")
+                    }
+                }
                 SftpResumableDownloader.download(
                     leases = pool,
                     connections = settings.parallelDownloads,
@@ -1690,7 +1936,7 @@ class SessionService : Service() {
                 val partial = SftpPartialDownload.forDestination(
                     sftpPartialDirectory(), hostKey, source, "file:${destinationFile.absolutePath}", part
                 )
-                RandomAccessFile(part, "rw").use { raf -> downloadInto(partial, raf.channel) }
+                RandomAccessFile(part, "rw").use { raf -> downloadInto(partial, raf.channel, raf.fd) }
                 if (!part.renameTo(destinationFile)) {
                     part.copyTo(destinationFile, overwrite = true)
                     part.delete()
@@ -1705,7 +1951,7 @@ class SessionService : Service() {
                                 sftpPartialDirectory(), hostKey, source, uri.toString(), null
                             )
                             try {
-                                downloadInto(partial, channel)
+                                downloadInto(partial, channel, pfd.fileDescriptor)
                             } catch (error: Throwable) {
                                 // The picker made this file for the download; leave it empty, not half written.
                                 if (cancelled()) runCatching { channel.truncate(0L) }
@@ -1719,7 +1965,7 @@ class SessionService : Service() {
                     runCatching { descriptor?.close() }
                     val partial = SftpPartialDownload.forRemote(sftpPartialDirectory(), hostKey, source)
                     val data = checkNotNull(partial.dataFile)
-                    RandomAccessFile(data, "rw").use { raf -> downloadInto(partial, raf.channel) }
+                    RandomAccessFile(data, "rw").use { raf -> downloadInto(partial, raf.channel, raf.fd) }
                     try {
                         contentResolver.openOutputStream(uri, "w")?.use { output ->
                             data.inputStream().use { input -> input.copyTo(output, COPY_BUFFER_BYTES) }
@@ -1787,7 +2033,20 @@ class SessionService : Service() {
                     settings.sftpReadSize.toLong() * settings.sftpMaxRequests,
                     SftpTransferSettings.MAX_IN_FLIGHT_BYTES_PER_CONNECTION
                 )
-                SftpSegmentedTransfer(
+                val boosted = fileBoostFor(hostId)?.let { boost ->
+                    try {
+                        boostUpload(boost, destination, local, transferProgressPublisher(transfer, local.size)) {
+                            transfer.cancellationRequested.get()
+                        }
+                        true
+                    } catch (error: Throwable) {
+                        if (transfer.cancellationRequested.get() || error is FileTransferCancelledException) throw error
+                        // SFTP starts the file over.
+                        fileBoostFailed(hostId, boost, error, "upload")
+                        false
+                    }
+                } ?: false
+                if (!boosted) SftpSegmentedTransfer(
                     queue = SftpChunkQueue(SftpChunkQueue.plan(local.size, settings.parallelDownloads)),
                     workers = settings.parallelDownloads,
                     leases = pool,
@@ -1817,6 +2076,7 @@ class SessionService : Service() {
 
     /** A local file to upload, opened for reads at any offset. */
     private class UploadSource(
+        val descriptor: java.io.FileDescriptor,
         val channel: java.nio.channels.FileChannel,
         val size: Long,
         val label: String,
@@ -1836,8 +2096,10 @@ class SessionService : Service() {
             val file = File(source)
             require(file.exists()) { "Local file does not exist: $source" }
             require(file.isFile) { "Local path is not a file: $source" }
-            val channel = RandomAccessFile(file, "r").channel
+            val raf = RandomAccessFile(file, "r")
+            val channel = raf.channel
             return UploadSource(
+                descriptor = raf.fd,
                 channel = channel,
                 size = channel.size(),
                 label = file.absolutePath,
@@ -1850,7 +2112,7 @@ class SessionService : Service() {
         val descriptor = runCatching { contentResolver.openFileDescriptor(uri, "r") }.getOrNull()
         if (descriptor != null && descriptor.statSize >= 0L) {
             val channel = FileInputStream(descriptor.fileDescriptor).channel
-            return UploadSource(channel, descriptor.statSize, label, 0b110_100_100, null) {
+            return UploadSource(descriptor.fileDescriptor, channel, descriptor.statSize, label, 0b110_100_100, null) {
                 runCatching { descriptor.close() }
             }
         }
@@ -1866,8 +2128,9 @@ class SessionService : Service() {
             staged.delete()
             throw error
         }
-        val channel = RandomAccessFile(staged, "r").channel
-        return UploadSource(channel, channel.size(), label, 0b110_100_100, null) { staged.delete() }
+        val stagedFile = RandomAccessFile(staged, "r")
+        val channel = stagedFile.channel
+        return UploadSource(stagedFile.fd, channel, channel.size(), label, 0b110_100_100, null) { staged.delete() }
     }
 
     /** Looks [path] up on the browser's connection, which is already open; transfers' own may still be logging in. */
@@ -2058,7 +2321,13 @@ class SessionService : Service() {
             }
         }
         measureOperation("sftpListDirectory", hostId, thresholdMs = 200L) {
-            val directory = loadSftpDirectoryPipelined(
+            // File boost lists a folder, links and all, in one round trip; SFTP covers anything it can't do.
+            val boosted = fileBoostFor(hostId)?.let { boost ->
+                runCatching { parseBoostListing(boost.list(path), resolveSymbolicLinks) }
+                    .onFailure { fileBoostFailed(hostId, boost, it, "listing") }
+                    .getOrNull()
+            }
+            val directory = boosted ?: loadSftpDirectoryPipelined(
                 sftp = sftp,
                 requestedPath = path,
                 resolveSymbolicLinks = resolveSymbolicLinks,
@@ -3587,6 +3856,109 @@ class SessionService : Service() {
         }
         // sshj's session channel is both a Command and a Shell, so an exec'd tmux behaves like a shell.
         val shell = if (attachTmux) session.exec(TMUX_ATTACH_COMMAND) as Session.Shell else session.startShell()
+        return bindShell(hostId, SshTerminalChannel(session, shell), reuseTerminalEngine)
+    }
+
+    /**
+     * Opens the terminal through Boost when it's on for terminals: the helper runs the login shell, reached over
+     * UDP (or TCP), so the terminal survives the SSH connection and network changes. Null, and the caller opens an
+     * SSH shell, when it's off, the host attaches tmux, or the helper can't start or be reached; a failure is
+     * remembered for a while, so connecting to that host again doesn't wait on it.
+     */
+    private suspend fun openBoostShell(
+        sessionId: String,
+        host: HostConnection,
+        client: SSHClient,
+        terminalEmulation: TerminalEmulation,
+        reuseTerminalEngine: TermuxTerminalEngine?
+    ): ShellBinding? {
+        val settings = sftpTransferSettings
+        if (!settings.boost || !settings.boostTerminal || host.attachTmux || !BoostHelper.clientAvailable) return null
+        val hostKey = "${host.username}@${host.host}:${host.port}"
+        if ((boostTerminalUnavailableUntil[hostKey] ?: 0L) > SystemClock.elapsedRealtime()) return null
+        fun unavailable(reason: String, error: Throwable?) {
+            boostTerminalUnavailableUntil[hostKey] = SystemClock.elapsedRealtime() + BOOST_TERMINAL_RETRY_MS
+            Log.i(FILE_BOOST_TAG, "Boost terminal unavailable for $sessionId", error)
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Boost isn't available for the terminal: $reason. Using SSH."
+                )
+            )
+        }
+        val (columns, rows) = shellSizes[sessionId] ?: (DEFAULT_SHELL_COLUMNS to DEFAULT_SHELL_ROWS)
+        // The first time, the helper is copied to the server, which can take a while on a slow link. Past the wait
+        // the terminal opens over SSH and the copy finishes in the background, for the next session.
+        val start = serviceScope.async(Dispatchers.IO) {
+            client.newSFTPClient().use { sftp ->
+                BoostHelper.start(
+                    this@SessionService, client, sftp, settings.boostTcpFallback, settings.boostPortRange, shells = true
+                )
+            }
+        }
+        val helper = try {
+            withTimeoutOrNull(BOOST_TERMINAL_START_TIMEOUT_MS) { start.await() }
+        } catch (error: CancellationException) {
+            serviceScope.launch { runCatching { start.await().close() } }
+            throw error
+        } catch (error: Exception) {
+            unavailable((error as? BoostUnavailable)?.message ?: (error.message ?: error.javaClass.simpleName), error)
+            return null
+        }
+        if (helper == null) {
+            serviceScope.launch { runCatching { start.await().close() } }
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Boost is still being set up on this server; this terminal uses SSH."
+                )
+            )
+            return null
+        }
+        val channel = try {
+            withContext(Dispatchers.IO) {
+                BoostTerminalChannel(helper, columns, rows, terminalEmulation.ptyName) { state, detail ->
+                    onBoostTerminalState(sessionId, state, detail)
+                }
+            }
+        } catch (error: Exception) {
+            runCatching { helper.close() }
+            if (error is CancellationException) throw error
+            unavailable(error.message ?: error.javaClass.simpleName, error)
+            return null
+        }
+        boostTerminalStates[sessionId] = "connected"
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = sessionId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Terminal on Boost (${helper.transport.uppercase()})."
+            )
+        )
+        return bindShell(sessionId, channel, reuseTerminalEngine)
+    }
+
+    /** Logs a Boost terminal's connection changes: once when it starts reconnecting, once when it's back. */
+    private fun onBoostTerminalState(sessionId: String, state: String, detail: String) {
+        val previous = boostTerminalStates.put(sessionId, state)
+        if (previous == state) return
+        val (level, message) = when (state) {
+            "reconnecting" -> SessionLogBus.LogLevel.WARN to "Terminal reconnecting over Boost ($detail)..."
+            "connected" -> SessionLogBus.LogLevel.INFO to "Terminal back on Boost (${detail.uppercase()})."
+            "lost" -> SessionLogBus.LogLevel.WARN to "Boost lost the terminal: $detail."
+            else -> return
+        }
+        SessionLogBus.emit(SessionLogBus.Entry(hostId = sessionId, level = level, message = message))
+    }
+
+    /** Wires a terminal channel to the screen: a terminal engine (a reconnect's old one), and the I/O loops. */
+    private fun bindShell(
+        hostId: String,
+        channel: TerminalChannel,
+        reuseTerminalEngine: TermuxTerminalEngine?
+    ): ShellBinding {
         val terminalEngine = reuseTerminalEngine ?: TermuxTerminalEngine(
             onWriteToRemote = {},
             onTerminalDiagnostic = { message ->
@@ -3600,14 +3972,13 @@ class SessionService : Service() {
                 )
             }
         )
-        val outputReaderJob = startShellOutputReader(hostId, shell, terminalEngine)
+        val outputReaderJob = startShellOutputReader(hostId, channel, terminalEngine)
         val inputQueue = CoroutineChannel<ByteArray>(CoroutineChannel.UNLIMITED)
-        val inputWriterJob = startShellInputWriter(hostId, shell, inputQueue)
+        val inputWriterJob = startShellInputWriter(hostId, channel, inputQueue)
         val resizeQueue = CoroutineChannel<Pair<Int, Int>>(CoroutineChannel.CONFLATED)
-        val resizeWriterJob = startShellResizeWriter(hostId, shell, resizeQueue)
+        val resizeWriterJob = startShellResizeWriter(hostId, channel, resizeQueue)
         return ShellBinding(
-            session = session,
-            shell = shell,
+            channel = channel,
             terminalEngine = terminalEngine,
             outputReaderJob = outputReaderJob,
             inputQueue = inputQueue,
@@ -3619,7 +3990,7 @@ class SessionService : Service() {
 
     private fun startShellOutputReader(
         hostId: String,
-        shell: Session.Shell,
+        channel: TerminalChannel,
         terminalEngine: TermuxTerminalEngine
     ): Job = serviceScope.launch(Dispatchers.IO) {
         val buffer = ByteArray(2048)
@@ -3642,7 +4013,7 @@ class SessionService : Service() {
         )
         while (isActive) {
             val read = try {
-                shell.inputStream.read(buffer)
+                channel.inputStream.read(buffer)
             } catch (error: Exception) {
                 if (!isActive) return@launch
                 emitShellLifecycleDiagnostic(
@@ -3683,12 +4054,12 @@ class SessionService : Service() {
 
     private fun startShellResizeWriter(
         hostId: String,
-        shell: Session.Shell,
+        channel: TerminalChannel,
         resizeQueue: CoroutineChannel<Pair<Int, Int>>
     ): Job = serviceScope.launch(Dispatchers.IO) {
         for ((columns, rows) in resizeQueue) {
             try {
-                shell.changeWindowDimensions(columns, rows, 0, 0)
+                channel.resize(columns, rows)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -3706,12 +4077,12 @@ class SessionService : Service() {
 
     private fun startShellInputWriter(
         hostId: String,
-        shell: Session.Shell,
+        channel: TerminalChannel,
         inputQueue: CoroutineChannel<ByteArray>
     ): Job = serviceScope.launch(Dispatchers.IO) {
         for (payload in inputQueue) {
             runCatching {
-                writeShellInputPayload(hostId, shell, payload)
+                writeShellInputPayload(hostId, channel, payload)
                 emitShellStreamDiagnostic(hostId = hostId, direction = "TX", payload = payload, size = payload.size)
             }.onFailure { err ->
                 SessionLogBus.emit(
@@ -3725,7 +4096,7 @@ class SessionService : Service() {
         }
     }
 
-    private suspend fun writeShellInputPayload(hostId: String, shell: Session.Shell, payload: ByteArray) {
+    private suspend fun writeShellInputPayload(hostId: String, channel: TerminalChannel, payload: ByteArray) {
         val timedOut = AtomicBoolean(false)
         val watchdog = serviceScope.launch(Dispatchers.IO) {
             delay(SHELL_INPUT_WRITE_TIMEOUT_MS)
@@ -3739,14 +4110,14 @@ class SessionService : Service() {
             )
             // Closing the shell would wait on the same stalled link, so drop the connection under it instead.
             activeConnections[hostId]
-                ?.takeIf { it.shellBinding?.shell === shell }
+                ?.takeIf { it.shellBinding?.channel === channel }
                 ?.client
                 ?.let(::dropDeadConnection)
-                ?: runCatching { shell.close() }
+                ?: runCatching { channel.close() }
         }
         try {
-            shell.outputStream.write(payload)
-            shell.outputStream.flush()
+            channel.outputStream.write(payload)
+            channel.outputStream.flush()
             if (timedOut.get()) {
                 throw TimeoutException("Timed out writing to shell input")
             }
@@ -4012,12 +4383,16 @@ class SessionService : Service() {
         message: String?,
         failureKind: ConnectionFailureKind? = null
     ) {
+        // Under a live Boost terminal a reconnect is SSH's alone: the terminal stays usable, so the session stays
+        // active instead of showing the reconnect screen.
+        val boostCarriesOn = status == SessionStatus.CONNECTING &&
+            (keptBoostShells[sessionId]?.channel as? BoostTerminalChannel)?.alive == true
         val snapshot = SessionSnapshot(
             hostId = sessionId,
             host = host,
             mode = mode,
-            status = status,
-            statusMessage = message,
+            status = if (boostCarriesOn) SessionStatus.ACTIVE else status,
+            statusMessage = if (boostCarriesOn) "Terminal on Boost; SSH reconnecting ($message)" else message,
             failureKind = failureKind
         )
         synchronized(sessionStateLock) {
@@ -4314,6 +4689,7 @@ class SessionService : Service() {
 
     companion object {
         private const val PERF_TAG = "SSHPeachesPerf"
+        private const val FILE_BOOST_TAG = "BoostHelper"
         private const val BACKGROUND_STOP_POLL_MS = 30_000L
         private const val CHANNEL_ID = "sessions"
         private const val SUMMARY_NOTIFICATION_ID = 42_000
@@ -4332,6 +4708,10 @@ class SessionService : Service() {
         private const val DEFAULT_SHELL_COLUMNS = 120
         private const val DEFAULT_SHELL_ROWS = 40
         private const val MAX_RECONNECT_ATTEMPTS = 8
+        /** How long a session waits for its Boost terminal to start (installing the helper included). */
+        private const val BOOST_TERMINAL_START_TIMEOUT_MS = 20_000L
+        /** How long a host whose Boost terminal couldn't start uses SSH without trying again. */
+        private const val BOOST_TERMINAL_RETRY_MS = 30 * 60_000L
         private const val MAX_EDITABLE_FILE_BYTES = 1024L * 1024L
         /** How long to keep reading a background command's output after it ran (or timed out). */
         private const val REMOTE_OUTPUT_DRAIN_MS = 2_000L
@@ -4354,6 +4734,8 @@ class SessionService : Service() {
         private const val FILE_TRANSFER_PROGRESS_UPDATE_INTERVAL_NANOS = 250_000_000L
         private const val PARTIAL_DOWNLOAD_SUFFIX = ".part"
         private const val TRANSFER_KEEPALIVE_MAX_UNANSWERED = 6
+        private const val FILE_BOOST_RETRY_MS = 30_000L
+        private const val FILE_BOOST_STREAMS = 16
         private const val COPY_BUFFER_BYTES = 1 shl 20
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
@@ -4431,8 +4813,7 @@ class SessionService : Service() {
     )
 
     private data class ShellBinding(
-        val session: Session,
-        val shell: Session.Shell,
+        val channel: TerminalChannel,
         val terminalEngine: TermuxTerminalEngine,
         val outputReaderJob: Job,
         val inputQueue: CoroutineChannel<ByteArray>,

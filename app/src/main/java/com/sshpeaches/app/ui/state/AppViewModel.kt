@@ -858,6 +858,30 @@ class AppViewModel(
         }
     }
 
+    fun setBoost(enabled: Boolean) {
+        launchLogged("setBoost", "enabled=$enabled") {
+            SettingsStore.setBoost(enabled)
+        }
+    }
+
+    fun setBoostTerminal(enabled: Boolean) {
+        launchLogged("setBoostTerminal", "enabled=$enabled") {
+            SettingsStore.setBoostTerminal(enabled)
+        }
+    }
+
+    fun setBoostTcpFallback(enabled: Boolean) {
+        launchLogged("setBoostTcpFallback", "enabled=$enabled") {
+            SettingsStore.setBoostTcpFallback(enabled)
+        }
+    }
+
+    fun setBoostPorts(ports: String) {
+        launchLogged("setBoostPorts", "ports=$ports") {
+            SettingsStore.setBoostPorts(ports)
+        }
+    }
+
     fun applySftpFastPreset() {
         launchLogged("applySftpFastPreset") {
             SettingsStore.applySftpFastPreset()

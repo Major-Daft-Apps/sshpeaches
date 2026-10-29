@@ -29,3 +29,10 @@
 -keep class org.joni.** { *; }
 -keep class org.jcodings.** { *; }
 -dontwarn org.eclipse.jdt.annotation.**
+
+# File boost: the gomobile-bound Go library (tools/boost) calls into these classes by name through JNI, including
+# the app's own Progress and ShellListener implementations.
+-keep class go.** { *; }
+-keep class com.majordaftapps.sshpeaches.boost.** { *; }
+-keep class * implements com.majordaftapps.sshpeaches.boost.boostclient.Progress { *; }
+-keep class * implements com.majordaftapps.sshpeaches.boost.boostclient.ShellListener { *; }

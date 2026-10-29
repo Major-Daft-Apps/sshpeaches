@@ -55,6 +55,20 @@ Check:
 
 Transfers log in to the server again, on up to four extra connections (**Settings** -> **Advanced** -> **Connections per transfer**), so browsing never waits for them. If the server refuses a second login (it allows one connection per user, or asks for a one-time code), transfers share the session's own connection instead, and are slower. The session log says when that happens.
 
+## Boost isn't used
+
+The session log says why when Boost can't start ("Boost isn't available: ...") and the app uses SFTP or SSH:
+
+- "the server's firewall doesn't let UDP through" or "lets neither UDP nor TCP through": open the **Boost ports**
+  range (**Settings** -> **Advanced**, default `60000-61000` UDP, plus TCP for the fallback) in the server's firewall,
+  or set the range to ports it already allows.
+- "the server isn't Linux" or "the server's processor isn't supported": the helper only runs on Linux, x86_64 or ARM64.
+- "no free UDP port": every port in the range is in use; widen it.
+- "Boost is still being set up on this server": the first session copies the helper (about 6 MB); on a slow link the
+  terminal opens over SSH meanwhile and the next session uses Boost.
+
+After a host's Boost terminal fails to start, terminals to that host use SSH for 30 minutes without trying again.
+
 ## Background sessions not staying alive
 
 Verify:

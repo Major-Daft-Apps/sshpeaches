@@ -81,6 +81,10 @@ object SettingsStore {
     private val sftpReadSizeKey = intPreferencesKey("sftp_read_size")
     private val sftpMaxRequestsKey = intPreferencesKey("sftp_max_requests")
     private val parallelDownloadsKey = intPreferencesKey("parallel_downloads")
+    private val boostKey = booleanPreferencesKey("boost")
+    private val boostTerminalKey = booleanPreferencesKey("boost_terminal")
+    private val boostTcpFallbackKey = booleanPreferencesKey("boost_tcp_fallback")
+    private val boostPortsKey = stringPreferencesKey("boost_ports")
 
     val defaultCrashReportsEnabled: Boolean = true
     val defaultAnalyticsEnabled: Boolean = true
@@ -310,7 +314,11 @@ object SettingsStore {
             SftpTransferSettings(
                 sftpReadSize = prefs[sftpReadSizeKey] ?: SftpTransferSettings.DEFAULT_SFTP_READ_SIZE,
                 sftpMaxRequests = prefs[sftpMaxRequestsKey] ?: SftpTransferSettings.DEFAULT_SFTP_MAX_REQUESTS,
-                parallelDownloads = prefs[parallelDownloadsKey] ?: SftpTransferSettings.DEFAULT_PARALLEL_DOWNLOADS
+                parallelDownloads = prefs[parallelDownloadsKey] ?: SftpTransferSettings.DEFAULT_PARALLEL_DOWNLOADS,
+                boost = prefs[boostKey] ?: false,
+                boostTerminal = prefs[boostTerminalKey] ?: true,
+                boostTcpFallback = prefs[boostTcpFallbackKey] ?: true,
+                boostPorts = prefs[boostPortsKey] ?: SftpTransferSettings.DEFAULT_BOOST_PORTS
             ).sanitized()
         }
     }
@@ -549,6 +557,23 @@ object SettingsStore {
                 SftpTransferSettings.MAX_PARALLEL_DOWNLOADS
             )
         }
+    }
+
+    suspend fun setBoost(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[boostKey] = enabled }
+    }
+
+    suspend fun setBoostTerminal(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[boostTerminalKey] = enabled }
+    }
+
+    suspend fun setBoostTcpFallback(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[boostTcpFallbackKey] = enabled }
+    }
+
+    suspend fun setBoostPorts(ports: String) {
+        if (!SftpTransferSettings.isValidBoostPorts(ports)) return
+        dataStore.edit { prefs -> prefs[boostPortsKey] = ports.trim() }
     }
 
     suspend fun applySftpFastPreset() {

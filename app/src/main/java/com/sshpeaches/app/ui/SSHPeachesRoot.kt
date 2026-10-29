@@ -242,6 +242,10 @@ data class SSHPeachesRootActions(
     val onSftpMaxRequestsChange: (Int) -> Unit = {},
     val onParallelDownloadsChange: (Int) -> Unit = {},
     val onApplySftpFastPreset: () -> Unit = {},
+    val onBoostToggle: (Boolean) -> Unit = {},
+    val onBoostTerminalToggle: (Boolean) -> Unit = {},
+    val onBoostTcpFallbackToggle: (Boolean) -> Unit = {},
+    val onBoostPortsChange: (String) -> Unit = {},
     val onTerminalEmulationChange: (com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation) -> Unit,
     val onTerminalSelectionModeChange: (TerminalSelectionMode) -> Unit,
     val onTerminalBellModeChange: (TerminalBellMode) -> Unit,
@@ -397,6 +401,10 @@ fun SSHPeachesRoot(
     val onSftpMaxRequestsChange = actions.onSftpMaxRequestsChange
     val onParallelDownloadsChange = actions.onParallelDownloadsChange
     val onApplySftpFastPreset = actions.onApplySftpFastPreset
+    val onBoostToggle = actions.onBoostToggle
+    val onBoostTerminalToggle = actions.onBoostTerminalToggle
+    val onBoostTcpFallbackToggle = actions.onBoostTcpFallbackToggle
+    val onBoostPortsChange = actions.onBoostPortsChange
     val onTerminalEmulationChange = actions.onTerminalEmulationChange
     val onTerminalSelectionModeChange = actions.onTerminalSelectionModeChange
     val onTerminalBellModeChange = actions.onTerminalBellModeChange
@@ -2500,6 +2508,8 @@ fun SSHPeachesRoot(
                                 onConfirmPasswordInsertToggle = onConfirmPasswordInsertToggle,
                                 autoReconnect = uiState.autoReconnect,
                                 onAutoReconnectToggle = onAutoReconnectToggle,
+                                boost = uiState.sftpTransferSettings.boost,
+                                onBoostToggle = onBoostToggle,
                                 crashReportsEnabled = uiState.crashReportsEnabled,
                                 onCrashReportsToggle = onCrashReportsToggle,
                                 analyticsEnabled = uiState.analyticsEnabled,
@@ -2539,6 +2549,9 @@ fun SSHPeachesRoot(
                                 onSftpMaxRequestsChange = onSftpMaxRequestsChange,
                                 onParallelDownloadsChange = onParallelDownloadsChange,
                                 onApplySftpFastPreset = onApplySftpFastPreset,
+                                onBoostTerminalToggle = onBoostTerminalToggle,
+                                onBoostTcpFallbackToggle = onBoostTcpFallbackToggle,
+                                onBoostPortsChange = onBoostPortsChange,
                                 onRestoreDefaultSettings = onRestoreDefaultSettings,
                                 onShowMessage = showMessage,
                                 terminalSettings = {

@@ -48,6 +48,9 @@ fun AdvancedSettingsScreen(
     onSftpMaxRequestsChange: (Int) -> Unit,
     onParallelDownloadsChange: (Int) -> Unit,
     onApplySftpFastPreset: () -> Unit,
+    onBoostTerminalToggle: (Boolean) -> Unit = {},
+    onBoostTcpFallbackToggle: (Boolean) -> Unit = {},
+    onBoostPortsChange: (String) -> Unit = {},
     onRestoreDefaultSettings: () -> Unit,
     onShowMessage: (String) -> Unit = {},
     terminalSettings: (@Composable () -> Unit)? = null
@@ -61,6 +64,9 @@ fun AdvancedSettingsScreen(
     }
     val parallelDownloadsState = remember(sftpTransferSettings.parallelDownloads) {
         mutableStateOf(sftpTransferSettings.parallelDownloads.toString())
+    }
+    val boostPortsState = remember(sftpTransferSettings.boostPorts) {
+        mutableStateOf(sftpTransferSettings.boostPorts)
     }
 
     Box(
@@ -168,6 +174,45 @@ fun AdvancedSettingsScreen(
                             if (enabled) onApplySftpFastPreset()
                         },
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_SFTP_FAST_SWITCH)
+                    )
+                    AdvancedSettingsToggleRow(
+                        title = "Boost terminal",
+                        description = "With Boost on, also run SSH terminals through its helper, so a terminal survives dropped and changing networks like Mosh, without installing anything. Turn off to boost only the file browser.",
+                        checked = sftpTransferSettings.boostTerminal,
+                        onCheckedChange = onBoostTerminalToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BOOST_TERMINAL_SWITCH)
+                    )
+                    AdvancedSettingsToggleRow(
+                        title = "Boost TCP fallback",
+                        description = "When Boost can't get UDP through, reach its helper over TCP (TLS) instead of going back to SSH. Turn off to never use TCP for Boost.",
+                        checked = sftpTransferSettings.boostTcpFallback,
+                        onCheckedChange = onBoostTcpFallbackToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_BOOST_TCP_FALLBACK_SWITCH)
+                    )
+                    val boostPortsValid = SftpTransferSettings.isValidBoostPorts(boostPortsState.value)
+                    OutlinedTextField(
+                        value = boostPortsState.value,
+                        onValueChange = { next ->
+                            val text = next.filter { it.isDigit() || it == '-' || it == ' ' }.take(11)
+                            boostPortsState.value = text
+                            if (SftpTransferSettings.isValidBoostPorts(text)) onBoostPortsChange(text)
+                        },
+                        label = { Text("Boost ports") },
+                        supportingText = {
+                            Text(
+                                if (boostPortsValid) {
+                                    "Server ports Boost's helper listens on (UDP, and TCP for the fallback), one per session. Default 60000-61000, the range mosh uses, so a firewall open for mosh lets it through. Leave blank for any port."
+                                } else {
+                                    "Enter a port or a range like 60000-61000, between 1024 and 65535."
+                                }
+                            )
+                        },
+                        isError = !boostPortsValid,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(UiTestTags.SETTINGS_BOOST_PORTS_INPUT)
                     )
                 }
             }
