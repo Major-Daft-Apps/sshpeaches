@@ -1,7 +1,8 @@
 What's new in 0.12.0
 
-- Much faster file transfers: files move in chunks over several connections, with faster encryption.
-- Downloads and uploads survive dropped or changing networks: they retry and pick up where they stopped.
+- New Boost (Settings > Boost): faster browsing and transfers, and terminals that survive network changes like Mosh, over UDP via a helper the app starts on your Linux server.
+- Much faster transfers: chunks over several connections, faster encryption.
+- Transfers survive dropped or changing networks and resume.
 - Browse, rename and edit while files transfer; more transfers queue up.
-- The file browser reconnects by itself and stays in your folder.
-- Big folders, and folders full of links, open much faster.
+- The file browser reconnects by itself.
+- Big folders and links open much faster.
