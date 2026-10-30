@@ -1,0 +1,8 @@
+What's new in 0.12.2
+
+- Back, forward and up in the file browser show recent folders instantly.
+- New Transfers pane, like a browser's downloads: see, cancel, retry and open each transfer.
+- More reliable on slow, laggy networks.
+- Optional connection latency display (Advanced settings).
+- Rate and share SSHPeaches from Settings.
+- Back on Home asks before leaving.
