@@ -71,6 +71,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -1619,9 +1621,7 @@ fun SSHPeachesRoot(
 
             else -> effectiveQuickConnectState
         }
-        val logs = remember(sessionLogs, request?.sessionId) {
-            request?.let { current -> sessionLogs.filter { it.hostId == current.sessionId } } ?: emptyList()
-        }
+        val logs = rememberSessionLogs(sessionLogs, request?.sessionId)
         val shellOutput = request?.let { current ->
             shellOutputs[current.sessionId].orEmpty()
         }.orEmpty()
@@ -3119,6 +3119,19 @@ internal fun PermissionRequiredDialog(
             null
         }
     )
+}
+
+/**
+ * [sessionId]'s entries of the app-wide session log, kept current as entries arrive. derivedStateOf, not
+ * remember(allLogs): the list changes in place, so a remember keyed on it kept the first filtering forever and the
+ * connecting screen's log panel stopped showing new lines (0.12.0).
+ */
+@Composable
+internal fun rememberSessionLogs(allLogs: List<SessionLogBus.Entry>, sessionId: String?): List<SessionLogBus.Entry> {
+    val logs by remember(allLogs, sessionId) {
+        derivedStateOf { sessionId?.let { id -> allLogs.filter { it.hostId == id } } ?: emptyList() }
+    }
+    return logs
 }
 
 private fun sessionIdFor(hostId: String, mode: ConnectionMode): String =

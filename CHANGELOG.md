@@ -4,6 +4,18 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.12.1 (1201)
+
+Release date: 2026-10-30
+
+- **Boost** is now on by default (**Settings** -> **Boost**). It falls back to SFTP and SSH where it can't work, so nothing changes on servers it doesn't reach.
+- Boost transfers show progress as the data arrives. The bar used to sit still until whole 1 MiB pieces finished, 16 of them moving at once, which on a slow or distant connection looked like a stuck transfer for half a minute or more.
+- A slow connection no longer makes a Boost transfer give up: a piece now fails only after 60 seconds with no data at all, not when it takes longer than 60 seconds. Below about 280 KB/s every piece used to fail that way and the transfer went back to SFTP.
+- A Boost upload whose piece failed or was cancelled no longer cuts the helper's whole connection, which failed the next transfer.
+- Closing a session ends its Boost terminal's shell on the server reliably. The hang-up could be lost when the connection closed right after it, leaving the shell running for up to 12 hours.
+- The connecting screen's log shows new lines again. 0.12.0 showed only the lines that were there when the screen opened.
+- Choosing an app icon switches the launcher icon at once and no longer closes the app. Android removes a task started from a launcher icon when that icon's entry is disabled, which is how the icon is switched; the launcher icons now open the app in a task of its own. Recent apps shows the chosen icon.
+
 ## 0.12.0 (1200)
 
 Release date: 2026-10-29

@@ -1,6 +1,5 @@
 package com.majordaftapps.sshpeaches.app.settings
 
-import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import androidx.compose.ui.test.assertHasClickAction
@@ -38,7 +37,6 @@ import com.majordaftapps.sshpeaches.app.ui.navigation.Routes
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -147,14 +145,11 @@ class SettingsPreferencesTest {
             aliasState(AppIconOption.TERMINAL_GREEN) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
                 aliasState(AppIconOption.ORANGE_ON_CREAM) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
 
-        // Not while the app is open: switching aliases would close it.
-        Thread.sleep(2_000)
-        assertFalse(switched())
-        InstrumentationRegistry.getInstrumentation().uiAutomation
-            .performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+        // At once, with the app still open (LauncherActivity keeps its screen out of the aliases' tasks).
         val deadline = System.currentTimeMillis() + 10_000
         while (!switched() && System.currentTimeMillis() < deadline) Thread.sleep(200)
         assertTrue(switched())
+        composeRule.onNodeWithTag(terminalGreen).assertIsSelected()
     }
 
     @Test

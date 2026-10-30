@@ -20,6 +20,7 @@ import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus
 import com.majordaftapps.sshpeaches.app.testutil.AppStateSeeder
 import com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest
+import com.majordaftapps.sshpeaches.app.testutil.TransferSettingsOverride
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
@@ -444,6 +445,8 @@ class LiveSftpPerfTest {
     }
 
     private fun withSessionService(block: (SessionService) -> Unit) {
+        // These measure SFTP itself.
+        TransferSettingsOverride.withoutBoost(InstrumentationRegistry.getInstrumentation().targetContext)
         val connected = CountDownLatch(1)
         var service: SessionService? = null
         val connection = object : ServiceConnection {

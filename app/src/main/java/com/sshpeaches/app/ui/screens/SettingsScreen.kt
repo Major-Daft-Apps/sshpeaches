@@ -133,7 +133,7 @@ fun SettingsScreen(
     onConfirmPasswordInsertToggle: (Boolean) -> Unit,
     autoReconnect: Boolean,
     onAutoReconnectToggle: (Boolean) -> Unit,
-    boost: Boolean = false,
+    boost: Boolean = true,
     onBoostToggle: (Boolean) -> Unit = {},
     crashReportsEnabled: Boolean,
     onCrashReportsToggle: (Boolean) -> Unit,

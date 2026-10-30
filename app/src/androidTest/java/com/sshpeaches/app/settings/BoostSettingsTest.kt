@@ -50,7 +50,8 @@ class BoostSettingsTest {
     fun boostSettingsExplainThemselvesAndPersist() {
         composeRule.navigateDrawer(Routes.SETTINGS)
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_BOOST_SWITCH)
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOff()
+        // On by default.
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOn()
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_INFO_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_INFO_DIALOG).assertIsDisplayed()
@@ -62,8 +63,8 @@ class BoostSettingsTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).performClick()
-        waitForStored { it.boost }
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOn()
+        waitForStored { !it.boost }
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOff()
 
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_BOOST_TERMINAL_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_TERMINAL_SWITCH).assertIsOn()
@@ -92,7 +93,7 @@ class BoostSettingsTest {
         composeRule.waitForIdle()
         // Still on Advanced settings: revealing the switch goes back to Settings.
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_BOOST_SWITCH)
-        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOn()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_SWITCH).assertIsOff()
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_BOOST_TERMINAL_SWITCH)
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_BOOST_TERMINAL_SWITCH).assertIsOff()
         composeRule.revealSettingsControl(UiTestTags.SETTINGS_BOOST_TCP_FALLBACK_SWITCH)

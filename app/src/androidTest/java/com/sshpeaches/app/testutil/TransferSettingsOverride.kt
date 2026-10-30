@@ -25,4 +25,15 @@ object TransferSettingsOverride {
             maxRequests?.let { SettingsStore.setSftpMaxRequests(it) }
         }
     }
+
+    /**
+     * Turns Boost off (it's on by default): tests of SSH and SFTP behaviour against a real Linux server would
+     * otherwise go through the Boost helper, around the network impairment they set up.
+     */
+    fun withoutBoost(context: Context) {
+        runBlocking {
+            SettingsStore.init(context.applicationContext)
+            SettingsStore.setBoost(false)
+        }
+    }
 }

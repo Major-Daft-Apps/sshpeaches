@@ -315,7 +315,7 @@ object SettingsStore {
                 sftpReadSize = prefs[sftpReadSizeKey] ?: SftpTransferSettings.DEFAULT_SFTP_READ_SIZE,
                 sftpMaxRequests = prefs[sftpMaxRequestsKey] ?: SftpTransferSettings.DEFAULT_SFTP_MAX_REQUESTS,
                 parallelDownloads = prefs[parallelDownloadsKey] ?: SftpTransferSettings.DEFAULT_PARALLEL_DOWNLOADS,
-                boost = prefs[boostKey] ?: false,
+                boost = prefs[boostKey] ?: true,
                 boostTerminal = prefs[boostTerminalKey] ?: true,
                 boostTcpFallback = prefs[boostTcpFallbackKey] ?: true,
                 boostPorts = prefs[boostPortsKey] ?: SftpTransferSettings.DEFAULT_BOOST_PORTS

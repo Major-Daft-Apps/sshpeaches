@@ -11,7 +11,7 @@ data class SftpTransferSettings(
     val sftpMaxRequests: Int = DEFAULT_SFTP_MAX_REQUESTS,
     val parallelDownloads: Int = DEFAULT_PARALLEL_DOWNLOADS,
     /** Boost: browse, transfer and run the terminal through a helper the app runs on the server, over QUIC (UDP). */
-    val boost: Boolean = false,
+    val boost: Boolean = true,
     /** Whether Boost also carries the terminal (SSH mode), not only the file browser. */
     val boostTerminal: Boolean = true,
     /** Lets Boost use TLS over TCP when UDP doesn't get through. */

@@ -363,8 +363,12 @@ func (s *Server) acceptQuic(ctx context.Context) {
 				}
 				go func() {
 					defer stream.Close()
-					if !s.handle(stream) {
+					// Only a request without the token cuts the connection; a broken stream (a cancelled
+					// request) ends just itself, and the client's other requests carry on.
+					if more, refused := s.handle(stream); refused {
 						conn.CloseWithError(1, "refused")
+					} else if !more {
+						stream.CancelRead(0)
 					}
 				}()
 			}
@@ -380,22 +384,30 @@ func (s *Server) acceptTCP() {
 		}
 		go func() {
 			defer conn.Close()
-			for s.handle(conn) {
+			for {
+				if more, _ := s.handle(conn); !more {
+					return
+				}
 			}
 		}()
 	}
 }
 
-// handle serves one request; false when the stream or connection should not be used again.
-func (s *Server) handle(rw io.ReadWriter) bool {
+// handle serves one request. more is false when the stream (or TCP connection) can't be used again; refused
+// says the request didn't carry the token.
+func (s *Server) handle(rw io.ReadWriter) (more, refused bool) {
 	token, req, err := wire.ReadRequest(rw)
 	if err != nil {
-		return false
+		return false, false
 	}
 	if !s.admit(token) {
-		return false
+		return false, true
 	}
 	s.touch()
+	return s.serve(rw, req), false
+}
+
+func (s *Server) serve(rw io.ReadWriter, req wire.Request) bool {
 	switch req.Op {
 	case "ping":
 		return wire.WriteReply(rw, wire.Reply{}) == nil

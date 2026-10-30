@@ -340,6 +340,7 @@ class LiveNetworkResilienceTest {
     private fun withSessionService(block: (SessionService) -> Unit) {
         val context = instrumentation.targetContext
         TransferSettingsOverride.apply(context)
+        TransferSettingsOverride.withoutBoost(context)
         val connected = CountDownLatch(1)
         var service: SessionService? = null
         val connection = object : ServiceConnection {

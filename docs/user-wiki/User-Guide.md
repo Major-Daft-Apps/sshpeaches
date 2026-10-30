@@ -159,7 +159,7 @@ Settings includes:
 
 ### Boost
 
-**Settings** -> **Boost** -> **Boost** (off by default; the info button explains it) moves the file browser's
+**Settings** -> **Boost** -> **Boost** (on by default; the info button explains it) moves the file browser's
 listings, downloads and uploads, and SSH terminals, off SSH onto QUIC, the UDP protocol behind HTTP/3. With it off,
 nothing changes.
 

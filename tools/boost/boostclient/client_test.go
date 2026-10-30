@@ -370,3 +370,56 @@ func TestHelpersTakeFreePortsFromTheRange(t *testing.T) {
 		t.Fatalf("a third helper in a full range: %v", err)
 	}
 }
+
+type progressLog struct {
+	mu    sync.Mutex
+	first time.Duration
+	start time.Time
+	bytes map[int]int64
+}
+
+func (p *progressLog) OnChunk(index int, done int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.first == 0 {
+		p.first = time.Since(p.start)
+	}
+	p.bytes[index] = done
+}
+
+func TestASlowLinkKeepsMovingAndShowsProgress(t *testing.T) {
+	// A piece takes far longer than the silence limit, but bytes keep coming: the transfer must not time out,
+	// and progress must show before any piece is done.
+	defer func(old time.Duration) { requestTimeout = old }(requestTimeout)
+	requestTimeout = 2 * time.Second
+	dir := t.TempDir()
+	path, data := randomFile(t, dir, 3*1024*1024)
+	h := startHelper(t, false)
+	h.srv.AllowRead(path)
+	r := newRelay(t, h.srv.UDPPort())
+	s, err := Dial("127.0.0.1", r.port(), 0, h.srv.CertHash(), h.token, false, 3000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r.bytesPerSecond.Store(400 << 10) // 3 MiB over 4 workers: each 1 MiB piece takes several seconds
+	out, _ := os.CreateTemp(t.TempDir(), "down")
+	defer out.Close()
+	out.Truncate(int64(len(data)))
+	p := &progressLog{start: time.Now(), bytes: map[int]int64{}}
+	if err := s.StartDownload(path, int(out.Fd()), chunksFor(int64(len(data)), 1<<20), 4, p).Await(); err != nil {
+		t.Fatalf("the slow download failed after %s: %v", time.Since(p.start).Round(time.Millisecond), err)
+	}
+	took := time.Since(p.start)
+	got, _ := os.ReadFile(out.Name())
+	if !bytes.Equal(got, data) {
+		t.Fatal("downloaded bytes differ")
+	}
+	if took < requestTimeout {
+		t.Fatalf("the link wasn't slow enough to test anything (%s)", took)
+	}
+	if p.first > took/3 {
+		t.Fatalf("first progress after %s of %s: only whole pieces were reported", p.first, took)
+	}
+	t.Logf("3 MiB in %s, first progress after %s", took.Round(time.Millisecond), p.first.Round(time.Millisecond))
+}

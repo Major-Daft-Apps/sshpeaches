@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.fragment.app.FragmentActivity
 import com.majordaftapps.sshpeaches.app.SSHPeachesApplication
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
+import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
@@ -332,6 +333,9 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.result("MainActivity.onCreate", true)
         setupBiometricPrompt()
         restorePendingIntentState(savedInstanceState)
+        lifecycleScope.launch {
+            SettingsStore.appIcon.collect { option -> AppIconManager.applyToTask(this@MainActivity, option) }
+        }
         lifecycleScope.launch {
             appViewModel.uiState.collect { state ->
                 latestUiState = state

@@ -147,8 +147,9 @@ func (s *Session) Close() {
 
 // stream is one request's channel: a QUIC stream, or a pooled TCP connection.
 type stream struct {
-	rw     io.ReadWriter
-	finish func(ok bool)
+	rw          io.ReadWriter
+	finish      func(ok bool)
+	setDeadline func(time.Time)
 }
 
 func (s *Session) open(ctx context.Context) (*stream, error) {
@@ -160,10 +161,11 @@ func (s *Session) open(ctx context.Context) (*stream, error) {
 		if err != nil {
 			return nil, err
 		}
-		if deadline, ok := ctx.Deadline(); ok {
-			st.SetDeadline(deadline)
-		}
-		return &stream{rw: st, finish: func(bool) { st.CancelRead(0); st.Close() }}, nil
+		return &stream{
+			rw:          st,
+			finish:      func(bool) { st.CancelRead(0); st.Close() },
+			setDeadline: func(t time.Time) { st.SetDeadline(t) },
+		}, nil
 	}
 	var conn net.Conn
 	select {
@@ -176,42 +178,64 @@ func (s *Session) open(ctx context.Context) (*stream, error) {
 		}
 		conn = c
 	}
-	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline)
-	} else {
-		conn.SetDeadline(time.Time{})
-	}
-	return &stream{rw: conn, finish: func(ok bool) {
-		if ok && !s.closed.Load() {
-			select {
-			case s.tcpPool <- conn:
-				return
-			default:
+	return &stream{
+		rw: conn,
+		finish: func(ok bool) {
+			conn.SetDeadline(time.Time{})
+			if ok && !s.closed.Load() {
+				select {
+				case s.tcpPool <- conn:
+					return
+				default:
+				}
 			}
-		}
-		conn.Close()
-	}}, nil
+			conn.Close()
+		},
+		setDeadline: func(t time.Time) { conn.SetDeadline(t) },
+	}, nil
 }
 
-// RequestTimeout ends a request that gets no reply: over TCP a dead link would otherwise block it forever.
-const RequestTimeout = 60 * time.Second
+// requestTimeout ends a request that moves nothing for this long: over a dead link (TCP above all) it would
+// otherwise wait forever. It times silence, not the whole request: on a slow link a piece may take minutes.
+var requestTimeout = 60 * time.Second
 
-// call sends [req] (with [payload] for a write) and returns the reply's payload.
+// ioSlice is how much of a payload goes between deadline refreshes and progress reports.
+const ioSlice = 64 << 10
+
+// call sends [req] (with [payload] for a write) and returns the reply's payload. With [sink], the reply's payload
+// goes to it as it arrives instead (into and the returned slice are then unused); [sent] hears how much of
+// [payload] has gone.
 func (s *Session) call(parent context.Context, req wire.Request, payload []byte, into []byte) (int, []byte, error) {
-	ctx, cancel := context.WithTimeout(parent, RequestTimeout)
+	return s.callStreaming(parent, req, payload, into, nil, nil)
+}
+
+func (s *Session) callStreaming(
+	parent context.Context, req wire.Request, payload []byte, into []byte, sink func([]byte) error, sent func(int),
+) (int, []byte, error) {
+	openCtx, cancel := context.WithTimeout(parent, requestTimeout)
 	defer cancel()
-	st, err := s.open(ctx)
+	st, err := s.open(openCtx)
 	if err != nil {
 		return 0, nil, err
 	}
 	ok := false
 	defer func() { st.finish(ok) }()
+	// Cancelling the transfer unblocks a read or write at once; otherwise each step gets requestTimeout.
+	stop := context.AfterFunc(parent, func() { st.setDeadline(time.Now()) })
+	defer stop()
+	alive := func() { st.setDeadline(time.Now().Add(requestTimeout)) }
+	alive()
 	if err := wire.WriteRequest(st.rw, s.token, req); err != nil {
 		return 0, nil, err
 	}
-	if len(payload) > 0 {
-		if _, err := st.rw.Write(payload); err != nil {
+	for off := 0; off < len(payload); off += ioSlice {
+		end := min(off+ioSlice, len(payload))
+		if _, err := st.rw.Write(payload[off:end]); err != nil {
 			return 0, nil, err
+		}
+		alive()
+		if sent != nil {
+			sent(end)
 		}
 	}
 	rep, err := wire.ReadReply(st.rw)
@@ -228,6 +252,25 @@ func (s *Session) call(parent context.Context, req wire.Request, payload []byte,
 	}
 	if rep.N < 0 || (into != nil && rep.N > int64(len(into))) || rep.N > 64<<20 {
 		return 0, nil, errors.New("reply too large")
+	}
+	if sink != nil {
+		chunk := into
+		if len(chunk) > ioSlice || chunk == nil {
+			chunk = make([]byte, ioSlice)
+		}
+		for left := rep.N; left > 0; {
+			alive()
+			n, err := io.ReadFull(st.rw, chunk[:min(int64(len(chunk)), left)])
+			if err != nil {
+				return 0, nil, err
+			}
+			if err := sink(chunk[:n]); err != nil {
+				return 0, nil, err
+			}
+			left -= int64(n)
+		}
+		ok = true
+		return int(rep.N), nil, nil
 	}
 	buf := into
 	if buf == nil {
@@ -313,18 +356,23 @@ func (s *Session) StartDownload(path string, fd int, chunksJSON string, workers 
 	return s.start(fd, chunksJSON, workers, progress, func(ctx context.Context, f *os.File, c *chunk, buf []byte) error {
 		for c.Done < c.End {
 			length := min(int64(Piece), c.End-c.Done)
-			n, data, err := s.call(ctx, wire.Request{Op: "read", Path: path, Offset: c.Done, Length: length}, nil, buf)
+			// Each slice is written as it arrives, then reported: the bar moves on a slow link too, and what
+			// the app saves for resuming never runs ahead of the file.
+			n, _, err := s.callStreaming(ctx, wire.Request{Op: "read", Path: path, Offset: c.Done, Length: length}, nil, buf,
+				func(data []byte) error {
+					if _, err := f.WriteAt(data, c.Done); err != nil {
+						return err
+					}
+					c.Done += int64(len(data))
+					progress.OnChunk(c.Index, c.Done)
+					return nil
+				}, nil)
 			if err != nil {
 				return err
 			}
 			if n == 0 {
 				return errors.New("the remote file is shorter than expected")
 			}
-			if _, err := f.WriteAt(data, c.Done); err != nil {
-				return err
-			}
-			c.Done += int64(n)
-			progress.OnChunk(c.Index, c.Done)
 		}
 		return nil
 	})
@@ -342,7 +390,10 @@ func (s *Session) StartUpload(path string, fd int, chunksJSON string, workers in
 			if int64(n) != length {
 				return errors.New("the local file is shorter than expected")
 			}
-			if _, _, err := s.call(ctx, wire.Request{Op: "write", Path: path, Offset: c.Done, Length: length}, buf[:length], nil); err != nil {
+			// Progress as the piece goes out; an upload that fails starts again, so nothing saved depends on it.
+			start := c.Done
+			if _, _, err := s.callStreaming(ctx, wire.Request{Op: "write", Path: path, Offset: c.Done, Length: length},
+				buf[:length], nil, nil, func(sent int) { progress.OnChunk(c.Index, start+int64(sent)) }); err != nil {
 				return err
 			}
 			c.Done += length

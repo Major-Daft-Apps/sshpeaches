@@ -183,6 +183,8 @@ type relay struct {
 	conn    *net.UDPConn
 	target  *net.UDPAddr
 	dropped atomic.Bool
+	// bytesPerSecond, when set, caps what flows from the helper to the client, like a slow mobile link.
+	bytesPerSecond atomic.Int64
 }
 
 func newRelay(t *testing.T, target int) *relay {
@@ -224,6 +226,9 @@ func newRelay(t *testing.T, target int) *relay {
 							return
 						}
 						if !r.dropped.Load() {
+							if rate := r.bytesPerSecond.Load(); rate > 0 {
+								time.Sleep(time.Duration(int64(n) * int64(time.Second) / rate))
+							}
 							conn.WriteToUDP(back[:n], client)
 						}
 					}

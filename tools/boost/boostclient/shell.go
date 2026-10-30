@@ -27,7 +27,9 @@ const (
 	shellGiveUp = 12 * time.Hour
 	// Reattach attempts come every few seconds for shellSlowRetryAfter, then every shellSlowRetry.
 	shellSlowRetryAfter = 2 * time.Minute
-	shellSlowRetry      = 30 * time.Second
+	// shellHangupWait is how long closing waits for the helper to confirm the shell ended.
+	shellHangupWait = 3 * time.Second
+	shellSlowRetry  = 30 * time.Second
 )
 
 // ShellListener hears a shell's events, one at a time, on a goroutine of the shell's.
@@ -136,7 +138,8 @@ func (sh *Shell) Kick() {
 }
 
 // Close stops the shell's connection; with hangup it also ends the shell on the server (the session was closed),
-// otherwise the helper keeps it for a while.
+// otherwise the helper keeps it for a while. It doesn't block: a hangup waits in the background, briefly, for the
+// helper to confirm the shell ended, since closing the connection at once could drop the request.
 func (sh *Shell) Close(hangup bool) {
 	sh.mu.Lock()
 	if sh.closed {
@@ -147,23 +150,45 @@ func (sh *Shell) Close(hangup bool) {
 	sh.hangup = hangup
 	att := sh.current
 	sh.mu.Unlock()
-	if hangup && att != nil {
-		_ = att.send(wire.FrameHangup, nil)
+	if !hangup {
+		if att != nil {
+			att.shut()
+		}
+		sh.signal(sh.kick)
+		return
 	}
-	if att != nil {
-		att.shut()
-	}
-	sh.signal(sh.kick)
-	if hangup && att == nil {
-		// Between connections: attach once more, briefly, just to hang up.
-		go func() {
-			if a, _, err := sh.attach(); err == nil {
-				_ = a.send(wire.FrameHangup, nil)
-				time.Sleep(200 * time.Millisecond)
-				a.shut()
+	go func() {
+		defer sh.signal(sh.kick)
+		if att != nil {
+			// The serve loop is still reading: the exit frame ends it, and run, and finished.
+			_ = att.send(wire.FrameHangup, nil)
+			select {
+			case <-sh.finished:
+			case <-time.After(shellHangupWait):
 			}
-		}()
-	}
+			att.shut()
+			return
+		}
+		// Between connections: attach once more, just to hang up.
+		a, _, err := sh.attach()
+		if err != nil {
+			return
+		}
+		defer a.shut()
+		if a.send(wire.FrameHangup, nil) != nil {
+			return
+		}
+		if d, ok := a.rw.(interface{ SetDeadline(time.Time) error }); ok {
+			d.SetDeadline(time.Now().Add(shellHangupWait))
+		}
+		buf := make([]byte, wire.MaxFrame)
+		for {
+			kind, _, err := wire.ReadShellFrame(a.rw, buf)
+			if err != nil || kind == wire.FrameExit {
+				return
+			}
+		}
+	}()
 }
 
 func (sh *Shell) signal(ch chan struct{}) {
