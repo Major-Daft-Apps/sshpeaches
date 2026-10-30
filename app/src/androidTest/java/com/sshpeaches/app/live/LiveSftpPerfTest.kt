@@ -99,7 +99,7 @@ class LiveSftpPerfTest {
         service.listSftpDirectory(id, path)
         check(waitFor(120_000) {
             val now = service.remoteDirectoryFlow().value[id]
-            now != null && now !== before && now.complete && now.path.trimEnd('/').endsWith(path.substringAfterLast('/')) &&
+            now != null && now !== before && now.complete && !now.fromCache && now.path.trimEnd('/').endsWith(path.substringAfterLast('/')) &&
                 now.entries.size >= minEntries
         }) { "listing of $path never arrived" }
         return secondsSince(start)
@@ -112,7 +112,8 @@ class LiveSftpPerfTest {
         service.listSftpDirectory(id, path)
         check(waitFor(120_000) {
             val now = service.remoteDirectoryFlow().value[id]
-            now != null && now !== before && now.entries.isNotEmpty() && now.path.trimEnd('/').endsWith(path.substringAfterLast('/'))
+            now != null && now !== before && !now.fromCache && now.entries.isNotEmpty() &&
+                now.path.trimEnd('/').endsWith(path.substringAfterLast('/'))
         }) { "listing of $path never arrived" }
         val seconds = secondsSince(start)
         check(waitFor(120_000) { service.remoteDirectoryFlow().value[id]?.complete == true }) { "$path never finished" }
@@ -201,6 +202,118 @@ class LiveSftpPerfTest {
      * keepalive (60 s) to show. No retries are expected: the link is slow, not broken. Uploads are covered by
      * SftpSlowLinkTest: an upload held back by a slow link kills the test emulator's Wi-Fi.
      */
+    /**
+     * Going back, forward or up to a folder seen lately shows it at once from the browser's recent listings, then
+     * the fresh listing replaces it; a folder not seen yet lists as usual.
+     */
+    @Test
+    fun backForwardAndUpShowRecentFoldersAtOnce() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        val id = "perf-recent-${System.nanoTime()}"
+        withSessionService { service ->
+            try {
+                openSftp(service, id, ConnectionMode.SCP)
+                val many = "$dir/many"
+                val sub = "$dir/sub1"
+                timeListing(service, id, many)
+                timeListing(service, id, sub)
+                fun revisit(path: String, label: String) {
+                    val before = service.remoteDirectoryFlow().value[id]
+                    val start = System.nanoTime()
+                    service.listSftpDirectory(id, path)
+                    val shown = service.remoteDirectoryFlow().value[id]
+                    check(shown != null && shown !== before && shown.fromCache && shown.complete &&
+                        shown.path.trimEnd('/') == path) { "$label: $path wasn't shown from the recent listings: $shown" }
+                    val cachedSeconds = secondsSince(start)
+                    check(waitFor(60_000) {
+                        val now = service.remoteDirectoryFlow().value[id]
+                        now != null && !now.fromCache && now.complete && now.path.trimEnd('/') == path
+                    }) { "$label: the fresh listing of $path never replaced the cached one" }
+                    val fresh = service.remoteDirectoryFlow().value.getValue(id)
+                    check(fresh.entries.map { it.name }.sorted() == shown.entries.map { it.name }.sorted()) {
+                        "$label: the cached listing of $path differs from the fresh one"
+                    }
+                    note("recent: $label to ${path.substringAfterLast('/')} shown in %.3f s, refreshed in %.2f s".format(cachedSeconds, secondsSince(start)))
+                }
+                revisit(many, "back")
+                revisit(sub, "forward")
+                // Up to a folder not listed yet: no cached listing, the usual one.
+                val before = service.remoteDirectoryFlow().value[id]
+                service.listSftpDirectory(id, dir)
+                check(service.remoteDirectoryFlow().value[id] === before) { "a folder never listed was shown from the cache" }
+                timeListing(service, id, dir)
+                revisit(many, "into a folder seen before")
+                // Home stays however many folders were opened since.
+                (1..3).forEach { timeListing(service, id, "$dir/sub$it") }
+                timeListing(service, id, "$dir/huge")
+                timeListing(service, id, "$dir/links")
+                val home = service.remoteDirectoryFlow().value.let { _ ->
+                    service.listSftpDirectory(id, ".")
+                    service.remoteDirectoryFlow().value.getValue(id)
+                }
+                check(home.fromCache) { "Home wasn't shown at once after seven other folders: ${home.path}" }
+                note("recent: home shown at once after seven other folders (${home.path})")
+            } finally {
+                service.stopSession(id)
+            }
+        }
+        Log.i("NetScenario", "== recent listings\n" + results.joinToString("\n"))
+    }
+
+    /**
+     * The transfers pane's queue: transfers listed running first, then waiting in order; one cancelled while it
+     * waits leaves the others going and can be retried; finished ones can be cleared.
+     */
+    @Test
+    fun transferQueueCancelsRetriesAndClearsOneByOne() {
+        assumeTrue("needs -e netHost", args.getString("netHost") != null)
+        val id = "perf-queue-${System.nanoTime()}"
+        val context = instrumentation.targetContext
+        val targets = (1..3).map { java.io.File(context.cacheDir, "queue-$it.bin").apply { delete() } }
+        withSessionService { service ->
+            try {
+                openSftp(service, id, ConnectionMode.SCP)
+                targets.forEach { service.scpDownloadFile(id, "$dir/mid.bin", it.absolutePath) }
+                check(waitFor(10_000) { service.fileTransfersFlow().value[id].orEmpty().size == 3 }) { "three transfers weren't listed" }
+                val listed = service.fileTransfersFlow().value.getValue(id)
+                check(!listed[0].waiting && listed[1].waiting && listed[2].waiting) {
+                    "not running first, then waiting: ${listed.map { it.fileName to it.waiting }}"
+                }
+                val second = listed[1].operationId
+                check(service.cancelFileTransfer(id, second)) { "the waiting transfer couldn't be cancelled" }
+                check(waitFor(120_000) { service.fileTransfersFlow().value[id].orEmpty().none { it.isActive } }) {
+                    // The test runs in the app's process: its threads show where a stuck queue waits.
+                    Thread.getAllStackTraces().filter { (_, stack) -> stack.any { "sshpeaches" in it.className } }
+                        .forEach { (thread, stack) ->
+                            Log.e("QueueDump", "${thread.name} ${thread.state}\n" + stack.take(25).joinToString("\n") { "    at $it" })
+                        }
+                    "the queue never emptied: ${service.fileTransfersFlow().value[id]?.map { "${it.fileName} ${it.status} waiting=${it.waiting} ${it.bytesTransferred}" }}"
+                }
+                val finished = service.fileTransfersFlow().value.getValue(id).associateBy { it.operationId }
+                check(finished.getValue(second).status == FileTransferStatus.CANCELLED && finished.getValue(second).canRetry) {
+                    "the cancelled transfer: ${finished[second]}"
+                }
+                check(finished.values.count { it.status == FileTransferStatus.SUCCEEDED } == 2) { "the others didn't finish: $finished" }
+                check(targets[0].length() == targets[2].length() && targets[0].length() > 0) { "downloads incomplete" }
+
+                check(service.retryFileTransfer(id, second)) { "the cancelled transfer couldn't be retried" }
+                check(waitFor(120_000) {
+                    val list = service.fileTransfersFlow().value[id].orEmpty()
+                    list.none { it.isActive } && list.count { it.status == FileTransferStatus.SUCCEEDED } == 3
+                }) { "the retried transfer didn't finish: ${service.fileTransfersFlow().value[id]}" }
+                check(targets[1].length() == targets[0].length()) { "the retried download is incomplete" }
+                note("queue: 3 downloads, the waiting one cancelled, retried and finished")
+
+                service.clearFinishedTransfers(id)
+                check(service.fileTransfersFlow().value[id].isNullOrEmpty()) { "finished transfers weren't cleared" }
+            } finally {
+                service.stopSession(id)
+                targets.forEach { it.delete() }
+            }
+        }
+        Log.i("NetScenario", "== transfer queue\n" + results.joinToString("\n"))
+    }
+
     @Test
     fun slowLinkDownloadDoesntDrop() {
         assumeTrue("needs -e netHost", args.getString("netHost") != null)

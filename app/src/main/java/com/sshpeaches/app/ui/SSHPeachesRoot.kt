@@ -73,6 +73,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -334,7 +335,13 @@ data class SSHPeachesRootActions(
     val onOpenAppPermissionSettings: () -> Unit,
     val onStartupRouteHandled: () -> Unit,
     val onIncomingImportHandled: () -> Unit = {},
-    val onCancelFileTransfer: (String) -> Unit = {}
+    val onCancelFileTransfer: (String) -> Unit = {},
+    val onCancelTransfer: (sessionId: String, operationId: String) -> Unit = { _, _ -> },
+    val onRetryTransfer: (sessionId: String, operationId: String) -> Unit = { _, _ -> },
+    val onClearFinishedTransfers: (sessionId: String) -> Unit = {},
+    val onShowConnectionLatencyToggle: (Boolean) -> Unit = {},
+    /** Back on Home after a session: a good moment for the one-time review prompt. */
+    val onReturnedHomeFromSession: () -> Unit = {}
 )
 
 data class SSHPeachesRootRuntime(
@@ -346,6 +353,9 @@ data class SSHPeachesRootRuntime(
     val shellOutputs: Map<String, String>,
     val remoteDirectories: Map<String, com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot>,
     val fileTransferProgresses: Map<String, FileTransferProgress>,
+    val fileTransferLists: Map<String, List<FileTransferProgress>> = emptyMap(),
+    val showConnectionLatency: Boolean = false,
+    val connectionLatencies: Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency> = emptyMap(),
     val hostKeyPrompts: List<HostKeyPrompt>,
     val passwordPrompts: List<PasswordPrompt>,
     val requestedOpenSessionId: String?,
@@ -485,6 +495,9 @@ fun SSHPeachesRoot(
     val onScpDownloadFile = actions.onScpDownloadFile
     val onScpUploadFile = actions.onScpUploadFile
     val onCancelFileTransfer = actions.onCancelFileTransfer
+    val onCancelTransfer = actions.onCancelTransfer
+    val onRetryTransfer = actions.onRetryTransfer
+    val onClearFinishedTransfers = actions.onClearFinishedTransfers
     val onOpenSessionRequestHandled = actions.onOpenSessionRequestHandled
     val onRespondToHostKeyPrompt = actions.onRespondToHostKeyPrompt
     val onRespondToPasswordPrompt = actions.onRespondToPasswordPrompt
@@ -501,6 +514,10 @@ fun SSHPeachesRoot(
     val shellOutputs = runtime.shellOutputs
     val remoteDirectories = runtime.remoteDirectories
     val fileTransferProgresses = runtime.fileTransferProgresses
+    val fileTransferLists = runtime.fileTransferLists
+    val showConnectionLatency = runtime.showConnectionLatency
+    val connectionLatencies = runtime.connectionLatencies
+    val onShowConnectionLatencyToggle = actions.onShowConnectionLatencyToggle
     val hostKeyPrompts = runtime.hostKeyPrompts
     val passwordPrompts = runtime.passwordPrompts
     val requestedOpenSessionId = runtime.requestedOpenSessionId
@@ -719,6 +736,52 @@ fun SSHPeachesRoot(
     }
     BackHandler(enabled = isSessionVerticalRoute && !drawerState.isOpen) {
         navigateBackFromConnecting()
+    }
+    var previousRoute by remember { mutableStateOf(currentRoute) }
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == Routes.HOME && (previousRoute == Routes.SESSION || previousRoute == Routes.CONNECTING)) {
+            actions.onReturnedHomeFromSession()
+        }
+        previousRoute = currentRoute
+    }
+    // Back on Home used to close the app at once; it asks first, and says what happens to open sessions.
+    var showExitConfirm by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = currentRoute == Routes.HOME && !drawerState.isOpen) {
+        showExitConfirm = true
+    }
+    if (showExitConfirm) {
+        val activity = LocalContext.current as? android.app.Activity
+        val openSessions = sessions.count {
+            it.status != com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ERROR
+        }
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            modifier = Modifier.testTag(UiTestTags.EXIT_CONFIRM_DIALOG),
+            title = { Text("Leave SSHPeaches?") },
+            text = {
+                Text(
+                    when {
+                        openSessions == 0 -> "You can come back to it from your home screen or recent apps."
+                        uiState.allowBackgroundSessions ->
+                            "Your $openSessions open session${if (openSessions == 1) "" else "s"} keep running in the background."
+                        else ->
+                            "Your $openSessions open session${if (openSessions == 1) "" else "s"} will close: background sessions are off in Settings."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    // What Back on the app's first screen did: Android 12+ moves the task back, older versions close it.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        activity?.moveTaskToBack(true)
+                    } else {
+                        activity?.finish()
+                    }
+                }) { Text("Leave") }
+            },
+            dismissButton = { TextButton(onClick = { showExitConfirm = false }) { Text("Stay") } }
+        )
     }
     val activeSessionRequest = effectiveQuickConnectRequest
     val currentTitle = when (chromeRoute) {
@@ -1631,6 +1694,7 @@ fun SSHPeachesRoot(
         val activeFileTransfer = request?.let { current ->
             fileTransferProgresses[current.sessionId]
         }
+        val sessionTransfers = request?.let { current -> fileTransferLists[current.sessionId] }.orEmpty()
         val activeTerminalProfile = uiState.terminalProfiles.firstOrNull {
             it.id == resolvedSessionTerminalProfileId(request)
         } ?: uiState.terminalProfiles.firstOrNull {
@@ -1645,6 +1709,10 @@ fun SSHPeachesRoot(
                 shellOutput = shellOutput,
                 remoteDirectory = remoteDirectory,
                 activeFileTransfer = activeFileTransfer,
+                transfers = sessionTransfers,
+                onCancelTransfer = { operationId -> request?.let { onCancelTransfer(it.sessionId, operationId) } },
+                onRetryTransfer = { operationId -> request?.let { onRetryTransfer(it.sessionId, operationId) } },
+                onClearFinishedTransfers = { request?.let { onClearFinishedTransfers(it.sessionId) } },
                 terminalProfile = activeTerminalProfile,
                 terminalSelectionMode = uiState.terminalSelectionMode,
                 terminalBellMode = uiState.terminalBellMode,
@@ -1911,6 +1979,11 @@ fun SSHPeachesRoot(
                                     }
                                 },
                                 actions = {
+                                    if (isSessionVerticalRoute && showConnectionLatency && activeSessionRequest != null) {
+                                        com.majordaftapps.sshpeaches.app.ui.screens.ConnectionLatencyBadge(
+                                            connectionLatencies[activeSessionRequest.sessionId]
+                                        )
+                                    }
                                     if (isSessionVerticalRoute) {
                                         if (activeSessionRequest?.mode == ConnectionMode.SSH) {
                                             val sessionId = activeSessionRequest.sessionId
@@ -2545,6 +2618,8 @@ fun SSHPeachesRoot(
                         composable(Routes.ADVANCED_SETTINGS) {
                             AdvancedSettingsScreen(
                                 sftpTransferSettings = uiState.sftpTransferSettings,
+                                showConnectionLatency = showConnectionLatency,
+                                onShowConnectionLatencyToggle = onShowConnectionLatencyToggle,
                                 onSftpReadSizeChange = onSftpReadSizeChange,
                                 onSftpMaxRequestsChange = onSftpMaxRequestsChange,
                                 onParallelDownloadsChange = onParallelDownloadsChange,

@@ -132,7 +132,7 @@ internal fun FirstRunWelcomeDialog(
                 }
 
                 Text(
-                    text = "SSHPeaches is completely free and open source—no ads, " +
+                    text = "SSHPeaches is completely free and open source: no ads, " +
                         "subscriptions, or paid features. Just a capable SSH client, " +
                         "made for everyone.",
                     style = MaterialTheme.typography.bodyLarge,

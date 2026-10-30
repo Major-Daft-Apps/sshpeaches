@@ -110,7 +110,7 @@ class LiveFileBoostTest {
         service.listSftpDirectory(id, path)
         check(waitFor(120_000) {
             val now = service.remoteDirectoryFlow().value[id]
-            now != null && now !== before && now.complete && now.path.endsWith(path.substringAfterLast('/'))
+            now != null && now !== before && now.complete && !now.fromCache && now.path.endsWith(path.substringAfterLast('/'))
         }) { "listing of $path never arrived" }
         return secondsSince(start) to service.remoteDirectoryFlow().value.getValue(id)
     }
@@ -258,6 +258,91 @@ class LiveFileBoostTest {
         val expected = args.getString("midSha256") ?: MID_SHA256
         check(sha256(down) == expected) { "the download's SHA-256 is ${sha256(down)}, want $expected" }
         return down
+    }
+
+    /**
+     * Cancelling a download, at any point of it, leaves the session as it was: no reconnect. The transfer thread
+     * is interrupted to stop it, and an interrupt landing in SSH I/O on the session's own connection (the file's
+     * stat, Boost's control messages) could break that connection.
+     */
+    @Test
+    fun cancellingADownloadKeepsTheSession() {
+        assumeTrue("needs -e boostHost", args.getString("boostHost") != null)
+        collectLogs()
+        val target = File(context.cacheDir, "boost-cancel.bin")
+        withSessionService { service ->
+            for (boost in listOf(true, false)) {
+                runBlocking { SettingsStore.setBoost(boost) }
+                Thread.sleep(500)
+                val id = "boost-cancel-${if (boost) "on" else "off"}"
+                val statuses = CopyOnWriteArrayList<SessionStatus>()
+                val watcher = logScope.launch {
+                    service.sessionsFlow().collect { list -> list.firstOrNull { it.hostId == id }?.let { statuses += it.status } }
+                }
+                try {
+                    open(service, id)
+                    if (boost) boostLine(id)
+                    for (delayMs in listOf(0L, 300L, 1500L)) {
+                        target.delete()
+                        statuses.clear()
+                        service.scpDownloadFile(id, "$dir/big.bin", target.absolutePath)
+                        Thread.sleep(delayMs)
+                        check(service.cancelFileTransfer(id)) { "nothing to cancel" }
+                        check(waitFor(30_000) { service.fileTransferProgressFlow().value[id]?.isActive != true }) { "the cancel didn't end the transfer" }
+                        Thread.sleep(3_000)
+                        val reconnects = logs.filter { it.first == id && "Reconnecting" in it.second }
+                        check(SessionStatus.CONNECTING !in statuses && reconnects.isEmpty()) {
+                            "cancelling ${delayMs} ms into a ${if (boost) "Boost" else "SFTP"} download reconnected the session: $statuses $reconnects"
+                        }
+                        // And the session still works.
+                        val (_, snapshot) = list(service, id, "$dir/many")
+                        check(snapshot.entries.size >= 500) { "listing after the cancel: ${snapshot.entries.size}" }
+                        note("${if (boost) "boost" else "sftp"}: cancelled $delayMs ms in, session kept")
+                    }
+                } finally {
+                    watcher.cancel()
+                    service.stopSession(id)
+                    Thread.sleep(1_000)
+                }
+            }
+        }
+        target.delete()
+        Log.i("NetScenario", "== cancel\n" + results.joinToString("\n"))
+    }
+
+    /**
+     * The network going away and coming back (airplane mode on, then off) during a Boost download: the session
+     * reconnects, and the download carries on (over SFTP if Boost's connection went with the network) and finishes
+     * whole. 0.12.0 reported it as cancelled.
+     */
+    @Test
+    fun aDownloadSurvivesTheNetworkDropping() {
+        assumeTrue("needs -e boostHost", args.getString("boostHost") != null)
+        collectLogs()
+        val target = File(context.cacheDir, "boost-drop.bin").apply { delete() }
+        val id = "boost-drop"
+        withSessionService { service ->
+            runBlocking { SettingsStore.setBoost(true) }
+            Thread.sleep(500)
+            try {
+                open(service, id)
+                note("drop: ${boostLine(id)}")
+                service.scpDownloadFile(id, "$dir/big.bin", target.absolutePath)
+                check(waitFor(60_000) { (service.fileTransferProgressFlow().value[id]?.bytesTransferred ?: 0L) > 0L }) { "the download never started" }
+                service.simulateNetworkDropForTests()
+                check(waitFor(300_000) { service.fileTransferProgressFlow().value[id]?.isActive == false }) { "the download never ended" }
+                val end = service.fileTransferProgressFlow().value.getValue(id)
+                check(end.status == FileTransferStatus.SUCCEEDED) {
+                    "after the network dropped the download ended ${end.status}: ${end.errorMessage}; log: ${logs.filter { it.first == id }.map { it.second }.takeLast(12)}"
+                }
+                check(target.length() == 128L shl 20) { "the download is ${target.length()} bytes" }
+                note("drop: the download carried on through the drop and finished")
+            } finally {
+                service.stopSession(id)
+                target.delete()
+            }
+        }
+        Log.i("NetScenario", "== network drop\n" + results.joinToString("\n"))
     }
 
     private fun collectLogs() {

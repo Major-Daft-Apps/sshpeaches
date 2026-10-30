@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/majordaftapps/sshpeaches/tools/boost/internal/server"
@@ -49,6 +50,10 @@ type ShellListener interface {
 type Shell struct {
 	s        *Session
 	listener ShellListener
+
+	// pingSentAt is when the unanswered ping went out (unix nanos, 0 for none); rttMicros the smoothed round trip.
+	pingSentAt atomic.Int64
+	rttMicros  atomic.Int64
 
 	mu       sync.Mutex
 	id       string
@@ -383,6 +388,15 @@ func (sh *Shell) serve(att *attachment) (status int, exited bool, err error) {
 					sh.ackLocked(int64(binary.BigEndian.Uint64(payload)))
 					sh.mu.Unlock()
 				}
+			case wire.FramePing:
+				if sentAt := sh.pingSentAt.Swap(0); sentAt != 0 {
+					sample := (time.Now().UnixNano() - sentAt) / int64(time.Microsecond)
+					if old := sh.rttMicros.Load(); old == 0 {
+						sh.rttMicros.Store(sample)
+					} else {
+						sh.rttMicros.Store((old*7 + sample*3) / 10)
+					}
+				}
 			case wire.FrameExit:
 				code := 0
 				if len(payload) == 4 {
@@ -399,7 +413,7 @@ func (sh *Shell) serve(att *attachment) (status int, exited bool, err error) {
 	sent := sh.inAcked
 	sh.mu.Unlock()
 	lastHeard := time.Now()
-	lastSent := time.Now()
+	lastPing := time.Time{}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -424,14 +438,12 @@ func (sh *Shell) serve(att *attachment) (status int, exited bool, err error) {
 			if err := att.send(wire.FrameResize, size); err != nil {
 				return 0, false, err
 			}
-			lastSent = time.Now()
 		}
 		if input != nil {
 			if err := att.send(wire.FrameInput, input); err != nil {
 				return 0, false, err
 			}
 			sent += int64(len(input))
-			lastSent = time.Now()
 			continue
 		}
 		select {
@@ -449,14 +461,24 @@ func (sh *Shell) serve(att *attachment) (status int, exited bool, err error) {
 			if time.Since(lastHeard) > shellDeadAfter {
 				return 0, false, fmt.Errorf("no answer from the helper for %d s", int(shellDeadAfter/time.Second))
 			}
-			if time.Since(lastSent) >= shellPingEvery {
+			// Every few seconds, typing or not: the answer times the round trip too.
+			if time.Since(lastPing) >= shellPingEvery {
+				sh.pingSentAt.Store(time.Now().UnixNano())
 				if err := att.send(wire.FramePing, nil); err != nil {
 					return 0, false, err
 				}
-				lastSent = time.Now()
+				lastPing = time.Now()
 			}
 		}
 	}
+}
+
+// RTTMillis is the smoothed round trip to the helper, from the shell's pings; -1 until one was answered.
+func (sh *Shell) RTTMillis() int {
+	if us := sh.rttMicros.Load(); us > 0 {
+		return int((us + 500) / 1000)
+	}
+	return -1
 }
 
 // Await waits until the shell is over (exited, lost or closed).

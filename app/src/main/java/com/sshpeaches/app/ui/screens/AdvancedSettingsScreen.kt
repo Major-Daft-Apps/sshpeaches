@@ -49,6 +49,8 @@ fun AdvancedSettingsScreen(
     onParallelDownloadsChange: (Int) -> Unit,
     onApplySftpFastPreset: () -> Unit,
     onBoostTerminalToggle: (Boolean) -> Unit = {},
+    showConnectionLatency: Boolean = false,
+    onShowConnectionLatencyToggle: (Boolean) -> Unit = {},
     onBoostTcpFallbackToggle: (Boolean) -> Unit = {},
     onBoostPortsChange: (String) -> Unit = {},
     onRestoreDefaultSettings: () -> Unit,
@@ -84,6 +86,24 @@ fun AdvancedSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             terminalSettings?.invoke()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Connection", style = MaterialTheme.typography.titleMedium)
+                    AdvancedSettingsToggleRow(
+                        title = "Show connection latency",
+                        description = "Show each terminal and file browser session's round trip to the server (for example \"42 ms\") in its top bar, checked every 5 seconds. Tap it for the last minute's figures.",
+                        checked = showConnectionLatency,
+                        onCheckedChange = onShowConnectionLatencyToggle,
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_SHOW_LATENCY_SWITCH)
+                    )
+                }
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)

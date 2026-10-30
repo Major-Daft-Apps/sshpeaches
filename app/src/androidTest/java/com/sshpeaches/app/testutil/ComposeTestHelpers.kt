@@ -207,6 +207,8 @@ private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH -> "Diagnostics"
     UiTestTags.SETTINGS_BOOST_SWITCH,
     UiTestTags.SETTINGS_BOOST_INFO_BUTTON -> "Boost"
+    UiTestTags.SETTINGS_RATE_APP,
+    UiTestTags.SETTINGS_SHARE_APP -> "Rate & share"
     UiTestTags.SETTINGS_EXPORT_BUTTON,
     UiTestTags.SETTINGS_IMPORT_BUTTON,
     UiTestTags.SETTINGS_EXPORT_QR_BUTTON,

@@ -81,8 +81,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1201
-        versionName = "0.12.1"
+        versionCode = 1202
+        versionName = "0.12.2"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -287,6 +287,8 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     implementation("org.bouncycastle:bcutil-jdk18on:1.86")
     implementation("com.google.zxing:core:3.5.4")
+    // Google Play's in-app review sheet, asked for once after a good session (ReviewPrompt).
+    implementation("com.google.android.play:review-ktx:2.0.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation(project(":terminal-emulator"))

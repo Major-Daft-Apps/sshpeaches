@@ -7,6 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
@@ -24,6 +25,7 @@ import com.majordaftapps.sshpeaches.app.ui.state.TerminalBellMode
 import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
@@ -85,6 +87,10 @@ object SettingsStore {
     private val boostTerminalKey = booleanPreferencesKey("boost_terminal")
     private val boostTcpFallbackKey = booleanPreferencesKey("boost_tcp_fallback")
     private val boostPortsKey = stringPreferencesKey("boost_ports")
+    private val showConnectionLatencyKey = booleanPreferencesKey("show_connection_latency")
+    private val successfulSessionsKey = intPreferencesKey("successful_sessions")
+    private val firstUseAtKey = longPreferencesKey("first_use_at")
+    private val reviewPromptedKey = booleanPreferencesKey("review_prompted")
 
     val defaultCrashReportsEnabled: Boolean = true
     val defaultAnalyticsEnabled: Boolean = true
@@ -569,6 +575,34 @@ object SettingsStore {
 
     suspend fun setBoostTcpFallback(enabled: Boolean) {
         dataStore.edit { prefs -> prefs[boostTcpFallbackKey] = enabled }
+    }
+
+    /** Sessions that connected (first connects, not reconnects): for the one-time review prompt. */
+    val successfulSessions: Flow<Int> by lazy { dataStore.data.map { it[successfulSessionsKey] ?: 0 } }
+
+    /** When the app was first used (epoch millis), 0 before; set by [recordSuccessfulSession]. */
+    val firstUseAt: Flow<Long> by lazy { dataStore.data.map { it[firstUseAtKey] ?: 0L } }
+
+    val reviewPrompted: Flow<Boolean> by lazy { dataStore.data.map { it[reviewPromptedKey] ?: false } }
+
+    suspend fun recordSuccessfulSession() {
+        dataStore.edit { prefs ->
+            prefs[successfulSessionsKey] = (prefs[successfulSessionsKey] ?: 0) + 1
+            if (prefs[firstUseAtKey] == null) prefs[firstUseAtKey] = System.currentTimeMillis()
+        }
+    }
+
+    suspend fun setReviewPrompted() {
+        dataStore.edit { prefs -> prefs[reviewPromptedKey] = true }
+    }
+
+    /** Advanced: show sessions' round trip to the server. Off by default. */
+    val showConnectionLatency: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[showConnectionLatencyKey] ?: false }.distinctUntilChanged()
+    }
+
+    suspend fun setShowConnectionLatency(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[showConnectionLatencyKey] = enabled }
     }
 
     suspend fun setBoostPorts(ports: String) {

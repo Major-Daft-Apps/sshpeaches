@@ -131,6 +131,12 @@ internal class BoostTerminalChannel(
         shell.resize(rows.toLong(), columns.toLong())
     }
 
+    /** "UDP" or "TCP": what the helper was reached over. */
+    val transport: String get() = boost.transport.uppercase()
+
+    /** Smoothed round trip to the helper from the terminal's pings, or null before the first answer. */
+    fun rttMillis(): Long? = shell.rttMillis().takeIf { it >= 0 }
+
     /** Reattaches now over a new connection: the network changed, so the old path is probably gone. */
     fun kick() {
         shell.kick()

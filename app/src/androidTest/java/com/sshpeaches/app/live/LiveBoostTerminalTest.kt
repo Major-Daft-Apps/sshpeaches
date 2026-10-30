@@ -171,6 +171,45 @@ class LiveBoostTerminalTest {
         Log.i("NetScenario", "== boost-terminal\n" + results.joinToString("\n"))
     }
 
+    /** With Show connection latency on, a file browser is timed over SSH and a Boost terminal by its pings. */
+    @Test
+    fun latencyIsMeasuredOverSshAndBoost() {
+        assumeTrue("needs -e boostHost", args.getString("boostHost") != null)
+        runBlocking {
+            SettingsStore.setShowConnectionLatency(true)
+            SettingsStore.setBoost(true)
+            SettingsStore.setBoostTerminal(true)
+        }
+        try {
+            withSessionService { service ->
+                val terminal = "boost-term-latency"
+                val browser = "boost-browser-latency"
+                try {
+                    open(service, terminal)
+                    service.startSession(
+                        requestedSessionId = browser, host = host.copy(id = browser, name = browser), mode = ConnectionMode.SCP,
+                        passwordOverride = args.getString("boostPassword"), autoTrustUnknownHostKey = true, hostKeyPromptEnabled = false
+                    )
+                    waitFor(60_000, "both latencies") {
+                        val l = service.connectionLatencyFlow().value
+                        l[terminal]?.lastMs != null && l[browser]?.lastMs != null
+                    }
+                    val l = service.connectionLatencyFlow().value
+                    note("latency: terminal ${l[terminal]}, browser ${l[browser]}")
+                    check(l.getValue(terminal).via.startsWith("Boost")) { "the Boost terminal was timed ${l[terminal]?.via}" }
+                    check(l.getValue(browser).via == "SSH") { "the file browser was timed ${l[browser]?.via}" }
+                    check(l.values.all { (it.lastMs ?: 0) in 0..2_000 }) { "implausible round trips: $l" }
+                } finally {
+                    service.stopSession(terminal)
+                    service.stopSession(browser)
+                }
+            }
+        } finally {
+            runBlocking { SettingsStore.setShowConnectionLatency(false) }
+        }
+        Log.i("NetScenario", "== latency\n" + results.joinToString("\n"))
+    }
+
     @Test
     fun boostTerminalOffUsesSsh() {
         assumeTrue("needs -e boostHost", args.getString("boostHost") != null)

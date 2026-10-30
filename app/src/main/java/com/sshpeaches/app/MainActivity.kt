@@ -372,6 +372,9 @@ class MainActivity : FragmentActivity() {
             val emptyFileTransferProgressState:
                 State<Map<String, com.majordaftapps.sshpeaches.app.service.FileTransferProgress>> =
                 remember { mutableStateOf(emptyMap()) }
+            val emptyFileTransferListsState:
+                State<Map<String, List<com.majordaftapps.sshpeaches.app.service.FileTransferProgress>>> =
+                remember { mutableStateOf(emptyMap()) }
             val sessionSnapshotsFlow = sessionService?.sessionsFlow()
             val observedSessionSnapshots by sessionSnapshotsFlow
                 ?.collectAsStateWithLifecycle(minActiveState = Lifecycle.State.CREATED)
@@ -392,6 +395,13 @@ class MainActivity : FragmentActivity() {
                 ?.collectAsStateWithLifecycle() ?: emptyRemoteDirectoriesState
             val fileTransferProgress by sessionService?.fileTransferProgressFlow()
                 ?.collectAsStateWithLifecycle() ?: emptyFileTransferProgressState
+            val fileTransferLists by sessionService?.fileTransfersFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyFileTransferListsState
+            val showConnectionLatency by SettingsStore.showConnectionLatency.collectAsStateWithLifecycle(initialValue = false)
+            val emptyLatenciesState: State<Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency>> =
+                remember { mutableStateOf(emptyMap()) }
+            val connectionLatencies by sessionService?.connectionLatencyFlow()
+                ?.collectAsStateWithLifecycle() ?: emptyLatenciesState
             LaunchedEffect(uiState.hosts) {
                 HostWidgets.updateAllAsync(this@MainActivity)
             }
@@ -784,6 +794,13 @@ class MainActivity : FragmentActivity() {
                         onScpDownloadFile = scpDownloadFile,
                         onScpUploadFile = scpUploadFile,
                         onCancelFileTransfer = cancelFileTransfer,
+                        onCancelTransfer = { hostId, operationId -> sessionService?.cancelFileTransfer(hostId, operationId) },
+                        onRetryTransfer = { hostId, operationId -> sessionService?.retryFileTransfer(hostId, operationId) },
+                        onClearFinishedTransfers = { hostId -> sessionService?.clearFinishedTransfers(hostId) },
+                        onShowConnectionLatencyToggle = { enabled ->
+                            lifecycleScope.launch { SettingsStore.setShowConnectionLatency(enabled) }
+                        },
+                        onReturnedHomeFromSession = { lifecycleScope.launch { ReviewPrompt.maybeAsk(this@MainActivity) } },
                         onOpenSessionRequestHandled = { handledSessionId ->
                             val pendingSessionId = requestedOpenSessionHostId.value
                             val matchesPendingRequest = pendingSessionId == handledSessionId
@@ -826,6 +843,9 @@ class MainActivity : FragmentActivity() {
                         shellOutputs = shellOutputs,
                         remoteDirectories = remoteDirectories,
                         fileTransferProgresses = fileTransferProgress,
+                        fileTransferLists = fileTransferLists,
+                        showConnectionLatency = showConnectionLatency,
+                        connectionLatencies = connectionLatencies,
                         hostKeyPrompts = hostKeyPrompts,
                         passwordPrompts = passwordPrompts,
                         requestedOpenSessionId = requestedOpenSessionHostId.value,

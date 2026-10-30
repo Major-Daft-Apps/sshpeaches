@@ -346,3 +346,31 @@ func TestLotsOfOutputArrivesWhole(t *testing.T) {
 		}
 	}
 }
+
+func TestShellReportsItsRoundTrip(t *testing.T) {
+	srv, token, _ := shellHelper(t, true)
+	r := newRelay(t, srv.UDPPort())
+	s, err := Dial("127.0.0.1", r.port(), 0, srv.CertHash(), token, false, 3000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	sh, err := s.StartShell(24, 80, "xterm", newShellEvents())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sh.Close(true)
+	if sh.RTTMillis() != -1 {
+		t.Fatalf("a round trip before any ping: %d", sh.RTTMillis())
+	}
+	deadline := time.Now().Add(shellPingEvery + 3*time.Second)
+	for sh.RTTMillis() < 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("no round trip measured")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if rtt := sh.RTTMillis(); rtt > 200 {
+		t.Fatalf("a loopback round trip of %d ms", rtt)
+	}
+}

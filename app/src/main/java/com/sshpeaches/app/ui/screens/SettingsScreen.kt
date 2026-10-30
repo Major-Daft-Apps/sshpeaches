@@ -102,6 +102,7 @@ private enum class SettingsCategory(
     AUTOMATION("Automation", "Snippets and port forward defaults"),
     DIAGNOSTICS("Diagnostics", "Crash, usage, and session diagnostics"),
     TRANSFER("Transfer", "Export and import via QR or file"),
+    SUPPORT("Rate & share", "Rate SSHPeaches on Google Play, or share it"),
     ADVANCED("Advanced", "SFTP transfer tuning and other expert options")
 }
 
@@ -906,9 +907,32 @@ fun SettingsScreen(
                     )
                     SettingsToggleRow(
                         title = "Send usage reports",
-                        description = "Upload a usage report every 7 days",
+                        description = "Upload a usage report every 7 days: how many hosts, keys and snippets you have, and how fast connecting, transfers, folder listings and Boost are. No host names, addresses or file names.",
                         checked = usageReportsEnabled,
                         onCheckedChange = onUsageReportsToggle
+                    )
+                }
+            }
+                }
+                if (SettingsCategory.SUPPORT in visibleCategories) {
+            Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        "Rate & share",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    SettingsLinkRow(
+                        title = "Rate SSHPeaches",
+                        description = "Leave a rating or review on Google Play",
+                        onClick = { openPlayListing(context) },
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_RATE_APP)
+                    )
+                    SettingsLinkRow(
+                        title = "Share SSHPeaches",
+                        description = "Send a link to the app",
+                        onClick = { shareApp(context) },
+                        modifier = Modifier.testTag(UiTestTags.SETTINGS_SHARE_APP)
                     )
                 }
             }
@@ -1723,4 +1747,49 @@ private fun ImportReviewDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+private const val PLAY_LISTING = "https://play.google.com/store/apps/details?id=com.majordaftapps.sshpeaches"
+
+@Composable
+private fun SettingsLinkRow(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(title)
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Opens the app's Play Store page (the Play Store app, or the web page without it). */
+private fun openPlayListing(context: android.content.Context) {
+    val market = android.content.Intent(
+        android.content.Intent.ACTION_VIEW,
+        android.net.Uri.parse("market://details?id=com.majordaftapps.sshpeaches")
+    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(market) }.recoverCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(PLAY_LISTING))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+}
+
+private fun shareApp(context: android.content.Context) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_SUBJECT, "SSHPeaches")
+        .putExtra(
+            android.content.Intent.EXTRA_TEXT,
+            "SSHPeaches is a free, open-source SSH client for Android, with SFTP, Mosh and port forwarding: $PLAY_LISTING"
+        )
+    runCatching {
+        context.startActivity(
+            android.content.Intent.createChooser(send, "Share SSHPeaches").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
 }

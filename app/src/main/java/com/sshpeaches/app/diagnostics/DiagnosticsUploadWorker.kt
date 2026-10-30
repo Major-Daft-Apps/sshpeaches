@@ -34,10 +34,16 @@ class DiagnosticsUploadWorker(
             snippets = db.snippetDao().countAll()
         )
         val bundle = DiagnosticsBundle.basic(settings, counts)
+        val metrics = PerformanceMetrics.get(applicationContext).apply { enabled = true }
+        val payload = bundle.toJson().put("performance", metrics.snapshot())
         val appCheckToken = AppCheckTokenProvider.getToken()
         val uploader = DiagnosticsUploader(BuildConfig.DIAGNOSTICS_ENDPOINT)
-        return when (uploader.upload(bundle, appCheckToken)) {
-            is DiagnosticsUploader.UploadResult.Success -> Result.success()
+        return when (uploader.uploadJson(payload.toString(), appCheckToken)) {
+            is DiagnosticsUploader.UploadResult.Success -> {
+                // Each report covers the time since the last one.
+                metrics.reset()
+                Result.success()
+            }
             is DiagnosticsUploader.UploadResult.Skipped -> Result.success()
             is DiagnosticsUploader.UploadResult.Failed -> Result.failure()
             is DiagnosticsUploader.UploadResult.Retryable -> Result.retry()

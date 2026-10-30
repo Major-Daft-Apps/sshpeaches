@@ -84,6 +84,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineStart
@@ -152,6 +154,12 @@ class SessionService : Service() {
     private val remoteDirectories = MutableStateFlow<Map<String, RemoteDirectorySnapshot>>(emptyMap())
     private val fileTransferProgress = MutableStateFlow<Map<String, FileTransferProgress>>(emptyMap())
     private val activeFileTransfers = ConcurrentHashMap<String, CopyOnWriteArrayList<ActiveFileTransfer>>()
+    /** Each session's finished transfers, newest first, for the transfers pane. */
+    private val finishedTransfers = ConcurrentHashMap<String, List<FileTransferProgress>>()
+    /** How to start a finished transfer again, by operation id, with the session it belongs to. */
+    private val transferRetries = ConcurrentHashMap<String, Pair<String, () -> Unit>>()
+    /** Every session's transfers, running and waiting first, then finished: what the transfers pane lists. */
+    private val transferLists = MutableStateFlow<Map<String, List<FileTransferProgress>>>(emptyMap())
     private val transferQueues = ConcurrentHashMap<String, Mutex>()
     private val listingGenerations = ConcurrentHashMap<String, AtomicLong>()
     private val lastRequestedListings = ConcurrentHashMap<String, String>()
@@ -168,6 +176,14 @@ class SessionService : Service() {
     private val shellSizes = ConcurrentHashMap<String, Pair<Int, Int>>()
     /** Boost terminals kept while their session's SSH connection reconnects: typing and output carry on meanwhile. */
     private val keptBoostShells = ConcurrentHashMap<String, ShellBinding>()
+    /** Each file browser's recently listed folders, shown at once when it goes back, forward or up to one. */
+    private val recentListings = ConcurrentHashMap<String, RecentListings<RemoteDirectorySnapshot>>()
+    private val metrics by lazy { com.majordaftapps.sshpeaches.app.diagnostics.PerformanceMetrics.get(this) }
+    /** Each session's round trips, sampled while Advanced settings → Show connection latency is on. */
+    private val connectionLatencies = MutableStateFlow<Map<String, ConnectionLatency>>(emptyMap())
+    private val latencySamples = ConcurrentHashMap<String, LatencySamples>()
+    @Volatile
+    private var latencyJob: Job? = null
     /** Hosts where a Boost terminal couldn't start lately, so connecting there doesn't wait on it again for a while. */
     private val boostTerminalUnavailableUntil = ConcurrentHashMap<String, Long>()
     /** The last state each Boost terminal reported, so a run of reconnect attempts is logged once. */
@@ -216,6 +232,20 @@ class SessionService : Service() {
         collectorScope.launch {
             SettingsStore.diagnosticsEnabled.collect { enabled ->
                 diagnosticsEnabled = enabled
+            }
+        }
+        collectorScope.launch {
+            // Performance figures go into the weekly usage report, so they're collected only while it's on.
+            SettingsStore.usageReportsEnabled.collect { enabled -> metrics.enabled = enabled }
+        }
+        collectorScope.launch {
+            SettingsStore.showConnectionLatency.collect { enabled ->
+                latencyJob?.cancel()
+                latencyJob = if (enabled) serviceScope.launch { sampleLatencies() } else null
+                if (!enabled) {
+                    latencySamples.clear()
+                    connectionLatencies.value = emptyMap()
+                }
             }
         }
         collectorScope.launch {
@@ -375,6 +405,19 @@ class SessionService : Service() {
             ?.getNetworkCapabilities(network)
             ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
 
+    /** Tests: what airplane mode on then off does, without changing the device: the network lost, then a new one. */
+    @androidx.annotation.VisibleForTesting
+    internal fun simulateNetworkDropForTests() {
+        networkAvailable.value = false
+        disconnectForNetworkTransition(DefaultNetworkTransition.LOST)
+        networkHandler.postDelayed({
+            networkAvailable.value = true
+            kickBoostShells()
+            activeFileTransfers.values.flatten().forEach { it.engine?.wakeUp() }
+            disconnectForNetworkTransition(DefaultNetworkTransition.CHANGED)
+        }, 2_000)
+    }
+
     private fun disconnectForNetworkTransition(transition: DefaultNetworkTransition) {
         networkHandler.post {
             if (serviceDestroyed) return@post
@@ -518,6 +561,7 @@ class SessionService : Service() {
             val osKnownAtStart = host.osMetadata is OsMetadata.Known
             while (true) {
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
+            val attemptStartedAt = SystemClock.elapsedRealtime()
             val reconnectSignal = CompletableDeferred<String>()
             val attempt = runCatching {
                 if (reconnectReason != null) {
@@ -793,6 +837,17 @@ class SessionService : Service() {
                     ConnectionMode.SCP -> "SFTP ready"
                 }
                 updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.ACTIVE, modeLabel)
+                metrics.recordConnect(
+                    kind = when {
+                        mode == ConnectionMode.SSH && useMoshTransport -> "mosh"
+                        mode == ConnectionMode.SSH -> "terminal"
+                        mode == ConnectionMode.SCP -> "browser"
+                        else -> "console"
+                    },
+                    millis = SystemClock.elapsedRealtime() - attemptStartedAt,
+                    reconnect = reconnectReason != null
+                )
+                if (reconnectReason == null) serviceScope.launch { SettingsStore.recordSuccessfulSession() }
                 // Log in for transfers now, so the first one starts at once.
                 transferPool?.let { pool -> serviceScope.launch { pool.warmUp() } }
                 if (mode != ConnectionMode.SSH) {
@@ -881,6 +936,12 @@ class SessionService : Service() {
                 sftpBinding = null
                 activeForwardBindings = emptyList()
                 reconnectAttempt += 1
+                reportNetworkIssue(
+                    if (reconnectAttempt == 1) "connection_lost" else "reconnect_failed",
+                    sessionId,
+                    attempt.exceptionOrNull(),
+                    mapOf("reason" to retryReason, "attempt" to reconnectAttempt.toString())
+                )
                 reconnectReason = retryReason
                 TelemetryInitializer.breadcrumb("session reconnect attempt=$reconnectAttempt mode=$mode")
                 SessionLogBus.emit(
@@ -1074,6 +1135,7 @@ class SessionService : Service() {
         val client = connection.client ?: return
         if (connection.mode != ConnectionMode.SSH || connection.shellBinding == null) return
         if (sessionId in reconnectingSessions) return
+        val probeStartedAt = SystemClock.elapsedRealtime()
         serviceScope.launch {
             val alive = withTimeoutOrNull(LIVENESS_PROBE_TIMEOUT_MS) {
                 // Sending can block on the transport's write lock, so it runs apart and the timeout covers it.
@@ -1092,7 +1154,11 @@ class SessionService : Service() {
                 runCatching { promise.retrieve() }
                     .fold(onSuccess = { true }, onFailure = ::isGlobalRequestRefusal)
             } ?: false
-            if (alive || activeConnections[sessionId]?.client !== client) return@launch
+            // Output that arrived meanwhile is an answer too: on a laggy network the keepalive's reply can queue
+            // behind it, and dropping that connection was what "Socket closed" was on bad links.
+            val heardMeanwhile = (lastShellOutputAtMs[sessionId] ?: Long.MIN_VALUE) >= probeStartedAt
+            if (alive || heardMeanwhile || activeConnections[sessionId]?.client !== client) return@launch
+            reportNetworkIssue("no_answer", sessionId, null, mapOf("waited_ms" to LIVENESS_PROBE_TIMEOUT_MS.toString()))
             SessionLogBus.emit(
                 SessionLogBus.Entry(
                     hostId = sessionId,
@@ -1110,6 +1176,52 @@ class SessionService : Service() {
     @androidx.annotation.VisibleForTesting
     internal fun dropSshConnectionForTests(sessionId: String) {
         activeConnections[sessionId]?.client?.let(::dropDeadConnection)
+    }
+
+    fun connectionLatencyFlow(): StateFlow<Map<String, ConnectionLatency>> = connectionLatencies.asStateFlow()
+
+    /**
+     * Every few seconds, times each session's round trip: a Boost terminal by its own pings (the path its keys
+     * take), the rest by an SSH keepalive request, which OpenSSH answers at once. Mosh sessions are left out: there
+     * is no SSH connection under them to time, and mosh-client shows its own connection state.
+     */
+    private suspend fun sampleLatencies() = coroutineScope {
+        while (isActive) {
+            val sessions = (activeConnections.keys + keptBoostShells.keys).toSet()
+            latencySamples.keys.retainAll(sessions)
+            sessions.map { sessionId ->
+                async {
+                    val boost = boostShellFor(sessionId)
+                    val connection = activeConnections[sessionId]
+                    when {
+                        boost != null -> sessionId to ("Boost ${boost.transport}" to boost.rttMillis())
+                        connection?.moshBinding != null || connection?.client == null || sessionId in reconnectingSessions -> null
+                        else -> sessionId to ("SSH" to timeSshRoundTrip(connection.client))
+                    }
+                }
+            }.awaitAll().filterNotNull().forEach { (sessionId, sample) ->
+                latencySamples.getOrPut(sessionId) { LatencySamples() }.add(sample.second)
+                sample.second?.let { metrics.recordLatency(sample.first, it) }
+            }
+            connectionLatencies.value = buildMap {
+                latencySamples.forEach { (sessionId, samples) ->
+                    val via = boostShellFor(sessionId)?.let { "Boost ${it.transport}" } ?: "SSH"
+                    samples.summary(via)?.let { put(sessionId, it) }
+                }
+            }
+            delay(LATENCY_SAMPLE_INTERVAL_MS)
+        }
+    }
+
+    /** Milliseconds for an SSH keepalive request to be answered, or null without an answer within the probe timeout. */
+    private suspend fun timeSshRoundTrip(client: SSHClient): Long? = withTimeoutOrNull(LIVENESS_PROBE_TIMEOUT_MS) {
+        val start = System.nanoTime()
+        val promise = withContext(Dispatchers.IO) {
+            runCatching { client.connection.sendGlobalRequest("keepalive@openssh.com", true, ByteArray(0)) }.getOrNull()
+        } ?: return@withTimeoutOrNull null
+        // Polled, as in probeConnection: OpenSSH refuses keepalives, and an awaited refusal is logged as an error.
+        while (!promise.isFulfilled) delay(LATENCY_POLL_MS)
+        (System.nanoTime() - start) / 1_000_000
     }
 
     private fun dropDeadConnection(client: SSHClient) {
@@ -1368,9 +1480,18 @@ class SessionService : Service() {
     fun listSftpDirectory(hostId: String, path: String) {
         val targetPath = path.trim().ifBlank { "." }
         val resolveSymbolicLinks =
-            shouldResolveSftpLinkMetadata(activeConnections[hostId]?.mode)
+            // The connection registers only once the session is ready: a listing asked for while it opens goes by
+            // the mode the session was started in (it used to be taken for the console's, without link details).
+            shouldResolveSftpLinkMetadata(
+                activeConnections[hostId]?.mode ?: sessionSnapshots.value.firstOrNull { it.hostId == hostId }?.mode
+            )
         val generation = nextListingGeneration(hostId)
         lastRequestedListings[hostId] = targetPath
+        // A folder the browser saw lately shows at once; the listing below then replaces it with what's there now.
+        val cached = recentListings[hostId]?.get(targetPath)?.takeIf { resolveSymbolicLinks }
+        cached?.let {
+            setRemoteDirectorySnapshot(hostId, it.copy(refreshToken = SystemClock.elapsedRealtimeNanos(), fromCache = true))
+        }
         serviceScope.launch {
             awaitBrowserConnection(hostId)
             val listed = runWithSftpClient(hostId) { sftp ->
@@ -1380,7 +1501,9 @@ class SessionService : Service() {
                         sftp = sftp,
                         path = targetPath,
                         resolveSymbolicLinks = resolveSymbolicLinks,
-                        generation = generation
+                        generation = generation,
+                        // Over a cached listing, the first entries of a big folder would look like a shrunken one.
+                        showPartial = cached == null
                     )
                 } catch (error: Exception) {
                     // The connection died under the listing: reconnecting lists this folder again.
@@ -1432,6 +1555,7 @@ class SessionService : Service() {
                         message = "Boost on (${boost.transport.uppercase()})."
                     )
                 )
+                metrics.recordBoost("files", boost.transport.lowercase())
             }.onFailure { error ->
                 val reason = (error as? BoostUnavailable)?.message ?: (error.message ?: error.javaClass.simpleName)
                 Log.i(FILE_BOOST_TAG, "Boost unavailable for $sessionId", error)
@@ -1442,6 +1566,7 @@ class SessionService : Service() {
                         message = "Boost isn't available: $reason. Using SFTP."
                     )
                 )
+                metrics.recordBoost("files", com.majordaftapps.sshpeaches.app.diagnostics.PerformanceMetrics.boostReason(reason))
             }
         }
     }
@@ -1472,6 +1597,7 @@ class SessionService : Service() {
                 message = "Boost $what failed (${error.message ?: error.javaClass.simpleName}); using SFTP."
             )
         )
+        reportNetworkIssue("boost_$what", sessionId, error)
     }
 
     /**
@@ -1635,8 +1761,59 @@ class SessionService : Service() {
 
     private fun publishDisplayedTransfer(sessionId: String) {
         val transfers = activeTransfersFor(sessionId)
+        publishTransferList(sessionId)
         val shown = transfers.firstOrNull { it.running } ?: transfers.firstOrNull() ?: return
         setFileTransferProgress(sessionId, shown.latestProgress.copy(queuedTransfers = transfers.size - 1))
+    }
+
+    /** Publishes [sessionId]'s transfers for the pane: the running one, those waiting in order, then the finished. */
+    private fun publishTransferList(sessionId: String) {
+        synchronized(fileTransferStateLock) {
+            val active = activeTransfersFor(sessionId).sortedBy { if (it.running) 0 else 1 }
+                .map { it.latestProgress.copy(waiting = !it.running) }
+            val list = active + finishedTransfers[sessionId].orEmpty()
+            transferLists.update { current -> if (list.isEmpty()) current - sessionId else current + (sessionId to list) }
+        }
+    }
+
+    fun fileTransfersFlow(): StateFlow<Map<String, List<FileTransferProgress>>> = transferLists.asStateFlow()
+
+    /** Cancels one of the session's transfers, running or waiting; the others carry on. */
+    fun cancelFileTransfer(sessionId: String, operationId: String): Boolean {
+        val transfer = activeTransfersFor(sessionId).firstOrNull { it.operationId == operationId } ?: return false
+        transfer.cancellationRequested.compareAndSet(false, true)
+        transfer.job?.cancel(FileTransferCancelledException())
+        transfer.workerThread?.interrupt()
+        return true
+    }
+
+    /** Starts a failed or cancelled transfer again: it joins the session's queue as a new transfer. */
+    fun retryFileTransfer(sessionId: String, operationId: String): Boolean {
+        val (owner, retry) = transferRetries[operationId] ?: return false
+        if (owner != sessionId) return false
+        transferRetries.remove(operationId)
+        synchronized(fileTransferStateLock) {
+            finishedTransfers.computeIfPresent(sessionId) { _, list -> list.filter { it.operationId != operationId } }
+        }
+        publishTransferList(sessionId)
+        retry()
+        return true
+    }
+
+    /** Forgets the session's finished transfers. */
+    fun clearFinishedTransfers(sessionId: String) {
+        synchronized(fileTransferStateLock) {
+            finishedTransfers.remove(sessionId)?.forEach { transferRetries.remove(it.operationId) }
+        }
+        publishTransferList(sessionId)
+    }
+
+    private fun forgetTransfers(sessionId: String) {
+        synchronized(fileTransferStateLock) {
+            finishedTransfers.remove(sessionId)
+            transferRetries.entries.removeIf { it.value.first == sessionId }
+            transferLists.update { it - sessionId }
+        }
     }
 
     private fun publishFileTransferFailure(
@@ -1676,9 +1853,12 @@ class SessionService : Service() {
     ) {
         val base = transfer.latestProgress
         if (!base.isActive) return
-        transfer.latestProgress = transform(base)
+        val next = transform(base)
+        transfer.latestProgress = next.copy(bytesPerSecond = transfer.sampleRate(next.bytesTransferred) ?: next.bytesPerSecond)
         if (displayedTransfer(transfer.sessionId) === transfer) {
             publishDisplayedTransfer(transfer.sessionId)
+        } else {
+            publishTransferList(transfer.sessionId)
         }
     }
 
@@ -1707,8 +1887,37 @@ class SessionService : Service() {
                 errorMessage = errorMessage?.takeIf { it.isNotBlank() },
                 completedAtEpochMillis = System.currentTimeMillis(),
                 queuedTransfers = 0,
-                retryMessage = null
+                retryMessage = null,
+                waiting = false,
+                bytesPerSecond = null,
+                canRetry = status != FileTransferStatus.SUCCEEDED && transferRetries.containsKey(transfer.operationId)
             ).also { transfer.latestProgress = it }
+        }
+        if (status == FileTransferStatus.SUCCEEDED) transferRetries.remove(transfer.operationId)
+        // A transfer that had to retry and still finished: how often connections drop mid-transfer, and why.
+        if (status == FileTransferStatus.SUCCEEDED && transfer.retries > 0) {
+            reportNetworkIssue(
+                "transfer_recovered", transfer.sessionId, null,
+                mapOf(
+                    "retries" to transfer.retries.toString(),
+                    "last_reason" to transfer.lastRetryReason.orEmpty(),
+                    "direction" to terminal.direction.name.lowercase(),
+                    "route" to transfer.route
+                )
+            )
+        }
+        if (transfer.startedAtMs > 0L) {
+            metrics.recordTransfer(
+                direction = terminal.direction.name.lowercase(),
+                route = transfer.route,
+                status = status.name.lowercase(),
+                bytes = terminal.bytesTransferred,
+                millis = SystemClock.elapsedRealtime() - transfer.startedAtMs
+            )
+        }
+        synchronized(fileTransferStateLock) {
+            finishedTransfers[transfer.sessionId] =
+                (listOf(terminal) + finishedTransfers[transfer.sessionId].orEmpty()).take(MAX_FINISHED_TRANSFERS)
         }
         // Release the transfer before showing its end, so a new transfer started from that state
         // queues behind nothing.
@@ -1717,6 +1926,7 @@ class SessionService : Service() {
             publishDisplayedTransfer(transfer.sessionId)
             return true
         }
+        publishTransferList(transfer.sessionId)
         setFileTransferProgress(hostId = transfer.sessionId, progress = terminal)
         return true
     }
@@ -1738,6 +1948,7 @@ class SessionService : Service() {
                     throwIfFileTransferCancelled(transfer)
                     transfer.workerThread = Thread.currentThread()
                     transfer.running = true
+                    transfer.startedAtMs = SystemClock.elapsedRealtime()
                     publishDisplayedTransfer(transfer.sessionId)
                     val successMessage = measureOperation(operationName, transfer.sessionId) {
                         block()
@@ -1813,7 +2024,7 @@ class SessionService : Service() {
         job.start()
     }
 
-    /** Cancels the session's running transfer and any waiting behind it. */
+    /** Cancels the session's running transfer and every one waiting behind it. */
     fun cancelFileTransfer(sessionId: String): Boolean {
         val transfers = activeTransfersFor(sessionId)
         if (transfers.isEmpty()) return false
@@ -1876,6 +2087,7 @@ class SessionService : Service() {
             sourceLabel = source,
             destinationLabel = destinationLabel
         )
+        transferRetries[transfer.operationId] = hostId to { startDownload(hostId, mode, remotePath, localPath, operationName) }
         launchFileTransfer(transfer, operationName) {
             val pool = awaitTransferPool(hostId)
             val destinationUri = localPath.toContentUriOrNull()
@@ -1886,7 +2098,9 @@ class SessionService : Service() {
                 throw IOException("$source is a folder; only files can be downloaded.")
             }
             val size = attributes.size.coerceAtLeast(0L)
-            updateActiveFileTransfer(transfer) { it.copy(destinationLabel = resolvedLabel, totalBytes = size) }
+            updateActiveFileTransfer(transfer) {
+                it.copy(destinationLabel = resolvedLabel, totalBytes = size, openUri = destinationUri?.toString())
+            }
             val settings = sftpTransferSettings.sanitized()
             val hostKey = transferHostKey(hostId)
             val progress = transferProgressPublisher(transfer, size)
@@ -1904,11 +2118,13 @@ class SessionService : Service() {
             fun downloadInto(partial: SftpPartialDownload, channel: java.nio.channels.FileChannel, descriptor: java.io.FileDescriptor) {
                 fileBoostFor(hostId)?.let { boost ->
                     try {
+                        transfer.route = "boost"
                         boostDownload(boost, source, size, attributes.mtime, partial, channel, descriptor, progress, cancelled)
                         return
                     } catch (error: Throwable) {
                         if (cancelled() || error is FileTransferCancelledException) throw error
                         // SFTP carries on from the chunks file boost finished.
+                        transfer.route = "mixed"
                         fileBoostFailed(hostId, boost, error, "download")
                     }
                 }
@@ -2018,6 +2234,7 @@ class SessionService : Service() {
             sourceLabel = source,
             destinationLabel = destination
         )
+        transferRetries[transfer.operationId] = hostId to { startUpload(hostId, mode, localPath, remotePath, operationName) }
         launchFileTransfer(transfer, operationName) {
             val pool = awaitTransferPool(hostId)
             openUploadSource(source).use { local ->
@@ -2035,6 +2252,7 @@ class SessionService : Service() {
                 )
                 val boosted = fileBoostFor(hostId)?.let { boost ->
                     try {
+                        transfer.route = "boost"
                         boostUpload(boost, destination, local, transferProgressPublisher(transfer, local.size)) {
                             transfer.cancellationRequested.get()
                         }
@@ -2042,6 +2260,7 @@ class SessionService : Service() {
                     } catch (error: Throwable) {
                         if (transfer.cancellationRequested.get() || error is FileTransferCancelledException) throw error
                         // SFTP starts the file over.
+                        transfer.route = "mixed"
                         fileBoostFailed(hostId, boost, error, "upload")
                         false
                     }
@@ -2152,6 +2371,8 @@ class SessionService : Service() {
     private fun retryPublisher(transfer: ActiveFileTransfer): (String?) -> Unit = { message ->
         updateActiveFileTransfer(transfer) { it.copy(retryMessage = message) }
         if (message != null) {
+            transfer.retries += 1
+            transfer.lastRetryReason = message
             SessionLogBus.emit(
                 SessionLogBus.Entry(hostId = transfer.sessionId, level = SessionLogBus.LogLevel.WARN, message = message)
             )
@@ -2310,7 +2531,8 @@ class SessionService : Service() {
         path: String,
         resolveSymbolicLinks: Boolean,
         generation: Long? = null,
-        client: SSHClient? = activeConnections[hostId]?.client
+        client: SSHClient? = activeConnections[hostId]?.client,
+        showPartial: Boolean = true
     ) {
         val bulkLookup = client?.takeIf { resolveSymbolicLinks && hostId !in bulkLinkLookupUnavailable }?.let { ssh ->
             { directory: String, names: List<String> ->
@@ -2320,6 +2542,7 @@ class SessionService : Service() {
                 }
             }
         }
+        val listingStartedAt = SystemClock.elapsedRealtime()
         measureOperation("sftpListDirectory", hostId, thresholdMs = 200L) {
             // File boost lists a folder, links and all, in one round trip; SFTP covers anything it can't do.
             val boosted = fileBoostFor(hostId)?.let { boost ->
@@ -2332,7 +2555,7 @@ class SessionService : Service() {
                 requestedPath = path,
                 resolveSymbolicLinks = resolveSymbolicLinks,
                 // The file browser shows a big folder as it arrives; the console prints only the whole listing.
-                onPartial = if (resolveSymbolicLinks) {
+                onPartial = if (resolveSymbolicLinks && showPartial) {
                     { partial ->
                         if (generation == null || isLatestListing(hostId, generation)) {
                             setRemoteDirectorySnapshot(
@@ -2351,15 +2574,27 @@ class SessionService : Service() {
                 },
                 bulkLinkLookup = bulkLookup
             )
-            if (generation != null && !isLatestListing(hostId, generation)) return@measureOperation
-            setRemoteDirectorySnapshot(
-                hostId,
-                RemoteDirectorySnapshot(
-                    path = directory.path,
-                    entries = directory.entries,
-                    refreshToken = SystemClock.elapsedRealtimeNanos()
-                )
+            val listing = RemoteDirectorySnapshot(
+                path = directory.path,
+                entries = directory.entries,
+                refreshToken = SystemClock.elapsedRealtimeNanos()
             )
+            // The browser's listings only (the console's skip link details), under the folder's own path and the one
+            // asked for, which differ for "." and links.
+            if (resolveSymbolicLinks) {
+                recentListings.computeIfAbsent(hostId) { RecentListings(RECENT_LISTINGS) }.apply {
+                    // "." is where the browser starts: the home folder, kept apart so Home is always instant.
+                    if (path.trim() == "." || path.trim() == "~") {
+                        putHome(directory.path, listing)
+                    } else {
+                        put(directory.path, listing)
+                        put(path, listing)
+                    }
+                }
+            }
+            if (resolveSymbolicLinks) metrics.recordListing(directory.entries.size, SystemClock.elapsedRealtime() - listingStartedAt)
+            if (generation != null && !isLatestListing(hostId, generation)) return@measureOperation
+            setRemoteDirectorySnapshot(hostId, listing)
             SessionLogBus.emit(
                 SessionLogBus.Entry(
                     hostId = hostId,
@@ -2511,9 +2746,55 @@ class SessionService : Service() {
         if (error is CancellationException || error is FileTransferCancelledException) return
         // A host key or password prompt nobody answered in time: nothing went wrong in the app.
         if (error is ConnectionTimeoutException) return
-        if (error.connectionFailureKind() != null) return
+        // A network failure is investigated like a crash: reported as a network issue, with what the connection was.
+        error.connectionFailureKind()?.let { kind ->
+            if (kind.isNetwork) reportNetworkIssue(action, hostId, error, context)
+            return
+        }
         if (generateSequence(error) { it.cause }.take(8).any { it is SFTPException }) return
         TelemetryInitializer.recordNonFatal(action, error, context, telemetrySecrets(hostId, host))
+    }
+
+    private val networkIssueLimiter = NetworkIssueLimiter(clock = SystemClock::elapsedRealtime)
+
+    /**
+     * Reports a network failure for investigation (Crash reports on), with what the connection was: its mode,
+     * route (SSH, Boost, Mosh), the phone's network (Wi-Fi, mobile data) and its recent round trip.
+     */
+    private fun reportNetworkIssue(kind: String, hostId: String, error: Throwable?, context: Map<String, String> = emptyMap()) {
+        val root = error?.let { generateSequence(it) { cause -> cause.cause }.take(16).last() }
+        if (!networkIssueLimiter.allow("$kind|${root?.javaClass?.simpleName.orEmpty()}")) return
+        val connection = activeConnections[hostId]
+        val details = buildMap {
+            put("network_issue", kind)
+            put("net_mode", (connection?.mode ?: sessionSnapshots.value.firstOrNull { it.hostId == hostId }?.mode)?.name ?: "unknown")
+            put("net_route", when {
+                boostShellFor(hostId) != null -> "boost_terminal"
+                fileBoostFor(hostId) != null -> "boost_files"
+                connection?.moshBinding != null -> "mosh"
+                else -> "ssh"
+            })
+            put("net_type", currentNetworkType())
+            latencySamples[hostId]?.summary("")?.takeIf { it.samples > 0 }?.let {
+                put("net_rtt_avg_ms", it.avgMs.toString())
+                put("net_rtt_max_ms", it.maxMs.toString())
+            }
+            putAll(context)
+        }
+        TelemetryInitializer.recordNonFatal("network_$kind", NetworkIssue(kind, error), details, telemetrySecrets(hostId, connection?.host))
+    }
+
+    /** "wifi", "cellular", "ethernet" (plus "+vpn"), or "none". */
+    private fun currentNetworkType(): String {
+        val manager = connectivityManager ?: return "unknown"
+        val capabilities = runCatching { manager.getNetworkCapabilities(manager.activeNetwork) }.getOrNull() ?: return "none"
+        val base = when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            else -> "other"
+        }
+        return if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) "$base+vpn" else base
     }
 
     private fun hasSftpTransport(hostId: String): Boolean =
@@ -3877,6 +4158,7 @@ class SessionService : Service() {
         val hostKey = "${host.username}@${host.host}:${host.port}"
         if ((boostTerminalUnavailableUntil[hostKey] ?: 0L) > SystemClock.elapsedRealtime()) return null
         fun unavailable(reason: String, error: Throwable?) {
+            metrics.recordBoost("terminal", com.majordaftapps.sshpeaches.app.diagnostics.PerformanceMetrics.boostReason(reason))
             boostTerminalUnavailableUntil[hostKey] = SystemClock.elapsedRealtime() + BOOST_TERMINAL_RETRY_MS
             Log.i(FILE_BOOST_TAG, "Boost terminal unavailable for $sessionId", error)
             SessionLogBus.emit(
@@ -3915,6 +4197,7 @@ class SessionService : Service() {
                     message = "Boost is still being set up on this server; this terminal uses SSH."
                 )
             )
+            metrics.recordBoost("terminal", "setup_slow")
             return null
         }
         val channel = try {
@@ -3937,6 +4220,7 @@ class SessionService : Service() {
                 message = "Terminal on Boost (${helper.transport.uppercase()})."
             )
         )
+        metrics.recordBoost("terminal", helper.transport.lowercase())
         return bindShell(sessionId, channel, reuseTerminalEngine)
     }
 
@@ -3947,7 +4231,10 @@ class SessionService : Service() {
         val (level, message) = when (state) {
             "reconnecting" -> SessionLogBus.LogLevel.WARN to "Terminal reconnecting over Boost ($detail)..."
             "connected" -> SessionLogBus.LogLevel.INFO to "Terminal back on Boost (${detail.uppercase()})."
-            "lost" -> SessionLogBus.LogLevel.WARN to "Boost lost the terminal: $detail."
+            "lost" -> {
+                reportNetworkIssue("boost_terminal_lost", sessionId, null, mapOf("detail" to detail))
+                SessionLogBus.LogLevel.WARN to "Boost lost the terminal: $detail."
+            }
             else -> return
         }
         SessionLogBus.emit(SessionLogBus.Entry(hostId = sessionId, level = level, message = message))
@@ -4203,6 +4490,7 @@ class SessionService : Service() {
     }
 
     private fun clearRemoteDirectoryForHost(hostId: String) {
+        recentListings.remove(hostId)
         if (!remoteDirectories.value.containsKey(hostId)) return
         remoteDirectories.update { current -> current - hostId }
     }
@@ -4239,6 +4527,7 @@ class SessionService : Service() {
     }
 
     private fun clearFileTransferProgress(hostId: String) {
+        forgetTransfers(hostId)
         transferNotificationRefreshJobs.remove(hostId)?.cancel()
         if (!fileTransferProgress.value.containsKey(hostId)) {
             updateSessionNotifications()
@@ -4531,7 +4820,7 @@ class SessionService : Service() {
         val style = NotificationCompat.InboxStyle().setBigContentTitle(title)
         entries.take(MAX_SUMMARY_SESSION_LINES).forEach { (snapshot, identity) ->
             style.addLine(
-                "${sessionNotificationTitle(snapshot, identity)} — ${sessionNotificationText(snapshot)}"
+                "${sessionNotificationTitle(snapshot, identity)}: ${sessionNotificationText(snapshot)}"
             )
         }
         if (count > MAX_SUMMARY_SESSION_LINES) {
@@ -4615,7 +4904,7 @@ class SessionService : Service() {
     private fun sessionNotificationText(snapshot: SessionSnapshot): String =
         fileTransferProgress.value[snapshot.hostId]
             ?.takeIf { it.isActive }
-            ?.statusMessage()
+            ?.let { it.statusMessage() + if (it.queuedTransfers > 0) " · ${it.queuedTransfers} waiting" else "" }
             ?: when (snapshot.status) {
             SessionStatus.ACTIVE -> snapshot.statusMessage ?: "Connected"
             SessionStatus.CONNECTING -> snapshot.statusMessage ?: "Connecting"
@@ -4708,6 +4997,10 @@ class SessionService : Service() {
         private const val DEFAULT_SHELL_COLUMNS = 120
         private const val DEFAULT_SHELL_ROWS = 40
         private const val MAX_RECONNECT_ATTEMPTS = 8
+        /** Folders each file browser keeps for going back, forward or up. */
+        private const val RECENT_LISTINGS = 5
+        /** Finished transfers the pane keeps per session. */
+        private const val MAX_FINISHED_TRANSFERS = 30
         /** How long a session waits for its Boost terminal to start (installing the helper included). */
         private const val BOOST_TERMINAL_START_TIMEOUT_MS = 20_000L
         /** How long a host whose Boost terminal couldn't start uses SSH without trying again. */
@@ -4740,9 +5033,12 @@ class SessionService : Service() {
         private const val SLOW_OPERATION_WARN_MS = 250L
         private const val SHELL_DIAG_PREVIEW_BYTES = 96
         private const val SHELL_INPUT_WRITE_TIMEOUT_MS = 10_000L
-        private const val LIVENESS_PROBE_TIMEOUT_MS = 5_000L
+        // 10 s: 5 s dropped healthy connections on networks whose round trips spike past it.
+        private const val LIVENESS_PROBE_TIMEOUT_MS = 10_000L
         private const val UNANSWERED_INPUT_GRACE_MS = 3_000L
         private const val LIVENESS_PROBE_POLL_MS = 50L
+        private const val LATENCY_SAMPLE_INTERVAL_MS = 5_000L
+        private const val LATENCY_POLL_MS = 5L
         private const val LIVENESS_CHECK_MIN_INTERVAL_MS = 2_000L
         private const val MOSH_BOOTSTRAP_TIMEOUT_MS = 15_000L
         private const val MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS = 4_096
@@ -4799,6 +5095,42 @@ class SessionService : Service() {
 
         @Volatile
         var workerThread: Thread? = null
+
+        /** When it got its turn (elapsed realtime), and what moved it: "sftp", "boost", or "mixed" after a fallback. */
+        @Volatile
+        var startedAtMs = 0L
+
+        @Volatile
+        var route = "sftp"
+
+        /** Times its connections dropped and it retried, and why the last time. */
+        @Volatile
+        var retries = 0
+
+        @Volatile
+        var lastRetryReason: String? = null
+
+        private var sampleAtNanos = 0L
+        private var sampleBytes = 0L
+        private var rate = 0.0
+
+        /** Smoothed bytes per second, updated at most twice a second; null until there's a sample. */
+        @Synchronized
+        fun sampleRate(bytes: Long): Long? {
+            val now = System.nanoTime()
+            if (sampleAtNanos == 0L || bytes < sampleBytes) {
+                sampleAtNanos = now
+                sampleBytes = bytes
+                return null
+            }
+            val elapsed = (now - sampleAtNanos) / 1e9
+            if (elapsed < 0.5) return rate.takeIf { it > 0 }?.toLong()
+            val instant = (bytes - sampleBytes) / elapsed
+            rate = if (rate == 0.0) instant else rate * 0.7 + instant * 0.3
+            sampleAtNanos = now
+            sampleBytes = bytes
+            return rate.toLong()
+        }
     }
 
     private data class ActiveConnection(
@@ -4869,7 +5201,9 @@ class SessionService : Service() {
         val entries: List<RemoteDirectoryEntry>,
         val refreshToken: Long = 0L,
         /** False while a big folder is still being read: [entries] is what has arrived so far. */
-        val complete: Boolean = true
+        val complete: Boolean = true,
+        /** A recently seen listing shown at once (going back, forward or up); the folder is being listed again. */
+        val fromCache: Boolean = false
     )
 
     data class RemoteDirectoryEntry(

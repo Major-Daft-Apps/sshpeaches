@@ -30,6 +30,12 @@
 -keep class org.jcodings.** { *; }
 -dontwarn org.eclipse.jdt.annotation.**
 
+# sshj and BouncyCastle keep their names: their frames are most of a network failure's report (Crashlytics showed
+# merged, renamed ones as unrelated okhttp classes), and isSshjTransportBreakage() tells sshj's frames by name.
+-keepnames class net.schmizz.** { *; }
+-keepnames class com.hierynomus.** { *; }
+-keepnames class org.bouncycastle.** { *; }
+
 # File boost: the gomobile-bound Go library (tools/boost) calls into these classes by name through JNI, including
 # the app's own Progress and ShellListener implementations.
 -keep class go.** { *; }

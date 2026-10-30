@@ -153,7 +153,9 @@ Settings includes:
   - host key prompt controls
 - Port forward auto-start
 - Boost (see below)
-- Diagnostics/privacy toggles
+- Diagnostics/privacy toggles (Send usage reports includes anonymous connection performance: connect times,
+  Boost results, transfer speeds, listing times)
+- Advanced -> Show connection latency: each session's round trip to the server in its top bar
 - Restore defaults
 - Transfer data via QR (include identities/settings options)
 

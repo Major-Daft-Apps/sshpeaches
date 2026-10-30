@@ -81,7 +81,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.ContentCopy
@@ -90,6 +91,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -302,6 +305,10 @@ fun ConnectingScreen(
     shellOutput: String,
     remoteDirectory: com.majordaftapps.sshpeaches.app.service.SessionService.RemoteDirectorySnapshot?,
     activeFileTransfer: FileTransferProgress? = null,
+    transfers: List<FileTransferProgress> = emptyList(),
+    onCancelTransfer: (operationId: String) -> Unit = {},
+    onRetryTransfer: (operationId: String) -> Unit = {},
+    onClearFinishedTransfers: () -> Unit = {},
     terminalProfile: TerminalProfile,
     terminalSelectionMode: TerminalSelectionMode,
     terminalBellMode: TerminalBellMode = TerminalBellMode.DISABLED,
@@ -433,6 +440,7 @@ fun ConnectingScreen(
     ) { mutableStateListOf(".") }
     var lastResetSessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var scpPathHistoryIndex by rememberSaveable(request?.sessionId) { mutableStateOf(0) }
+    var showTransfers by rememberSaveable(request?.sessionId) { mutableStateOf(false) }
     var scpSelectedPath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var pendingScpDownloadRemotePath by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
     var scpTransferStatus by rememberSaveable(request?.sessionId) { mutableStateOf<String?>(null) }
@@ -1761,6 +1769,17 @@ fun ConnectingScreen(
         keyboardVisibleRequested = false
     }
 
+    if (showTransfers) {
+        TransfersPane(
+            transfers = transfers,
+            onDismiss = { showTransfers = false },
+            onCancel = onCancelTransfer,
+            onRetry = onRetryTransfer,
+            onOpen = { transfer -> openTransferredFile(context, transfer) },
+            onClearFinished = onClearFinishedTransfers
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1839,6 +1858,9 @@ fun ConnectingScreen(
                 showScpDeleteDialog = showScpDeleteDialog,
                 onShowScpDeleteDialogChange = { showScpDeleteDialog = it },
                 activeFileTransfer = activeFileTransfer,
+                transfers = transfers,
+                onShowTransfers = { showTransfers = true },
+                onCancelTransfer = onCancelTransfer,
                 context = context,
                 hideKeyboard = { keyboardController?.hide() },
                 onCopyRemotePath = { clipboardManager.setText(AnnotatedString(it)) },
@@ -1893,6 +1915,7 @@ fun ConnectingScreen(
                 onSftpDownload = onSftpDownload,
                 onSftpUpload = onSftpUpload,
                 onCancelFileTransfer = onCancelFileTransfer,
+                onShowTransfers = { showTransfers = true },
                 onManageRemotePath = onManageRemotePath,
                 inferRemoteDestination = ::inferRemoteDestination,
                 resolveRemotePath = ::resolveRemotePath,
@@ -2768,6 +2791,9 @@ private fun ConnectingScpContent(
     showScpDeleteDialog: Boolean,
     onShowScpDeleteDialogChange: (Boolean) -> Unit,
     activeFileTransfer: FileTransferProgress?,
+    transfers: List<FileTransferProgress>,
+    onShowTransfers: () -> Unit,
+    onCancelTransfer: (String) -> Unit,
     context: Context,
     hideKeyboard: () -> Unit,
     onCopyRemotePath: (String) -> Unit,
@@ -2910,7 +2936,13 @@ private fun ConnectingScpContent(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+        // Nine buttons, ten with Transfers: on a narrow screen they shrink rather than run off the edge.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val toolbarButtonSize = minOf(FILE_BROWSER_TOOLBAR_ICON_SIZE, maxWidth / (if (transfers.isNotEmpty()) 10 else 9))
+        CompositionLocalProvider(
+            LocalMinimumInteractiveComponentEnforcement provides false,
+            LocalFileBrowserToolbarButtonSize provides toolbarButtonSize
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
@@ -2965,7 +2997,7 @@ private fun ConnectingScpContent(
                 Box {
                     FileBrowserToolbarButton(
                         onClick = { sortMenuExpanded = true },
-                        imageVector = Icons.Default.SwapVert,
+                        imageVector = Icons.Default.FilterList,
                         contentDescription = "Sort files",
                         tint = colorScheme.onSurface,
                         modifier = Modifier.testTag(UiTestTags.connectingScpAction("sort"))
@@ -3025,6 +3057,20 @@ private fun ConnectingScpContent(
                         )
                     }
                 }
+                if (transfers.isNotEmpty()) {
+                    val running = transfers.count { it.isActive }
+                    BadgedBox(
+                        badge = { if (running > 0) Badge { Text(running.toString()) } }
+                    ) {
+                        FileBrowserToolbarButton(
+                            onClick = onShowTransfers,
+                            imageVector = Icons.Default.Download,
+                            contentDescription = if (running > 0) "Transfers, $running in progress" else "Transfers",
+                            tint = colorScheme.onSurface,
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_TRANSFERS_BUTTON)
+                        )
+                    }
+                }
                 FileBrowserToolbarButton(
                     onClick = ::handleScpUploadAction,
                     enabled = canChooseUploadSource,
@@ -3053,6 +3099,14 @@ private fun ConnectingScpContent(
                         expanded = scpActionsExpanded,
                         onDismissRequest = { onScpActionsExpandedChange(false) }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Transfers") },
+                            onClick = {
+                                onScpActionsExpandedChange(false)
+                                onShowTransfers()
+                            },
+                            modifier = Modifier.testTag(UiTestTags.connectingScpAction("transfers"))
+                        )
                         DropdownMenuItem(
                             text = { Text("Show hidden files") },
                             onClick = {
@@ -3141,6 +3195,7 @@ private fun ConnectingScpContent(
                     }
                 }
             }
+        }
         }
         TextField(
             value = scpRemotePath,
@@ -3323,7 +3378,9 @@ private fun ConnectingScpContent(
             activeFileTransfer?.let { transfer ->
                 FileTransferStatusStrip(
                     transfer = transfer,
-                    onCancel = onCancelFileTransfer,
+                    // This transfer only; the others are in the transfers pane.
+                    onCancel = { onCancelTransfer(transfer.operationId) },
+                    onShowTransfers = onShowTransfers,
                     modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_TRANSFER_STRIP)
                 )
             }
@@ -3626,6 +3683,7 @@ private fun ConnectingSftpContent(
     onSftpDownload: (String, String?) -> Unit,
     onSftpUpload: (String, String) -> Unit,
     onCancelFileTransfer: () -> Unit,
+    onShowTransfers: () -> Unit,
     onManageRemotePath: (String, String, String?) -> Unit,
     inferRemoteDestination: (String, String) -> String,
     resolveRemotePath: (String, String) -> String,
@@ -3931,7 +3989,8 @@ private fun ConnectingSftpContent(
         if (activeFileTransfer != null) {
             FileTransferProgressCard(
                 transfer = activeFileTransfer,
-                onCancel = onCancelFileTransfer
+                onCancel = onCancelFileTransfer,
+                onShowTransfers = onShowTransfers
             )
         } else if (sftpTransferStatus != null) {
             ScpStatusStrip(status = sftpTransferStatus.orEmpty(), modifier = Modifier.testTag(UiTestTags.CONNECTING_SFTP_STATUS_STRIP))
@@ -4104,7 +4163,9 @@ private fun ConnectingStatusContent(
                 userFacingStateMessage.takeIf { it.isNotBlank() }?.let { message ->
                     Text(text = message, style = MaterialTheme.typography.bodySmall.copy(color = colorScheme.onSurfaceVariant))
                 }
-                activeFileTransfer?.let { transfer ->
+                // Only a transfer still going: a finished one's result is the file browser's to show, not the
+                // (re)connecting screen's.
+                activeFileTransfer?.takeIf { it.isActive }?.let { transfer ->
                     FileTransferProgressCard(transfer = transfer)
                 }
                 failureHelp?.let { help ->
@@ -4476,11 +4537,13 @@ private fun RowScope.CompactKeyButton(
 @Composable
 private fun FileTransferProgressCard(
     transfer: FileTransferProgress,
-    onCancel: (() -> Unit)? = null
+    onCancel: (() -> Unit)? = null,
+    onShowTransfers: (() -> Unit)? = null
 ) {
     FileTransferStatusStrip(
         transfer = transfer,
         onCancel = onCancel,
+        onShowTransfers = onShowTransfers,
         modifier = Modifier
     )
 }
@@ -4489,6 +4552,7 @@ private fun FileTransferProgressCard(
 private fun FileTransferStatusStrip(
     transfer: FileTransferProgress,
     onCancel: (() -> Unit)? = null,
+    onShowTransfers: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -4548,11 +4612,22 @@ private fun FileTransferStatusStrip(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = transfer.progressSummary(),
+                        text = listOfNotNull(
+                            transfer.progressSummary(),
+                            transfer.rateSummary()?.takeIf { transfer.hasStarted }
+                        ).joinToString(" · "),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
                         color = colorScheme.onSurfaceVariant
                     )
+                    if (onShowTransfers != null) {
+                        TextButton(
+                            onClick = onShowTransfers,
+                            modifier = Modifier.testTag(UiTestTags.CONNECTING_TRANSFERS_VIEW_ALL)
+                        ) {
+                            Text(if (transfer.queuedTransfers > 0) "View all (${transfer.queuedTransfers + 1})" else "View all")
+                        }
+                    }
                     if (onCancel != null) {
                         TextButton(
                             enabled = !cancellationRequested,
@@ -4564,6 +4639,7 @@ private fun FileTransferStatusStrip(
                             Text(
                                 when {
                                     cancellationRequested -> "Cancelling…"
+                                    onShowTransfers != null -> "Cancel"
                                     transfer.queuedTransfers > 0 -> "Cancel all"
                                     else -> "Cancel transfer"
                                 }
@@ -5043,7 +5119,7 @@ private fun FileBrowserToolbarButton(
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(FILE_BROWSER_TOOLBAR_ICON_SIZE)
+        modifier = modifier.size(LocalFileBrowserToolbarButtonSize.current)
     ) {
         Icon(
             imageVector = imageVector,
@@ -5085,6 +5161,23 @@ private val TERMINAL_IME_OPTIONS = EditorInfo.IME_ACTION_NONE or
 private const val TERMINAL_IME_INLINE_PASTE_MAX_BYTES = 1_048_576
 private const val TERMINAL_IME_CONTENT_READ_BUFFER_BYTES = 8_192
 private val FILE_BROWSER_TOOLBAR_ICON_SIZE = 36.dp
+
+/** The file browser toolbar's button size: 36 dp, less on a screen too narrow for all of them. */
+private val LocalFileBrowserToolbarButtonSize = androidx.compose.runtime.staticCompositionLocalOf { FILE_BROWSER_TOOLBAR_ICON_SIZE }
+
+/** Opens a finished download's file with whatever app handles its type. */
+private fun openTransferredFile(context: Context, transfer: FileTransferProgress) {
+    val uri = transfer.openUri?.let(Uri::parse) ?: return
+    val type = runCatching { context.contentResolver.getType(uri) }.getOrNull() ?: "*/*"
+    val view = Intent(Intent.ACTION_VIEW)
+        .setDataAndType(uri, type)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    runCatching {
+        context.startActivity(Intent.createChooser(view, "Open ${transfer.fileName}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }.onFailure {
+        Toast.makeText(context, "No app can open ${transfer.fileName}", Toast.LENGTH_SHORT).show()
+    }
+}
 private const val SFTP_CONSOLE_MAX_LINES = 500
 private const val SFTP_DIRECTORY_ENTRY_OUTPUT_LIMIT = SFTP_CONSOLE_MAX_LINES - 2
 private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L

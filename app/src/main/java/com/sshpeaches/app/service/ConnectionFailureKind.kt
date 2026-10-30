@@ -71,7 +71,7 @@ internal fun Throwable.isFatalSftpTransportFailure(): Boolean {
     var current: Throwable? = this
     repeat(MAX_CAUSE_DEPTH) {
         val cause = current ?: return false
-        if (cause is TransportException) return true
+        if (cause is TransportException || cause.isSshjTransportBreakage()) return true
         current = cause.cause
     }
     return false
@@ -100,7 +100,19 @@ private fun Throwable.networkFailureKind(): ConnectionFailureKind? = when (this)
     // like this, and so does a server or load balancer that is restarting. Unclassified, a reconnect gave up at once.
     is TransportException ->
         if (message == "Server closed connection during identification exchange") ConnectionFailureKind.NETWORK else null
-    else -> null
+    else -> if (isSshjTransportBreakage()) ConnectionFailureKind.NETWORK else null
 }
+
+/**
+ * sshj failing inside its own transport, as when its packet encoder threw ArrayIndexOutOfBoundsException while a
+ * reconnecting file browser listed a folder (0.12.0, a bad mobile network): the connection's state can't be trusted
+ * any more, so it's handled like a dropped one (a new connection) instead of ending the session. It is still
+ * reported, as a network issue with its stack. Needs sshj's class names, which proguard-rules.pro keeps.
+ */
+internal fun Throwable.isSshjTransportBreakage(): Boolean =
+    this is RuntimeException && this !is ConnectionFailure &&
+        stackTrace.take(SSHJ_FRAMES_CHECKED).any { it.className.startsWith("net.schmizz.sshj.transport.") }
+
+private const val SSHJ_FRAMES_CHECKED = 12
 
 private const val MAX_CAUSE_DEPTH = 16

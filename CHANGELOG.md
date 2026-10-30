@@ -4,6 +4,24 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.12.2 (1202)
+
+Release date: 2026-10-30
+
+- Going back, forward or up to one of the last five folders the file browser opened shows it at once, then refreshes it in the background (it used to load it again from scratch). Measured on the test emulator: under 5 ms instead of a full listing.
+- New **Transfers** pane, like a browser's downloads page: the file browser's toolbar (and its ⋮ menu) opens a list of the session's transfers, the running one with its speed and time left, those waiting their turn in order, and the finished ones. Each can be cancelled, a failed or cancelled one tried again, a finished download opened, and the finished list cleared. The transfer card no longer ends with "(1 more queued)": it has a View all link, and its Cancel stops that transfer only.
+- The transfer card shows the speed and time left.
+- The sort button in the file browser has the usual sort icon (lines), not up and down arrows. On a narrow screen the toolbar's buttons shrink to fit.
+- New **Advanced** -> **Show connection latency** (off by default): terminal and file browser sessions show their round trip to the server in the top bar ("42 ms", green under 100 ms, amber under 300, red above or with no answer), checked every 5 seconds; tap it for the last minute's fastest, average, slowest and jitter. SSH sessions are timed with an SSH keepalive, Boost terminals with their own pings (the path the keys take).
+- **Send usage reports** now also carries connection performance: time to connect, whether Boost worked or why not (as a category), transfer speeds, folder listing times and, when the latency badge is on, round trips. Counts and quantiles only, no host names, addresses or file names; collected only while usage reports are on, and dropped when they're turned off.
+- Laggy networks: a terminal's quick check after typing (no output 3 s after a key) gives the server 10 s to answer instead of 5, and counts output that arrives meanwhile as an answer. On networks whose round trips spike past 5 s it closed connections that were only slow, which then failed with "Socket closed".
+- sshj failing inside its own transport (seen once on a bad mobile network: ArrayIndexOutOfBoundsException in its packet encoder while a reconnecting file browser listed a folder) is handled like a dropped connection, a new one, instead of ending the session.
+- Network issues are reported like crashes when Crash reports is on, so they can be investigated: a dropped connection, a reconnect that gave up, a quick check the server didn't answer, a transfer that had to retry or failed, Boost failing. Each carries the session's mode, route (SSH, Boost, Mosh), the phone's network type and recent round trip; scrubbed like every report, and limited to one of a kind every 10 minutes. sshj's and BouncyCastle's class names stay readable in reports.
+- From the closed test's feedback: **Settings** -> **Rate & share** opens SSHPeaches' Play Store page to rate it, or shares a link to it. After a few good sessions (five, over three days) the app asks Google Play once for its in-app review sheet, back on Home after a session; Play decides whether it shows.
+- Back on Home asks before leaving the app, and says whether open sessions keep running in the background.
+- The app's text no longer uses em dashes.
+- The connecting and reconnecting screen shows a transfer only while it runs; a finished or cancelled one's result stayed there, which looked like part of the reconnect.
+
 ## 0.12.1 (1201)
 
 Release date: 2026-10-30
