@@ -1,0 +1,7 @@
+What's new in 0.12.1
+
+- Boost is now on by default.
+- Boost transfers show progress right away and keep going on slow connections.
+- Closing a session reliably ends its Boost terminal on the server.
+- The connection log shows new lines again.
+- Choosing an app icon no longer closes the app.
