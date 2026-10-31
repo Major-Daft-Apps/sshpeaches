@@ -264,6 +264,7 @@ object UiTestTags {
     const val SETTINGS_RATE_APP = "settings_rate_app"
     const val SETTINGS_SHARE_APP = "settings_share_app"
     const val EXIT_CONFIRM_DIALOG = "exit_confirm_dialog"
+    const val SESSION_TOP_BAR_TITLE = "session_top_bar_title"
     const val TRANSFERS_CLEAR_FINISHED = "transfers_clear_finished"
     fun transfersRow(operationId: String) = "transfers_row_$operationId"
     fun transfersAction(operationId: String, action: String) = "transfers_${action}_$operationId"

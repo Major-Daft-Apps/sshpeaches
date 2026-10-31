@@ -63,10 +63,18 @@ object KeyboardLayoutDefaults {
         textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
     )
 
-    // Fn layer: Back (return to the main rows), F1-F12, then the keyboard toggle.
-    private val FIXED_FN_SLOTS: List<KeyboardSlotAction> = listOf(fnBackAction()) +
-        (1..12).map(::functionKeyAction) +
-        textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+    // Fn layer, 8 keys a row: Ctrl and Shift (for Ctrl+F5, Shift+F1...), F1-F12, Back (where Fn sits on the main
+    // rows) and the keyboard toggle.
+    private val FIXED_FN_SLOTS: List<KeyboardSlotAction> =
+        listOf(modifierAction(KeyboardModifier.CTRL, "Ctrl")) +
+            (1..6).map(::functionKeyAction) +
+            fnBackAction() +
+            modifierAction(KeyboardModifier.SHIFT, "Shift") +
+            (7..12).map(::functionKeyAction) +
+            textAction(label = "Keyboard", text = "").copy(iconId = "keyboard")
+
+    /** Keys a row for a layer of [keyCount] keys: the main rows have [SLOT_COLUMNS], the Fn layer one more. */
+    fun columnsFor(keyCount: Int): Int = maxOf(SLOT_COLUMNS, (keyCount + SLOT_ROWS - 1) / SLOT_ROWS)
 
     // The keyboard editor's choices, in its groups. Letters and digits (the phone keyboard has
     // them), the numpad, and lock/system keys that send nothing to a terminal are not offered;

@@ -61,7 +61,7 @@ val helpTopics: List<HelpTopic> = listOf(
         question = "How do I type Ctrl, Alt, Esc, Tab, or F1-F12?",
         steps = listOf(
             "Use the extra keys under the terminal. Ctrl and Alt apply to the next key you press, so Ctrl then c sends Ctrl-C.",
-            "Tap Fn for F1-F12. Back returns to the main keys.",
+            "Tap Fn for F1-F12. Ctrl and Shift are there too, so Ctrl then F5 sends Ctrl+F5. Back returns to the main keys.",
             "Keyboard Editor changes which keys are on the two main rows."
         ),
         destination = HelpDestination.KEYBOARD,

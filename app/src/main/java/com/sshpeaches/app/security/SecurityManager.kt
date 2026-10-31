@@ -16,6 +16,7 @@ import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.spec.MGF1ParameterSpec
@@ -34,6 +35,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.json.JSONObject
 
 object SecurityManager {
@@ -60,6 +62,7 @@ object SecurityManager {
     private const val STORAGE_VERSION_VAULT = 1
     private const val CURRENT_EXPORT_KDF_ITERATIONS = 210_000
     private const val CURRENT_PIN_KDF_ITERATIONS = 210_000
+    private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val KEY_PIN_FAILED_ATTEMPTS = "pin_failed_attempts"
     /** Wall-clock lockout from before 0.11.8; only removed now. */
     private const val KEY_PIN_LOCKOUT_UNTIL = "pin_lockout_until"
@@ -901,10 +904,24 @@ object SecurityManager {
     }
 
     private fun deriveKey(passphrase: String, salt: ByteArray, iterations: Int): ByteArray {
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val factory = pbkdf2Factory()
         val spec = PBEKeySpec(passphrase.toCharArray(), salt, iterations, 256)
         return factory.generateSecret(spec).encoded
     }
+
+    /**
+     * PBKDF2 comes from the "BC" provider, which the first SSH client swaps for the bundled Bouncy Castle
+     * (SshClientProvider.installBundledBouncyCastleProvider). A lookup that lands mid-swap finds no "BC" at all, and
+     * setting or checking the PIN at startup failed with "PBKDF2WithHmacSHA256 SecretKeyFactory not available";
+     * the bundled provider, asked directly, always has it.
+     */
+    private fun pbkdf2Factory(): SecretKeyFactory = try {
+        SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
+    } catch (_: NoSuchAlgorithmException) {
+        SecretKeyFactory.getInstance(PBKDF2_ALGORITHM, bundledBouncyCastle)
+    }
+
+    private val bundledBouncyCastle by lazy { BouncyCastleProvider() }
 
     private fun encryptTransferPayload(value: String, passphrase: String): String {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }

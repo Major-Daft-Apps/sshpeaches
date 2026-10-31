@@ -159,6 +159,7 @@ import com.majordaftapps.sshpeaches.app.ui.components.AppDrawer
 import com.majordaftapps.sshpeaches.app.ui.components.AuthChoice
 import com.majordaftapps.sshpeaches.app.ui.components.LockScreenOverlay
 import com.majordaftapps.sshpeaches.app.ui.components.SessionOverflowMenu
+import com.majordaftapps.sshpeaches.app.ui.components.ShrinkToFitText
 import com.majordaftapps.sshpeaches.app.ui.components.resolveSessionTerminalProfileId
 import com.majordaftapps.sshpeaches.app.ui.components.TransferImportSummary
 import com.majordaftapps.sshpeaches.app.ui.components.importHostId
@@ -1959,7 +1960,17 @@ fun SSHPeachesRoot(
                                 (chromeRoute != Routes.CONNECTING || showConnectingTopBar)
                         if (showTopBar) {
                             TopAppBar(
-                                title = { Text(currentTitle) },
+                                title = {
+                                    if (isSessionVerticalRoute) {
+                                        // Host names can be long: shrink a little, then ellipsize.
+                                        ShrinkToFitText(
+                                            currentTitle,
+                                            testTag = UiTestTags.SESSION_TOP_BAR_TITLE
+                                        )
+                                    } else {
+                                        Text(currentTitle)
+                                    }
+                                },
                                 navigationIcon = {
                                     if (isSessionVerticalRoute) {
                                         IconButton(onClick = { navigateBackFromConnecting() }) {

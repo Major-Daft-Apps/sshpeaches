@@ -710,8 +710,9 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(8)).performClick()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
         composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
-        composeRule.onNodeWithText("Shift").assertDoesNotExist()
-        (1..12).forEach { index ->
+        composeRule.onNodeWithText("Shift").assertIsDisplayed()
+        // F1-F6 follow Ctrl on the first row, F7-F12 follow Shift on the second.
+        ((1..6) + (9..14)).forEach { index ->
             composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(index))
                 .assertIsDisplayed()
                 .performClick()
@@ -719,7 +720,7 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_KEYBOARD_TOGGLE)
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(7)).performClick()
         composeRule.onNodeWithText("Esc").assertIsDisplayed()
 
         composeRule.runOnIdle {
@@ -1344,6 +1345,65 @@ class ConnectingScreenTest {
     }
 
     @Test
+    fun fnLayer_hasCtrlAndShiftForModifiedFunctionKeys() {
+        val sentPayloads = mutableListOf<ByteArray>()
+
+        composeRule.setContent {
+            MaterialTheme {
+                ConnectingScreen(
+                    request = requestFor(ConnectionMode.SSH),
+                    state = QuickConnectUiState(
+                        phase = QuickConnectPhase.SUCCESS,
+                        message = "Interactive shell session ready"
+                    ),
+                    logs = emptyList(),
+                    shellOutput = "user@host:~$ ",
+                    remoteDirectory = null,
+                    terminalProfile = TerminalProfileDefaults.builtInProfiles.first(),
+                    terminalSelectionMode = TerminalSelectionMode.NATURAL,
+                    keyboardSlots = KeyboardLayoutDefaults.DEFAULT_SLOTS,
+                    snippets = emptyList(),
+                    onSendShellBytes = { sentPayloads += it.copyOf() },
+                    onTerminalResize = { _, _ -> },
+                    onSftpListDirectory = {},
+                    onSftpDownload = { _, _ -> },
+                    onSftpUpload = { _, _ -> },
+                    onScpDownload = { _, _ -> },
+                    onScpUpload = { _, _ -> },
+                    onManageRemotePath = { _, _, _ -> },
+                    onRetry = {},
+                    onToggleConnectedHostBar = {},
+                    onOpenSettings = {},
+                    findRequestToken = 0
+                )
+            }
+        }
+        fun sent() = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }
+            .toString(StandardCharsets.UTF_8)
+
+        // Fn layer: Ctrl F1..F6 Back / Shift F7..F12 Keyboard.
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(6)).performClick()
+        composeRule.onNodeWithText("F1").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(8)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(5)).performClick()
+        composeRule.runOnIdle { check(sent() == "\u001B[15;2~") { "Shift+F5: ${sent()}" } }
+
+        sentPayloads.clear()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(8)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(11)).performClick()
+        composeRule.runOnIdle { check(sent() == "\u001B[20;6~") { "Ctrl+Shift+F9: ${sent()}" } }
+
+        // Ctrl latched on the Fn layer survives going Back to the main keys (Up).
+        sentPayloads.clear()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(7)).performClick()
+        composeRule.onNodeWithText("F1").assertDoesNotExist()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(3)).performClick()
+        composeRule.runOnIdle { check(sent() == "\u001B[1;5A") { "Ctrl+Up after Back: ${sent()}" } }
+    }
+
+    @Test
     fun keyboardEditorShortcuts_sendTheExpectedTerminalBytes() {
         val sentPayloads = mutableListOf<ByteArray>()
         fun preset(label: String) = (KeyboardLayoutDefaults.keyPresets + KeyboardLayoutDefaults.shortcutPresets +
@@ -1448,7 +1508,7 @@ class ConnectingScreenTest {
         composeRule.onNodeWithText("F1").assertIsDisplayed()
         composeRule.onNodeWithText("Custom").assertDoesNotExist()
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(1)).performClick()
-        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(7)).performClick()
 
         composeRule.runOnIdle {
             val actual = sentPayloads.fold(ByteArray(0)) { combined, payload -> combined + payload }

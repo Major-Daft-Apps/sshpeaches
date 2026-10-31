@@ -134,7 +134,7 @@ fun KeyboardEditorScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "Tap a main-row slot to edit it. The Fn layer (Back, F1-F12, keyboard) is fixed.",
+                            "Tap a main-row slot to edit it. The Fn layer (Ctrl, Shift, F1-F12, Back, keyboard) is fixed.",
                             modifier = Modifier.onSizeChanged { introHeightPx.intValue = it.height }
                         )
 
@@ -372,7 +372,7 @@ private fun KeyActionEditorVertical(
 
         SectionTitle("Modifiers")
         Text(
-            "Ctrl, Alt and Shift apply to the next key you press. Fn swaps the rows for Back, F1-F12 and the keyboard key, which stay fixed.",
+            "Ctrl, Alt and Shift apply to the next key you press, also on the Fn layer. Fn swaps the rows for Ctrl, Shift, F1-F12, Back and the keyboard key, which stay fixed.",
             style = MaterialTheme.typography.bodySmall
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

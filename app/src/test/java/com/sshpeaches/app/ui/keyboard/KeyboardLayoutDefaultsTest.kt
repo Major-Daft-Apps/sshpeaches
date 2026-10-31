@@ -154,20 +154,23 @@ class KeyboardLayoutDefaultsTest {
     }
 
     @Test
-    fun fnLayout_isTwoFixedRowsOrderedBackThenF1ThroughF12ThenKeyboard() {
+    fun fnLayout_isTwoFixedRowsOfEightWithCtrlAndShiftForModifiedFunctionKeys() {
         val fnLayout = KeyboardLayoutDefaults.builtInFnLayout()
 
-        assertEquals(14, fnLayout.size)
+        assertEquals(16, fnLayout.size)
+        assertEquals(8, KeyboardLayoutDefaults.columnsFor(fnLayout.size))
+        assertEquals(KeyboardLayoutDefaults.SLOT_COLUMNS, KeyboardLayoutDefaults.columnsFor(KeyboardLayoutDefaults.SLOT_COUNT))
         assertEquals(
             listOf(
-                "Back", "F1", "F2", "F3", "F4", "F5", "F6",
-                "F7", "F8", "F9", "F10", "F11", "F12", "Keyboard"
+                "Ctrl", "F1", "F2", "F3", "F4", "F5", "F6", "Back",
+                "Shift", "F7", "F8", "F9", "F10", "F11", "F12", "Keyboard"
             ),
             fnLayout.map { it.label }
         )
-        assertEquals("fn_back", fnLayout[0].iconId)
-        assertEquals("keyboard", fnLayout[13].iconId)
-        assertFalse(fnLayout.any { it.type == KeyboardActionType.MODIFIER })
+        assertEquals(KeyboardModifier.CTRL, fnLayout[0].modifier)
+        assertEquals(KeyboardModifier.SHIFT, fnLayout[8].modifier)
+        assertEquals("fn_back", fnLayout[7].iconId)
+        assertEquals("keyboard", fnLayout[15].iconId)
     }
 
     @Test

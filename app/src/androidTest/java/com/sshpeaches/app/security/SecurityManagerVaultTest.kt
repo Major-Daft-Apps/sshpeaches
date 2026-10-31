@@ -53,6 +53,23 @@ class SecurityManagerVaultTest {
     }
 
     @Test
+    fun pinWorksWhileTheBcProviderIsBeingSwapped() {
+        // The first SSH client replaces "BC" with the bundled Bouncy Castle; between the remove and the add there's
+        // no "BC" at all, and PIN checks at startup failed with "PBKDF2WithHmacSHA256 SecretKeyFactory not available".
+        val original = java.security.Security.getProvider("BC")
+        java.security.Security.removeProvider("BC")
+        try {
+            SecurityManager.setPin("2468")
+            SecurityManager.lock()
+            assertTrue(SecurityManager.verifyPin("2468"))
+        } finally {
+            if (java.security.Security.getProvider("BC") == null && original != null) {
+                java.security.Security.addProvider(original)
+            }
+        }
+    }
+
+    @Test
     fun setPinStoresNoFastPinHash() {
         SecurityManager.setPin("2468")
 

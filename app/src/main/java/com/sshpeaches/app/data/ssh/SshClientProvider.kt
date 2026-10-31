@@ -483,10 +483,13 @@ object SshClientProvider {
             runCatching {
                 val existing = Security.getProvider(BOUNCY_CASTLE_PROVIDER_NAME)
                 if (existing?.javaClass?.name != BouncyCastleProvider::class.java.name) {
+                    // Built before the old one goes: constructing it takes long enough (hundreds of ms on a busy
+                    // phone) that PIN checks running meanwhile found no "BC" provider at all.
+                    val bundled = BouncyCastleProvider()
                     if (existing != null) {
                         Security.removeProvider(existing.name)
                     }
-                    Security.addProvider(BouncyCastleProvider())
+                    Security.addProvider(bundled)
                 }
             }.onFailure { error ->
                 Log.w(TAG, "Unable to install bundled Bouncy Castle host-key provider", error)

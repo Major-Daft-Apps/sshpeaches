@@ -4,6 +4,14 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.12.3 (1203)
+
+Release date: 2026-10-30
+
+- Setting, entering or checking the PIN could fail with "PBKDF2WithHmacSHA256 SecretKeyFactory not available" while the app swapped in its bundled Bouncy Castle provider (when the first SSH connection is prepared, often right at startup): the swap now builds the new provider before removing the old one, and the PIN code falls back to the bundled provider. Seen in crash reports from 0.10.20 to 0.11.1 and in the test suite.
+- The extra keys' **Fn** layer has **Ctrl** and **Shift**, so Ctrl+F5, Shift+F1 or Ctrl+Shift+F9 can be typed there (two rows of eight: Ctrl, F1-F6, Back / Shift, F7-F12, keyboard). Back sits where Fn is on the main rows, and a Ctrl or Shift latched on either layer still applies after switching.
+- A terminal or file browser session's long name in the top bar now shrinks its font a little to fit, and only ends in "…" when it would get too small to read (it was cut off at full size).
+
 ## 0.12.2 (1202)
 
 Release date: 2026-10-30

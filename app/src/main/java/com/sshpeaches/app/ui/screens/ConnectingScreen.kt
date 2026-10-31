@@ -1678,7 +1678,8 @@ fun ConnectingScreen(
         }
         val action = key.action
         if (handleIconAlias(action)) {
-            if (action.iconId != "fn" && action.iconId != "fn_active") {
+            // Switching layers keeps a latched Ctrl/Shift/Alt for the key pressed on the other one.
+            if (action.iconId !in setOf("fn", "fn_active", "fn_back")) {
                 pendingModifiers = emptySet()
             }
             return
@@ -4328,9 +4329,10 @@ private fun CompactKeyRow(
 ) {
     if (keys.isEmpty()) return
     val keyShape = RoundedCornerShape(5.dp)
+    val columns = KeyboardLayoutDefaults.columnsFor(keys.size)
     val rows = remember(keys) {
         keys
-            .chunked(KeyboardLayoutDefaults.SLOT_COLUMNS)
+            .chunked(columns)
             .take(KeyboardLayoutDefaults.SLOT_ROWS)
     }
     BoxWithConstraints(modifier = modifier) {
@@ -4343,6 +4345,7 @@ private fun CompactKeyRow(
             ) {
                 CompactKeyRows(
                     rows = rows.take(2),
+                    columns = columns,
                     rowOffset = 0,
                     keyShape = keyShape,
                     activeModifiers = activeModifiers,
@@ -4352,6 +4355,7 @@ private fun CompactKeyRow(
                 )
                 CompactKeyRows(
                     rows = rows.drop(2),
+                    columns = columns,
                     rowOffset = 2,
                     keyShape = keyShape,
                     activeModifiers = activeModifiers,
@@ -4363,6 +4367,7 @@ private fun CompactKeyRow(
         } else {
             CompactKeyRows(
                 rows = rows,
+                columns = columns,
                 rowOffset = 0,
                 keyShape = keyShape,
                 activeModifiers = activeModifiers,
@@ -4377,6 +4382,7 @@ private fun CompactKeyRow(
 @Composable
 private fun CompactKeyRows(
     rows: List<List<CompactTerminalKey>>,
+    columns: Int,
     rowOffset: Int,
     keyShape: RoundedCornerShape,
     activeModifiers: Set<KeyboardModifier>,
@@ -4394,7 +4400,7 @@ private fun CompactKeyRows(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                repeat(KeyboardLayoutDefaults.SLOT_COLUMNS) { index ->
+                repeat(columns) { index ->
                     val key = row.getOrNull(index)
                     if (key == null) {
                         Box(
@@ -4408,7 +4414,7 @@ private fun CompactKeyRows(
                         key.action.modifier != null &&
                         activeModifiers.contains(key.action.modifier)
                     val aliasActive = key.action.iconId in activeAliasIcons
-                    val flatIndex = (rowOffset + rowIndex) * KeyboardLayoutDefaults.SLOT_COLUMNS + index
+                    val flatIndex = (rowOffset + rowIndex) * columns + index
                     val testTag = if (key.action.iconId == "keyboard") {
                         UiTestTags.CONNECTING_KEYBOARD_TOGGLE
                     } else {
