@@ -1,0 +1,5 @@
+What's new in 0.12.3
+
+- The Fn keys have Ctrl and Shift, for Ctrl+F5, Shift+F1 and the like.
+- Long connection names in the session's top bar shrink to fit before they're cut off.
+- Fixed setting or entering the PIN failing right after the app starts.
