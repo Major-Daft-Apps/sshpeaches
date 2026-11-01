@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.data.ssh
 
 import android.content.Context
 import android.util.Log
+import com.majordaftapps.sshpeaches.app.BuildConfig
 import com.hierynomus.sshj.key.BaseKeyAlgorithm
 import com.hierynomus.sshj.key.KeyAlgorithm
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
@@ -921,7 +922,8 @@ object SshClientProvider {
                 }
                 true
             }.getOrElse { error ->
-                Log.w(TAG, "Failed to persist accepted host key for $hostname", error)
+                // Release logcat (readable through adb and bug reports) leaves out the host name.
+                Log.w(TAG, if (BuildConfig.DEBUG) "Failed to persist accepted host key for $hostname" else "Failed to persist an accepted host key", error)
                 true
             }
         }
@@ -984,7 +986,8 @@ object SshClientProvider {
         private fun logUnableToResolveKeyType(hostname: String, key: PublicKey) {
             Log.w(
                 TAG,
-                "Unable to resolve host key type for $hostname using algorithm ${key.algorithm} (${key.javaClass.name})"
+                "Unable to resolve host key type for ${if (BuildConfig.DEBUG) hostname else "a host"} using algorithm " +
+                    "${key.algorithm} (${key.javaClass.name})"
             )
         }
 

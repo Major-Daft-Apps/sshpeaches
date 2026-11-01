@@ -56,7 +56,14 @@ class RoomAppRepository(
     }
 
     override suspend fun updateHost(host: HostConnection) {
-        hostDao.upsert(host.asEntity())
+        database.withTransaction {
+            // Updates copy the whole host from the UI's last snapshot; one taken before the OS was detected would
+            // otherwise wipe it. Nothing sets a host back to Undetected on purpose.
+            val keptOs = host.osMetadata.takeUnless { it == OsMetadata.Undetected }
+                ?: hostDao.getById(host.id)?.asModel()?.osMetadata
+                ?: OsMetadata.Undetected
+            hostDao.upsert(host.copy(osMetadata = keptOs).asEntity())
+        }
     }
 
     override suspend fun deleteHost(host: HostConnection) {

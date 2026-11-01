@@ -26,6 +26,14 @@ class TelemetrySanitizerTest {
     }
 
     @Test
+    fun fileNamesWithSpacesAreRemovedWhole() {
+        val scrubbed = TelemetrySanitizer.scrub("Local file does not exist: /storage/emulated/0/Download/Jane Doe passport.pdf")
+        assertEquals("Local file does not exist: <path>", scrubbed)
+        // Plain words after a path stay.
+        assertEquals("Opened <path> without trouble", TelemetrySanitizer.scrub("Opened /etc/hosts without trouble"))
+    }
+
+    @Test
     fun removesNamedSecretsSuchAsTheSessionsHostAndUser() {
         val scrubbed = TelemetrySanitizer.scrub("Authentication failed for tester on homeserver", listOf("tester", "homeserver"))
         assertEquals("Authentication failed for <redacted> on <redacted>", scrubbed)

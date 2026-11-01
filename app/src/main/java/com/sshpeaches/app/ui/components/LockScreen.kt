@@ -1,6 +1,8 @@
 package com.majordaftapps.sshpeaches.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.testTag
@@ -53,6 +60,29 @@ fun LockScreenOverlay(
     modifier: Modifier = Modifier,
     externalMessage: String? = null
 ) {
+    // When the activity is recreated while locked (rotation, a theme or font change), dialogs restored from saved
+    // state are added as windows during the first frames, and a lock window added before them would sit underneath,
+    // leaving them usable. So the lock window opens after those frames; until then an opaque cover takes the touches.
+    var windowReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        repeat(LOCK_WINDOW_DELAY_FRAMES) { withFrameNanos { } }
+        windowReady = true
+    }
+    if (!windowReady) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent().changes.forEach { it.consume() }
+                        }
+                    }
+                }
+        )
+        return
+    }
     Dialog(
         onDismissRequest = onBackPressed,
         properties = DialogProperties(
@@ -187,3 +217,5 @@ private fun LockScreenContent(
         }
     }
 }
+
+private const val LOCK_WINDOW_DELAY_FRAMES = 3

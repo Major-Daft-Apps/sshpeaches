@@ -327,3 +327,13 @@ class TerminalInputRouter(
         const val SHIFTED_DIGITS = ")!@#$%^&*("
     }
 }
+
+/**
+ * Whether text a keyboard committed is really a paste: more than one line (a single trailing Enter is still typing)
+ * or escape and C1 control characters, which typing never produces.
+ */
+internal fun isPasteLikeImeText(text: String): Boolean {
+    if (text.length < 2) return false
+    val body = text.removeSuffix("\r\n").removeSuffix("\r").removeSuffix("\n")
+    return body.any { it == '\r' || it == '\n' || it == '\u001B' || it in '\u0080'..'\u009F' }
+}

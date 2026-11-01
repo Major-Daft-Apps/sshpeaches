@@ -35,6 +35,16 @@ class QrImportHandlersTest {
     }
 
     @Test
+    fun hostImport_nameDifferingOnlyBySpacesOrCase_isADuplicate() {
+        val existing = listOf(sampleHost(id = "existing", name = "Prod"))
+        listOf("Prod ", " prod", "PROD\t").forEach { name ->
+            val payload = encodeHostPayload(sampleHost(id = "incoming", name = name), encryptedPasswordPayload = null)
+            val result = processHostQrImport(payload, existing)
+            assertTrue("'$name' was imported next to Prod", result is HostQrImportResult.Error)
+        }
+    }
+
+    @Test
     fun hostImport_missingId_assignsGeneratedTargetId() {
         val payload = encodeHostPayload(
             sampleHost(id = "", name = "new-host"),

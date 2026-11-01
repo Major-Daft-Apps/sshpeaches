@@ -113,6 +113,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -210,6 +211,7 @@ import com.majordaftapps.sshpeaches.app.ui.state.TerminalSelectionMode
 import com.majordaftapps.sshpeaches.app.ui.state.userFacingLabel
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.terminal.TerminalInputRouter
+import com.majordaftapps.sshpeaches.app.ui.terminal.isPasteLikeImeText
 import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
 import com.majordaftapps.sshpeaches.app.ui.terminal.resolveTerminalTypeface
 import com.termux.view.TerminalView
@@ -349,6 +351,8 @@ fun ConnectingScreen(
     onConfirmPasswordInsertChange: (Boolean) -> Unit = {},
     applyStatusBarsPadding: Boolean = true
 ) {
+    // Dialogs restored after the activity is recreated would open above the lock screen: none while locked.
+    val appLocked = SecurityManager.lockState().collectAsState().value
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1741,6 +1745,12 @@ fun ConnectingScreen(
     fun handleTerminalImeText(text: String) {
         if (text.isEmpty()) return
         val modifiers = pendingModifiers
+        // Keyboards insert their clipboard bar's suggestions as typed text; one holding several lines or escape
+        // sequences gets the paste path (bracketed, control characters stripped) instead of running line by line.
+        if (modifiers.isEmpty() && isPasteLikeImeText(text)) {
+            terminalInput.pasteText(text)
+            return
+        }
         terminalInput.sendText(
             text = text,
             ctrlDown = modifiers.contains(KeyboardModifier.CTRL),
@@ -1770,7 +1780,7 @@ fun ConnectingScreen(
         keyboardVisibleRequested = false
     }
 
-    if (showTransfers) {
+    if (showTransfers && !appLocked) {
         TransfersPane(
             transfers = transfers,
             onDismiss = { showTransfers = false },
@@ -1993,7 +2003,7 @@ fun ConnectingScreen(
                 onDismiss = { problemReport = null }
             )
         }
-        if (showInsertPasswordConfirm && showTerminalSession) {
+        if (showInsertPasswordConfirm && showTerminalSession && !appLocked) {
             InsertPasswordConfirmDialog(
                 onConfirm = { dontShowAgain ->
                     showInsertPasswordConfirm = false
@@ -2809,6 +2819,8 @@ private fun ConnectingScpContent(
     resolveChildPath: (String, String) -> String,
     parentPath: (String) -> String
 ) {
+    // Dialogs restored after the activity is recreated would open above the lock screen: none while locked.
+    val appLocked = SecurityManager.lockState().collectAsState().value
     var showHiddenFiles by rememberSaveable(sessionId) { mutableStateOf(false) }
     var permissionsTarget by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
     var editorPath by rememberSaveable(sessionId) { mutableStateOf<String?>(null) }
@@ -3397,7 +3409,7 @@ private fun ConnectingScpContent(
         }
     }
 
-    if (!pendingUploadSourceUri.isNullOrBlank()) {
+    if (!pendingUploadSourceUri.isNullOrBlank() && !appLocked) {
         val collisionIsDirectory =
             pendingUploadCollision?.isDirectory == true ||
                 pendingUploadCollision?.linkTargetIsDirectory == true
@@ -3480,7 +3492,7 @@ private fun ConnectingScpContent(
         )
     }
 
-    permissionsTarget?.let { target ->
+    permissionsTarget?.takeUnless { appLocked }?.let { target ->
         val entry = remoteItems.firstOrNull { entryPathFor(it) == target }
         val mode = entry?.permissionSummary?.let(::permissionSummaryToMode)
         if (entry == null || mode == null) {
@@ -3497,7 +3509,7 @@ private fun ConnectingScpContent(
             )
         }
     }
-    editorPath?.let { target ->
+    editorPath?.takeUnless { appLocked }?.let { target ->
         RemoteTextEditorDialog(
             path = target,
             load = { onReadRemoteText(target) },
@@ -3508,7 +3520,7 @@ private fun ConnectingScpContent(
             }
         )
     }
-    if (showScpRenameDialog && selectedEntry != null) {
+    if (showScpRenameDialog && selectedEntry != null && !appLocked) {
         val validRename = isValidRemoteChildName(scpRenameValue)
         AlertDialog(
             modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_RENAME_DIALOG),
@@ -3547,7 +3559,7 @@ private fun ConnectingScpContent(
             dismissButton = { TextButton(onClick = { onShowScpRenameDialogChange(false) }) { Text("Cancel") } }
         )
     }
-    if (showScpMoveDialog && selectedEntry != null) {
+    if (showScpMoveDialog && selectedEntry != null && !appLocked) {
         AlertDialog(
             modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_MOVE_DIALOG),
             onDismissRequest = { onShowScpMoveDialogChange(false) },
@@ -3575,7 +3587,7 @@ private fun ConnectingScpContent(
             dismissButton = { TextButton(onClick = { onShowScpMoveDialogChange(false) }) { Text("Cancel") } }
         )
     }
-    if (showScpNewFolderDialog) {
+    if (showScpNewFolderDialog && !appLocked) {
         val validFolderName = isValidRemoteChildName(scpNewFolderValue)
         AlertDialog(
             modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_NEW_FOLDER_DIALOG),
@@ -3612,7 +3624,7 @@ private fun ConnectingScpContent(
             dismissButton = { TextButton(onClick = { onShowScpNewFolderDialogChange(false) }) { Text("Cancel") } }
         )
     }
-    if (showScpDeleteDialog && selectedEntry != null) {
+    if (showScpDeleteDialog && selectedEntry != null && !appLocked) {
         AlertDialog(
             modifier = Modifier.testTag(UiTestTags.CONNECTING_SCP_DELETE_DIALOG),
             onDismissRequest = { onShowScpDeleteDialogChange(false) },

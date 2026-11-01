@@ -63,4 +63,19 @@ class RoomAppRepositoryImportTest {
 
         assertEquals(debian, repository.hosts.first().single().osMetadata)
     }
+
+    @Test
+    fun anUpdateFromASnapshotTakenBeforeDetectionKeepsTheOs() = runBlocking {
+        val stale = host(updated = 1, os = OsMetadata.Undetected)
+        repository.addHost(stale)
+        val ubuntu = OsMetadata.Known(OsFamily.UBUNTU, "24.04")
+        repository.updateHost(stale.copy(osMetadata = ubuntu, updatedEpochMillis = 2))
+
+        // Marking the host used, from the copy the UI had before the OS arrived.
+        repository.updateHost(stale.copy(lastUsedEpochMillis = 3, updatedEpochMillis = 3))
+
+        val saved = repository.hosts.first().single()
+        assertEquals(3L, saved.lastUsedEpochMillis)
+        assertEquals(ubuntu, saved.osMetadata)
+    }
 }

@@ -1062,6 +1062,12 @@ class MainActivity : FragmentActivity() {
             )
             return
         }
+        if (latestUiState.isLocked) {
+            // A widget tap while the app is locked waits for the PIN: it would otherwise connect, run the host's
+            // startup command and start its forwards for whoever holds the phone. Unlocking retries it.
+            UiDebugLog.result("widgetStartSession", false, "waiting-for-unlock hostId=$hostId")
+            return
+        }
         if (service == null) {
             ensureSessionServiceConnection()
             UiDebugLog.result(

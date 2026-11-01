@@ -280,9 +280,18 @@ internal class BoostHelper private constructor(
         private fun helperPresent(ssh: SSHClient, sftp: SFTPClient, path: String, sha256: String, size: Long): Boolean {
             val attributes = runCatching { sftp.stat(path) }.getOrNull() ?: return false
             if (attributes.size != size) return false
-            // The directory is the user's own (0700) and named by the hash; the check also catches a damaged copy.
-            val sum = runCommand(ssh, "sha256sum ${posixShellQuote(path)} 2>/dev/null")?.trim()?.substringBefore(' ')
-            return sum.isNullOrEmpty() || sum == sha256
+            // The directory is the user's own (0700) and named by the hash; the check also catches a damaged copy. A
+            // copy that can't be hashed is uploaded again rather than run on its size alone.
+            return remoteSha256(ssh, path) == sha256
+        }
+
+        /** The file's SHA-256 by whichever tool the server has, or null when none answers. */
+        private fun remoteSha256(ssh: SSHClient, path: String): String? {
+            val quoted = posixShellQuote(path)
+            return runCommand(
+                ssh,
+                "sha256sum $quoted 2>/dev/null || shasum -a 256 $quoted 2>/dev/null || openssl dgst -sha256 -r $quoted 2>/dev/null"
+            )?.trim()?.substringBefore(' ')?.lowercase()?.takeIf { it.length == 64 }
         }
 
         private fun install(context: Context, ssh: SSHClient, sftp: SFTPClient, arch: String, dir: String, path: String, sha256: String) {
@@ -317,8 +326,8 @@ internal class BoostHelper private constructor(
             runCatching { sftp.rm(path) }
             sftp.rename(temp, path)
             sftp.chmod(path, 0b111_000_000)
-            val sum = runCommand(ssh, "sha256sum ${posixShellQuote(path)} 2>/dev/null")?.trim()?.substringBefore(' ')
-            if (!sum.isNullOrEmpty() && sum != sha256) throw BoostUnavailable("the helper was damaged on its way to the server")
+            val sum = remoteSha256(ssh, path)
+            if (sum != null && sum != sha256) throw BoostUnavailable("the helper was damaged on its way to the server")
             removeOlderHelpers(sftp, dir.substringAfterLast('/'))
         }
 

@@ -51,7 +51,8 @@ class QuickConnectLaunchTest {
         composeRule.onNodeWithTag(UiTestTags.QUICK_CONNECT_CONNECT_BUTTON).performScrollTo().assertIsDisplayed()
 
         composeRule.onNodeWithTag(UiTestTags.QUICK_CONNECT_CONNECT_BUTTON).performClick()
-        composeRule.onNodeWithText("Host, port, and username required").assertIsDisplayed()
+        // The message appears above the button, which can leave it just out of the sheet's view.
+        composeRule.onNodeWithText("Host, port, and username required").performScrollTo().assertIsDisplayed()
     }
 
     @Test

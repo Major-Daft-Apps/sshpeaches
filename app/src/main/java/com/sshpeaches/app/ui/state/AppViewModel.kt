@@ -32,6 +32,7 @@ import com.majordaftapps.sshpeaches.app.util.normalizeAssociatedHostIds
 import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
 import com.majordaftapps.sshpeaches.app.util.importedKeyMatchesFingerprint
+import com.majordaftapps.sshpeaches.app.util.snippetReference
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -671,6 +672,8 @@ class AppViewModel(
             return
         }
         launchLogged("setBiometricLock", "enabled=$enabled") {
+            // Turning it on is the user's go-ahead for the fingerprints enrolled now (see SecurityManager.rearmBiometric).
+            if (enabled) SecurityManager.rearmBiometric()
             SettingsStore.setBiometricLockEnabled(enabled)
         }
     }
@@ -1321,6 +1324,12 @@ class AppViewModel(
         }
         launchLogged("deleteSnippet", "snippetId=$id") {
             repository.deleteSnippet(existing)
+            // A host whose startup command pointed at this snippet would otherwise run whatever snippet later takes
+            // its id (an import may reuse a deleted id).
+            val reference = snippetReference(id)
+            uiState.value.hosts.filter { it.startupScript.trim() == reference }.forEach { host ->
+                repository.updateHost(host.copy(startupScript = "", updatedEpochMillis = System.currentTimeMillis()))
+            }
         }
     }
 
@@ -1491,9 +1500,16 @@ class AppViewModel(
 
     /** Shown on the lock screen when biometric unlock cannot be used right now. */
     fun reportBiometricUnavailable() {
+        if (runCatching { SecurityManager.isBiometricRevoked() }.getOrDefault(false)) {
+            // A fingerprint was added or removed: unlocking with the PIN no longer turns it back on by itself.
+            viewModelScope.launch { runCatching { SettingsStore.setBiometricLockEnabled(false) } }
+            lockScreenMessageFlow.value =
+                "The fingerprints on this phone changed, so biometric unlock was turned off. Unlock with your PIN, " +
+                    "then turn it on again in Settings if you want it."
+            return
+        }
         lockScreenMessageFlow.value =
-            "Biometric unlock isn't available right now (for example after a fingerprint change). " +
-                "Unlock with your PIN to turn it back on."
+            "Biometric unlock isn't available right now. Unlock with your PIN."
     }
 
     fun consumeSecurityNotice() {
@@ -1639,7 +1655,7 @@ class AppViewModel(
                     privateKeyText = privateKey,
                     derivedPublicKey = derivedPublic,
                     expectedFingerprint = fingerprint,
-                    identityHasKey = existing?.hasPrivateKey == true
+                    acceptUnverifiable = existing?.hasPrivateKey != true && id in identitiesCreatedByImport
                 )
             ) { "Imported key does not match the identity's fingerprint." }
             SecurityManager.storeIdentityKey(id, privateKey)
@@ -1744,10 +1760,14 @@ class AppViewModel(
             updatedEpochMillis = identity.updatedEpochMillis ?: identity.createdEpochMillis,
             tags = identity.tags.map { it.trim() }.filter { it.isNotBlank() }
         )
+        identitiesCreatedByImport += normalized.id
         launchLogged("importIdentity", "identityId=${normalized.id}") {
             repository.addIdentity(normalized)
         }
     }
+
+    /** Identities created from imports: only their keys may arrive unverifiable (see importedKeyMatchesFingerprint). */
+    private val identitiesCreatedByImport: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
 
     private fun markIdentityHasKeyWithRetry(id: String, hasKey: Boolean) {
         launchLogged("markIdentityHasKey", "identityId=$id, hasKey=$hasKey") {

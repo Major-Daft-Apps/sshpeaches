@@ -153,12 +153,28 @@ func WriteRequest(w io.Writer, token []byte, req Request) error {
 
 // ReadRequest reads a request's token and header; the caller reads a write's payload.
 func ReadRequest(r io.Reader) (token []byte, req Request, err error) {
-	token = make([]byte, TokenSize)
-	if _, err = io.ReadFull(r, token); err != nil {
+	if token, err = ReadToken(r); err != nil {
 		return nil, req, err
 	}
-	err = readFrame(r, &req)
+	req, err = ReadHeader(r)
 	return token, req, err
+}
+
+// ReadToken reads the token a request starts with, so a server can refuse a peer before reading (and allocating
+// for) the rest.
+func ReadToken(r io.Reader) ([]byte, error) {
+	token := make([]byte, TokenSize)
+	if _, err := io.ReadFull(r, token); err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+// ReadHeader reads the header that follows a request's token.
+func ReadHeader(r io.Reader) (Request, error) {
+	var req Request
+	err := readFrame(r, &req)
+	return req, err
 }
 
 func WriteReply(w io.Writer, rep Reply) error { return writeFrame(w, rep) }

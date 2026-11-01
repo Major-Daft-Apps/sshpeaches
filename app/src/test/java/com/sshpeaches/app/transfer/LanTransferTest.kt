@@ -96,4 +96,14 @@ class LanTransferTest {
         assertNull(LanTransfer.parsePairingUri("https://example.com"))
         assertNull(LanTransfer.parsePairingUri("sshpeaches-lan://192.168.1.20:99999/$code"))
     }
+
+    @Test
+    fun mobileDataAndVpnInterfacesAreNotTheLocalNetwork() {
+        listOf("rmnet_data0", "rmnet0", "ccmni1", "v4-rmnet_data0", "tun0", "ppp0", "seth_lte0").forEach {
+            org.junit.Assert.assertTrue(it, LanTransfer.isMobileOrTunnelInterface(it))
+        }
+        listOf("wlan0", "wlan1", "swlan0", "ap0", "eth0", "rndis0").forEach {
+            org.junit.Assert.assertFalse(it, LanTransfer.isMobileOrTunnelInterface(it))
+        }
+    }
 }

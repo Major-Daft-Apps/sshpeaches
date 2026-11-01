@@ -33,7 +33,9 @@ fun processHostQrImport(
     ) {
         return HostQrImportResult.Error("Invalid host QR")
     }
-    if (existingHosts.any { it.name.equals(imported.name, ignoreCase = true) }) {
+    // Names are saved trimmed, so "Prod " would otherwise become a second "Prod" pointing somewhere else.
+    val importedName = normalizedHostName(imported.name)
+    if (existingHosts.any { normalizedHostName(it.name).equals(importedName, ignoreCase = true) }) {
         return HostQrImportResult.Error("Host already exists")
     }
     // Saving replaces a host with the same id, so a QR whose id is already taken (e.g. by a host renamed since it
@@ -159,3 +161,6 @@ fun processSnippetQrImport(
         )
     )
 }
+
+/** A host name as it's compared for duplicates: trimmed, runs of whitespace as one space. */
+internal fun normalizedHostName(name: String): String = name.trim().replace(Regex("\\s+"), " ")

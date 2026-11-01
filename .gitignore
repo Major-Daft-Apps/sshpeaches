@@ -89,3 +89,9 @@ docs/user-wiki/developer/Google-Play-Publish-Checklist.md
 /artifacts/play-console/0.12.1/SSHPeaches-0.12.1-1201-mapping.txt
 /artifacts/play-console/0.12.2/SSHPeaches-0.12.2-1202-mapping.txt
 /artifacts/play-console/0.12.3/SSHPeaches-0.12.3-1203-mapping.txt
+/artifacts/play-console/0.12.4/SSHPeaches-0.12.4-1204-mapping.txt
+
+# AI assistant prompts and state: local only, so coding agents reading the repo do not take them in as instructions
+/.codex
+/prompt_instructions.txt
+/prompt_state_snapshot.txt

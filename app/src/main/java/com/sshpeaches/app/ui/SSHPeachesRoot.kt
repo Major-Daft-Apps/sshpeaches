@@ -1463,18 +1463,20 @@ fun SSHPeachesRoot(
                         ),
                         notes = item.optString("notes"),
                         defaultMode = defaultMode,
-                        // Keep only references that resolve to an imported or existing item.
+                        // Keep only references that resolve to an imported item, or to one of yours when the host is
+                        // one you already have: a new host naming your ids would offer your key to its server and
+                        // tie your forwards to it.
                         attachedForwards = jsonStringList(item.optJSONArray("attachedForwards"))
-                            .mapNotNull { forwardIdMap[it] ?: it.takeIf { id -> id in localForwardIds } },
+                            .mapNotNull { forwardIdMap[it] ?: it.takeIf { id -> updatesSavedHost && id in localForwardIds } },
                         snippets = jsonStringList(item.optJSONArray("snippets"))
-                            .mapNotNull { snippetIdMap[it] ?: it.takeIf { id -> id in localSnippetIds } },
+                            .mapNotNull { snippetIdMap[it] ?: it.takeIf { id -> updatesSavedHost && id in localSnippetIds } },
                         hasPassword = false,
                         useMosh = item.optBoolean("useMosh", false),
                         attachTmux = item.optBoolean("attachTmux", false),
                         preferredIdentityId = item.optString("preferredIdentityId").trim().ifBlank { null }
-                            ?.let { identityIdMap[it] ?: it.takeIf { id -> id in localIdentityIds } },
+                            ?.let { identityIdMap[it] ?: it.takeIf { id -> updatesSavedHost && id in localIdentityIds } },
                         preferredForwardId = item.optString("preferredForwardId").trim().ifBlank { null }
-                            ?.let { forwardIdMap[it] ?: it.takeIf { id -> id in localForwardIds } },
+                            ?.let { forwardIdMap[it] ?: it.takeIf { id -> updatesSavedHost && id in localForwardIds } },
                         startupScript = "",
                         backgroundBehavior = runCatching {
                             BackgroundBehavior.valueOf(
@@ -1594,16 +1596,17 @@ fun SSHPeachesRoot(
                     protectedImportFailures += 1
                 }
             }
-            pendingIdentityKeyImports.forEach { (identityId, payload) ->
-                if (onImportIdentityKey(identityId, payload, passphrase)) {
-                    importedPrivateKeys += 1
+            // Passphrases first: an encrypted key can then be checked against its identity's fingerprint.
+            pendingIdentityKeyPassphraseImports.forEach { (identityId, payload) ->
+                if (onImportIdentityKeyPassphrasePayload(identityId, payload, passphrase)) {
+                    importedKeyPassphrases += 1
                 } else {
                     protectedImportFailures += 1
                 }
             }
-            pendingIdentityKeyPassphraseImports.forEach { (identityId, payload) ->
-                if (onImportIdentityKeyPassphrasePayload(identityId, payload, passphrase)) {
-                    importedKeyPassphrases += 1
+            pendingIdentityKeyImports.forEach { (identityId, payload) ->
+                if (onImportIdentityKey(identityId, payload, passphrase)) {
+                    importedPrivateKeys += 1
                 } else {
                     protectedImportFailures += 1
                 }

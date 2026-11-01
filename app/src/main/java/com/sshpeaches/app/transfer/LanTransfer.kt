@@ -81,11 +81,22 @@ object LanTransfer {
     /** This device's IPv4 address on Wi-Fi or Ethernet, if it has a private one. */
     fun localNetworkAddress(): InetAddress? = runCatching {
         NetworkInterface.getNetworkInterfaces().toList()
-            .filter { it.isUp && !it.isLoopback && !it.isVirtual }
+            .filter { it.isUp && !it.isLoopback && !it.isVirtual && !isMobileOrTunnelInterface(it.name) }
             .sortedBy { iface -> if (iface.name.startsWith("wlan") || iface.name.startsWith("eth")) 0 else 1 }
             .flatMap { it.inetAddresses.toList() }
             .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
     }.getOrNull()
+
+    /**
+     * Mobile data and VPN interfaces: carriers hand out private (10.x) addresses too, and a transfer offered there
+     * would be open to other subscribers instead of the phones on your Wi-Fi. Hotspot interfaces (ap0, swlan0) stay.
+     */
+    internal fun isMobileOrTunnelInterface(name: String): Boolean =
+        MOBILE_OR_TUNNEL_INTERFACE_PREFIXES.any { name.startsWith(it) }
+
+    private val MOBILE_OR_TUNNEL_INTERFACE_PREFIXES = listOf(
+        "rmnet", "r_rmnet", "rev_rmnet", "v4-", "clat", "ccmni", "ccemni", "pdp", "seth", "wwan", "tun", "ppp", "ipsec"
+    )
 
     fun encrypt(payload: String, code: String): ByteArray {
         val salt = ByteArray(SALT_BYTES).also(random::nextBytes)

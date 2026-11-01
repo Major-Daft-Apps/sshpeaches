@@ -81,8 +81,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1203
-        versionName = "0.12.3"
+        versionCode = 1204
+        versionName = "0.12.4"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -273,6 +273,8 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-svg:2.7.0")
+    // Draws the bundled OS logos directly (OsLogo); the same version coil-svg uses.
+    implementation("com.caverock:androidsvg-aar:1.4")
     implementation("com.hierynomus:sshj:0.40.0")
     // File boost client (QUIC), built from tools/boost with gomobile: arm64-v8a and x86_64 only.
     implementation(files("libs/boostclient.aar"))

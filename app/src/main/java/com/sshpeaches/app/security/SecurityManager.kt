@@ -47,6 +47,9 @@ object SecurityManager {
     private const val KEY_VAULT_PIN_ITERATIONS = "vault_pin_iter"
     private const val KEY_VAULT_PIN_WRAPPED = "vault_pin_wrapped"
     private const val KEY_VAULT_BIOMETRIC_WRAPPED = "vault_biometric_wrapped"
+    // Set when the biometric key stopped working (a fingerprint was added or removed): the vault isn't wrapped for
+    // biometrics again until the user turns biometric unlock back on (rearmBiometric).
+    private const val KEY_BIOMETRIC_REVOKED = "biometric_revoked"
     private const val KEY_PASSWORD_PREFIX = "pwd_"
     private const val KEY_IDENTITY_PREFIX = "ident_"
     private const val KEY_IDENTITY_PUBLIC_PREFIX = "ident_pub_"
@@ -215,7 +218,13 @@ object SecurityManager {
         lockState.value = false
     }
 
-    fun verifyPin(pin: String): Boolean {
+    // One PIN check at a time: guesses started together (the lock screen recreated by a rotation keeps the earlier
+    // one running) all passed the lockout check before any failure was counted, and their counts could be lost.
+    private val pinVerifyLock = Any()
+
+    fun verifyPin(pin: String): Boolean = synchronized(pinVerifyLock) { verifyPinLocked(pin) }
+
+    private fun verifyPinLocked(pin: String): Boolean {
         val securePrefs = awaitPrefs()
         if (pinLockoutRemainingMillis(securePrefs) > 0L) return false
         val vaultKey = if (isVaultBackedStorage(securePrefs)) {
@@ -499,7 +508,11 @@ object SecurityManager {
             decryptVaultPayload(payload, vaultKey)
         }
         val wrappedWithPin = wrapVaultKeyWithPin(vaultKey, pin)
-        val wrappedWithBiometric = wrapVaultKeyWithBiometric(vaultKey)
+        val wrappedWithBiometric = if (securePrefs.getBoolean(KEY_BIOMETRIC_REVOKED, false)) {
+            null
+        } else {
+            wrapVaultKeyWithBiometric(vaultKey)
+        }
         securePrefs.edit(commit = true) {
             encryptedSecrets.forEach { (key, payload) ->
                 putString(key, payload)
@@ -570,11 +583,15 @@ object SecurityManager {
             remove(KEY_VAULT_PIN_ITERATIONS)
             remove(KEY_VAULT_PIN_WRAPPED)
             remove(KEY_VAULT_BIOMETRIC_WRAPPED)
+            remove(KEY_BIOMETRIC_REVOKED)
         }
     }
 
     private fun ensureBiometricWrappedVaultKey(securePrefs: SharedPreferences, vaultKey: ByteArray) {
         if (!securePrefs.getString(KEY_VAULT_BIOMETRIC_WRAPPED, null).isNullOrBlank()) return
+        // After a fingerprint change, a PIN unlock must not quietly trust the new set of fingerprints, which may
+        // include someone else's.
+        if (securePrefs.getBoolean(KEY_BIOMETRIC_REVOKED, false)) return
         val wrapped = wrapVaultKeyWithBiometric(vaultKey) ?: return
         securePrefs.edit {
             putString(KEY_VAULT_BIOMETRIC_WRAPPED, wrapped)
@@ -758,9 +775,28 @@ object SecurityManager {
 
     private fun handleBiometricWrapFailure(securePrefs: SharedPreferences) {
         deleteBiometricKey()
-        securePrefs.edit {
+        securePrefs.edit(commit = true) {
             remove(KEY_VAULT_BIOMETRIC_WRAPPED)
+            putBoolean(KEY_BIOMETRIC_REVOKED, true)
         }
+    }
+
+    /** True once biometric unlock stopped working until the user turns it back on (see [rearmBiometric]). */
+    fun isBiometricRevoked(): Boolean = awaitPrefs().getBoolean(KEY_BIOMETRIC_REVOKED, false)
+
+    /**
+     * Turning biometric unlock on (while unlocked) wraps the vault for the fingerprints enrolled now. False when the
+     * app is locked or the key can't be made.
+     */
+    fun rearmBiometric(): Boolean {
+        val securePrefs = awaitPrefs()
+        if (!isPinSet() || !isVaultBackedStorage(securePrefs)) return false
+        val vaultKey = currentUnlockedVaultKey() ?: return false
+        securePrefs.edit(commit = true) { remove(KEY_BIOMETRIC_REVOKED) }
+        if (!securePrefs.getString(KEY_VAULT_BIOMETRIC_WRAPPED, null).isNullOrBlank()) return true
+        val wrapped = wrapVaultKeyWithBiometric(vaultKey) ?: return false
+        securePrefs.edit(commit = true) { putString(KEY_VAULT_BIOMETRIC_WRAPPED, wrapped) }
+        return true
     }
 
     private fun encryptVaultPayload(value: String, vaultKey: ByteArray): String {

@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app
 
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetrySanitizer
 
 /**
  * Keeps an error on one of sshj's reader threads from crashing the whole app. Those threads parse what the server
@@ -16,7 +17,9 @@ internal object SshThreadCrashGuard {
             if (isSshReaderThread(thread.name)) {
                 runCatching { TelemetryInitializer.recordNonFatal("ssh_reader_thread", error) }
             } else {
-                previous?.uncaughtException(thread, error)
+                // Crashlytics' handler reports what it's given: a crash's message (a path, user@host) must be scrubbed
+                // like every other report. Debug builds keep the original for logcat.
+                previous?.uncaughtException(thread, if (BuildConfig.DEBUG) error else TelemetrySanitizer.sanitize(error))
             }
         }
     }

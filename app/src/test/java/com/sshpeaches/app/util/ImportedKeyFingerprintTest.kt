@@ -29,8 +29,9 @@ class ImportedKeyFingerprintTest {
     }
 
     @Test
-    fun aKeyThatCantBeCheckedOnlyFillsAnEmptyIdentity() {
-        assertTrue(importedKeyMatchesFingerprint("opaque", "", yours.fingerprint, identityHasKey = false))
-        assertFalse(importedKeyMatchesFingerprint("opaque", "", yours.fingerprint, identityHasKey = true))
+    fun aKeyThatCantBeCheckedOnlyFillsAnIdentityTheSameImportCreated() {
+        assertTrue(importedKeyMatchesFingerprint("opaque", "", yours.fingerprint, acceptUnverifiable = true))
+        // Your own public-key-only identity: an unverifiable key could be anyone's.
+        assertFalse(importedKeyMatchesFingerprint("opaque", "", yours.fingerprint, acceptUnverifiable = false))
     }
 }

@@ -78,7 +78,9 @@ type Server struct {
 	sshGone  bool
 
 	lastActive atomic.Int64
-	closed     chan struct{}
+	// unauthenticated counts connections that haven't yet sent the token (see authTimeout).
+	unauthenticated atomic.Int32
+	closed          chan struct{}
 	closeOnce  sync.Once
 }
 
@@ -349,13 +351,48 @@ func (s *Server) SSHGone() {
 	}
 }
 
+// Anyone who can reach the ports can connect. A peer gets authTimeout to send the token, and at most
+// maxUnauthenticated connections may be waiting to, so silent connections can't pile up memory, goroutines and
+// file descriptors in the user's account.
+var authTimeout = 10 * time.Second
+
+const maxUnauthenticated = 32
+
+// reserveUnauthenticated takes a slot for a connection that hasn't sent the token yet; the returned release (safe
+// to call more than once) frees it.
+func (s *Server) reserveUnauthenticated() (release func(), ok bool) {
+	if s.unauthenticated.Add(1) > maxUnauthenticated {
+		s.unauthenticated.Add(-1)
+		return nil, false
+	}
+	return sync.OnceFunc(func() { s.unauthenticated.Add(-1) }), true
+}
+
 func (s *Server) acceptQuic(ctx context.Context) {
 	for {
 		conn, err := s.udp.Accept(ctx)
 		if err != nil {
 			return
 		}
+		release, ok := s.reserveUnauthenticated()
+		if !ok {
+			conn.CloseWithError(1, "busy")
+			continue
+		}
+		var authenticated atomic.Bool
+		authTimer := time.AfterFunc(authTimeout, func() {
+			if !authenticated.Load() {
+				conn.CloseWithError(1, "no token")
+			}
+		})
+		admitted := func() {
+			if authenticated.CompareAndSwap(false, true) {
+				authTimer.Stop()
+				release()
+			}
+		}
 		go func() {
+			defer release()
 			for {
 				stream, err := conn.AcceptStream(ctx)
 				if err != nil {
@@ -363,9 +400,15 @@ func (s *Server) acceptQuic(ctx context.Context) {
 				}
 				go func() {
 					defer stream.Close()
+					// The token comes with the stream's first bytes; a stream that never sends it ends.
+					stream.SetReadDeadline(time.Now().Add(authTimeout))
 					// Only a request without the token cuts the connection; a broken stream (a cancelled
 					// request) ends just itself, and the client's other requests carry on.
-					if more, refused := s.handle(stream); refused {
+					more, refused := s.handle(stream, func() {
+						stream.SetReadDeadline(time.Time{})
+						admitted()
+					})
+					if refused {
 						conn.CloseWithError(1, "refused")
 					} else if !more {
 						stream.CancelRead(0)
@@ -380,12 +423,34 @@ func (s *Server) acceptTCP() {
 	for {
 		conn, err := s.tcp.Accept()
 		if err != nil {
-			return
+			select {
+			case <-s.closed:
+				return
+			default:
+			}
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			// Out of file descriptors, say: wait and keep the fallback alive instead of giving it up for good.
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		release, ok := s.reserveUnauthenticated()
+		if !ok {
+			conn.Close()
+			continue
 		}
 		go func() {
 			defer conn.Close()
+			defer release()
+			// Covers the TLS handshake and the first request's token; the connection is then the client's.
+			conn.SetDeadline(time.Now().Add(authTimeout))
 			for {
-				if more, _ := s.handle(conn); !more {
+				more, _ := s.handle(conn, func() {
+					conn.SetDeadline(time.Time{})
+					release()
+				})
+				if !more {
 					return
 				}
 			}
@@ -394,14 +459,20 @@ func (s *Server) acceptTCP() {
 }
 
 // handle serves one request. more is false when the stream (or TCP connection) can't be used again; refused
-// says the request didn't carry the token.
-func (s *Server) handle(rw io.ReadWriter) (more, refused bool) {
-	token, req, err := wire.ReadRequest(rw)
+// says the request didn't carry the token. admitted runs once the token checks out, before the header is read:
+// a peer without it gets nothing allocated for a header.
+func (s *Server) handle(rw io.ReadWriter, admitted func()) (more, refused bool) {
+	token, err := wire.ReadToken(rw)
 	if err != nil {
 		return false, false
 	}
 	if !s.admit(token) {
 		return false, true
+	}
+	admitted()
+	req, err := wire.ReadHeader(rw)
+	if err != nil {
+		return false, false
 	}
 	s.touch()
 	return s.serve(rw, req), false

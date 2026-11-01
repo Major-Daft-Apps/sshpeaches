@@ -4,6 +4,28 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.12.4 (1204)
+
+Release date: 2026-10-31
+
+Security fixes from a review of the whole app:
+
+- **Lock screen:** after a rotation, theme or font change while the app was locked, a file editor, rename or delete dialog, or the Transfers pane that had been open could come back above the PIN screen and be used. The session screen's dialogs now stay closed while locked, and the lock window opens after the screen's own windows.
+- **Lock screen:** tapping a host on the home screen widget while the app is locked waits for the PIN instead of connecting (and running the host's startup command and forwards) for whoever holds the phone.
+- **Biometric unlock:** after a fingerprint was added or removed, unlocking with the PIN quietly trusted the new set of fingerprints again. Biometric unlock now turns itself off until you turn it back on in Settings.
+- **PIN:** PIN checks run one at a time, so guesses started together (for example around a rotation) can't get around the lockout.
+- **Imports:** an import naming one of your public-key-only identities could store someone else's private key in it, which "Install key on host" would then put on your servers. A key for an identity you already have must now prove it's that identity's key. New hosts from an import no longer point at your own identities, forwards or snippets, a host QR can't add a second host whose name differs from yours only by spaces or case, and deleting a snippet clears host startup commands that pointed at it.
+- **Paste:** text a keyboard inserts from its clipboard bar went to the terminal as typed, so several lines ran one after another. Multi-line or escape-carrying text now takes the paste path (bracketed paste, control characters stripped) like the Paste button.
+- **Boost:** the helper on the server read up to 64 KiB of a request before checking its token and set no time limits, so anyone who could reach its port could tie up memory and connections in your account. It now checks the token first, gives a peer 10 s to send it, and serves at most 32 connections that haven't. quic-go updated to 0.49.1 (CVE-2025-59530). A helper already on the server is only run when its SHA-256 checks out (sha256sum, shasum or openssl).
+- **Privacy:** crashes are scrubbed like other reports before they reach Crashlytics, file names with spaces are removed whole, and host names and Boost errors stay out of release logs.
+- **Wi-Fi transfer** only offers itself on Wi-Fi, Ethernet or hotspot addresses, not on a carrier's private mobile-data address or a VPN.
+- **Install key on host** refuses a public key that spans more than one line.
+- **Build supply chain:** every Gradle dependency is checked against recorded SHA-256 checksums (gradle/verification-metadata.xml), the unused JitPack repository is gone, and the Gradle download is pinned by its checksum.
+
+Also:
+
+- Hosts' OS logos are drawn directly instead of loaded in the background, so a load that failed when the app started cold no longer leaves the coloured circle empty until you connect to the host. Saving a host from an older copy (for example marking it used) also keeps an OS that was detected meanwhile.
+
 ## 0.12.3 (1203)
 
 Release date: 2026-10-30

@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Terminal
@@ -47,9 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -63,9 +60,6 @@ import android.content.Intent.ACTION_SEND
 import android.content.Intent.EXTRA_TEXT
 import android.graphics.Bitmap
 import android.widget.Toast
-import coil.compose.AsyncImage
-import coil.decode.SvgDecoder
-import coil.request.ImageRequest
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
@@ -166,27 +160,7 @@ fun HostCard(
                         .size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val iconRes = host.osMetadata.iconResOrNull()
-                    if (iconRes != null) {
-                        val imageContext = LocalContext.current
-                        AsyncImage(
-                            model = ImageRequest.Builder(imageContext)
-                                .data(iconRes)
-                                .decoderFactory(SvgDecoder.Factory())
-                                .build(),
-                            contentDescription = host.osMetadata.label(),
-                            contentScale = ContentScale.Fit,
-                            colorFilter = ColorFilter.tint(Color.White),
-                            modifier = Modifier.size(28.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.DesktopWindows,
-                            contentDescription = host.osMetadata.label(),
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    OsLogo(host.osMetadata, contentDescription = host.osMetadata.label())
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(host.name, style = MaterialTheme.typography.titleMedium)
@@ -593,19 +567,3 @@ private fun OsMetadata.toColor(): Color = when (this) {
     else -> Color(OsFamily.UNKNOWN.colorHex.toColorInt())
 }
 
-private fun OsMetadata.iconResOrNull(): Int? = when (this) {
-    is OsMetadata.Known -> when (family) {
-        OsFamily.UBUNTU -> R.raw.ubuntu
-        OsFamily.DEBIAN -> R.raw.debian
-        OsFamily.FEDORA -> R.raw.fedora
-        OsFamily.MINT -> R.raw.linux_mint
-        OsFamily.ARCH -> R.raw.arch
-        OsFamily.SUSE -> R.raw.suse
-        OsFamily.REDHAT -> R.raw.redhat
-        OsFamily.MAC -> R.raw.apple
-        OsFamily.WINDOWS -> R.raw.windows
-        OsFamily.BSD -> R.raw.bsd
-        else -> R.raw.linux
-    }
-    else -> null
-}

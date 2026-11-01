@@ -18,6 +18,9 @@ object TelemetrySanitizer {
     private val path = Regex("""(?<![\w<])(?:~|/)[^\s:'"`,;()<>]+""")
     // Relative paths ("projects/acme/x.conf"), and the rest of a path after a space ("My Docs/tax.pdf").
     private val relativePath = Regex("""(?<![\w<>./~-])[\w.-]+/[\w./-]+""")
+    // A file name with spaces continues past the path match ("/Download/Jane Doe passport.pdf"): take the words up to
+    // one with an extension, a few at most, so "passport" and "Doe" don't go out.
+    private val pathTail = Regex("""<path>(?: [^\s:'"`,;()<>]+){0,3}? [^\s:'"`,;()<>]*\.[A-Za-z0-9]{1,10}(?![\w.])""")
     private val hostName = Regex("""(?<![A-Za-z0-9.-])[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,24}\b""")
     private val fingerprint = Regex("""SHA256:[A-Za-z0-9+/=]{20,}""")
     private val timeOfDay = Regex("""\d{1,2}:\d{2}(?::\d{2})?""")
@@ -44,6 +47,7 @@ object TelemetrySanitizer {
             if (timeOfDay.matches(match.value)) match.value else "<ip>"
         }
         result = path.replace(result, "<path>")
+        result = pathTail.replace(result, "<path>")
         result = relativePath.replace(result, "<path>")
         result = hostName.replace(result, "<host>")
         return result

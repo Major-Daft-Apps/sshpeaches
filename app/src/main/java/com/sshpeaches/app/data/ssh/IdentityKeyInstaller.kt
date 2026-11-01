@@ -217,6 +217,9 @@ object IdentityKeyInstaller {
     }
 
     private fun buildAuthorizedKeyInstallCommand(publicKey: String): String {
+        // One authorized_keys line, always: a key whose comment carried a newline would add lines of its own (with
+        // options such as command="..." that the user never saw).
+        require(publicKey.none { it == '\n' || it == '\r' || it == '\u0000' }) { "The public key spans more than one line." }
         val escaped = publicKey.replace("'", "'\"'\"'")
         return "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && (grep -qxF '$escaped' ~/.ssh/authorized_keys || echo '$escaped' >> ~/.ssh/authorized_keys) && chmod 600 ~/.ssh/authorized_keys"
     }

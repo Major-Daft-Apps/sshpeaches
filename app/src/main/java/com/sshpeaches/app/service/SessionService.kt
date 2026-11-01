@@ -1558,7 +1558,7 @@ class SessionService : Service() {
                 metrics.recordBoost("files", boost.transport.lowercase())
             }.onFailure { error ->
                 val reason = (error as? BoostUnavailable)?.message ?: (error.message ?: error.javaClass.simpleName)
-                Log.i(FILE_BOOST_TAG, "Boost unavailable for $sessionId", error)
+                Log.i(FILE_BOOST_TAG, "Boost unavailable for $sessionId", if (BuildConfig.DEBUG) error else null)
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
                         hostId = sessionId,
