@@ -1,0 +1,5 @@
+What's new in 0.12.4
+
+- Security fixes for the lock screen, biometric unlock, imports, paste and Boost.
+- Host OS logos no longer go missing after a cold start.
+- Crash reports are scrubbed of host names and file names.
