@@ -1,0 +1,6 @@
+What's new in 0.13.0
+
+- Optional lock when idle: with a PIN, lock after the timeout even while the app is open.
+- New PINs need at least 6 digits.
+- Updated Jetpack Compose and Material 3, fixing a rare crash on rotation.
+- New hosts prefer modern host keys over SHA-1 RSA.
