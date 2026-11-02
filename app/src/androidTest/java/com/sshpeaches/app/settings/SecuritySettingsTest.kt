@@ -2,6 +2,9 @@ package com.majordaftapps.sshpeaches.app.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -11,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.majordaftapps.sshpeaches.app.testutil.NotificationPermissionHelper
 import com.majordaftapps.sshpeaches.app.MainActivity
@@ -45,8 +49,13 @@ class SecuritySettingsTest {
             .assertTextContains("PIN lock not configured.")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_SET_PIN_BUTTON).performClick()
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_DIALOG).assertIsDisplayed()
+        // Four digits are no longer enough for a new PIN.
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_INPUT).performTextInput("2468")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_CONFIRM_INPUT).performTextInput("2468")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_SAVE_BUTTON).performClick()
+        composeRule.onNodeWithText("PIN must be at least 6 digits.").assertIsDisplayed()
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_INPUT).performTextReplacement("246813")
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_CONFIRM_INPUT).performTextReplacement("246813")
         composeRule.onNodeWithTag(UiTestTags.SETTINGS_PIN_SAVE_BUTTON).performClick()
 
         composeRule.waitUntil(15_000) {
@@ -107,6 +116,25 @@ class SecuritySettingsTest {
                 .fetchSemanticsNodes().isEmpty()
         ) {
             "PIN-required biometric warning should disappear once a PIN is configured."
+        }
+    }
+
+    @Test
+    fun lockWhenIdleNeedsAPinAndCanBeTurnedOn() {
+        openSettings()
+        revealSecurityControl(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH).assertIsNotEnabled().assertIsOff()
+
+        AppStateSeeder.configurePin(pin = "246813", locked = false)
+        composeRule.activityRule.scenario.recreate()
+        openSettings()
+        revealSecurityControl(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH).assertIsEnabled().performClick()
+        composeRule.waitUntil(5_000) {
+            runCatching {
+                composeRule.onNodeWithTag(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH).assertIsOn()
+                true
+            }.getOrDefault(false)
         }
     }
 

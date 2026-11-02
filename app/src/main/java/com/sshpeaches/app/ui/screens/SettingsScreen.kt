@@ -153,6 +153,8 @@ fun SettingsScreen(
     usageReportsEnabled: Boolean,
     onUsageReportsToggle: (Boolean) -> Unit,
     onOpenAdvancedSettings: () -> Unit = {},
+    lockWhenIdle: Boolean = false,
+    onLockWhenIdleToggle: (Boolean) -> Unit = {},
     pinConfigured: Boolean,
     isLocked: Boolean,
     biometricAvailable: Boolean,
@@ -787,6 +789,25 @@ fun SettingsScreen(
                             label = { Text("Custom timeout (minutes)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Lock when idle")
+                            Text(
+                                "Also lock after the timeout (a minute at least) without a tap or key press while the app is open",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = lockWhenIdle,
+                            onCheckedChange = onLockWhenIdleToggle,
+                            enabled = pinConfigured,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH)
                         )
                     }
                     Row(
@@ -1457,7 +1478,9 @@ fun SettingsScreen(
                 TextButton(
                     onClick = {
                         pinDialogError.value = when {
-                            pinEntry.value.length < 4 -> "PIN must be at least 4 digits."
+                            // Six digits for new PINs: the PIN is what stands between a copied vault and an offline
+                            // guess, and four digits are 10,000 tries. PINs already set keep working.
+                            pinEntry.value.length < MIN_NEW_PIN_LENGTH -> "PIN must be at least $MIN_NEW_PIN_LENGTH digits."
                             pinEntry.value != confirmPinEntry.value -> "PINs don't match."
                             else -> null
                         }
@@ -1793,3 +1816,5 @@ private fun shareApp(context: android.content.Context) {
         )
     }
 }
+
+private const val MIN_NEW_PIN_LENGTH = 6

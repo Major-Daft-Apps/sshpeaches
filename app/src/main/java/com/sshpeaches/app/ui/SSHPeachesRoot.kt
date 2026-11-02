@@ -341,6 +341,9 @@ data class SSHPeachesRootActions(
     val onRetryTransfer: (sessionId: String, operationId: String) -> Unit = { _, _ -> },
     val onClearFinishedTransfers: (sessionId: String) -> Unit = {},
     val onShowConnectionLatencyToggle: (Boolean) -> Unit = {},
+    val onLockWhenIdleToggle: (Boolean) -> Unit = {},
+    /** The user typed into a terminal with the system keyboard (counts as activity for the idle lock). */
+    val onUserTyped: () -> Unit = {},
     /** Back on Home after a session: a good moment for the one-time review prompt. */
     val onReturnedHomeFromSession: () -> Unit = {}
 )
@@ -356,6 +359,7 @@ data class SSHPeachesRootRuntime(
     val fileTransferProgresses: Map<String, FileTransferProgress>,
     val fileTransferLists: Map<String, List<FileTransferProgress>> = emptyMap(),
     val showConnectionLatency: Boolean = false,
+    val lockWhenIdle: Boolean = false,
     val connectionLatencies: Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency> = emptyMap(),
     val hostKeyPrompts: List<HostKeyPrompt>,
     val passwordPrompts: List<PasswordPrompt>,
@@ -519,6 +523,9 @@ fun SSHPeachesRoot(
     val showConnectionLatency = runtime.showConnectionLatency
     val connectionLatencies = runtime.connectionLatencies
     val onShowConnectionLatencyToggle = actions.onShowConnectionLatencyToggle
+    val lockWhenIdle = runtime.lockWhenIdle
+    val onLockWhenIdleToggle = actions.onLockWhenIdleToggle
+    val onUserTyped = actions.onUserTyped
     val hostKeyPrompts = runtime.hostKeyPrompts
     val passwordPrompts = runtime.passwordPrompts
     val requestedOpenSessionId = runtime.requestedOpenSessionId
@@ -1347,8 +1354,8 @@ fun SSHPeachesRoot(
                         description = item.optString("description"),
                         command = command,
                         tags = jsonStringList(item.optJSONArray("tags")),
-                        autoRunHostIds = jsonStringList(item.optJSONArray("autoRunHostIds")),
-                        requireConfirmation = item.optBoolean("requireConfirmation", true),
+                        // autoRunHostIds and requireConfirmation (in older exports) were never used: a snippet runs
+                        // on connect only as a host's startup command. They aren't imported.
                         favorite = item.optBoolean("favorite", false)
                     )
                     onImportSnippet(importedSnippet)
@@ -2309,10 +2316,14 @@ fun SSHPeachesRoot(
                             )
                         }
                         composable(Routes.CONNECTING) {
-                            SessionVerticalContent()
+                            androidx.compose.runtime.CompositionLocalProvider(
+                                com.majordaftapps.sshpeaches.app.ui.screens.LocalOnUserTyped provides onUserTyped
+                            ) { SessionVerticalContent() }
                         }
                         composable(Routes.SESSION) {
-                            SessionVerticalContent()
+                            androidx.compose.runtime.CompositionLocalProvider(
+                                com.majordaftapps.sshpeaches.app.ui.screens.LocalOnUserTyped provides onUserTyped
+                            ) { SessionVerticalContent() }
                         }
                     composable(Routes.HELP) {
                         HelpScreen(
@@ -2568,6 +2579,8 @@ fun SSHPeachesRoot(
                     }
                         composable(Routes.SETTINGS) {
                             SettingsScreen(
+                                lockWhenIdle = lockWhenIdle,
+                                onLockWhenIdleToggle = onLockWhenIdleToggle,
                                 incomingImportUri = incomingImportUri,
                                 onIncomingImportHandled = onIncomingImportHandled,
                                 currentTheme = uiState.themeMode,
@@ -4027,8 +4040,6 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                     put("description", snippet.description)
                     put("command", snippet.command)
                     put("tags", JSONArray(snippet.tags))
-                    put("autoRunHostIds", JSONArray(snippet.autoRunHostIds))
-                    put("requireConfirmation", snippet.requireConfirmation)
                     put("favorite", snippet.favorite)
                 })
             }

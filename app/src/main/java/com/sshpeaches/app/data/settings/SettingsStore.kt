@@ -88,6 +88,7 @@ object SettingsStore {
     private val boostTcpFallbackKey = booleanPreferencesKey("boost_tcp_fallback")
     private val boostPortsKey = stringPreferencesKey("boost_ports")
     private val showConnectionLatencyKey = booleanPreferencesKey("show_connection_latency")
+    private val lockWhenIdleKey = booleanPreferencesKey("lock_when_idle")
     private val successfulSessionsKey = intPreferencesKey("successful_sessions")
     private val firstUseAtKey = longPreferencesKey("first_use_at")
     private val reviewPromptedKey = booleanPreferencesKey("review_prompted")
@@ -599,6 +600,15 @@ object SettingsStore {
     /** Advanced: show sessions' round trip to the server. Off by default. */
     val showConnectionLatency: Flow<Boolean> by lazy {
         dataStore.data.map { prefs -> prefs[showConnectionLatencyKey] ?: false }.distinctUntilChanged()
+    }
+
+    /** Off by default: also lock after the lock timeout without taps or typing while the app is open. */
+    val lockWhenIdle: Flow<Boolean> by lazy {
+        dataStore.data.map { prefs -> prefs[lockWhenIdleKey] ?: false }.distinctUntilChanged()
+    }
+
+    suspend fun setLockWhenIdle(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[lockWhenIdleKey] = enabled }
     }
 
     suspend fun setShowConnectionLatency(enabled: Boolean) {

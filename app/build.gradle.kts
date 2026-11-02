@@ -81,8 +81,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1204
-        versionName = "0.12.4"
+        versionCode = 1300
+        versionName = "0.13.0"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         ndk {
             abiFilters += releaseAbiFilters
@@ -248,7 +248,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.02.01")
+    val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
@@ -259,7 +259,7 @@ dependencies {
     implementation("androidx.compose.material3.adaptive:adaptive:1.0.0")
     implementation("androidx.compose.material3.adaptive:adaptive-layout:1.0.0")
     implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.compose.material:material-icons-extended:1.6.1")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")

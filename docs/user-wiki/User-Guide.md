@@ -147,9 +147,9 @@ Settings includes:
 - Terminal emulation (`xterm` or `vt100`)
 - Selection mode (`Natural` or `Block`)
 - Security:
-  - PIN
+  - PIN (at least 6 digits)
   - biometric unlock (requires PIN)
-  - lock timeout
+  - lock timeout, and "Lock when idle" to also lock after that long without a tap or key press while the app is open
   - host key prompt controls
 - Port forward auto-start
 - Boost (see below)

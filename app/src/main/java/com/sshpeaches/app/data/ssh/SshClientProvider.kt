@@ -519,12 +519,14 @@ object SshClientProvider {
 
     private fun androidHostKeyPriority(name: String): Int {
         val lower = name.lowercase()
+        // Plain ssh-rsa signs with SHA-1: a new host uses it only when it offers nothing else. Hosts already known
+        // keep the algorithm of their saved key (findExistingAlgorithms).
         return when {
             lower == "rsa-sha2-512" -> 0
             lower == "rsa-sha2-256" -> 1
-            lower.contains("rsa") -> 2
-            lower.contains("ecdsa") -> 3
-            lower.contains("ed25519") || lower.contains("eddsa") -> 4
+            lower.contains("ecdsa") -> 2
+            lower.contains("ed25519") || lower.contains("eddsa") -> 3
+            lower.contains("rsa") -> 4
             else -> 5
         }
     }

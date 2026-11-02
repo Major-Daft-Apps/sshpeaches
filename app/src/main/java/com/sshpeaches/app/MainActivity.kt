@@ -398,6 +398,7 @@ class MainActivity : FragmentActivity() {
             val fileTransferLists by sessionService?.fileTransfersFlow()
                 ?.collectAsStateWithLifecycle() ?: emptyFileTransferListsState
             val showConnectionLatency by SettingsStore.showConnectionLatency.collectAsStateWithLifecycle(initialValue = false)
+            val lockWhenIdle by SettingsStore.lockWhenIdle.collectAsStateWithLifecycle(initialValue = false)
             val emptyLatenciesState: State<Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency>> =
                 remember { mutableStateOf(emptyMap()) }
             val connectionLatencies by sessionService?.connectionLatencyFlow()
@@ -800,6 +801,9 @@ class MainActivity : FragmentActivity() {
                         onShowConnectionLatencyToggle = { enabled ->
                             lifecycleScope.launch { SettingsStore.setShowConnectionLatency(enabled) }
                         },
+                        onLockWhenIdleToggle = { enabled -> lifecycleScope.launch { SettingsStore.setLockWhenIdle(enabled) } },
+                        // Text from the system keyboard reaches the terminal without a touch in this window.
+                        onUserTyped = appViewModel::onUserInteraction,
                         onReturnedHomeFromSession = { lifecycleScope.launch { ReviewPrompt.maybeAsk(this@MainActivity) } },
                         onOpenSessionRequestHandled = { handledSessionId ->
                             val pendingSessionId = requestedOpenSessionHostId.value
@@ -845,6 +849,7 @@ class MainActivity : FragmentActivity() {
                         fileTransferProgresses = fileTransferProgress,
                         fileTransferLists = fileTransferLists,
                         showConnectionLatency = showConnectionLatency,
+                        lockWhenIdle = lockWhenIdle,
                         connectionLatencies = connectionLatencies,
                         hostKeyPrompts = hostKeyPrompts,
                         passwordPrompts = passwordPrompts,

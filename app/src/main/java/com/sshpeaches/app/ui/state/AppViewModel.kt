@@ -92,6 +92,11 @@ class AppViewModel(
     private val autoReconnectFlow = MutableStateFlow(true)
     private var lockTimerJob: Job? = null
     private var appInBackground: Boolean = false
+    // Lock when idle (Security setting, off by default): after the lock timeout (a minute at least) without a tap, a
+    // key or typed text, the app locks while open too, as it does in the background.
+    private var lockWhenIdle = false
+    private var idleLockJob: Job? = null
+    private var idleLockRestartedAt = 0L
 
     init {
         viewModelScope.launch {
@@ -153,6 +158,16 @@ class AppViewModel(
             SettingsStore.lockTimeout.collect { timeout ->
                 lockTimeoutFlow.value = timeout
             }
+        }
+        viewModelScope.launch {
+            SettingsStore.lockWhenIdle.collect { enabled ->
+                lockWhenIdle = enabled
+                restartIdleLock(force = true)
+            }
+        }
+        viewModelScope.launch {
+            // Unlocking starts the idle clock; locking stops it.
+            lockedFlow.collect { restartIdleLock(force = true) }
         }
         viewModelScope.launch {
             SettingsStore.terminalEmulation.collect { value ->
@@ -1520,13 +1535,31 @@ class AppViewModel(
         message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
     fun onUserInteraction() {
-        logAction("onUserInteraction", "locked=${lockedFlow.value}")
-        logResult("onUserInteraction", true)
+        restartIdleLock()
+    }
+
+    private fun restartIdleLock(force: Boolean = false) {
+        if (!lockWhenIdle || appInBackground || lockedFlow.value || !SecurityManager.isPinSet()) {
+            idleLockJob?.cancel()
+            idleLockJob = null
+            return
+        }
+        // Every touch lands here: restarting the timer once a second is plenty.
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force && idleLockJob?.isActive == true && now - idleLockRestartedAt < IDLE_LOCK_RESTART_MIN_MS) return
+        idleLockRestartedAt = now
+        val idleMillis = maxOf(lockTimeoutDuration(lockTimeoutFlow.value) ?: return, IDLE_LOCK_MIN_MS)
+        idleLockJob?.cancel()
+        idleLockJob = viewModelScope.launch {
+            delay(idleMillis)
+            if (lockWhenIdle && !appInBackground && !lockedFlow.value) lockApp()
+        }
     }
 
     fun onAppBackgrounded() {
         logAction("onAppBackgrounded", "locked=${lockedFlow.value}")
         appInBackground = true
+        restartIdleLock()
         if (!lockedFlow.value) {
             SecurityManager.markBackgrounded(lockTimeoutDuration(lockTimeoutFlow.value))
             scheduleLockTimer(lockTimeoutFlow.value)
@@ -1544,6 +1577,7 @@ class AppViewModel(
         if (SecurityManager.lockIfBackgroundTimeoutElapsed()) {
             lockedFlow.value = true
         }
+        restartIdleLock(force = true)
         logResult("onAppForegrounded", true, "locked=${lockedFlow.value}")
     }
 
@@ -1880,6 +1914,8 @@ class AppViewModel(
     }
 
     companion object {
+        private const val IDLE_LOCK_MIN_MS = 60_000L
+        private const val IDLE_LOCK_RESTART_MIN_MS = 1_000L
         private val byLastUsed = compareByDescending<HostConnection> { it.lastUsedEpochMillis ?: 0L }
         private val byName = compareBy<HostConnection> { it.name.lowercase() }
 

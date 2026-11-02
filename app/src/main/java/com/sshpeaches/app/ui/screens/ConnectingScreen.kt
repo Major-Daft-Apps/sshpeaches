@@ -299,6 +299,13 @@ private typealias RemoteDirectoryEntry =
 private val sessionTerminalFontSizes = mutableMapOf<String, Float>()
 
 @OptIn(ExperimentalLayoutApi::class)
+/**
+ * Called when the user types into a terminal with the system keyboard, whose text reaches the app without a touch in
+ * its window (the idle lock counts it as activity). A composition local rather than one more parameter: adding a
+ * parameter to ConnectingScreen made its compiled code read the wrong arguments (an NPE on remoteDirectory).
+ */
+val LocalOnUserTyped = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
 @Composable
 fun ConnectingScreen(
     request: QuickConnectRequest?,
@@ -353,6 +360,7 @@ fun ConnectingScreen(
 ) {
     // Dialogs restored after the activity is recreated would open above the lock screen: none while locked.
     val appLocked = SecurityManager.lockState().collectAsState().value
+    val onUserTyped = LocalOnUserTyped.current
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1744,6 +1752,7 @@ fun ConnectingScreen(
 
     fun handleTerminalImeText(text: String) {
         if (text.isEmpty()) return
+        onUserTyped()
         val modifiers = pendingModifiers
         // Keyboards insert their clipboard bar's suggestions as typed text; one holding several lines or escape
         // sequences gets the paste path (bracketed, control characters stripped) instead of running line by line.

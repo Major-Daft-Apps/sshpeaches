@@ -4,6 +4,16 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.13.0 (1300)
+
+Release date: 2026-11-02
+
+- Jetpack Compose updated to 1.7.8 and Material 3 to 1.3.1 (the app ran Compose 1.7.0); among other fixes, an occasional crash inside Compose when the screen rotated.
+- New **Settings** -> **Security** -> **Lock when idle** (off by default): with a PIN set, the app also locks after the lock timeout (a minute at least) without a tap, key press or typed text while it's open, not only after being in the background.
+- New PINs need at least 6 digits; PINs already set keep working.
+- Hosts connected to for the first time prefer ECDSA and Ed25519 host keys over RSA keys signed with SHA-1 (plain ssh-rsa); RSA keys with SHA-2 still come first, and hosts already known keep their saved key.
+- Snippet exports no longer carry two settings that never did anything ("auto-run on hosts" and "require confirmation"); a snippet runs on connect when it's chosen as a host's startup command.
+
 ## 0.12.4 (1204)
 
 Release date: 2026-10-31
