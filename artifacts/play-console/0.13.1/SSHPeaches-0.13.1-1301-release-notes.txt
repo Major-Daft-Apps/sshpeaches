@@ -1,0 +1,4 @@
+What's new in 0.13.1
+
+- Works on phones with 16 KB memory pages (newer Android devices).
+- Everything from 0.13.0: optional lock when idle, 6-digit PINs for new PINs, updated Jetpack Compose.

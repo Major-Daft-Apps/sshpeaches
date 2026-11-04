@@ -1,0 +1,5 @@
+What's new in 0.14.0
+
+- With a PIN set, saved passwords and keys are tied to this phone's secure hardware: a copy of the app's data can't be unlocked anywhere else.
+- Optional: also require this phone's screen lock to open them (Settings > Security).
+- Works on phones with 16 KB memory pages.
