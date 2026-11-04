@@ -1481,6 +1481,11 @@ class AppViewModel(
                     "Incorrect PIN"
                 }
             }
+        } catch (_: SecurityManager.ScreenLockRequiredException) {
+            // MainActivity confirms the phone's screen lock and tries the same PIN again.
+            SCREEN_LOCK_NEEDED
+        } catch (lost: SecurityManager.ScreenLockKeyLostException) {
+            lost.message
         } catch (t: Throwable) {
             TelemetryInitializer.recordNonFatal("unlockWithPin", t)
             UiDebugLog.error("unlockWithPin", t)
@@ -1914,6 +1919,8 @@ class AppViewModel(
     }
 
     companion object {
+        /** unlockWithPin's answer when the phone's screen lock has to be confirmed first. */
+        const val SCREEN_LOCK_NEEDED = "screen-lock-needed"
         private const val IDLE_LOCK_MIN_MS = 60_000L
         private const val IDLE_LOCK_RESTART_MIN_MS = 1_000L
         private val byLastUsed = compareByDescending<HostConnection> { it.lastUsedEpochMillis ?: 0L }

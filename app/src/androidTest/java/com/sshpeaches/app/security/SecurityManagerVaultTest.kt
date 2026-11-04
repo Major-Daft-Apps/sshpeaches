@@ -70,6 +70,95 @@ class SecurityManagerVaultTest {
     }
 
     @Test
+    fun aNewPinIsBoundToTheKeystore() {
+        val host = hostFixture("bound-pin-host")
+        AppStateSeeder.seedHost(host, password = "bound-secret")
+        SecurityManager.setPin("246813")
+
+        assertTrue(SecurityManager.isPinBoundToKeystore())
+        SecurityManager.lock()
+        assertFalse(SecurityManager.verifyPin("135792"))
+        assertTrue(SecurityManager.verifyPin("246813"))
+        assertEquals("bound-secret", SecurityManager.getHostPassword(host.id))
+    }
+
+    @Test
+    fun withoutTheKeystoreKeyTheRightPinOpensNothing() {
+        // What a copy of the app's files on another device amounts to: the PIN alone can't unwrap the vault.
+        SecurityManager.setPin("246813")
+        SecurityManager.lock()
+        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry("sshpeaches_vault_pin_binding")
+
+        assertFalse(runCatching { SecurityManager.verifyPin("246813") }.getOrDefault(false))
+        assertTrue(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun aVaultFromBeforeTheKeystoreBindingIsUpgradedOnTheNextUnlock() {
+        val host = hostFixture("upgraded-pin-host")
+        AppStateSeeder.seedHost(host, password = "kept-secret")
+        SecurityManager.setPin("2468")
+        SecurityManager.rewrapPinWithoutKeystoreForTests("2468")
+        assertFalse(SecurityManager.isPinBoundToKeystore())
+        SecurityManager.lock()
+
+        assertTrue(SecurityManager.verifyPin("2468"))
+        assertTrue(SecurityManager.isPinBoundToKeystore())
+        assertEquals("kept-secret", SecurityManager.getHostPassword(host.id))
+        SecurityManager.lock()
+        assertTrue("the upgraded vault opens again", SecurityManager.verifyPin("2468"))
+    }
+
+    private fun deviceIsSecure(): Boolean =
+        (InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(android.content.Context.KEYGUARD_SERVICE)
+            as android.app.KeyguardManager).isDeviceSecure
+
+    @Test
+    fun theScreenLockSealNeedsAScreenLockOnThePhone() {
+        org.junit.Assume.assumeFalse("the device has a screen lock", deviceIsSecure())
+        SecurityManager.setPin("246813")
+        assertFalse(SecurityManager.canRequireScreenLock())
+        assertTrue(runCatching { SecurityManager.setScreenLockRequired(true) }.isFailure)
+        assertFalse(SecurityManager.screenLockRequired().value)
+        SecurityManager.lock()
+        assertTrue("the PIN still opens the vault", SecurityManager.verifyPin("246813"))
+    }
+
+    @Test
+    fun withTheScreenLockSealThePinOpensTheVaultOnlyThroughItsKey() {
+        // Needs a screen lock confirmed in the last few minutes (the test lane unlocks the emulator with its PIN).
+        org.junit.Assume.assumeTrue("the device has no screen lock", deviceIsSecure())
+        val host = hostFixture("sealed-host")
+        AppStateSeeder.seedHost(host, password = "sealed-secret")
+        SecurityManager.setPin("246813")
+        SecurityManager.setScreenLockRequired(true)
+        assertTrue(SecurityManager.screenLockRequired().value)
+        SecurityManager.lock()
+
+        assertFalse(SecurityManager.verifyPin("135792"))
+        assertTrue(SecurityManager.verifyPin("246813"))
+        assertEquals("sealed-secret", SecurityManager.getHostPassword(host.id))
+
+        // Removing the phone's screen lock destroys this key: the right PIN then opens nothing.
+        SecurityManager.lock()
+        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry("sshpeaches_vault_screen_lock")
+        val lost = runCatching { SecurityManager.verifyPin("246813") }.exceptionOrNull()
+        assertTrue("$lost", lost is SecurityManager.ScreenLockKeyLostException)
+        assertTrue(SecurityManager.isLocked())
+    }
+
+    @Test
+    fun changingThePinTurnsTheScreenLockSealOff() {
+        org.junit.Assume.assumeTrue("the device has no screen lock", deviceIsSecure())
+        SecurityManager.setPin("246813")
+        SecurityManager.setScreenLockRequired(true)
+        SecurityManager.setPin("975310")
+        assertFalse(SecurityManager.screenLockRequired().value)
+        SecurityManager.lock()
+        assertTrue(SecurityManager.verifyPin("975310"))
+    }
+
+    @Test
     fun setPinStoresNoFastPinHash() {
         SecurityManager.setPin("2468")
 

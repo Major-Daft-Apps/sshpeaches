@@ -22,9 +22,20 @@ for arch in amd64 arm64; do
   manifest="$manifest,\"$arch\":{\"sha256\":\"$sum\",\"size\":$size}"
 done
 echo "$manifest}" > "$ASSETS/manifest.json"
+# max-page-size: 16 KB-aligned segments, which Play requires (devices with 16 KB memory pages can't load the
+# library otherwise); NDK 27's linker still defaults to 4 KB.
 CGO_ENABLED=1 gomobile bind -target=android/arm64,android/amd64 -androidapi 26 \
-  -javapkg com.majordaftapps.sshpeaches.boost -trimpath -ldflags "-s -w" \
+  -javapkg com.majordaftapps.sshpeaches.boost -trimpath -ldflags "-s -w -extldflags=-Wl,-z,max-page-size=16384" \
   -o "$ROOT/app/libs/boostclient.aar" ./boostclient
 rm -f "$ROOT/app/libs/boostclient-sources.jar"
+# Refuse a library Play would flag: every loadable segment must be 16 KB-aligned.
+check=$(mktemp -d)
+unzip -q -o "$ROOT/app/libs/boostclient.aar" 'jni/*' -d "$check"
+for so in "$check"/jni/*/libgojni.so; do
+  if readelf -lW "$so" | awk '$1=="LOAD" && $NF!="0x4000"{bad=1} END{exit !bad}'; then
+    echo "error: $so is not 16 KB-aligned" >&2; rm -rf "$check"; exit 1
+  fi
+done
+rm -rf "$check"
 cat "$ASSETS/manifest.json"
 ls -la "$ASSETS" "$ROOT/app/libs/boostclient.aar"

@@ -176,6 +176,48 @@ class MainActivity : FragmentActivity() {
         UiDebugLog.result("setupBiometricPrompt", true, "biometricAvailable=true")
     }
 
+    /**
+     * Android's own screen-lock prompt (the phone's PIN, pattern or password, or a strong fingerprint), for the
+     * "Require this phone's screen lock" seal on saved secrets. True once confirmed.
+     */
+    private suspend fun confirmScreenLock(title: String): Boolean =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    if (continuation.isActive) continuation.resumeWith(Result.success(true))
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    if (continuation.isActive) continuation.resumeWith(Result.success(false))
+                }
+            })
+            val info = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle("Confirm this phone's screen lock to open saved passwords and keys")
+                .apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        setAllowedAuthenticators(
+                            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        setDeviceCredentialAllowed(true)
+                    }
+                }
+                .build()
+            runCatching { prompt.authenticate(info) }
+                .onFailure { if (continuation.isActive) continuation.resumeWith(Result.success(false)) }
+            continuation.invokeOnCancellation { runCatching { prompt.cancelAuthentication() } }
+        }
+
+    /** Runs [action]; when the screen-lock seal needs the phone's screen lock, confirms it and runs it again. */
+    private suspend fun withScreenLockConfirmed(title: String, action: () -> Unit): Result<Unit> {
+        val first = runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { action() } }
+        if (first.exceptionOrNull() !is SecurityManager.ScreenLockRequiredException) return first
+        if (!confirmScreenLock(title)) return Result.failure(SecurityManager.ScreenLockRequiredException())
+        return runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { action() } }
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         val granted = ContextCompat.checkSelfPermission(
@@ -226,11 +268,10 @@ class MainActivity : FragmentActivity() {
         }
 
         val foregroundServiceTypeGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val connectedDeviceGranted = ContextCompat.checkSelfPermission(
+            ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
+                Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE
             ) == PackageManager.PERMISSION_GRANTED
-            connectedDeviceGranted
         } else {
             true
         }
@@ -399,6 +440,7 @@ class MainActivity : FragmentActivity() {
                 ?.collectAsStateWithLifecycle() ?: emptyFileTransferListsState
             val showConnectionLatency by SettingsStore.showConnectionLatency.collectAsStateWithLifecycle(initialValue = false)
             val lockWhenIdle by SettingsStore.lockWhenIdle.collectAsStateWithLifecycle(initialValue = false)
+            val screenLockRequired by SecurityManager.screenLockRequired().collectAsStateWithLifecycle()
             val emptyLatenciesState: State<Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency>> =
                 remember { mutableStateOf(emptyMap()) }
             val connectionLatencies by sessionService?.connectionLatencyFlow()
@@ -662,7 +704,23 @@ class MainActivity : FragmentActivity() {
                         onSetPin = viewModel::setPin,
                         onClearPin = viewModel::clearPin,
                         onLockApp = viewModel::lockApp,
-                        onUnlockWithPin = viewModel::unlockWithPin,
+                        onUnlockWithPin = { pin ->
+                            val first = viewModel.unlockWithPin(pin)
+                            if (first != AppViewModel.SCREEN_LOCK_NEEDED) {
+                                first
+                            } else if (confirmScreenLock("Unlock SSHPeaches")) {
+                                viewModel.unlockWithPin(pin).let { retry ->
+                                    // null is success; still needing the screen lock is a failure with a message.
+                                    if (retry == AppViewModel.SCREEN_LOCK_NEEDED) {
+                                        "Confirm this phone's screen lock to open saved secrets."
+                                    } else {
+                                        retry
+                                    }
+                                }
+                            } else {
+                                "Confirm this phone's screen lock to open saved secrets."
+                            }
+                        },
                         onSecurityNoticeShown = viewModel::consumeSecurityNotice,
                         onBiometricUnlock = {
                         UiDebugLog.action("uiBiometricUnlock", "promptReady=${biometricPrompt != null && biometricPromptInfo != null}")
@@ -802,6 +860,19 @@ class MainActivity : FragmentActivity() {
                             lifecycleScope.launch { SettingsStore.setShowConnectionLatency(enabled) }
                         },
                         onLockWhenIdleToggle = { enabled -> lifecycleScope.launch { SettingsStore.setLockWhenIdle(enabled) } },
+                        onRequireScreenLockToggle = { enabled ->
+                            lifecycleScope.launch {
+                                withScreenLockConfirmed(if (enabled) "Require screen lock" else "Stop requiring screen lock") {
+                                    SecurityManager.setScreenLockRequired(enabled)
+                                }.onFailure { error ->
+                                    android.widget.Toast.makeText(
+                                        this@MainActivity,
+                                        error.message ?: "Couldn't change the screen lock requirement.",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        },
                         // Text from the system keyboard reaches the terminal without a touch in this window.
                         onUserTyped = appViewModel::onUserInteraction,
                         onReturnedHomeFromSession = { lifecycleScope.launch { ReviewPrompt.maybeAsk(this@MainActivity) } },
@@ -850,6 +921,8 @@ class MainActivity : FragmentActivity() {
                         fileTransferLists = fileTransferLists,
                         showConnectionLatency = showConnectionLatency,
                         lockWhenIdle = lockWhenIdle,
+                        screenLockRequired = screenLockRequired,
+                        canRequireScreenLock = uiState.pinConfigured && SecurityManager.canRequireScreenLock(),
                         connectionLatencies = connectionLatencies,
                         hostKeyPrompts = hostKeyPrompts,
                         passwordPrompts = passwordPrompts,

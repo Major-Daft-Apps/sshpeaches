@@ -4,6 +4,20 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+## 0.14.0 (1400)
+
+Release date: 2026-11-04
+
+- The session service declares the foreground service type that fits it, `specialUse` (with the explanation Google Play asks for), instead of `connectedDevice`, which is for Bluetooth, USB and NFC hardware. Play rejected the 0.13.0 update over it. Nothing changes in use: the service runs only while a session you opened is connected, with its notification and Disconnect action.
+- **Saved secrets are tied to this phone's secure hardware.** With a PIN set, the key that opens the vault of saved passwords, private keys and passphrases is now derived through a key that never leaves Android Keystore (the phone's secure hardware where it has one), not from the PIN alone. A copy of the app's data is useless anywhere else, because every PIN guess has to run on this phone; on Android 9 and later the key also works only while the phone is unlocked. Existing vaults switch over the next time the right PIN is entered; biometric unlock is unchanged.
+- New **Settings** -> **Security** -> **Require this phone's screen lock** (off by default, needs a PIN and a screen lock on the phone): saved secrets then also need the phone's screen lock or a strong fingerprint used in the last 5 minutes; otherwise Android asks for it before the PIN is checked. Guesses at the screen lock are limited by the phone's secure hardware. Removing the phone's screen lock destroys the key and with it every saved secret (the setting warns before turning on); changing the SSHPeaches PIN turns it off.
+
+## 0.13.1 (1301)
+
+Release date: 2026-11-02
+
+- The Boost client library is built with 16 KB-aligned segments, as Google Play requires: phones with 16 KB memory pages could fail to install or start the app (every other native library already was). `tools/boost/build.sh` now refuses a library that isn't.
+
 ## 0.13.0 (1300)
 
 Release date: 2026-11-02

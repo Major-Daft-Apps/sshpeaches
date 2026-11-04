@@ -1691,6 +1691,10 @@ class ConnectingScreenTest {
         }
 
         composeRule.onNodeWithTag(UiTestTags.connectingCompactKey(0)).performClick()
+        // The confirmation opens once the saved password has been looked up (slow under load).
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_CONFIRM).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag(UiTestTags.CONNECTING_INSERT_PASSWORD_CONFIRM)
             .assertIsDisplayed()
             .performClick()

@@ -94,7 +94,7 @@ class SecuritySettingsTest {
         composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_PIN_INPUT).performTextInput("2468")
         composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_UNLOCK_BUTTON).performClick()
 
-        composeRule.waitUntil(15_000) {
+        composeRule.waitUntil(30_000) {
             composeRule.onAllNodesWithTag(UiTestTags.LOCK_SCREEN_OVERLAY).fetchSemanticsNodes().isEmpty()
         }
     }
@@ -136,6 +136,18 @@ class SecuritySettingsTest {
                 true
             }.getOrDefault(false)
         }
+    }
+
+    @Test
+    fun requireScreenLockIsUnavailableWithoutAScreenLockOnThePhone() {
+        val keyguard = composeRule.activity.getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+        org.junit.Assume.assumeFalse("the device has a screen lock", keyguard.isDeviceSecure)
+        AppStateSeeder.configurePin(pin = "246813", locked = false)
+        composeRule.activityRule.scenario.recreate()
+        openSettings()
+        revealSecurityControl(UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_SWITCH)
+        composeRule.onNodeWithTag(UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_SWITCH).assertIsNotEnabled().assertIsOff()
+        composeRule.onNodeWithText("Needs a PIN in SSHPeaches and a screen lock on this phone").assertIsDisplayed()
     }
 
     private fun openSettings() {

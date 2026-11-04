@@ -155,6 +155,9 @@ fun SettingsScreen(
     onOpenAdvancedSettings: () -> Unit = {},
     lockWhenIdle: Boolean = false,
     onLockWhenIdleToggle: (Boolean) -> Unit = {},
+    screenLockRequired: Boolean = false,
+    canRequireScreenLock: Boolean = false,
+    onRequireScreenLockToggle: (Boolean) -> Unit = {},
     pinConfigured: Boolean,
     isLocked: Boolean,
     biometricAvailable: Boolean,
@@ -200,6 +203,7 @@ fun SettingsScreen(
         TerminalBellMode.SHOW_NOTIFICATION
     )
     val showPinDialog = remember { mutableStateOf(false) }
+    val showRequireScreenLockDialog = remember { mutableStateOf(false) }
     val pinEntry = remember { mutableStateOf("") }
     val pinRevealIndex = remember { mutableIntStateOf(-1) }
     val confirmPinEntry = remember { mutableStateOf("") }
@@ -812,6 +816,31 @@ fun SettingsScreen(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Require this phone's screen lock")
+                            Text(
+                                if (canRequireScreenLock || screenLockRequired) {
+                                    "Saved passwords and keys open only after this phone's screen lock or fingerprint, as well as the PIN"
+                                } else {
+                                    "Needs a PIN in SSHPeaches and a screen lock on this phone"
+                                },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = screenLockRequired,
+                            onCheckedChange = { enabled ->
+                                if (enabled) showRequireScreenLockDialog.value = true else onRequireScreenLockToggle(false)
+                            },
+                            enabled = screenLockRequired || canRequireScreenLock,
+                            modifier = Modifier.testTag(UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_SWITCH)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
@@ -1414,6 +1443,34 @@ fun SettingsScreen(
                     importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
                     importPassphraseError.value = null
                 }) { Text("Cancel") }
+            }
+        )
+    }
+    if (showRequireScreenLockDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showRequireScreenLockDialog.value = false },
+            modifier = Modifier.testTag(UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_DIALOG),
+            title = { Text("Require this phone's screen lock?") },
+            text = {
+                Text(
+                    "Saved passwords and keys will open only if this phone's screen lock or fingerprint was used in the " +
+                        "last few minutes, as well as your PIN. Guesses at the screen lock are limited by the phone's " +
+                        "secure hardware.\n\nIf you ever remove this phone's screen lock, Android destroys the key, and " +
+                        "every saved password and key in SSHPeaches is lost for good. Changing your SSHPeaches PIN turns " +
+                        "this off."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRequireScreenLockDialog.value = false
+                        onRequireScreenLockToggle(true)
+                    },
+                    modifier = Modifier.testTag(UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_CONFIRM)
+                ) { Text("Require it") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRequireScreenLockDialog.value = false }) { Text("Cancel") }
             }
         )
     }

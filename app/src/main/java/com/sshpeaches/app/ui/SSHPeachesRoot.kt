@@ -342,6 +342,7 @@ data class SSHPeachesRootActions(
     val onClearFinishedTransfers: (sessionId: String) -> Unit = {},
     val onShowConnectionLatencyToggle: (Boolean) -> Unit = {},
     val onLockWhenIdleToggle: (Boolean) -> Unit = {},
+    val onRequireScreenLockToggle: (Boolean) -> Unit = {},
     /** The user typed into a terminal with the system keyboard (counts as activity for the idle lock). */
     val onUserTyped: () -> Unit = {},
     /** Back on Home after a session: a good moment for the one-time review prompt. */
@@ -360,6 +361,8 @@ data class SSHPeachesRootRuntime(
     val fileTransferLists: Map<String, List<FileTransferProgress>> = emptyMap(),
     val showConnectionLatency: Boolean = false,
     val lockWhenIdle: Boolean = false,
+    val screenLockRequired: Boolean = false,
+    val canRequireScreenLock: Boolean = false,
     val connectionLatencies: Map<String, com.majordaftapps.sshpeaches.app.service.ConnectionLatency> = emptyMap(),
     val hostKeyPrompts: List<HostKeyPrompt>,
     val passwordPrompts: List<PasswordPrompt>,
@@ -525,6 +528,9 @@ fun SSHPeachesRoot(
     val onShowConnectionLatencyToggle = actions.onShowConnectionLatencyToggle
     val lockWhenIdle = runtime.lockWhenIdle
     val onLockWhenIdleToggle = actions.onLockWhenIdleToggle
+    val screenLockRequired = runtime.screenLockRequired
+    val canRequireScreenLock = runtime.canRequireScreenLock
+    val onRequireScreenLockToggle = actions.onRequireScreenLockToggle
     val onUserTyped = actions.onUserTyped
     val hostKeyPrompts = runtime.hostKeyPrompts
     val passwordPrompts = runtime.passwordPrompts
@@ -2581,6 +2587,9 @@ fun SSHPeachesRoot(
                             SettingsScreen(
                                 lockWhenIdle = lockWhenIdle,
                                 onLockWhenIdleToggle = onLockWhenIdleToggle,
+                                screenLockRequired = screenLockRequired,
+                                canRequireScreenLock = canRequireScreenLock,
+                                onRequireScreenLockToggle = onRequireScreenLockToggle,
                                 incomingImportUri = incomingImportUri,
                                 onIncomingImportHandled = onIncomingImportHandled,
                                 currentTheme = uiState.themeMode,

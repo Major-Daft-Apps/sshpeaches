@@ -200,6 +200,7 @@ private fun settingsCategoryForControl(tag: String): String? = when (tag) {
     UiTestTags.SETTINGS_BUILTIN_KEYBOARD_SWITCH -> "Terminal"
     UiTestTags.SETTINGS_BIOMETRIC_SWITCH,
     UiTestTags.SETTINGS_LOCK_WHEN_IDLE_SWITCH,
+    UiTestTags.SETTINGS_REQUIRE_SCREEN_LOCK_SWITCH,
     UiTestTags.SETTINGS_PIN_STATUS_TEXT,
     UiTestTags.SETTINGS_SET_PIN_BUTTON,
     UiTestTags.SETTINGS_DISABLE_PIN_BUTTON,

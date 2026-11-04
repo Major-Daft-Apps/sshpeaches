@@ -46,6 +46,18 @@ object SecurityManager {
     private const val KEY_VAULT_PIN_SALT = "vault_pin_salt"
     private const val KEY_VAULT_PIN_ITERATIONS = "vault_pin_iter"
     private const val KEY_VAULT_PIN_WRAPPED = "vault_pin_wrapped"
+    // How the PIN unwraps the vault key: PIN_BINDING_NONE (PBKDF2 of the PIN alone, before 0.14) or
+    // PIN_BINDING_KEYSTORE (that, through an HMAC key in Android Keystore; see bindPinKey).
+    private const val KEY_VAULT_PIN_BINDING = "vault_pin_binding"
+    private const val PIN_BINDING_NONE = 0
+    private const val PIN_BINDING_KEYSTORE = 1
+    private const val PIN_BINDING_KEY_ALIAS = "sshpeaches_vault_pin_binding"
+    // "Require this phone's screen lock" (off by default): the stored PIN wrap is sealed with an AES key that works
+    // only within SCREEN_LOCK_VALIDITY_SECONDS of the phone's screen lock (or a strong biometric). Guesses at the
+    // screen lock are rate limited by the phone's secure hardware; removing the screen lock destroys the key.
+    private const val KEY_VAULT_PIN_SCREEN_LOCK = "vault_pin_screen_lock"
+    private const val SCREEN_LOCK_KEY_ALIAS = "sshpeaches_vault_screen_lock"
+    private const val SCREEN_LOCK_VALIDITY_SECONDS = 300
     private const val KEY_VAULT_BIOMETRIC_WRAPPED = "vault_biometric_wrapped"
     // Set when the biometric key stopped working (a fingerprint was added or removed): the vault isn't wrapped for
     // biometrics again until the user turns biometric unlock back on (rearmBiometric).
@@ -98,6 +110,7 @@ object SecurityManager {
     @Volatile
     private var initCompleteLatch = CountDownLatch(1)
     private val lockState = MutableStateFlow(false)
+    private val screenLockRequiredState = MutableStateFlow(false)
     private val pinConfiguredState = MutableStateFlow(false)
     private val secureStorageResetState = MutableStateFlow(false)
     @Volatile
@@ -200,6 +213,7 @@ object SecurityManager {
         }
         val legacySecrets = if (vaultBacked) emptyMap() else collectLegacySecrets(securePrefs)
         writeVault(securePrefs, pin, vaultKey, legacySecrets)
+        forgetScreenLockSeal()
         storeUnlockedVaultKey(vaultKey)
         setPinConfigured(true)
         lockState.value = false
@@ -255,9 +269,29 @@ object SecurityManager {
             remove(KEY_PIN_SALT)
         }
         storeUnlockedVaultKey(vaultKey)
+        upgradePinBinding(securePrefs, vaultKey, pin)
         ensureBiometricWrappedVaultKey(securePrefs, vaultKey)
         lockState.value = false
         return true
+    }
+
+    /** A vault from before 0.14 (PIN alone) is rewrapped through the Keystore key on the first right PIN. */
+    private fun upgradePinBinding(securePrefs: SharedPreferences, vaultKey: ByteArray, pin: String) {
+        if (securePrefs.getInt(KEY_VAULT_PIN_BINDING, PIN_BINDING_NONE) == PIN_BINDING_KEYSTORE) return
+        val wrapped = wrapVaultKeyWithPin(vaultKey, pin)
+        if (wrapped.binding != PIN_BINDING_KEYSTORE) return
+        val stored = if (securePrefs.getBoolean(KEY_VAULT_PIN_SCREEN_LOCK, false)) {
+            // The screen lock was just confirmed to unseal it, so sealing again works; if not, keep the old wrap.
+            runCatching { sealWithScreenLock(wrapped.payload) }.getOrNull() ?: return
+        } else {
+            wrapped.payload
+        }
+        securePrefs.edit(commit = true) {
+            putString(KEY_VAULT_PIN_SALT, wrapped.salt)
+            putInt(KEY_VAULT_PIN_ITERATIONS, wrapped.iterations)
+            putString(KEY_VAULT_PIN_WRAPPED, stored)
+            putInt(KEY_VAULT_PIN_BINDING, wrapped.binding)
+        }
     }
 
     fun prepareBiometricUnlockCipher(): Cipher? {
@@ -526,6 +560,10 @@ object SecurityManager {
             putString(KEY_VAULT_PIN_SALT, wrappedWithPin.salt)
             putInt(KEY_VAULT_PIN_ITERATIONS, wrappedWithPin.iterations)
             putString(KEY_VAULT_PIN_WRAPPED, wrappedWithPin.payload)
+            putInt(KEY_VAULT_PIN_BINDING, wrappedWithPin.binding)
+            // A new PIN starts without the screen-lock seal (it may be turned on again right away), so changing the
+            // PIN can't fail on an expired screen-lock window.
+            remove(KEY_VAULT_PIN_SCREEN_LOCK)
             if (wrappedWithBiometric != null) {
                 putString(KEY_VAULT_BIOMETRIC_WRAPPED, wrappedWithBiometric)
             } else {
@@ -568,8 +606,11 @@ object SecurityManager {
             remove(KEY_VAULT_PIN_SALT)
             remove(KEY_VAULT_PIN_ITERATIONS)
             remove(KEY_VAULT_PIN_WRAPPED)
+            remove(KEY_VAULT_PIN_BINDING)
+            remove(KEY_VAULT_PIN_SCREEN_LOCK)
             remove(KEY_VAULT_BIOMETRIC_WRAPPED)
         }
+        forgetScreenLockSeal()
     }
 
     private fun removePinAndVaultMetadata(securePrefs: SharedPreferences) {
@@ -582,9 +623,18 @@ object SecurityManager {
             remove(KEY_VAULT_PIN_SALT)
             remove(KEY_VAULT_PIN_ITERATIONS)
             remove(KEY_VAULT_PIN_WRAPPED)
+            remove(KEY_VAULT_PIN_BINDING)
+            remove(KEY_VAULT_PIN_SCREEN_LOCK)
             remove(KEY_VAULT_BIOMETRIC_WRAPPED)
             remove(KEY_BIOMETRIC_REVOKED)
         }
+        deleteKeystoreEntry(PIN_BINDING_KEY_ALIAS)
+        forgetScreenLockSeal()
+    }
+
+    private fun forgetScreenLockSeal() {
+        deleteKeystoreEntry(SCREEN_LOCK_KEY_ALIAS)
+        screenLockRequiredState.value = false
     }
 
     private fun ensureBiometricWrappedVaultKey(securePrefs: SharedPreferences, vaultKey: ByteArray) {
@@ -670,13 +720,19 @@ object SecurityManager {
     private fun wrapVaultKeyWithPin(vaultKey: ByteArray, pin: String): PinWrappedVaultKey {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val key = SecretKeySpec(deriveKey(pin, salt, CURRENT_PIN_KDF_ITERATIONS), "AES")
+        val pinKey = deriveKey(pin, salt, CURRENT_PIN_KDF_ITERATIONS)
+        // Without a working Keystore the vault falls back to the PIN alone (as before 0.14) rather than failing.
+        val bound = runCatching { bindPinKey(pinKey, createKey = true) }
+            .onFailure { android.util.Log.w("SecurityManager", "Keystore PIN binding unavailable: ${it.javaClass.simpleName}") }
+            .getOrNull()
+        val key = SecretKeySpec(bound ?: pinKey, "AES")
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
         val encrypted = cipher.doFinal(vaultKey)
         return PinWrappedVaultKey(
             salt = Base64.encodeToString(salt, Base64.NO_WRAP),
             iterations = CURRENT_PIN_KDF_ITERATIONS,
+            binding = if (bound != null) PIN_BINDING_KEYSTORE else PIN_BINDING_NONE,
             payload = Base64.encodeToString(
                 JSONObject().apply {
                     put("v", 1)
@@ -696,21 +752,195 @@ object SecurityManager {
         )
         val iterations = securePrefs.getInt(KEY_VAULT_PIN_ITERATIONS, 0)
         require(iterations == CURRENT_PIN_KDF_ITERATIONS) { "Unsupported vault PIN format." }
-        val payload = String(
-            Base64.decode(
-                securePrefs.getString(KEY_VAULT_PIN_WRAPPED, null)
-                    ?: error("Missing PIN-wrapped vault key."),
-                Base64.NO_WRAP
-            ),
-            StandardCharsets.UTF_8
-        )
+        val stored = securePrefs.getString(KEY_VAULT_PIN_WRAPPED, null) ?: error("Missing PIN-wrapped vault key.")
+        val wrapped = if (securePrefs.getBoolean(KEY_VAULT_PIN_SCREEN_LOCK, false)) unsealWithScreenLock(stored) else stored
+        val payload = String(Base64.decode(wrapped, Base64.NO_WRAP), StandardCharsets.UTF_8)
         val json = JSONObject(payload)
         val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
         val encrypted = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
-        val key = SecretKeySpec(deriveKey(pin, salt, iterations), "AES")
+        val pinKey = deriveKey(pin, salt, iterations)
+        val keyBytes = when (val binding = securePrefs.getInt(KEY_VAULT_PIN_BINDING, PIN_BINDING_NONE)) {
+            PIN_BINDING_NONE -> pinKey
+            // A missing Keystore key throws (not counted as a wrong PIN): the PIN alone can't open this vault.
+            PIN_BINDING_KEYSTORE -> bindPinKey(pinKey, createKey = false)
+            else -> error("Unsupported vault PIN binding $binding.")
+        }
+        val key = SecretKeySpec(keyBytes, "AES")
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
         return cipher.doFinal(encrypted)
+    }
+
+    /**
+     * The key that wraps the vault: HMAC-SHA256 of the PIN's PBKDF2 output under a key that never leaves Android
+     * Keystore (in the secure hardware where the phone has it). A copy of the app's files is then useless anywhere
+     * else, since every PIN guess needs this phone's Keystore; on Android 9+ the key also only works while the phone
+     * is unlocked, so a locked phone can't be made to test guesses either.
+     */
+    private fun bindPinKey(pinKey: ByteArray, createKey: Boolean): ByteArray {
+        val keyStore = loadKeyStore()
+        val existing = keyStore.getKey(PIN_BINDING_KEY_ALIAS, null) as? javax.crypto.SecretKey
+        val bindingKey = existing ?: if (createKey) createPinBindingKey() else error("The Keystore PIN key is missing.")
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(bindingKey)
+        return mac.doFinal(pinKey)
+    }
+
+    private fun createPinBindingKey(): javax.crypto.SecretKey {
+        fun generate(unlockedDeviceRequired: Boolean): javax.crypto.SecretKey {
+            val generator = javax.crypto.KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_HMAC_SHA256, KEYSTORE_NAME)
+            val spec = KeyGenParameterSpec.Builder(PIN_BINDING_KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .apply {
+                    if (unlockedDeviceRequired && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        setUnlockedDeviceRequired(true)
+                    }
+                }
+                .build()
+            generator.init(spec)
+            return generator.generateKey()
+        }
+        // Some devices refuse the unlocked-device restriction; the key itself is the protection that matters.
+        return runCatching { generate(unlockedDeviceRequired = true) }.getOrElse { generate(unlockedDeviceRequired = false) }
+    }
+
+    /** The phone's screen lock has to be confirmed before the app PIN can open saved secrets. */
+    class ScreenLockRequiredException : Exception("Confirm this phone's screen lock to open saved secrets.")
+
+    /** The screen-lock key is gone (the phone's screen lock was removed): the PIN can no longer open saved secrets. */
+    class ScreenLockKeyLostException : Exception(
+        "This phone's screen lock was removed, so saved passwords and keys can no longer be opened. Turn off the PIN " +
+            "in Settings to start over (saved secrets are lost)."
+    )
+
+    fun screenLockRequired(): StateFlow<Boolean> = screenLockRequiredState.asStateFlow()
+
+    /** Whether "Require this phone's screen lock" can be turned on: a PIN vault, and a phone with a secure lock. */
+    fun canRequireScreenLock(): Boolean {
+        val context = appContext ?: return false
+        val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager ?: return false
+        return keyguard.isDeviceSecure && isPinSet() && isVaultBackedStorage()
+    }
+
+    /**
+     * Turns the screen-lock seal on or off while the app is unlocked. Throws [ScreenLockRequiredException] when the
+     * phone's screen lock hasn't been used in the last few minutes: confirm it, then call again.
+     */
+    fun setScreenLockRequired(enabled: Boolean) = synchronized(pinVerifyLock) {
+        val securePrefs = awaitPrefs()
+        ensureUnlocked("change the screen lock requirement")
+        val sealed = securePrefs.getBoolean(KEY_VAULT_PIN_SCREEN_LOCK, false)
+        if (enabled == sealed) return@synchronized
+        val stored = securePrefs.getString(KEY_VAULT_PIN_WRAPPED, null) ?: error("Set a PIN first.")
+        if (enabled) {
+            check(canRequireScreenLock()) { "Set a screen lock on this phone first." }
+            val sealedPayload = sealWithScreenLock(stored)
+            securePrefs.edit(commit = true) {
+                putString(KEY_VAULT_PIN_WRAPPED, sealedPayload)
+                putBoolean(KEY_VAULT_PIN_SCREEN_LOCK, true)
+            }
+            screenLockRequiredState.value = true
+        } else {
+            val inner = unsealWithScreenLock(stored)
+            securePrefs.edit(commit = true) {
+                putString(KEY_VAULT_PIN_WRAPPED, inner)
+                remove(KEY_VAULT_PIN_SCREEN_LOCK)
+            }
+            forgetScreenLockSeal()
+        }
+    }
+
+    private fun sealWithScreenLock(payload: String): String {
+        val key = (loadKeyStore().getKey(SCREEN_LOCK_KEY_ALIAS, null) as? javax.crypto.SecretKey) ?: createScreenLockKey()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, key)
+        } catch (_: android.security.keystore.UserNotAuthenticatedException) {
+            throw ScreenLockRequiredException()
+        }
+        val encrypted = cipher.doFinal(payload.toByteArray(StandardCharsets.UTF_8))
+        return Base64.encodeToString(
+            JSONObject().apply {
+                put("sealed", 1)
+                put("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                put("cipher", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            }.toString().toByteArray(StandardCharsets.UTF_8),
+            Base64.NO_WRAP
+        )
+    }
+
+    private fun unsealWithScreenLock(stored: String): String {
+        val json = JSONObject(String(Base64.decode(stored, Base64.NO_WRAP), StandardCharsets.UTF_8))
+        val key = loadKeyStore().getKey(SCREEN_LOCK_KEY_ALIAS, null) as? javax.crypto.SecretKey
+            ?: throw ScreenLockKeyLostException()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, Base64.decode(json.getString("iv"), Base64.NO_WRAP)))
+        } catch (_: android.security.keystore.UserNotAuthenticatedException) {
+            throw ScreenLockRequiredException()
+        } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
+            throw ScreenLockKeyLostException()
+        }
+        return String(cipher.doFinal(Base64.decode(json.getString("cipher"), Base64.NO_WRAP)), StandardCharsets.UTF_8)
+    }
+
+    private fun createScreenLockKey(): javax.crypto.SecretKey {
+        fun generate(unlockedDeviceRequired: Boolean): javax.crypto.SecretKey {
+            val builder = KeyGenParameterSpec.Builder(
+                SCREEN_LOCK_KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setUserAuthenticationRequired(true)
+                // A new fingerprint mustn't lock the vault; the screen lock is what it's tied to.
+                .setInvalidatedByBiometricEnrollment(false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                builder.setUserAuthenticationParameters(
+                    SCREEN_LOCK_VALIDITY_SECONDS,
+                    KeyProperties.AUTH_DEVICE_CREDENTIAL or KeyProperties.AUTH_BIOMETRIC_STRONG
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                builder.setUserAuthenticationValidityDurationSeconds(SCREEN_LOCK_VALIDITY_SECONDS)
+            }
+            if (unlockedDeviceRequired && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                builder.setUnlockedDeviceRequired(true)
+            }
+            val generator = javax.crypto.KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_NAME)
+            generator.init(builder.build())
+            return generator.generateKey()
+        }
+        return runCatching { generate(unlockedDeviceRequired = true) }.getOrElse { generate(unlockedDeviceRequired = false) }
+    }
+
+    /** True when the vault's PIN wrap goes through the Keystore key (see bindPinKey). */
+    internal fun isPinBoundToKeystore(): Boolean =
+        awaitPrefs().getInt(KEY_VAULT_PIN_BINDING, PIN_BINDING_NONE) == PIN_BINDING_KEYSTORE
+
+    /** Tests: rewraps the unlocked vault the pre-0.14 way (PIN alone), to check the upgrade on the next unlock. */
+    internal fun rewrapPinWithoutKeystoreForTests(pin: String) {
+        val securePrefs = awaitPrefs()
+        val vaultKey = currentUnlockedVaultKey() ?: error("unlock first")
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(deriveKey(pin, salt, CURRENT_PIN_KDF_ITERATIONS), "AES"), GCMParameterSpec(128, iv))
+        val payload = Base64.encodeToString(
+            JSONObject().apply {
+                put("v", 1)
+                put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
+                put("cipher", Base64.encodeToString(cipher.doFinal(vaultKey), Base64.NO_WRAP))
+            }.toString().toByteArray(StandardCharsets.UTF_8),
+            Base64.NO_WRAP
+        )
+        securePrefs.edit(commit = true) {
+            putString(KEY_VAULT_PIN_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
+            putString(KEY_VAULT_PIN_WRAPPED, payload)
+            putInt(KEY_VAULT_PIN_BINDING, PIN_BINDING_NONE)
+        }
+        deleteKeystoreEntry(PIN_BINDING_KEY_ALIAS)
     }
 
     private fun wrapVaultKeyWithBiometric(vaultKey: ByteArray): String? {
@@ -1017,6 +1247,7 @@ object SecurityManager {
                         securePrefs.contains(KEY_PIN_HASH)
                     setPinConfigured(configured)
                     lockState.value = configured
+                    screenLockRequiredState.value = securePrefs.getBoolean(KEY_VAULT_PIN_SCREEN_LOCK, false)
                     clearUnlockedVaultKey()
                 } catch (t: Throwable) {
                     initError = t
@@ -1095,6 +1326,7 @@ object SecurityManager {
     private data class PinWrappedVaultKey(
         val salt: String,
         val iterations: Int,
+        val binding: Int,
         val payload: String
     )
 }
