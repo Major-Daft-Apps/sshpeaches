@@ -1930,8 +1930,21 @@ class ConnectingScreenTest {
         composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_SEND).performClick()
         composeRule.onNodeWithTag(UiTestTags.PROBLEM_REPORT_DIALOG).assertDoesNotExist()
         composeRule.runOnIdle {
-            check(sent.size == 1 && sent.single().note == "Worked yesterday") { "Sent: $sent" }
-            check(messages == listOf("Report sent. Thank you!")) { "Messages: $messages" }
+            if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) {
+                check(sent.size == 1 && sent.single().note == "Worked yesterday") { "Sent: $sent" }
+                check(messages == listOf("Report sent. Thank you!")) { "Messages: $messages" }
+            } else {
+                // The F-Droid edition never sends: the same scrubbed report, note included, goes to the clipboard.
+                check(sent.isEmpty()) { "The F-Droid edition sent: $sent" }
+                val clip = (InstrumentationRegistry.getInstrumentation().targetContext
+                    .getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                    .primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                check("Worked yesterday" in clip && "REFUSED" in clip) { "Clipboard: $clip" }
+                listOf("homeserver", "alice", "192.168.1.20").forEach { secret ->
+                    check(secret !in clip) { "Copied report leaked $secret: $clip" }
+                }
+                check(messages == listOf("Report copied. Paste it into a GitHub issue or an email.")) { "Messages: $messages" }
+            }
         }
     }
 

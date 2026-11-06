@@ -1,7 +1,6 @@
 package com.majordaftapps.sshpeaches.app
 
 import android.app.Activity
-import com.google.android.play.core.review.ReviewManagerFactory
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import kotlinx.coroutines.flow.first
 
@@ -23,10 +22,8 @@ object ReviewPrompt {
         val firstUse = SettingsStore.firstUseAt.first()
         val asked = SettingsStore.reviewPrompted.first()
         if (!shouldAsk(sessions, firstUse, System.currentTimeMillis(), asked)) return
+        if (!StoreReview.available) return
         SettingsStore.setReviewPrompted()
-        val manager = ReviewManagerFactory.create(activity)
-        manager.requestReviewFlow().addOnSuccessListener { info ->
-            if (!activity.isFinishing) manager.launchReviewFlow(activity, info)
-        }
+        StoreReview.request(activity)
     }
 }

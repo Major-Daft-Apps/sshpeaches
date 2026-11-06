@@ -1,0 +1,45 @@
+SSHPeaches is a fast, open-source SSH client and terminal for Android. Connect to your Linux server, Raspberry Pi or VPS, move files over SFTP and SCP, and keep your session going when the network drops. Free, with no ads and no in-app purchases.
+
+STAYS CONNECTED ON BAD NETWORKS
+• Mosh support (needs mosh-server on the server): your terminal survives network drops and switches between Wi-Fi and mobile data, and shows your typing at once on slow links.
+• Boost, on by default, carries terminal and file transfer traffic over QUIC (UDP). The app sets up its small helper on the server for you.
+• Sessions reconnect and file transfers resume by themselves after the network drops, so you pick up where you left off.
+
+SSH TERMINAL
+• Full xterm/vt100 terminal emulator with color themes, light and dark mode, and pinch-to-zoom for the font size.
+• Ctrl, Esc, Tab and arrow keys on an extra key row you can rearrange, or a full built-in keyboard.
+• Sessions keep running in the background, with a notification to take you back to them.
+• Attach to tmux automatically when you connect, so a reconnect lands you back in the same shell.
+
+SFTP AND SCP FILE TRANSFER
+• Fast uploads and downloads that use several connections at once, even on high-latency links.
+• Interrupted transfers resume where they stopped instead of starting over.
+• A Transfers pane, like a browser's downloads: progress, speed and time left, with cancel and retry for each file.
+• Browse remote folders and create, rename and delete files and folders. Recently visited folders open instantly.
+• Large folders list fast: up to 64 requests in flight lists 20,000 files in under 2 seconds.
+• Edit text and code files on the server in a built-in editor with syntax highlighting.
+
+SNIPPETS AND PORT FORWARDING
+• Save commands you run often, like restarting a service or tailing a log, as snippets and run them on any open session with a tap instead of typing on a phone keyboard.
+• Organize snippets with groups and tags, and set them to run automatically when you connect to chosen hosts.
+• Local port forwarding to reach web dashboards and databases on your server from your phone.
+
+SSH KEYS AND SECURITY
+• Password and public key authentication with Ed25519, ECDSA and RSA keys.
+• Generate SSH keys on your phone or import your existing private keys.
+• Host key verification, with a warning when a server's key changes.
+• Lock the app with a PIN or your fingerprint.
+
+HOSTS AND SHORTCUTS
+• Save hosts with their user, port, key and settings, organized with groups and favorites, and connect with one tap.
+• Quick Connect for one-off connections.
+• Home screen widgets for quick connections and open sessions.
+• Share hosts, keys and forwards between phones with a QR code or a file.
+
+WHO IT'S FOR
+An SSH client for system administrators, developers and hobbyists who look after a Linux server, Raspberry Pi, home lab or VPS: check a service, restart a process, tail a log, edit a config file or move files from anywhere.
+
+FREE AND OPEN SOURCE
+SSHPeaches is free and open source under the GPL-3.0 license, with no ads, subscriptions, in-app purchases, crash reporting or usage statistics. This F-Droid edition contains no Google libraries; every part of it, including the bundled mosh-client and the Boost helper, is built from source.
+
+Questions, bug reports and feature requests are welcome on the project's GitHub page.

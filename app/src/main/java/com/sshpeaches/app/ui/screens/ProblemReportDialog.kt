@@ -45,15 +45,24 @@ internal fun ProblemReportDialog(
     var note by rememberSaveable { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // The F-Droid edition can't send (our server only takes reports from the verified Google Play app): it copies the
+    // same report for a GitHub issue or an email instead.
+    val canSend = com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     AlertDialog(
         onDismissRequest = { if (!sending) onDismiss() },
         modifier = Modifier.testTag(UiTestTags.PROBLEM_REPORT_DIALOG),
-        title = { Text("Send to developer") },
+        title = { Text(if (canSend) "Send to developer" else "Report a problem") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "This goes to the SSHPeaches developer to help fix the problem. Host names, addresses, " +
-                        "usernames, and file paths are removed. This is everything that will be sent:",
+                    if (canSend) {
+                        "This goes to the SSHPeaches developer to help fix the problem. Host names, addresses, " +
+                            "usernames, and file paths are removed. This is everything that will be sent:"
+                    } else {
+                        "Copy this report and paste it into an issue at github.com/Major-Daft-Apps/sshpeaches/issues " +
+                            "or an email to the developer. Host names, addresses, usernames, and file paths are removed:"
+                    },
                     style = MaterialTheme.typography.bodySmall
                 )
                 Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.small) {
@@ -92,6 +101,12 @@ internal fun ProblemReportDialog(
             TextButton(
                 enabled = !sending,
                 onClick = {
+                    if (!canSend) {
+                        val withNote = ProblemReport.create(report.summary, report.details, report.logLines, note)
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(withNote.preview()))
+                        onSent()
+                        return@TextButton
+                    }
                     sending = true
                     error = null
                     scope.launch {
@@ -101,7 +116,7 @@ internal fun ProblemReportDialog(
                     }
                 },
                 modifier = Modifier.testTag(UiTestTags.PROBLEM_REPORT_SEND)
-            ) { Text("Send") }
+            ) { Text(if (canSend) "Send" else "Copy report") }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !sending) { Text("Cancel") } }
     )

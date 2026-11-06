@@ -1,12 +1,6 @@
-Bundled mosh runtime components are sourced from Termux packages:
-- mosh 1.4.0
-- abseil-cpp
-- libandroid-support
-- libc++
-- libprotobuf
-- ncurses
-- openssl
-- zlib
-
-Upstream projects retain their original licenses.
-See package metadata and upstream project sites for full license texts.
+The bundled mosh-client is built from source by tools/mosh-client/build.sh:
+- mosh 1.4.0 (GPL-3.0-or-later, with an OpenSSL linking exception) https://mosh.org
+- protobuf 3.21.12, lite runtime (BSD-3-Clause) https://github.com/protocolbuffers/protobuf
+- OpenSSL 3.0.22, libcrypto (Apache-2.0) https://www.openssl.org
+- ncurses 6.5 and its terminfo entries (MIT-style X11 license) https://invisible-island.net/ncurses/
+- libc++ from the Android NDK (Apache-2.0 with LLVM exceptions)

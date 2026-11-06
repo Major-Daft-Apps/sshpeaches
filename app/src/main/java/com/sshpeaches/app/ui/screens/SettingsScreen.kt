@@ -936,6 +936,8 @@ fun SettingsScreen(
             Card(colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Diagnostics & Privacy", style = MaterialTheme.typography.titleMedium)
+                    // The F-Droid edition has no crash or usage reporting (it would need Firebase and Play Integrity).
+                    if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) {
                     SettingsToggleRow(
                         title = "Crash reports",
                         description = "Send anonymous crash and error reports, with the screens and session steps that led to them. Host names, addresses, usernames, and file paths are removed.",
@@ -948,19 +950,26 @@ fun SettingsScreen(
                         checked = analyticsEnabled,
                         onCheckedChange = onAnalyticsToggle
                     )
+                    }
                     SettingsToggleRow(
                         title = "Session diagnostics",
-                        description = "Add detailed SSH and terminal diagnostics to the connection log. Logs stay on this phone unless you choose Send to developer.",
+                        description = if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) {
+                            "Add detailed SSH and terminal diagnostics to the connection log. Logs stay on this phone unless you choose Send to developer."
+                        } else {
+                            "Add detailed SSH and terminal diagnostics to the connection log. Logs stay on this phone unless you copy them into a report."
+                        },
                         checked = diagnosticsLoggingEnabled,
                         onCheckedChange = onDiagnosticsToggle,
                         modifier = Modifier.testTag(UiTestTags.SETTINGS_DIAGNOSTICS_SWITCH)
                     )
+                    if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) {
                     SettingsToggleRow(
                         title = "Send usage reports",
                         description = "Upload a usage report every 7 days: how many hosts, keys and snippets you have, and how fast connecting, transfers, folder listings and Boost are. No host names, addresses or file names.",
                         checked = usageReportsEnabled,
                         onCheckedChange = onUsageReportsToggle
                     )
+                    }
                 }
             }
                 }
@@ -1829,7 +1838,8 @@ private fun ImportReviewDialog(
     )
 }
 
-private const val PLAY_LISTING = "https://play.google.com/store/apps/details?id=com.majordaftapps.sshpeaches"
+/** The store page of this edition: Google Play, or F-Droid for the F-Droid edition. */
+private val STORE_PAGE: String = com.majordaftapps.sshpeaches.app.BuildConfig.STORE_PAGE_URL
 
 @Composable
 private fun SettingsLinkRow(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -1845,15 +1855,15 @@ private fun SettingsLinkRow(title: String, description: String, onClick: () -> U
     }
 }
 
-/** Opens the app's Play Store page (the Play Store app, or the web page without it). */
+/** Opens the app's store page (a store app that handles market:// links, or the web page without one). */
 private fun openPlayListing(context: android.content.Context) {
     val market = android.content.Intent(
         android.content.Intent.ACTION_VIEW,
-        android.net.Uri.parse("market://details?id=com.majordaftapps.sshpeaches")
+        android.net.Uri.parse("market://details?id=${context.packageName.removeSuffix(".debug")}")
     ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(market) }.recoverCatching {
         context.startActivity(
-            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(PLAY_LISTING))
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(STORE_PAGE))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
@@ -1865,7 +1875,7 @@ private fun shareApp(context: android.content.Context) {
         .putExtra(android.content.Intent.EXTRA_SUBJECT, "SSHPeaches")
         .putExtra(
             android.content.Intent.EXTRA_TEXT,
-            "SSHPeaches is a free, open-source SSH client for Android, with SFTP, Mosh and port forwarding: $PLAY_LISTING"
+            "SSHPeaches is a free, open-source SSH client for Android, with SFTP, Mosh and port forwarding: $STORE_PAGE"
         )
     runCatching {
         context.startActivity(

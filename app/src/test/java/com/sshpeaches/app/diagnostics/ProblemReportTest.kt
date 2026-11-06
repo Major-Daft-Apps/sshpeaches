@@ -27,4 +27,12 @@ class ProblemReportTest {
         assertTrue(report.logLines.last().startsWith("Authentication failed for"))
         assertEquals("SSH", report.details["Mode"])
     }
+
+    @Test
+    fun theCopiedReportKeepsTheNoteOnlyWhenThereIsOne() {
+        val withNote = ProblemReport.create("Connection failed", mapOf("Mode" to "SSH"), listOf("a log line"), note = "after the update")
+        assertTrue(withNote.preview().endsWith("Note: after the update"))
+        val withoutNote = ProblemReport.create("Connection failed", mapOf("Mode" to "SSH"), listOf("a log line"))
+        assertFalse(withoutNote.preview().contains("Note:"))
+    }
 }

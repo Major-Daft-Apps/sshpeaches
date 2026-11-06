@@ -1,0 +1,57 @@
+Categories:
+  - Connectivity
+  - Development
+  - System
+License: GPL-3.0-or-later
+AuthorName: Major Daft Apps
+WebSite: https://majordaftapps.com
+SourceCode: https://github.com/Major-Daft-Apps/sshpeaches
+IssueTracker: https://github.com/Major-Daft-Apps/sshpeaches/issues
+Changelog: https://github.com/Major-Daft-Apps/sshpeaches/blob/HEAD/CHANGELOG.md
+
+AutoName: SSHPeaches
+
+RepoType: git
+Repo: https://github.com/Major-Daft-Apps/sshpeaches.git
+Binaries: https://github.com/Major-Daft-Apps/sshpeaches/releases/download/v%v/SSHPeaches-fdroid-%v.apk
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 10000
+    commit: v1.0.0
+    subdir: app
+    sudo:
+      - apt-get update
+      - apt-get install -y build-essential cmake perl pkg-config
+    gradle:
+      - yes
+    rm:
+      - app/libs/boostclient.aar
+      - app/src/main/assets/boost/sshpeaches-boost-linux-amd64
+      - app/src/main/assets/boost/sshpeaches-boost-linux-arm64
+      - app/src/main/assets/mosh/arm64-v8a/bin/mosh-client
+      - app/src/main/assets/mosh/x86_64/bin/mosh-client
+      - app/src/play
+      - app/src/release
+    prebuild:
+      - sed -i -e '/com.google.gms.google-services/d' -e '/com.google.firebase/d' ../build.gradle.kts
+      - sed -i -e '/com.google.gms.google-services/d' -e '/com.google.firebase/d' -e '/firebaseBom/d' -e
+        '/com.google.android.play/d' build.gradle.kts
+    build:
+      - curl -fsSL -o /tmp/go.tgz https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
+      - echo "904b924d435eaea086515bc63235b192ea441bd8c9b198c507e85009e6e4c7f0  /tmp/go.tgz" | sha256sum -c
+      - tar -C /tmp -xzf /tmp/go.tgz
+      - export PATH=/tmp/go/bin:$PATH GOPATH=/tmp/gopath
+      - go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab
+      - ANDROID_NDK_HOME=$$NDK$$ ../tools/boost/build.sh
+      - ANDROID_NDK_HOME=$$NDK$$ ../tools/mosh-client/build.sh
+    ndk: 27.0.11902837
+    gradleprops:
+      - distribution=fdroid
+
+AllowedAPKSigningKeys: ec0c8db94a9faf482d876ff71914c6b7e6ff3d83a8677c663c0bdb53ce083537
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: 1.0.0
+CurrentVersionCode: 10000

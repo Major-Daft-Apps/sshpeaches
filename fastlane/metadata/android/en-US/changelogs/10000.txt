@@ -1,0 +1,1 @@
+First F-Droid release: the same SSHPeaches as on Google Play, without any Google libraries. No crash reports or analytics are sent; "Report a problem" copies the report so you can paste it wherever you like. Mosh is built from source as one small binary that also runs on phones with 16 KB memory pages. Installs next to the Play version.

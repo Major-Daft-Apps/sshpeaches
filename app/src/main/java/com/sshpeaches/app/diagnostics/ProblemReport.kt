@@ -43,6 +43,10 @@ data class ProblemReport(
             appendLine()
             logLines.forEach(::appendLine)
         }
+        if (note.isNotBlank()) {
+            appendLine()
+            appendLine("Note: $note")
+        }
     }.trimEnd()
 
     companion object {

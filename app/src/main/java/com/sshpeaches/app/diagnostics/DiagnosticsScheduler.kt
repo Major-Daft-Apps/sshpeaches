@@ -13,7 +13,8 @@ object DiagnosticsScheduler {
 
     fun update(context: Context, enabled: Boolean) {
         val workManager = WorkManager.getInstance(context)
-        if (!enabled) {
+        // The F-Droid edition never uploads usage reports (no App Check to vouch for it with our server).
+        if (!enabled || !com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
             return
         }

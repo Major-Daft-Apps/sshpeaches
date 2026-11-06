@@ -421,7 +421,7 @@ class SessionService : Service() {
     private fun disconnectForNetworkTransition(transition: DefaultNetworkTransition) {
         networkHandler.post {
             if (serviceDestroyed) return@post
-            val sessionIds = activeJobs.keys.toList()
+            val sessionIds = ArrayList(activeJobs.keys)
             if (sessionIds.isEmpty()) {
                 UiDebugLog.result(
                     "SessionService.networkTransition",
@@ -1230,7 +1230,7 @@ class SessionService : Service() {
 
     fun stopAllSessions() {
         UiDebugLog.action("stopAllSessions", "count=${activeJobs.size}")
-        val ids = activeJobs.keys.toList()
+        val ids = ArrayList(activeJobs.keys)
         ids.forEach { stopSession(it) }
         UiDebugLog.result("stopAllSessions", true)
     }
@@ -1342,7 +1342,7 @@ class SessionService : Service() {
     }
 
     fun sessionsFlow(): StateFlow<List<SessionSnapshot>> = sessionSnapshotsState
-    fun activeSessionIdsForRouting(): Set<String> = activeJobs.keys.toSet()
+    fun activeSessionIdsForRouting(): Set<String> = HashSet(activeJobs.keys)
     fun hostKeyPromptsFlow(): StateFlow<List<HostKeyPrompt>> = hostKeyPromptsState
     fun passwordPromptsFlow(): StateFlow<List<PasswordPrompt>> = passwordPromptsState
     fun shellOutputFlow(): StateFlow<Map<String, String>> = shellOutputState
@@ -2974,7 +2974,7 @@ class SessionService : Service() {
             close = {
                 runCatching { serverSocket.close() }
                 acceptThread.interrupt()
-                connectionJobs.toList().forEach { it.cancel() }
+                synchronized(connectionJobs) { connectionJobs.toList() }.forEach { it.cancel() }
             }
         )
     }
@@ -4721,7 +4721,10 @@ class SessionService : Service() {
     }
 
     private fun updateSessionNotifications() {
-        val activeSessionIds = activeJobs.keys.toSet()
+        // Copied, not toSet(): Kotlin's toSet() of a one-element collection reads the size, then iterator().next(),
+        // which throws if a session ends in between (the key set of a ConcurrentHashMap changes under it). Same for
+        // the other snapshots of activeJobs.
+        val activeSessionIds = HashSet(activeJobs.keys)
         val snapshots = sessionSnapshots.value
             .filter { it.hostId in activeSessionIds }
             .sortedWith(

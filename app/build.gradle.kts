@@ -2,8 +2,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
-	id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
 }
 
 import java.util.Properties
@@ -12,6 +10,14 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.api.tasks.bundling.Zip
+
+// The F-Droid edition (-Pdistribution=fdroid): its own package name, and none of Google's libraries or Gradle plugins
+// (Firebase Crashlytics, Analytics and App Check, Play's in-app review). The default build is the Google Play app.
+val fdroidEdition = (findProperty("distribution") as? String) == "fdroid"
+if (!fdroidEdition) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
 
 // The Firebase project currently has a release client only; skip non-release processing.
 tasks.configureEach {
@@ -28,6 +34,10 @@ tasks.configureEach {
     ) {
         enabled = false
     }
+    // The ART baseline profile isn't byte-for-byte reproducible between machines, so the F-Droid edition goes without.
+    if (fdroidEdition && name.contains("ArtProfile")) {
+        enabled = false
+    }
 }
 
 val liveForwardHttpPort = ((findProperty("liveForwardHttpPort") as? String)?.toIntOrNull() ?: 56323).coerceAtLeast(1024)
@@ -36,6 +46,9 @@ val releaseAbiFilters = listOf("arm64-v8a", "x86_64")
 android {
     namespace = "com.majordaftapps.sshpeaches.app"
     compileSdk = 36
+    // The NDK installed for the native modules; without it, AGP's default NDK (not installed) is missing and the
+    // release build packages native libraries unstripped, debug info and build paths included.
+    ndkVersion = "27.0.11902837"
     val liveSuiteAnnotation = "com.majordaftapps.sshpeaches.app.testutil.LiveTransportTest"
     val releaseLaneAnnotation = "com.majordaftapps.sshpeaches.app.testutil.ReleaseLaneTest"
     val storeScreenshotAnnotation = "com.majordaftapps.sshpeaches.app.testutil.StoreScreenshotTest"
@@ -76,7 +89,7 @@ android {
         ).replace("\"", "\\\"")
 
     defaultConfig {
-        applicationId = "com.majordaftapps.sshpeaches"
+        applicationId = if (fdroidEdition) "com.majordaftapps.sshpeaches.fdroid" else "com.majordaftapps.sshpeaches"
         minSdk = 26
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
@@ -84,6 +97,17 @@ android {
         versionCode = 1400
         versionName = "0.14.0"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
+        // Crash, usage and problem reports go through Firebase and App Check (Play Integrity): Google Play edition only.
+        buildConfigField("boolean", "REPORTS_AVAILABLE", (!fdroidEdition).toString())
+        buildConfigField(
+            "String",
+            "STORE_PAGE_URL",
+            if (fdroidEdition) {
+                "\"https://f-droid.org/packages/com.majordaftapps.sshpeaches.fdroid/\""
+            } else {
+                "\"https://play.google.com/store/apps/details?id=com.majordaftapps.sshpeaches\""
+            }
+        )
         ndk {
             abiFilters += releaseAbiFilters
         }
@@ -156,7 +180,9 @@ android {
                 proguardFile("proguard-release-androidtest-rules.pro")
             }
             testProguardFiles("proguard-release-test-apk-rules.pro")
-            if (releaseSigning != null) {
+            if (fdroidEdition) {
+                // Left unsigned like F-Droid's own build of it; tools/fdroid/sign.sh signs it with the F-Droid edition key.
+            } else if (releaseSigning != null) {
                 signingConfig = releaseSigning
             } else {
                 logger.warn("Release signing is not configured; set SSHPEACHES_* keystore properties.")
@@ -197,7 +223,25 @@ android {
             excludes += "/META-INF/LICENSE.md"
         }
     }
+    if (fdroidEdition) {
+        // F-Droid must rebuild the APK byte for byte: no dependency list encrypted for Google, and no git state
+        // (this tree is often built from a copy without .git, F-Droid builds from a checkout).
+        dependenciesInfo {
+            includeInApk = false
+            includeInBundle = false
+        }
+        buildTypes.configureEach { vcsInfo.include = false }
+    }
     sourceSets {
+        getByName("main") {
+            java.srcDir(if (fdroidEdition) "src/fdroid/java" else "src/play/java")
+        }
+        if (fdroidEdition) {
+            // The release-only classes use Firebase; the F-Droid release gets the debug build's no-op versions.
+            getByName("release") {
+                java.setSrcDirs(listOf("src/debug/java"))
+            }
+        }
         getByName("benchmark") {
             java.srcDir("src/debug/java")
         }
@@ -289,8 +333,10 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     implementation("org.bouncycastle:bcutil-jdk18on:1.86")
     implementation("com.google.zxing:core:3.5.4")
-    // Google Play's in-app review sheet, asked for once after a good session (ReviewPrompt).
-    implementation("com.google.android.play:review-ktx:2.0.2")
+    if (!fdroidEdition) {
+        // Google Play's in-app review sheet, asked for once after a good session (ReviewPrompt, src/play).
+        implementation("com.google.android.play:review-ktx:2.0.2")
+    }
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation(project(":terminal-emulator"))
@@ -318,12 +364,14 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 
-    val firebaseBom = platform("com.google.firebase:firebase-bom:33.7.0")
-    releaseImplementation(firebaseBom)
-    releaseImplementation("com.google.firebase:firebase-crashlytics")
-    releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
-    releaseImplementation("com.google.firebase:firebase-analytics")
-    releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
+    if (!fdroidEdition) {
+        val firebaseBom = platform("com.google.firebase:firebase-bom:33.7.0")
+        releaseImplementation(firebaseBom)
+        releaseImplementation("com.google.firebase:firebase-crashlytics")
+        releaseImplementation("com.google.firebase:firebase-crashlytics-ndk")
+        releaseImplementation("com.google.firebase:firebase-analytics")
+        releaseImplementation("com.google.firebase:firebase-appcheck-playintegrity")
+    }
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

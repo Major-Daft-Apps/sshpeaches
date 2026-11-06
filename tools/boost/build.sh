@@ -24,9 +24,16 @@ done
 echo "$manifest}" > "$ASSETS/manifest.json"
 # max-page-size: 16 KB-aligned segments, which Play requires (devices with 16 KB memory pages can't load the
 # library otherwise); NDK 27's linker still defaults to 4 KB.
-CGO_ENABLED=1 gomobile bind -target=android/arm64,android/amd64 -androidapi 26 \
-  -javapkg com.majordaftapps.sshpeaches.boost -trimpath -ldflags "-s -w -extldflags=-Wl,-z,max-page-size=16384" \
-  -o "$ROOT/app/libs/boostclient.aar" ./boostclient
+# The library embeds the module's directory (gomobile's go.mod replaces it by absolute path, which -trimpath leaves),
+# so bind from a fixed copy: the F-Droid edition must come out byte for byte the same on F-Droid's build server.
+STAGE=/tmp/sshpeaches-boost-src
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+tar --exclude=./build -cf - . | tar -xf - -C "$STAGE"
+(cd "$STAGE" && CGO_ENABLED=1 gomobile bind -target=android/arm64,android/amd64 -androidapi 26 \
+  -javapkg com.majordaftapps.sshpeaches.boost -trimpath \
+  -ldflags "-s -w -buildid= -extldflags=-Wl,-z,max-page-size=16384" \
+  -o "$ROOT/app/libs/boostclient.aar" ./boostclient)
+rm -rf "$STAGE"
 rm -f "$ROOT/app/libs/boostclient-sources.jar"
 # Refuse a library Play would flag: every loadable segment must be 16 KB-aligned.
 check=$(mktemp -d)

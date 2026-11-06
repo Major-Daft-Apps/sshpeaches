@@ -4,6 +4,11 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## Unreleased
 
+- **F-Droid edition** (`com.majordaftapps.sshpeaches.fdroid`, built with `-Pdistribution=fdroid`): no Google libraries at all, so no crash reports, analytics, App Check or Play's review prompt; "Report a problem" copies the report for pasting instead of sending it. It installs next to the Play app and is signed with its own key; F-Droid rebuilds it from source and checks its build matches the published APK byte for byte. Recipe in `tools/fdroid/`, signing with `tools/fdroid/sign.sh`.
+- The bundled mosh-client is built from source (`tools/mosh-client/build.sh`: mosh 1.4.0, protobuf-lite, OpenSSL's libcrypto, ncurses) as one binary that loads only Android's own libraries, in place of the Termux package and its 57 shared libraries. It's 16 KB-aligned, so it runs on phones with 16 KB memory pages.
+- Fixed a crash of the session service when a session ended at the same moment the session notification was refreshed (for example as a file transfer finished): the list of open sessions could change while it was being copied.
+- libtermux is compiled from its C source during the build instead of shipping a prebuilt copy (the app module now names its NDK, without which release builds silently skipped stripping it), and the Boost client library builds to the same bytes wherever it's built.
+
 ## 0.14.0 (1400)
 
 Release date: 2026-11-04

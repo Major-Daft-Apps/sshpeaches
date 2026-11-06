@@ -372,7 +372,10 @@ class LiveFileBoostTest {
     }
 
     private companion object {
-        /** SHA-256 of mid.bin in the Mosh test container's perf folder (pass -e midSha256 for another server). */
-        const val MID_SHA256 = "36d3174a41d7840d56438db0cce12c7a1d6bffd2dd7e27dad7a1e5029765e106"
+        /**
+         * SHA-256 of mid.bin in the Mosh test container's perf folder, as seed-mosh-perf.sh on New enzu generates it
+         * (pass -e midSha256 for another server).
+         */
+        const val MID_SHA256 = "9afe5fe11e176e1ef24c007c1d9197265df075a9a1ecc3d555bf4d62d23b33cb"
     }
 }

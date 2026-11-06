@@ -2007,7 +2007,7 @@ fun ConnectingScreen(
                 send = onSendProblemReport,
                 onSent = {
                     problemReport = null
-                    onShowMessage("Report sent. Thank you!")
+                    onShowMessage(if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) "Report sent. Thank you!" else "Report copied. Paste it into a GitHub issue or an email.")
                 },
                 onDismiss = { problemReport = null }
             )
@@ -4273,7 +4273,7 @@ private fun ConnectionFailureHelpCard(
                     onClick = onSendReport,
                     modifier = Modifier.testTag(UiTestTags.CONNECTING_FAILURE_SEND_REPORT)
                 ) {
-                    Text("Send to developer")
+                    Text(if (com.majordaftapps.sshpeaches.app.BuildConfig.REPORTS_AVAILABLE) "Send to developer" else "Report a problem")
                 }
             }
         }
