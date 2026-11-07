@@ -29,6 +29,10 @@ class SSHPeachesApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         SecurityManager.init(this)
+        com.termux.view.TerminalView.sCopyHandler =
+            com.termux.view.TerminalView.CopyHandler { context, text ->
+                com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.copy(context, text)
+            }
         SettingsStore.init(this)
         applyConfiguredNightMode()
         appScope.launch {

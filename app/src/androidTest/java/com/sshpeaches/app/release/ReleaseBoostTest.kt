@@ -126,6 +126,12 @@ class ReleaseBoostTest {
                     waitFor("the terminal") { logs.any { it.startsWith("Terminal on Boost") || "Using SSH" in it } }
                     val line = logs.first { it.startsWith("Terminal on Boost") || "Using SSH" in it }
                     check(line.startsWith("Terminal on Boost")) { line }
+                    // That line comes just before the session takes the shell, and input sent before then is
+                    // dropped: wait until the session is active, as LiveBoostTerminalTest does.
+                    waitFor("the session") {
+                        service.sessionsFlow().value.firstOrNull { it.hostId == id }?.status ==
+                            com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus.ACTIVE
+                    }
                     service.sendShellInput(id, "echo release-\$((40+2))\n")
                     waitFor("the shell's answer") { service.shellOutputFlow().value[id].orEmpty().contains("release-42") }
                 } finally {

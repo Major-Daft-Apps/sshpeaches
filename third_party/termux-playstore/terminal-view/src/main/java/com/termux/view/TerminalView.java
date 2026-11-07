@@ -1285,10 +1285,22 @@ public final class TerminalView extends View {
         return mEmulator.getScreen().getSelectedText(x1, y1, x2, y2, mSelectionJoinBackLines, false);
     }
 
+    /** Copies a selection its own way when set (SSHPeaches clears terminal copies from the clipboard after a while). */
+    public interface CopyHandler {
+        void copy(Context context, String text);
+    }
+
+    public static volatile CopyHandler sCopyHandler;
+
     void copyTextToClipboard(String text) {
         if (TextUtils.isEmpty(text)) return;
         if (mTermSession != null) {
             mTermSession.onCopyTextToClipboard(text);
+            return;
+        }
+        CopyHandler copyHandler = sCopyHandler;
+        if (copyHandler != null) {
+            copyHandler.copy(getContext(), text);
             return;
         }
         ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);

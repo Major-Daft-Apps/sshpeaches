@@ -87,6 +87,21 @@ fun connectionFailureHelp(
             ),
             actions = editHost
         )
+        ConnectionFailureKind.NO_COMMON_ALGORITHMS -> ConnectionFailureHelp(
+            title = "No secure connection method in common",
+            tips = listOfNotNull(
+                "The server offered only encryption or signature methods that SSHPeaches doesn't use by default, " +
+                    "usually because the server is old (SHA-1 signatures, SHA-1 key exchange, CBC ciphers).",
+                "Best: update the server's SSH software.",
+                if (isSavedHost) {
+                    "If you trust this server and its network, edit the host and turn on Allow legacy algorithms."
+                } else {
+                    "If you trust this server and its network, save it as a host, then edit it and turn on " +
+                        "Allow legacy algorithms."
+                }
+            ),
+            actions = editHost
+        )
         ConnectionFailureKind.AUTH_PASSWORD -> ConnectionFailureHelp(
             title = "The server rejected the password",
             tips = listOf(

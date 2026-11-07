@@ -30,7 +30,8 @@ fun HostEntity.asModel(): HostConnection = HostConnection(
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,
     terminalProfileId = terminalProfileId,
-    infoCommands = infoCommands
+    infoCommands = infoCommands,
+    allowLegacyAlgorithms = allowLegacyAlgorithms
 )
 
 fun HostConnection.asEntity(): HostEntity = HostEntity(
@@ -58,7 +59,8 @@ fun HostConnection.asEntity(): HostEntity = HostEntity(
     startupScript = startupScript,
     backgroundBehavior = backgroundBehavior,
     terminalProfileId = terminalProfileId,
-    infoCommands = infoCommands
+    infoCommands = infoCommands,
+    allowLegacyAlgorithms = allowLegacyAlgorithms
 )
 
 fun IdentityEntity.asModel(): Identity = Identity(

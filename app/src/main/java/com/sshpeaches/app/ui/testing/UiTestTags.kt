@@ -73,6 +73,7 @@ object UiTestTags {
     const val HOST_DIALOG_USERNAME_INPUT = "host_dialog_username_input"
     const val HOST_DIALOG_SCROLL = "host_dialog_scroll"
     const val HOST_DIALOG_ATTACH_TMUX = "host_dialog_attach_tmux"
+    const val HOST_DIALOG_LEGACY_ALGORITHMS = "host_dialog_legacy_algorithms"
     const val HOST_DIALOG_AUTH_FIELD = "host_dialog_auth_field"
     fun hostDialogAuthOption(authMethodName: String): String = "host_dialog_auth_option_$authMethodName"
     const val HOST_DIALOG_CONFIRM_BUTTON = "host_dialog_confirm_button"

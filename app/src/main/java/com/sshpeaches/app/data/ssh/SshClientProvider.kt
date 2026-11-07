@@ -223,19 +223,23 @@ object SshClientProvider {
         // starts the usual reconnect.
         config.keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
         config.compressionFactories = listOf(NoneCompression.Factory())
-        val fastCiphers = preferFastCiphers(config.cipherFactories.filterNot { isBrokenAlgorithm(it.name) })
+        val excluded = { name: String ->
+            isBrokenAlgorithm(name) || (!host.allowLegacyAlgorithms && isLegacyAlgorithm(name))
+        }
+        val fastCiphers = preferFastCiphers(config.cipherFactories.filterNot { excluded(it.name) })
         if (fastCiphers.isNotEmpty()) {
             config.cipherFactories = fastCiphers
         }
-        config.macFactories = config.macFactories.filterNot { isBrokenAlgorithm(it.name) }
+        config.macFactories = config.macFactories.filterNot { excluded(it.name) }
         val compatibleKex = androidCompatibleKeyExchangeFactories(
-            config.keyExchangeFactories.filterNot { isBrokenAlgorithm(it.name) },
+            config.keyExchangeFactories.filterNot { excluded(it.name) },
             keyExchangeAvailability
         )
         if (compatibleKex.isNotEmpty()) {
             config.keyExchangeFactories = compatibleKex
         }
         val compatibleHostKeys = config.keyAlgorithms
+            .filterNot { excluded(it.name) }
             .map { factory ->
                 androidCompatibleEcdsaHostKeyFactory(factory.name)
                     ?: androidCompatibleEd25519KeyFactory(factory.name)
@@ -333,6 +337,22 @@ object SshClientProvider {
             lower.startsWith("hmac-md5") ||
             lower.contains("-96") ||
             lower == "diffie-hellman-group1-sha1"
+    }
+
+    /**
+     * What OpenSSH's client stopped offering by default but a server may still need: SHA-1 signatures (ssh-rsa, which
+     * RSA keys then sign with) and DSA keys, SHA-1 key exchange, and CBC ciphers. Offered only for a host with
+     * [HostConnection.allowLegacyAlgorithms]; RSA keys keep working everywhere else through rsa-sha2-256/512.
+     */
+    internal fun isLegacyAlgorithm(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower == "ssh-rsa" ||
+            lower == "ssh-dss" ||
+            lower.startsWith("ssh-rsa-cert-") ||
+            lower.startsWith("ssh-dss-cert-") ||
+            (lower.startsWith("diffie-hellman-") && lower.endsWith("-sha1")) ||
+            lower.endsWith("-cbc") ||
+            lower == "rijndael-cbc@lysator.liu.se"
     }
 
     /**

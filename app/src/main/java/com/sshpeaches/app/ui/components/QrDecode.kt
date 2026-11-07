@@ -42,6 +42,7 @@ fun decodeHostFromQr(contents: String): HostQrPayload? = runCatching {
         hasPassword = json.optBoolean("hasPassword", false),
         useMosh = json.optBoolean("useMosh", false),
         attachTmux = json.optBoolean("attachTmux", false),
+        allowLegacyAlgorithms = json.optBoolean("allowLegacyAlgorithms", false),
         preferredIdentityId = json.optString("preferredIdentityId").takeIf { it.isNotBlank() },
         preferredForwardId = json.optString("preferredForwardId").takeIf { it.isNotBlank() },
         startupScript = json.optString("startupScript", ""),

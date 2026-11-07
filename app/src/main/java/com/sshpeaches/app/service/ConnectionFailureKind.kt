@@ -23,6 +23,8 @@ enum class ConnectionFailureKind(val isNetwork: Boolean = false) {
     NETWORK(isNetwork = true),
     /** The server's host key was not trusted, so the connection stopped before login. */
     HOST_KEY_REJECTED,
+    /** No encryption, key exchange or host key method in common: often an old server offering only legacy ones. */
+    NO_COMMON_ALGORITHMS,
     /** The server rejected the password. */
     AUTH_PASSWORD,
     /** The server rejected the identity key. */
@@ -48,6 +50,10 @@ internal fun Throwable.connectionFailureKind(): ConnectionFailureKind? {
         val cause = current ?: return null
         if (cause is ConnectionFailure) return cause.kind
         if (cause is UserAuthException) return ConnectionFailureKind.AUTH
+        // sshj's negotiation: "Unable to reach a settlement of <what>: [ours] and [theirs]".
+        if (cause is TransportException && cause.message.orEmpty().startsWith("Unable to reach a settlement")) {
+            return ConnectionFailureKind.NO_COMMON_ALGORITHMS
+        }
         if (cause is SSHException) {
             when (cause.disconnectReason) {
                 DisconnectReason.CONNECTION_LOST -> return ConnectionFailureKind.NETWORK

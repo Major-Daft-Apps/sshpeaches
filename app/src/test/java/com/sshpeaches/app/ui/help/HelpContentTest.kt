@@ -17,7 +17,7 @@ class HelpContentTest {
         "Include passwords and private keys", "Export passphrase", "Startup snippet", "Terminal profile",
         "Font Size", "Mosh server command", "Swipe for arrow keys", "Insert password", "Change theme", "Find",
         "Snippets", "Reset", "Keyboard Editor", "Theme Editor", "Port Forwards", "Identities",
-        "Reconnect automatically", "Attach to tmux", "Edit", "Permissions", "Continue"
+        "Reconnect automatically", "Attach to tmux", "Allow legacy algorithms", "Edit", "Permissions", "Continue"
     )
 
     private val helpText = (helpTopics.flatMap { listOf(it.question) + it.steps } +

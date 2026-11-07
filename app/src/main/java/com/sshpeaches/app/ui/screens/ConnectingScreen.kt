@@ -6,12 +6,9 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ClipData
 import android.content.ClipDescription
-import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.text.Editable
 import android.text.InputType
 import android.text.Selection
@@ -2508,22 +2505,7 @@ private class TerminalImeBridgeEditText(context: Context) : AppCompatEditText(co
                 val start = minOf(selectionStart, selectionEnd).coerceIn(0, shadow.length)
                 val end = maxOf(selectionStart, selectionEnd).coerceIn(0, shadow.length)
                 if (start == end) return false
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    ?: return false
-                val clipData = ClipData.newPlainText(
-                    "Terminal input",
-                    shadow.subSequence(start, end)
-                ).apply {
-                    description.extras = PersistableBundle().apply {
-                        putBoolean(TERMINAL_CLIPBOARD_SENSITIVE_EXTRA, true)
-                        // AOSP SystemUI honors this only on emulators; physical devices
-                        // safely ignore the private hint.
-                        putBoolean(TERMINAL_CLIPBOARD_SUPPRESS_OVERLAY_EXTRA, true)
-                    }
-                }
-                clipboard.setPrimaryClip(
-                    clipData
-                )
+                com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.copy(context, shadow.subSequence(start, end))
                 return true
             }
 
@@ -5165,9 +5147,6 @@ private fun remoteFileSortLabel(field: RemoteFileSortField): String = when (fiel
 
 private const val TERMINAL_IME_SENTINEL = "\u0001"
 private const val MAX_SENT_TAIL_CHARS = 256
-private const val TERMINAL_CLIPBOARD_SENSITIVE_EXTRA = "android.content.extra.IS_SENSITIVE"
-private const val TERMINAL_CLIPBOARD_SUPPRESS_OVERLAY_EXTRA =
-    "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
 private const val KEYBOARD_REQUESTED_STATE = "keyboard_requested"
 private const val SFTP_COMMAND_RESPONSE_TIMEOUT_MS = 60_000L
 private const val KEYBOARD_HIDDEN_STATE = "keyboard_hidden"

@@ -735,7 +735,7 @@ class MainActivity : FragmentActivity() {
                             viewModel.reportBiometricUnavailable()
                         }
                         },
-                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId, attachTmux ->
+                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId, attachTmux, allowLegacyAlgorithms ->
                         viewModel.addHost(
                             name,
                             host,
@@ -753,10 +753,11 @@ class MainActivity : FragmentActivity() {
                             terminalProfileId,
                             password,
                             suppliedId,
-                            attachTmux
+                            attachTmux,
+                            allowLegacyAlgorithms
                         )
                         },
-                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, attachTmux ->
+                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, attachTmux, allowLegacyAlgorithms ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -774,7 +775,8 @@ class MainActivity : FragmentActivity() {
                             backgroundBehavior,
                             terminalProfileId,
                             password,
-                            attachTmux
+                            attachTmux,
+                            allowLegacyAlgorithms
                         )
                         },
                         onHostDelete = viewModel::deleteHost,
@@ -998,6 +1000,12 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         refreshCorePermissionStatuses()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // The clipboard is readable again only with focus: clear a terminal copy whose time ran out meanwhile.
+        if (hasFocus) com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.onAppResumed()
     }
 
     override fun onStop() {

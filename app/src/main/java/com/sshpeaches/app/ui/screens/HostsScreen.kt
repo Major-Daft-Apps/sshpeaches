@@ -114,6 +114,7 @@ private data class HostEditorSnapshot(
     val preferredIdentityId: String?,
     val useMosh: Boolean,
     val attachTmux: Boolean = false,
+    val allowLegacyAlgorithms: Boolean = false,
     val terminalProfileId: String?,
     val preferredForwardId: String?,
     val startupScript: String,
@@ -139,14 +140,14 @@ fun HostsScreen(
     editRequestId: String? = null,
     importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportHost: (HostConnection) -> Unit = {},
     onImportPortForward: (PortForward) -> Unit = {},
     onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
     activeSshSessionHostIds: Set<String> = emptySet(),
     onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
@@ -176,6 +177,7 @@ fun HostsScreen(
     val identityExpanded = remember { mutableStateOf(false) }
     val useMoshState = rememberSaveable { mutableStateOf(false) }
     val attachTmuxState = rememberSaveable { mutableStateOf(false) }
+    val allowLegacyAlgorithmsState = rememberSaveable { mutableStateOf(false) }
     val terminalProfileIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val terminalProfileExpanded = remember { mutableStateOf(false) }
     val preferredForwardIdState = rememberSaveable { mutableStateOf<String?>(null) }
@@ -243,7 +245,8 @@ fun HostsScreen(
                     imported.terminalProfileId,
                     null,
                     processed.data.targetId,
-                    imported.attachTmux
+                    imported.attachTmux,
+                    imported.allowLegacyAlgorithms
                 )
                 if (processed.data.encryptedPasswordPayload != null) {
                     pendingEncryptedImport.value = processed.data.encryptedPasswordPayload to processed.data.targetId
@@ -464,6 +467,7 @@ fun HostsScreen(
         preferredIdentityId = preferredIdentityIdState.value,
         useMosh = useMoshState.value,
         attachTmux = attachTmuxState.value,
+        allowLegacyAlgorithms = allowLegacyAlgorithmsState.value,
         terminalProfileId = terminalProfileIdState.value,
         preferredForwardId = preferredForwardIdState.value,
         startupScript = startupScriptState.value,
@@ -509,6 +513,7 @@ fun HostsScreen(
         identityExpanded.value = false
         useMoshState.value = host?.useMosh ?: false
         attachTmuxState.value = host?.attachTmux ?: false
+        allowLegacyAlgorithmsState.value = host?.allowLegacyAlgorithms ?: false
         terminalProfileIdState.value = host?.terminalProfileId
         terminalProfileExpanded.value = false
         preferredForwardIdState.value = host?.preferredForwardId
@@ -684,7 +689,8 @@ fun HostsScreen(
                 terminalProfileIdState.value,
                 passwordValue,
                 null,
-                attachTmuxState.value
+                attachTmuxState.value,
+                allowLegacyAlgorithmsState.value
             )
         } else {
             onUpdate(
@@ -704,7 +710,8 @@ fun HostsScreen(
                 backgroundBehaviorState.value,
                 terminalProfileIdState.value,
                 passwordValue,
-                attachTmuxState.value
+                attachTmuxState.value,
+                allowLegacyAlgorithmsState.value
             )
         }
         closeDialog()
@@ -1008,6 +1015,7 @@ fun HostsScreen(
             if (!useMoshState.value) {
                 AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
             }
+            LegacyAlgorithmsRow(checked = allowLegacyAlgorithmsState.value, onCheckedChange = { allowLegacyAlgorithmsState.value = it })
             ExposedDropdownMenuBox(
                 expanded = terminalProfileExpanded.value,
                 onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
@@ -1836,6 +1844,7 @@ fun HostsScreen(
                     if (!useMoshState.value) {
                         AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
                     }
+                    LegacyAlgorithmsRow(checked = allowLegacyAlgorithmsState.value, onCheckedChange = { allowLegacyAlgorithmsState.value = it })
                     ExposedDropdownMenuBox(
                         expanded = terminalProfileExpanded.value,
                         onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
@@ -2101,7 +2110,8 @@ fun HostsScreen(
                             terminalProfileIdState.value,
                             passwordValue,
                             null,
-                            attachTmuxState.value
+                            attachTmuxState.value,
+                            allowLegacyAlgorithmsState.value
                         )
                     } else {
                         onUpdate(
@@ -2121,7 +2131,8 @@ fun HostsScreen(
                             backgroundBehaviorState.value,
                             terminalProfileIdState.value,
                             passwordValue,
-                            attachTmuxState.value
+                            attachTmuxState.value,
+                            allowLegacyAlgorithmsState.value
                         )
                     }
                     closeDialog()
@@ -2251,6 +2262,27 @@ fun HostsScreen(
         )
     }
 
+}
+
+@Composable
+private fun LegacyAlgorithmsRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .testTag(UiTestTags.HOST_DIALOG_LEGACY_ALGORITHMS),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text("Allow legacy algorithms")
+            Text(
+                "Only for servers too old for anything else: also offers SHA-1 signatures (ssh-rsa), DSA host " +
+                    "keys, SHA-1 key exchange and CBC ciphers, which OpenSSH no longer uses by default.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
 }
 
 @Composable

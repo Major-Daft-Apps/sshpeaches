@@ -2,6 +2,8 @@ package com.majordaftapps.sshpeaches.app.ui
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -124,6 +126,31 @@ class HostsCrudTest {
         }
         composeRule.onAllNodesWithText("Enter a valid hostname or IP address.").assertCountEquals(1)
         composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CANCEL_BUTTON)
+    }
+
+    @Test
+    fun allowLegacyAlgorithmsIsSavedAndCanBeTurnedOffAgain() {
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("Old Box")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.2.2")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT).performTextInput("tester")
+        selectPasswordAuth()
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_LEGACY_ALGORITHMS)
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) { savedOldBox()?.allowLegacyAlgorithms == true }
+
+        composeRule.onAllNodesWithContentDescription("More actions", useUnmergedTree = true)[0].performClick()
+        composeRule.onNodeWithText("Edit").performClick()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_LEGACY_ALGORITHMS).performScrollTo().assertIsOn()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_LEGACY_ALGORITHMS)
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) { savedOldBox()?.allowLegacyAlgorithms == false }
+    }
+
+    private fun savedOldBox() = kotlinx.coroutines.runBlocking {
+        com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase.get(composeRule.activity).hostDao().getAll()
+            .firstOrNull { it.name == "Old Box" }
     }
 
     private fun selectPasswordAuth() {

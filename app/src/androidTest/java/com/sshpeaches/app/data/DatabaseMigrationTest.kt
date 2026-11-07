@@ -12,7 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Opens a database written by version 10 of the schema and checks Room upgrades it intact. */
+/** Opens a database written by version 10 of the schema and checks Room upgrades it intact, through every later version. */
 @RunWith(AndroidJUnit4::class)
 class DatabaseMigrationTest {
 
@@ -25,7 +25,7 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun version10HostsGainAttachTmuxAndKeepTheirData() {
+    fun version10HostsGainAttachTmuxAndLegacyAlgorithmsOffAndKeepTheirData() {
         context.deleteDatabase(name)
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
             V10_TABLES.forEach(db::execSQL)
@@ -39,7 +39,7 @@ class DatabaseMigrationTest {
         }
 
         val room = Room.databaseBuilder(context, SshPeachesDatabase::class.java, name)
-            .addMigrations(SshPeachesDatabase.MIGRATION_10_11)
+            .addMigrations(SshPeachesDatabase.MIGRATION_10_11, SshPeachesDatabase.MIGRATION_11_12)
             .build()
         try {
             val host = runBlocking { room.hostDao().getById("h1") }!!
@@ -47,7 +47,8 @@ class DatabaseMigrationTest {
             assertEquals(2222, host.port)
             assertEquals("uptime", host.startupScript)
             assertFalse(host.attachTmux)
-            assertEquals(11, room.openHelper.readableDatabase.version)
+            assertFalse(host.allowLegacyAlgorithms)
+            assertEquals(12, room.openHelper.readableDatabase.version)
         } finally {
             room.close()
         }

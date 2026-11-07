@@ -33,6 +33,7 @@ fun encodeHostPayload(
         put("hasPassword", host.hasPassword)
         put("useMosh", host.useMosh)
         put("attachTmux", host.attachTmux)
+        put("allowLegacyAlgorithms", host.allowLegacyAlgorithms)
         put("preferredIdentityId", host.preferredIdentityId ?: "")
         put("preferredForwardId", host.preferredForwardId ?: "")
         put("startupScript", host.startupScript)

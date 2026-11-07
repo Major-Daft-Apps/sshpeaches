@@ -75,7 +75,12 @@ object SecurityManager {
     private const val INIT_AWAIT_TIMEOUT_SECONDS = 20L
     private const val STORAGE_VERSION_LEGACY = 0
     private const val STORAGE_VERSION_VAULT = 1
-    private const val CURRENT_EXPORT_KDF_ITERATIONS = 210_000
+    // OWASP's current figure for PBKDF2-HMAC-SHA256. Exports made before 0.14.1 used 210,000 and still import; no
+    // other count is accepted, so a crafted file can't make the import do 1 iteration or a billion.
+    private const val CURRENT_EXPORT_KDF_ITERATIONS = 600_000
+    private val ACCEPTED_EXPORT_KDF_ITERATIONS = setOf(CURRENT_EXPORT_KDF_ITERATIONS, 210_000)
+    private const val TRANSFER_KEY_TTL_MS = 60_000L
+    private const val MAX_TRANSFER_KEYS = 8
     private const val CURRENT_PIN_KDF_ITERATIONS = 210_000
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val KEY_PIN_FAILED_ATTEMPTS = "pin_failed_attempts"
@@ -164,6 +169,7 @@ object SecurityManager {
 
     fun lock() {
         clearUnlockedVaultKey()
+        clearTransferKeys()
         lockState.value = isPinSet()
     }
 
@@ -1189,9 +1195,52 @@ object SecurityManager {
 
     private val bundledBouncyCastle by lazy { BouncyCastleProvider() }
 
+    /**
+     * Keys derived from an export passphrase, kept for [TRANSFER_KEY_TTL_MS] so one export or import pays for PBKDF2
+     * once, not once per saved secret (each secret is its own payload). An export's payloads share a salt, each with
+     * its own IV; payloads from older exports, each with its own salt, still derive one by one. Wiped on lock.
+     */
+    private class TransferKey(
+        val passphraseDigest: ByteArray,
+        val salt: ByteArray,
+        val iterations: Int,
+        val key: ByteArray,
+        val createdAtMs: Long
+    )
+
+    private val transferKeys = ArrayDeque<TransferKey>()
+
+    private fun transferKey(passphrase: String, salt: ByteArray?, iterations: Int): TransferKey {
+        val digest = MessageDigest.getInstance("SHA-256").digest(passphrase.toByteArray(StandardCharsets.UTF_8))
+        val now = SystemClock.elapsedRealtime()
+        synchronized(transferKeys) {
+            transferKeys.removeAll { now - it.createdAtMs > TRANSFER_KEY_TTL_MS }
+            transferKeys.firstOrNull {
+                it.iterations == iterations &&
+                    MessageDigest.isEqual(it.passphraseDigest, digest) &&
+                    (salt == null || it.salt.contentEquals(salt))
+            }?.let { return it }
+        }
+        val useSalt = salt ?: ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val derived = TransferKey(digest, useSalt, iterations, deriveKey(passphrase, useSalt, iterations), now)
+        synchronized(transferKeys) {
+            transferKeys.addFirst(derived)
+            while (transferKeys.size > MAX_TRANSFER_KEYS) transferKeys.removeLast().key.fill(0)
+        }
+        return derived
+    }
+
+    private fun clearTransferKeys() {
+        synchronized(transferKeys) {
+            transferKeys.forEach { it.key.fill(0) }
+            transferKeys.clear()
+        }
+    }
+
     private fun encryptTransferPayload(value: String, passphrase: String): String {
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val key = deriveKey(passphrase, salt, CURRENT_EXPORT_KDF_ITERATIONS)
+        val transferKey = transferKey(passphrase, salt = null, CURRENT_EXPORT_KDF_ITERATIONS)
+        val salt = transferKey.salt
+        val key = transferKey.key
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
         val secretKey = SecretKeySpec(key, "AES")
@@ -1213,12 +1262,12 @@ object SecurityManager {
         val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
         val salt = Base64.decode(json.getString("salt"), Base64.NO_WRAP)
         val iterations = json.optInt("iter", 0)
-        require(iterations == CURRENT_EXPORT_KDF_ITERATIONS) {
+        require(iterations in ACCEPTED_EXPORT_KDF_ITERATIONS) {
             "Unsupported secret export format."
         }
         val cipherBytes = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val secretKey = SecretKeySpec(deriveKey(passphrase, salt, iterations), "AES")
+        val secretKey = SecretKeySpec(transferKey(passphrase, salt, iterations).key, "AES")
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
         return String(cipher.doFinal(cipherBytes), StandardCharsets.UTF_8)
     }

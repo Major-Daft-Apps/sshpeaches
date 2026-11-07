@@ -325,6 +325,56 @@ class SecurityManagerVaultTest {
         assertEquals("IMPORTED-PUBLIC-KEY", SecurityManager.getIdentityPublicKey(importedIdentity.id))
     }
 
+    @Test
+    fun exportsDeriveTheirKeyOnceAndAcceptOnlyKnownIterationCounts() {
+        val sourceHost = hostFixture("kdf-source-host")
+        val sourceIdentity = identityFixture("kdf-source-identity")
+        val importedHost = hostFixture("kdf-imported-host")
+        AppStateSeeder.seedHost(sourceHost, password = "kdf-host-password")
+        AppStateSeeder.seedIdentity(sourceIdentity, privateKey = "KDF-PRIVATE-KEY", publicKey = "KDF-PUBLIC-KEY")
+
+        val hostPayload = SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!!
+        val keyPayload = SecurityManager.exportIdentityKeyPayload(sourceIdentity.id, "export-passphrase")!!
+        val host = decodeTransferPayload(hostPayload)
+        val key = decodeTransferPayload(keyPayload)
+        assertEquals(600_000, host.getInt("iter"))
+        // One export: one salt (one PBKDF2 run), a fresh IV per secret.
+        assertEquals(host.getString("salt"), key.getString("salt"))
+        assertFalse(host.getString("iv") == key.getString("iv"))
+
+        // The wrong passphrase still fails while the right one's key is cached.
+        assertTrue(runCatching { SecurityManager.importHostPasswordPayload(importedHost.id, hostPayload, "wrong-passphrase") }.isFailure)
+
+        // Exports made before 0.14.1 (210,000 iterations) still import; any other count is refused.
+        SecurityManager.importHostPasswordPayload(importedHost.id, transferPayload("from-0.14.0", "export-passphrase", 210_000), "export-passphrase")
+        assertEquals("from-0.14.0", SecurityManager.getHostPassword(importedHost.id))
+        assertTrue(
+            runCatching {
+                SecurityManager.importHostPasswordPayload(importedHost.id, transferPayload("forged", "export-passphrase", 1), "export-passphrase")
+            }.isFailure
+        )
+        assertEquals("from-0.14.0", SecurityManager.getHostPassword(importedHost.id))
+    }
+
+    private fun decodeTransferPayload(payload: String) =
+        org.json.JSONObject(String(android.util.Base64.decode(payload, android.util.Base64.NO_WRAP), Charsets.UTF_8))
+
+    /** A payload in the export format with [iterations] of its own, as an older (or forged) export would carry. */
+    private fun transferPayload(value: String, passphrase: String, iterations: Int): String {
+        val salt = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
+        val key = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            .generateSecret(javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, iterations, 256)).encoded
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding").apply {
+            init(javax.crypto.Cipher.ENCRYPT_MODE, javax.crypto.spec.SecretKeySpec(key, "AES"), javax.crypto.spec.GCMParameterSpec(128, iv))
+        }
+        val b64 = { bytes: ByteArray -> android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP) }
+        val json = org.json.JSONObject()
+            .put("v", 1).put("iv", b64(iv)).put("salt", b64(salt)).put("iter", iterations)
+            .put("cipher", b64(cipher.doFinal(value.toByteArray(Charsets.UTF_8))))
+        return b64(json.toString().toByteArray(Charsets.UTF_8))
+    }
+
     private fun securePrefs(): SharedPreferences {
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
         SecurityManager.init(appContext)

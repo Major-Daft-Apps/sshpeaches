@@ -932,7 +932,8 @@ class AppViewModel(
         terminalProfileId: String?,
         password: String?,
         suppliedId: String? = null,
-        attachTmux: Boolean = false
+        attachTmux: Boolean = false,
+        allowLegacyAlgorithms: Boolean = false
     ) {
         logAction(
             "addHost",
@@ -966,6 +967,7 @@ class AppViewModel(
             hasPassword = hasPassword,
             useMosh = useMosh,
             attachTmux = attachTmux,
+            allowLegacyAlgorithms = allowLegacyAlgorithms,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
@@ -994,7 +996,8 @@ class AppViewModel(
         backgroundBehavior: BackgroundBehavior,
         terminalProfileId: String?,
         password: String?,
-        attachTmux: Boolean = false
+        attachTmux: Boolean = false,
+        allowLegacyAlgorithms: Boolean = false
     ) {
         logAction(
             "updateHost",
@@ -1031,6 +1034,7 @@ class AppViewModel(
             hasPassword = hasPassword,
             useMosh = useMosh,
             attachTmux = attachTmux,
+            allowLegacyAlgorithms = allowLegacyAlgorithms,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,

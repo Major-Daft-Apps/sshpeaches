@@ -1309,7 +1309,7 @@ fun SettingsScreen(
                             if (transferWorking.value) return@TextButton
                             transferWorking.value = true
                             scope.launch {
-                            // PBKDF2 per exported secret (about 1-2 s each) and QR rendering: off main.
+                            // PBKDF2 (once per export, 600,000 iterations) and QR rendering: off main.
                             val payload = withContext(Dispatchers.Default) {
                                 runCatching { onGenerateExportPayload(passphrase) }.getOrNull()
                             }

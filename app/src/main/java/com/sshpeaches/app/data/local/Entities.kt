@@ -35,7 +35,8 @@ data class HostEntity(
     val startupScript: String,
     val backgroundBehavior: BackgroundBehavior,
     val terminalProfileId: String?,
-    val infoCommands: List<String>
+    val infoCommands: List<String>,
+    @ColumnInfo(defaultValue = "0") val allowLegacyAlgorithms: Boolean = false
 )
 
 @Entity(tableName = "identities")

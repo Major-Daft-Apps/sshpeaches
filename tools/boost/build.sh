@@ -1,12 +1,19 @@
 #!/bin/bash
 # Builds SSHPeaches' file boost: the server helper (static Linux binaries, shipped as app assets, which the APK
-# compresses, with a manifest of their SHA-256; Android's packager would unzip a .gz asset and drop the extension) and the app's client library (an AAR bound with gomobile). Needs Go 1.22, gomobile and
-# gobind (golang.org/x/mobile v0.0.0-20240806205939-81131f6468ab), the Android SDK and NDK 27.
+# compresses, with a manifest of their SHA-256; Android's packager would unzip a .gz asset and drop the extension) and the app's client library (an AAR bound with gomobile). Needs Go 1.26, gomobile and
+# gobind (golang.org/x/mobile v0.0.0-20261011034528-197770444867), the Android SDK and NDK 27.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$(cd ../.. && pwd)
 ASSETS=$ROOT/app/src/main/assets/boost
 export GOTOOLCHAIN=local GOFLAGS=-buildvcs=false CGO_ENABLED=0
+# Go 1.26 or later: older cgo could put an exported function's argument block on an unaligned stack address, and the
+# runtime then aborted ("bulkBarrierPreWrite: unaligned arguments", golang/go#46893) whenever a call returned a string
+# while the garbage collector was running, as Session.List did after a cancelled download.
+case "$(go env GOVERSION)" in
+  go1.2[6-9]*|go1.[3-9][0-9]*) ;;
+  *) echo "error: needs Go 1.26 or later, found $(go env GOVERSION)" >&2; exit 1 ;;
+esac
 export ANDROID_HOME=${ANDROID_HOME:-$HOME/Android/Sdk}
 export ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.0.11902837}
 export PATH=$PATH:$(go env GOPATH)/bin

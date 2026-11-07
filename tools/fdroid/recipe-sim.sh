@@ -26,11 +26,11 @@ sed -i -e '/com.google.gms.google-services/d' -e '/com.google.firebase/d' -e '/f
     '/com.google.android.play/d' build.gradle.kts
 # build:
 export ANDROID_HOME=/opt/android-sdk NDK=/opt/android-sdk/ndk/27.0.11902837
-curl -fsSL -o /tmp/go.tgz https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
-echo "904b924d435eaea086515bc63235b192ea441bd8c9b198c507e85009e6e4c7f0  /tmp/go.tgz" | sha256sum -c
+curl -fsSL -o /tmp/go.tgz https://go.dev/dl/go1.26.10.linux-amd64.tar.gz
+echo "ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5  /tmp/go.tgz" | sha256sum -c
 tar -C /tmp -xzf /tmp/go.tgz
-export PATH=/tmp/go/bin:$PATH GOPATH=/tmp/gopath
-go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab
+export GOROOT=/tmp/go PATH=/tmp/go/bin:$PATH GOPATH=/tmp/gopath
+GOBIN=/tmp/gopath/bin go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20261011034528-197770444867 golang.org/x/mobile/cmd/gobind@v0.0.0-20261011034528-197770444867
 ANDROID_NDK_HOME=$NDK ../tools/boost/build.sh
 ANDROID_NDK_HOME=$NDK MOSH_SOURCES=$([ -d /cache ] && echo /cache || echo /tmp/mosh-sources) ../tools/mosh-client/build.sh
 # gradle: yes, gradleprops distribution=fdroid

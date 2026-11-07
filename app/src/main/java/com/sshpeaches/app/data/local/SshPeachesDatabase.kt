@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PortForwardEntity::class,
         SnippetEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -41,6 +41,7 @@ abstract class SshPeachesDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_8_9)
                     .addMigrations(MIGRATION_9_10)
                     .addMigrations(MIGRATION_10_11)
+                    .addMigrations(MIGRATION_11_12)
                     .build()
                     .also { instance = it }
             }
@@ -203,6 +204,12 @@ abstract class SshPeachesDatabase : RoomDatabase() {
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE hosts ADD COLUMN `attachTmux` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE hosts ADD COLUMN `allowLegacyAlgorithms` INTEGER NOT NULL DEFAULT 0")
             }
         }
 

@@ -26,7 +26,12 @@ data class HostConnection(
     val startupScript: String = "",
     val backgroundBehavior: BackgroundBehavior = BackgroundBehavior.INHERIT,
     val terminalProfileId: String? = null,
-    val infoCommands: List<String> = emptyList()
+    val infoCommands: List<String> = emptyList(),
+    /**
+     * Also offer what OpenSSH's client no longer does by default: SHA-1 signatures (ssh-rsa) and DSA host keys, SHA-1
+     * key exchange, CBC ciphers. Only for servers too old to offer anything else.
+     */
+    val allowLegacyAlgorithms: Boolean = false
 )
 
 data class Identity(

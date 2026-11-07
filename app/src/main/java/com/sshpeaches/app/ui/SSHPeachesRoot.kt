@@ -277,8 +277,8 @@ data class SSHPeachesRootActions(
     val onUnlockWithPin: suspend (String) -> String?,
     val onBiometricUnlock: () -> Unit,
     val onSecurityNoticeShown: () -> Unit,
-    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean) -> Unit,
-    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean) -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean) -> Unit,
     val onHostDelete: (String) -> Unit,
     val onImportHost: (HostConnection) -> Unit,
     val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
@@ -1497,7 +1497,13 @@ fun SSHPeachesRoot(
                             )
                         }.getOrDefault(BackgroundBehavior.INHERIT),
                         terminalProfileId = item.optString("terminalProfileId").trim().ifBlank { null },
-                        infoCommands = jsonStringList(item.optJSONArray("infoCommands"))
+                        infoCommands = jsonStringList(item.optJSONArray("infoCommands")),
+                        // An import may bring the setting for a new host, but never weaken one you already have.
+                        allowLegacyAlgorithms = if (updatesSavedHost) {
+                            uiState.hosts.first { it.id == targetId }.allowLegacyAlgorithms
+                        } else {
+                            item.optBoolean("allowLegacyAlgorithms", false)
+                        }
                     )
                 )
                 encryptedPasswordPayload?.let { pendingHostPasswordImports += targetId to it }
@@ -2831,6 +2837,7 @@ fun SSHPeachesRoot(
                         terminalProfileId,
                         password,
                         pinnedId,
+                        false,
                         false
                     )
                 }
@@ -3944,6 +3951,7 @@ private fun buildExportPayload(state: AppUiState, passphrase: String?): String? 
                     put("hasPassword", host.hasPassword)
                     put("useMosh", host.useMosh)
                     put("attachTmux", host.attachTmux)
+                    put("allowLegacyAlgorithms", host.allowLegacyAlgorithms)
                     put("preferredIdentityId", host.preferredIdentityId)
                     put("preferredForwardId", host.preferredForwardId)
                     put("startupScript", host.startupScript)
