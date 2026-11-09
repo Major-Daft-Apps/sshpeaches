@@ -333,8 +333,18 @@ class SecurityManagerVaultTest {
         AppStateSeeder.seedHost(sourceHost, password = "kdf-host-password")
         AppStateSeeder.seedIdentity(sourceIdentity, privateKey = "KDF-PRIVATE-KEY", publicKey = "KDF-PUBLIC-KEY")
 
-        val hostPayload = SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!!
-        val keyPayload = SecurityManager.exportIdentityKeyPayload(sourceIdentity.id, "export-passphrase")!!
+        val (hostPayload, keyPayload) = SecurityManager.withTransferKeyCache {
+            val payloads = SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!! to
+                SecurityManager.exportIdentityKeyPayload(sourceIdentity.id, "export-passphrase")!!
+            assertEquals(1, SecurityManager.cachedTransferKeyCountForTests())
+            // The wrong passphrase still fails while the right one's key is cached.
+            assertTrue(
+                runCatching { SecurityManager.importHostPasswordPayload(importedHost.id, payloads.first, "wrong-passphrase") }.isFailure
+            )
+            payloads
+        }
+        // The export is done: its key is gone.
+        assertEquals(0, SecurityManager.cachedTransferKeyCountForTests())
         val host = decodeTransferPayload(hostPayload)
         val key = decodeTransferPayload(keyPayload)
         assertEquals(600_000, host.getInt("iter"))
@@ -342,8 +352,10 @@ class SecurityManagerVaultTest {
         assertEquals(host.getString("salt"), key.getString("salt"))
         assertFalse(host.getString("iv") == key.getString("iv"))
 
-        // The wrong passphrase still fails while the right one's key is cached.
-        assertTrue(runCatching { SecurityManager.importHostPasswordPayload(importedHost.id, hostPayload, "wrong-passphrase") }.isFailure)
+        // Outside an export (a single QR code) nothing is kept: each payload gets its own salt.
+        val single = decodeTransferPayload(SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!!)
+        assertFalse(single.getString("salt") == host.getString("salt"))
+        assertEquals(0, SecurityManager.cachedTransferKeyCountForTests())
 
         // Exports made before 0.14.1 (210,000 iterations) still import; any other count is refused.
         SecurityManager.importHostPasswordPayload(importedHost.id, transferPayload("from-0.14.0", "export-passphrase", 210_000), "export-passphrase")
@@ -354,6 +366,26 @@ class SecurityManagerVaultTest {
             }.isFailure
         )
         assertEquals("from-0.14.0", SecurityManager.getHostPassword(importedHost.id))
+    }
+
+    @Test
+    fun anExpiredExportKeyIsDroppedEvenMidExport() {
+        val sourceHost = hostFixture("ttl-source-host")
+        AppStateSeeder.seedHost(sourceHost, password = "ttl-host-password")
+        SecurityManager.transferKeyTtlMsForTests = 200
+        try {
+            SecurityManager.withTransferKeyCache {
+                val first = decodeTransferPayload(SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!!)
+                Thread.sleep(400)
+                val second = decodeTransferPayload(SecurityManager.exportHostPasswordPayload(sourceHost.id, "export-passphrase")!!)
+                // The first key expired and was wiped; the second export derived (and cached) a new one.
+                assertFalse(first.getString("salt") == second.getString("salt"))
+                assertEquals(1, SecurityManager.cachedTransferKeyCountForTests())
+            }
+            assertEquals(0, SecurityManager.cachedTransferKeyCountForTests())
+        } finally {
+            SecurityManager.transferKeyTtlMsForTests = null
+        }
     }
 
     private fun decodeTransferPayload(payload: String) =

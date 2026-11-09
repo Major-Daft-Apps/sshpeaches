@@ -1607,7 +1607,8 @@ fun SSHPeachesRoot(
             }
         }
 
-        if (!passphrase.isNullOrBlank()) {
+        // One PBKDF2 run per export salt for the whole file, wiped as soon as the secrets are in.
+        if (!passphrase.isNullOrBlank()) SecurityManager.withTransferKeyCache {
             pendingHostPasswordImports.forEach { (hostId, payload) ->
                 if (onImportHostPasswordPayload(hostId, payload, passphrase)) {
                     importedPasswords += 1
@@ -3912,7 +3913,11 @@ private fun terminalAnsiColorsFromJson(array: JSONArray?): List<String> {
     }
 }
 
-private fun buildExportPayload(state: AppUiState, passphrase: String?): String? {
+// The export's secrets share one derived key, wiped when the payload is built.
+private fun buildExportPayload(state: AppUiState, passphrase: String?): String? =
+    SecurityManager.withTransferKeyCache { buildExportPayloadWithCachedKey(state, passphrase) }
+
+private fun buildExportPayloadWithCachedKey(state: AppUiState, passphrase: String?): String? {
     val includeSecrets = state.includeSecretsInQr
     val secretsPassphrase = if (includeSecrets) passphrase?.takeIf { it.isNotBlank() } ?: return null else null
     if (

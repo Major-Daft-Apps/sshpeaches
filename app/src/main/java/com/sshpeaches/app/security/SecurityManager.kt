@@ -1196,9 +1196,11 @@ object SecurityManager {
     private val bundledBouncyCastle by lazy { BouncyCastleProvider() }
 
     /**
-     * Keys derived from an export passphrase, kept for [TRANSFER_KEY_TTL_MS] so one export or import pays for PBKDF2
-     * once, not once per saved secret (each secret is its own payload). An export's payloads share a salt, each with
-     * its own IV; payloads from older exports, each with its own salt, still derive one by one. Wiped on lock.
+     * Keys derived from an export passphrase, so one export or import pays for PBKDF2 once, not once per saved secret
+     * (each secret is its own payload). Cached only inside [withTransferKeyCache] (a whole-file export or import) and
+     * wiped when the outermost one ends, when one is older than [TRANSFER_KEY_TTL_MS], and on lock. An export's
+     * payloads share a salt, each with its own IV; payloads from older exports, each with its own salt, still derive
+     * one by one. A single QR export or import derives its key, uses it once and wipes it.
      */
     private class TransferKey(
         val passphraseDigest: ByteArray,
@@ -1206,44 +1208,81 @@ object SecurityManager {
         val iterations: Int,
         val key: ByteArray,
         val createdAtMs: Long
-    )
+    ) {
+        fun wipe() {
+            key.fill(0)
+            passphraseDigest.fill(0)
+        }
+    }
 
     private val transferKeys = ArrayDeque<TransferKey>()
+    private var transferKeyCacheDepth = 0
 
-    private fun transferKey(passphrase: String, salt: ByteArray?, iterations: Int): TransferKey {
+    /** Tests: shortens [TRANSFER_KEY_TTL_MS]. */
+    @Volatile
+    internal var transferKeyTtlMsForTests: Long? = null
+
+    /** Runs [block] (one export or import of many secrets) with derived keys cached; wipes them when it ends. */
+    fun <T> withTransferKeyCache(block: () -> T): T {
+        synchronized(transferKeys) { transferKeyCacheDepth++ }
+        try {
+            return block()
+        } finally {
+            synchronized(transferKeys) {
+                transferKeyCacheDepth--
+                if (transferKeyCacheDepth == 0) wipeTransferKeysLocked()
+            }
+        }
+    }
+
+    internal fun cachedTransferKeyCountForTests(): Int = synchronized(transferKeys) { transferKeys.size }
+
+    /**
+     * The salt and a copy of the key for [passphrase]: the caller wipes the copy after use, so a cache wipe can't
+     * pull the key out from under a payload being encrypted on another thread.
+     */
+    private fun transferKey(passphrase: String, salt: ByteArray?, iterations: Int): Pair<ByteArray, ByteArray> {
         val digest = MessageDigest.getInstance("SHA-256").digest(passphrase.toByteArray(StandardCharsets.UTF_8))
         val now = SystemClock.elapsedRealtime()
+        val ttl = transferKeyTtlMsForTests ?: TRANSFER_KEY_TTL_MS
         synchronized(transferKeys) {
-            transferKeys.removeAll { now - it.createdAtMs > TRANSFER_KEY_TTL_MS }
+            transferKeys.removeAll { cached -> (now - cached.createdAtMs >= ttl).also { if (it) cached.wipe() } }
             transferKeys.firstOrNull {
                 it.iterations == iterations &&
                     MessageDigest.isEqual(it.passphraseDigest, digest) &&
                     (salt == null || it.salt.contentEquals(salt))
-            }?.let { return it }
+            }?.let {
+                digest.fill(0)
+                return it.salt to it.key.copyOf()
+            }
         }
         val useSalt = salt ?: ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val derived = TransferKey(digest, useSalt, iterations, deriveKey(passphrase, useSalt, iterations), now)
+        val key = deriveKey(passphrase, useSalt, iterations)
         synchronized(transferKeys) {
-            transferKeys.addFirst(derived)
-            while (transferKeys.size > MAX_TRANSFER_KEYS) transferKeys.removeLast().key.fill(0)
+            if (transferKeyCacheDepth > 0) {
+                transferKeys.addFirst(TransferKey(digest, useSalt, iterations, key.copyOf(), now))
+                while (transferKeys.size > MAX_TRANSFER_KEYS) transferKeys.removeLast().wipe()
+            } else {
+                digest.fill(0)
+            }
         }
-        return derived
+        return useSalt to key
     }
 
     private fun clearTransferKeys() {
-        synchronized(transferKeys) {
-            transferKeys.forEach { it.key.fill(0) }
-            transferKeys.clear()
-        }
+        synchronized(transferKeys) { wipeTransferKeysLocked() }
+    }
+
+    private fun wipeTransferKeysLocked() {
+        transferKeys.forEach { it.wipe() }
+        transferKeys.clear()
     }
 
     private fun encryptTransferPayload(value: String, passphrase: String): String {
-        val transferKey = transferKey(passphrase, salt = null, CURRENT_EXPORT_KDF_ITERATIONS)
-        val salt = transferKey.salt
-        val key = transferKey.key
+        val (salt, key) = transferKey(passphrase, salt = null, CURRENT_EXPORT_KDF_ITERATIONS)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val secretKey = SecretKeySpec(key, "AES")
+        val secretKey = try { SecretKeySpec(key, "AES") } finally { key.fill(0) }
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
         val encrypted = cipher.doFinal(value.toByteArray(StandardCharsets.UTF_8))
         val payload = JSONObject().apply {
@@ -1267,7 +1306,8 @@ object SecurityManager {
         }
         val cipherBytes = Base64.decode(json.getString("cipher"), Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val secretKey = SecretKeySpec(transferKey(passphrase, salt, iterations).key, "AES")
+        val key = transferKey(passphrase, salt, iterations).second
+        val secretKey = try { SecretKeySpec(key, "AES") } finally { key.fill(0) }
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
         return String(cipher.doFinal(cipherBytes), StandardCharsets.UTF_8)
     }
