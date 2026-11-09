@@ -46,8 +46,14 @@ fun processHostQrImport(
     return HostQrImportResult.Ready(
         HostQrImportData(
             // A scanned QR code can come from anyone: a startup command would run on the server at every connect
-            // without being seen, and identity/forward ids would attach this host to your own keys and forwards.
-            host = imported.copy(startupScript = "", preferredIdentityId = null, preferredForwardId = null),
+            // without being seen, identity/forward ids would attach this host to your own keys and forwards, and
+            // the legacy-algorithms switch would quietly allow SHA-1 and CBC. Turn that on yourself if the host needs it.
+            host = imported.copy(
+                startupScript = "",
+                preferredIdentityId = null,
+                preferredForwardId = null,
+                allowLegacyAlgorithms = false
+            ),
             targetId = targetId,
             encryptedPasswordPayload = payload.encryptedPasswordPayload
         )

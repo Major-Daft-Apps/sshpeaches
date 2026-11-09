@@ -77,6 +77,17 @@ class QrImportHandlersTest {
     }
 
     @Test
+    fun hostImport_neverTurnsOnLegacyAlgorithms() {
+        val shared = sampleHost(id = "incoming", name = "old-router").copy(allowLegacyAlgorithms = true)
+        val payload = encodeHostPayload(shared, encryptedPasswordPayload = null)
+        assertTrue("the QR carries the setting", decodeHostFromQr(payload)!!.host.allowLegacyAlgorithms)
+
+        val ready = (processHostQrImport(payload, emptyList()) as HostQrImportResult.Ready).data
+
+        assertEquals(false, ready.host.allowLegacyAlgorithms)
+    }
+
+    @Test
     fun identityImport_invalidPayload_returnsError() {
         val result = processIdentityQrImport("not-base64", emptyList())
         assertTrue(result is IdentityQrImportResult.Error)
