@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the app's mosh-client from source for Android: mosh 1.4.0's client with protobuf-lite 3.21, OpenSSL 3.0's
+# Builds the app's mosh-client from source for Android: mosh 1.4.0's client with protobuf-lite 3.21, OpenSSL 3.5's
 # libcrypto, ncurses 6.5 and libc++ linked in statically, so it loads only Android's own libc, libm, libdl and libz.
 # The app runs it through /system/bin/linker64, which is why it stays a dynamically linked PIE rather than a fully
 # static binary. Also compiles the terminfo entries the app ships (xterm, xterm-256color, vt100) with ncurses' tic.
@@ -20,7 +20,7 @@ export SOURCE_DATE_EPOCH=1700000000 LC_ALL=C TZ=UTC ZERO_AR_DATE=1
 
 MOSH_VERSION=1.4.0
 PROTOBUF_VERSION=3.21.12
-OPENSSL_VERSION=3.0.22
+OPENSSL_VERSION=3.5.9
 NCURSES_VERSION=6.5
 
 fetch() { # name url sha256
@@ -40,7 +40,7 @@ fetch protobuf-cpp-$PROTOBUF_VERSION.tar.gz \
     4eab9b524aa5913c6fffb20b2a8abf5ef7f95a80bc0701f3a6dbb4c607f73460
 fetch openssl-$OPENSSL_VERSION.tar.gz \
     https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz \
-    67ebca7e50d17383028045486653492195b83db95f8558709701bb47b5c1ef81
+    603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 fetch ncurses-$NCURSES_VERSION.tar.gz \
     https://ftp.gnu.org/gnu/ncurses/ncurses-$NCURSES_VERSION.tar.gz \
     136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6
