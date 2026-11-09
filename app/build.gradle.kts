@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.api.tasks.bundling.Zip
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 // The F-Droid edition (-Pdistribution=fdroid): its own package name, and none of Google's libraries or Gradle plugins
 // (Firebase Crashlytics, Analytics and App Check, Play's in-app review). The default build is the Google Play app.
@@ -578,6 +580,34 @@ val packageReleaseNativeDebugSymbols = tasks.register<Zip>("packageReleaseNative
 
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     finalizedBy(packageReleaseNativeDebugSymbols)
+}
+
+/** LOAD segments of a 64-bit ELF file aligned to less than 16 KB (empty for anything else). */
+fun under16KbLoadSegments(so: File): List<Long> {
+    val bytes = so.readBytes()
+    if (bytes.size < 64 || bytes[0] != 0x7f.toByte() || bytes[1] != 'E'.code.toByte() || bytes[4].toInt() != 2) {
+        return emptyList()
+    }
+    val elf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+    val headersAt = elf.getLong(0x20).toInt()
+    val headerSize = elf.getShort(0x36).toInt()
+    return (0 until elf.getShort(0x38).toInt()).mapNotNull { i ->
+        val at = headersAt + i * headerSize
+        elf.getLong(at + 0x30).takeIf { elf.getInt(at) == 1 && it < 16_384 }
+    }
+}
+
+// Phones with 16 KB memory pages can't load a library with 4 KB-aligned segments, and emulators (4 KB pages) never
+// notice. Every native library the app packages is checked here: libtermux silently came out 4 KB-aligned once its
+// ndk-build lacked the linker flag.
+tasks.matching { Regex("merge\\w*NativeLibs").matches(it.name) }.configureEach {
+    doLast {
+        val misaligned = outputs.files.asFileTree.files
+            .filter { it.name.endsWith(".so") && under16KbLoadSegments(it).isNotEmpty() }
+            .map { "${it.parentFile.name}/${it.name}" }
+            .sorted()
+        check(misaligned.isEmpty()) { "Native libraries not 16 KB-aligned: ${misaligned.joinToString()}" }
+    }
 }
 
 tasks.register("connectedReleaseLaunchCheck") {
