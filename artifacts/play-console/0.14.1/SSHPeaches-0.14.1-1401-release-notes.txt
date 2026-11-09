@@ -1,0 +1,7 @@
+What's new in 0.14.1
+
+- Fixed an occasional crash after cancelling a Boost download.
+- Old SSH algorithms (SHA-1, CBC) are now off by default, as in OpenSSH. Turn them on for an old server in that host's settings.
+- Text copied from the terminal is cleared from the clipboard after a minute.
+- Stronger encryption for exported passwords and keys.
+- Security updates to the built-in Mosh client.
