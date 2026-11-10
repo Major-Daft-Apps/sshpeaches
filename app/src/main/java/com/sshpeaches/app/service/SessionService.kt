@@ -186,6 +186,8 @@ class SessionService : Service() {
     private var latencyJob: Job? = null
     /** Hosts where a Boost terminal couldn't start lately, so connecting there doesn't wait on it again for a while. */
     private val boostTerminalUnavailableUntil = ConcurrentHashMap<String, Long>()
+    /** Copies of the Boost helper to a server ("user@host:port") running behind a terminal. */
+    private val boostInstalls = ConcurrentHashMap<String, Pair<SSHClient, Job>>()
     /** The last state each Boost terminal reported, so a run of reconnect attempts is logged once. */
     private val boostTerminalStates = ConcurrentHashMap<String, String>()
     /** When each shell last sent anything, for [checkUnansweredInput]. */
@@ -4141,6 +4143,41 @@ class SessionService : Service() {
     }
 
     /**
+     * Copies the Boost helper to the server over [client] while the session is used over SSH; one copy per server at
+     * a time. It ends with the connection: a later session starts it again.
+     */
+    private fun installBoostHelperBehind(sessionId: String, hostKey: String, client: SSHClient) {
+        // A copy on a connection that has since died is on its way out: the new connection's waits its turn.
+        boostInstalls[hostKey]?.let { (copying, job) -> if (job.isActive && copying === client) return }
+        SessionLogBus.emit(
+            SessionLogBus.Entry(
+                hostId = sessionId,
+                level = SessionLogBus.LogLevel.INFO,
+                message = "Boost is being set up on this server in the background; this terminal uses SSH."
+            )
+        )
+        boostInstalls[hostKey] = client to serviceScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                client.newSFTPClient().use { sftp -> BoostHelper.install(this@SessionService, client, sftp) }
+            }
+            if (!client.isConnected) return@launch
+            val reason = result.exceptionOrNull()?.let { (it as? BoostUnavailable)?.message ?: (it.message ?: it.javaClass.simpleName) }
+            Log.i(FILE_BOOST_TAG, "Boost helper copy for $sessionId: ${reason ?: "done"}")
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = if (reason == null) {
+                        "Boost is set up on this server: the next terminal uses it."
+                    } else {
+                        "Boost couldn't be set up on this server: $reason."
+                    }
+                )
+            )
+        }
+    }
+
+    /**
      * Opens the terminal through Boost when it's on for terminals: the helper runs the login shell, reached over
      * UDP (or TCP), so the terminal survives the SSH connection and network changes. Null, and the caller opens an
      * SSH shell, when it's off, the host attaches tmux, or the helper can't start or be reached; a failure is
@@ -4170,12 +4207,13 @@ class SessionService : Service() {
             )
         }
         val (columns, rows) = shellSizes[sessionId] ?: (DEFAULT_SHELL_COLUMNS to DEFAULT_SHELL_ROWS)
-        // The first time, the helper is copied to the server, which can take a while on a slow link. Past the wait
-        // the terminal opens over SSH and the copy finishes in the background, for the next session.
+        // A terminal never waits for the helper's copy to the server (megabytes, minutes on a phone's uplink): without
+        // the helper it opens over SSH at once, the copy runs behind it, and the next terminal is on Boost.
         val start = serviceScope.async(Dispatchers.IO) {
             client.newSFTPClient().use { sftp ->
                 BoostHelper.start(
-                    this@SessionService, client, sftp, settings.boostTcpFallback, settings.boostPortRange, shells = true
+                    this@SessionService, client, sftp, settings.boostTcpFallback, settings.boostPortRange, shells = true,
+                    install = false
                 )
             }
         }
@@ -4184,6 +4222,10 @@ class SessionService : Service() {
         } catch (error: CancellationException) {
             serviceScope.launch { runCatching { start.await().close() } }
             throw error
+        } catch (error: BoostNotInstalled) {
+            installBoostHelperBehind(sessionId, hostKey, client)
+            metrics.recordBoost("terminal", "setup_slow")
+            return null
         } catch (error: Exception) {
             unavailable((error as? BoostUnavailable)?.message ?: (error.message ?: error.javaClass.simpleName), error)
             return null
@@ -5004,7 +5046,7 @@ class SessionService : Service() {
         private const val RECENT_LISTINGS = 5
         /** Finished transfers the pane keeps per session. */
         private const val MAX_FINISHED_TRANSFERS = 30
-        /** How long a session waits for its Boost terminal to start (installing the helper included). */
+        /** How long a session waits for its Boost terminal to start on a server that has the helper. */
         private const val BOOST_TERMINAL_START_TIMEOUT_MS = 20_000L
         /** How long a host whose Boost terminal couldn't start uses SSH without trying again. */
         private const val BOOST_TERMINAL_RETRY_MS = 30 * 60_000L

@@ -2,9 +2,17 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
-## 0.14.1 (1401)
+## 0.14.2 (1402)
 
 Not released yet.
+
+- **Fixed: the first connection to a server could take over a minute to open and then hang or drop, on mobile data and other slow uplinks.** Boost needs a helper program on the server, and 0.14.1 came with a new one (7 MB), so every server needed it again. The terminal waited up to 20 seconds for that copy, then opened over SSH on the same connection the copy was still using, with about a megabyte in flight ahead of everything else: opening the shell, every key press, every folder listing and the keepalive queued behind it. On a 64 KiB/s uplink the terminal took 69 seconds to appear and typing got no answer for many seconds; on slower links the "is the server there?" check gave up and dropped the connection, and the copy began again from nothing after the reconnect. Now a terminal never waits for the copy: without the helper it opens over SSH at once, the helper is copied behind it in small pieces (at most 32 KiB in flight), and the next terminal uses Boost. The file browser's copy is paced the same way. On the same link the terminal opens in under a second and stays responsive throughout.
+- A terminal and a file browser opened together on a server without the helper no longer both copy it, each truncating the other's file.
+- New device test, part of the release gate (`LiveSlowLinkFirstConnectTest`): a first connection, with the default settings and no helper on the server, through a rate-limited link; the terminal and the file browser must open at once and keep answering while the helper is copied. The gate now also runs the Boost terminal and Boost file tests, which it had left out.
+
+## 0.14.1 (1401)
+
+Sent to Google Play open testing on 2026-11-10.
 
 - **F-Droid edition** (`com.majordaftapps.sshpeaches.fdroid`, built with `-Pdistribution=fdroid`): no Google libraries at all, so no crash reports, analytics, App Check or Play's review prompt; "Report a problem" copies the report for pasting instead of sending it. It installs next to the Play app and is signed with its own key; F-Droid rebuilds it from source and checks its build matches the published APK byte for byte. Recipe in `tools/fdroid/`, signing with `tools/fdroid/sign.sh`.
 - The bundled mosh-client is built from source (`tools/mosh-client/build.sh`: mosh 1.4.0, protobuf-lite, the libcrypto of OpenSSL 3.5.9, the long-term support release, in place of the end-of-life 3.0 series, and ncurses) as one binary that loads only Android's own libraries, in place of the Termux package and its 57 shared libraries. It's 16 KB-aligned, so it runs on phones with 16 KB memory pages.

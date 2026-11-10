@@ -1,0 +1,3 @@
+What's new in 0.14.2
+
+- Fixed: on mobile data and other slow connections, the first connection to a server could take over a minute to open, then hang or disconnect, in both the terminal and the file browser. Boost was being set up on the server ahead of everything else. The terminal now opens at once and Boost is set up in the background.

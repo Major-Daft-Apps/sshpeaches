@@ -27,7 +27,10 @@ import net.schmizz.sshj.sftp.SFTPClient
 import org.json.JSONObject
 
 /** Boost couldn't start on this server; the reason says why, and the app uses SFTP or SSH. */
-internal class BoostUnavailable(message: String, cause: Throwable? = null) : IOException(message, cause)
+internal open class BoostUnavailable(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+/** This version's helper isn't on the server yet, and the caller asked not to wait for the copy ([BoostHelper.install]). */
+internal class BoostNotInstalled : BoostUnavailable("Boost is still being set up on this server")
 
 /**
  * Boost for one session: the sshpeaches-boost helper (tools/boost) running on the server, started over the
@@ -163,6 +166,9 @@ internal class BoostHelper private constructor(
         private const val READY_TIMEOUT_MS = 15_000L
         private const val DIAL_TIMEOUT_MS = 4_000L
         private const val IDLE_SECONDS = 600
+        /** The helper's copy to the server: bytes per write, and writes the server hasn't confirmed yet. */
+        private const val INSTALL_PIECE_BYTES = 16 * 1024
+        private const val INSTALL_WRITES_IN_FLIGHT = 2
         private const val ASSET_DIR = "boost"
         private const val REMOTE_DIR = ".cache/sshpeaches/boost"
         private const val UNANSWERED_UDP_PORT = 9L
@@ -192,7 +198,8 @@ internal class BoostHelper private constructor(
         }
 
         /**
-         * Starts Boost over [ssh]: uploads the helper with [sftp] when the server doesn't have this version,
+         * Starts Boost over [ssh]: copies the helper to the server with [sftp] when it doesn't have this version
+         * (or, with [install] off, throws [BoostNotInstalled] instead: a terminal mustn't wait for megabytes),
          * starts it on a port in [ports] (null for any), and connects to it at the address SSH is connected to.
          * Throws [BoostUnavailable] saying why it can't.
          */
@@ -202,11 +209,34 @@ internal class BoostHelper private constructor(
             sftp: SFTPClient,
             allowTcp: Boolean,
             ports: IntRange?,
-            shells: Boolean = false
+            shells: Boolean = false,
+            install: Boolean = true
         ): BoostHelper {
             if (!clientAvailable) throw BoostUnavailable("this phone's processor isn't supported")
             // The address SSH reached, so UDP goes to the same machine (and Go needs no DNS of its own on Android).
             val host = dialHostForTests ?: ssh.remoteAddress?.hostAddress ?: throw BoostUnavailable("the session isn't connected")
+            val helper = locate(context, ssh)
+            if (!helperPresent(ssh, sftp, helper)) {
+                if (!install) throw BoostNotInstalled()
+                install(context, ssh, sftp, helper)
+            }
+            return serve(ssh, host, helper.path, allowTcp, ports, shells)
+        }
+
+        /**
+         * Copies this version's helper to the server if it isn't there, for the next [start]. Slow links take
+         * minutes over it, so it runs behind a session that is already in use.
+         */
+        fun install(context: Context, ssh: SSHClient, sftp: SFTPClient) {
+            if (!clientAvailable) throw BoostUnavailable("this phone's processor isn't supported")
+            val helper = locate(context, ssh)
+            if (!helperPresent(ssh, sftp, helper)) install(context, ssh, sftp, helper)
+        }
+
+        /** Where this version's helper for the server's processor lives on the server, and what it must be. */
+        private class RemoteHelper(val arch: String, val dir: String, val path: String, val sha256: String, val size: Long)
+
+        private fun locate(context: Context, ssh: SSHClient): RemoteHelper {
             val system = runCommand(ssh, "uname -sm")?.trim().orEmpty()
             val arch = when {
                 !system.startsWith("Linux") -> throw BoostUnavailable("the server isn't Linux (${system.ifBlank { "unknown" }})")
@@ -217,12 +247,11 @@ internal class BoostHelper private constructor(
             val manifest = JSONObject(context.assets.open("$ASSET_DIR/manifest.json").bufferedReader().use { it.readText() })
             val expected = manifest.getJSONObject(arch)
             val sha256 = expected.getString("sha256")
-            val size = expected.getLong("size")
             val dir = "$REMOTE_DIR/${sha256.take(16)}"
-            val helper = "$dir/sshpeaches-boost"
-            if (!helperPresent(ssh, sftp, helper, sha256, size)) {
-                install(context, ssh, sftp, arch, dir, helper, sha256)
-            }
+            return RemoteHelper(arch, dir, "$dir/sshpeaches-boost", sha256, expected.getLong("size"))
+        }
+
+        private fun serve(ssh: SSHClient, host: String, helper: String, allowTcp: Boolean, ports: IntRange?, shells: Boolean): BoostHelper {
             val token = ByteArray(32).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }
             val channel = ssh.startSession()
             try {
@@ -277,12 +306,12 @@ internal class BoostHelper private constructor(
             }
         }
 
-        private fun helperPresent(ssh: SSHClient, sftp: SFTPClient, path: String, sha256: String, size: Long): Boolean {
-            val attributes = runCatching { sftp.stat(path) }.getOrNull() ?: return false
-            if (attributes.size != size) return false
+        private fun helperPresent(ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper): Boolean {
+            val attributes = runCatching { sftp.stat(helper.path) }.getOrNull() ?: return false
+            if (attributes.size != helper.size) return false
             // The directory is the user's own (0700) and named by the hash; the check also catches a damaged copy. A
             // copy that can't be hashed is uploaded again rather than run on its size alone.
-            return remoteSha256(ssh, path) == sha256
+            return remoteSha256(ssh, helper.path) == helper.sha256
         }
 
         /** The file's SHA-256 by whichever tool the server has, or null when none answers. */
@@ -294,7 +323,23 @@ internal class BoostHelper private constructor(
             )?.trim()?.substringBefore(' ')?.lowercase()?.takeIf { it.length == 64 }
         }
 
-        private fun install(context: Context, ssh: SSHClient, sftp: SFTPClient, arch: String, dir: String, path: String, sha256: String) {
+        /**
+         * One copy at a time per server: a terminal and a file browser opened together both found no helper, and each
+         * truncated the other's half-written file.
+         */
+        private val installLocks = ConcurrentHashMap<String, Any>()
+
+        private fun install(context: Context, ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper) {
+            val lock = installLocks.getOrPut("${ssh.remoteHostname}:${ssh.remotePort}/${helper.dir}") { Any() }
+            synchronized(lock) {
+                // Whoever held the lock may have just finished the same copy.
+                if (helperPresent(ssh, sftp, helper)) return
+                upload(context, ssh, sftp, helper)
+            }
+        }
+
+        private fun upload(context: Context, ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper) {
+            val (dir, path, sha256) = Triple(helper.dir, helper.path, helper.sha256)
             sftp.mkdirs(dir)
             for (own in listOf(".cache/sshpeaches", REMOTE_DIR, dir)) {
                 runCatching { sftp.chmod(own, 0b111_000_000) }
@@ -306,9 +351,15 @@ internal class BoostHelper private constructor(
                 EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC),
                 FileAttributes.Builder().withPermissions(0b111_000_000).build()
             ).use { remote ->
-                remote.RemoteFileOutputStream(0, 16).use { out ->
-                    context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-$arch").use { input ->
-                        val buffer = ByteArray(64 * 1024)
+                // The copy shares the session's connection, and whatever is in flight is ahead of every key press,
+                // folder listing and keepalive on it. At most INSTALL_WRITES_IN_FLIGHT pieces of INSTALL_PIECE_BYTES
+                // wait for the server, a fraction of a second's worth on a slow phone uplink. It was a megabyte
+                // (17 writes of 64 KiB): on such an uplink a terminal took over a minute to open, nothing typed was
+                // answered for many seconds, and the "is the server there?" check dropped the connection, after
+                // which the copy began again from nothing.
+                remote.RemoteFileOutputStream(0, INSTALL_WRITES_IN_FLIGHT - 1).use { out ->
+                    context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-${helper.arch}").use { input ->
+                        val buffer = ByteArray(INSTALL_PIECE_BYTES)
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
