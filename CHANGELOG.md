@@ -4,7 +4,7 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.14.2 (1402)
 
-Not released yet.
+Sent to Google Play open testing on 2026-11-10.
 
 - **Fixed: the first connection to a server could take over a minute to open and then hang or drop, on mobile data and other slow uplinks.** Boost needs a helper program on the server, and 0.14.1 came with a new one (7 MB), so every server needed it again. The terminal waited up to 20 seconds for that copy, then opened over SSH on the same connection the copy was still using, with about a megabyte in flight ahead of everything else: opening the shell, every key press, every folder listing and the keepalive queued behind it. On a 64 KiB/s uplink the terminal took 69 seconds to appear and typing got no answer for many seconds; on slower links the "is the server there?" check gave up and dropped the connection, and the copy began again from nothing after the reconnect. Now a terminal never waits for the copy: without the helper it opens over SSH at once, the helper is copied behind it in small pieces (at most 32 KiB in flight), and the next terminal uses Boost. The file browser's copy is paced the same way. On the same link the terminal opens in under a second and stays responsive throughout.
 - A terminal and a file browser opened together on a server without the helper no longer both copy it, each truncating the other's file.
