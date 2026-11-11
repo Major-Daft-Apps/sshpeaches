@@ -2,6 +2,12 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 0.15.1 (1501)
+
+Not released yet.
+
+- **Fixed: on a very slow or busy connection the terminal could fail to open with the server dropping the connection** ("Protocol error: you already have a pty."). When the server's answer to the terminal request took longer than 20 seconds, the app sent a second, plainer request; OpenSSH treats a second request as a protocol error and disconnects. The second request is now sent only when the server refused the first one. Seen once, on 0.14.1, while the Boost helper's copy was holding up the connection.
+
 ## 0.15.0 (1500)
 
 Sent to Google Play open testing on 2026-11-11.

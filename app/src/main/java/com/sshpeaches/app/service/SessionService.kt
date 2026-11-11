@@ -4342,7 +4342,7 @@ class SessionService : Service() {
         // so a shell left at the default thought it had more rows than the screen: tmux then drew its status
         // line below the bottom and scrolled the screen up a line on every redraw.
         val (columns, rows) = shellSizes[hostId] ?: (DEFAULT_SHELL_COLUMNS to DEFAULT_SHELL_ROWS)
-        val allocated = runCatching {
+        try {
             session.allocatePTY(
                 terminalEmulation.ptyName,
                 columns,
@@ -4351,8 +4351,14 @@ class SessionService : Service() {
                 0,
                 mutableMapOf<PTYMode, Int>()
             )
-        }.isSuccess
-        if (!allocated) {
+        } catch (error: Exception) {
+            // Only a server that said no gets the plain request. After a timeout the first request is still on its
+            // way (a slow or busy link), and OpenSSH drops the whole connection on a second one: "Protocol error:
+            // you already have a pty."
+            if (!mayAskForPtyAgain(error, session.isOpen)) {
+                runCatching { session.close() }
+                throw error
+            }
             session.allocateDefaultPTY()
         }
         // sshj's session channel is both a Command and a Shell, so an exec'd tmux behaves like a shell.
@@ -5519,3 +5525,12 @@ internal fun isGlobalRequestRefusal(error: Throwable): Boolean {
     return error is ConnectionException && error.cause == null &&
         message.startsWith("Global request [") && message.endsWith("] failed")
 }
+
+/**
+ * Whether a second pty request may follow one that ended in [error]. Only when the server answered and said no:
+ * after a timeout the first request may still be granted, and a second one on a session that has a pty makes
+ * OpenSSH disconnect ("Protocol error: you already have a pty.").
+ */
+internal fun mayAskForPtyAgain(error: Throwable, sessionOpen: Boolean): Boolean =
+    sessionOpen && error is ConnectionException &&
+        generateSequence<Throwable>(error) { it.cause }.take(8).none { it is TimeoutException || it is InterruptedException }
