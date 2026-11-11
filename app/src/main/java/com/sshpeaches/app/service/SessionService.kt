@@ -30,6 +30,7 @@ import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.settings.DEFAULT_MOSH_SERVER_COMMAND
@@ -49,6 +50,8 @@ import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider.HostKeyPrompt
 import com.majordaftapps.sshpeaches.app.security.SecurityManager
 import com.majordaftapps.sshpeaches.app.ui.logging.UiDebugLog
 import com.majordaftapps.sshpeaches.app.ui.terminal.TermuxTerminalEngine
+import com.majordaftapps.sshpeaches.app.util.REMOTE_FORWARD_REFUSED_HINT
+import com.majordaftapps.sshpeaches.app.util.displayName
 import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
 import com.majordaftapps.sshpeaches.app.util.legacyLoopbackDestinationHost
 import com.majordaftapps.sshpeaches.app.widget.HostWidgets
@@ -112,6 +115,9 @@ import net.schmizz.keepalive.KeepAliveRunner
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.common.SSHPacket
 import net.schmizz.sshj.connection.ConnectionException
+import net.schmizz.sshj.connection.channel.OpenFailException
+import net.schmizz.sshj.connection.channel.forwarded.ConnectListener
+import net.schmizz.sshj.connection.channel.forwarded.RemotePortForwarder
 import net.schmizz.sshj.connection.channel.Channel
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.direct.PTYMode
@@ -2884,18 +2890,12 @@ class SessionService : Service() {
     ): List<PortForwardBinding> {
         val bindings = mutableListOf<PortForwardBinding>()
         forwards.forEach { forward ->
-            if (forward.type != com.majordaftapps.sshpeaches.app.data.model.PortForwardType.LOCAL) {
-                SessionLogBus.emit(
-                    SessionLogBus.Entry(
-                        hostId = hostId,
-                        level = SessionLogBus.LogLevel.WARN,
-                        message = "Only Local forwarding is supported. Skipping ${forward.label} (${forward.type})."
-                    )
-                )
-                return@forEach
-            }
             runCatching {
-                val binding = startLocalPortForward(hostId, client, sessionHost, forward)
+                val binding = when (forward.type) {
+                    PortForwardType.LOCAL -> startLocalPortForward(hostId, client, sessionHost, forward)
+                    PortForwardType.REMOTE -> startRemotePortForward(hostId, client, forward)
+                    PortForwardType.DYNAMIC -> startDynamicPortForward(hostId, client, forward)
+                }
                 bindings += binding
                 SessionLogBus.emit(
                     SessionLogBus.Entry(
@@ -2909,7 +2909,8 @@ class SessionService : Service() {
                     SessionLogBus.Entry(
                         hostId = hostId,
                         level = SessionLogBus.LogLevel.ERROR,
-                        message = "Failed to start ${forward.type} forward ${forward.label}: ${err.message ?: "unknown error"}"
+                        message = "Failed to start ${forward.type.displayName()} forward ${forward.label}: " +
+                            portForwardStartFailure(forward, err)
                     )
                 )
             }
@@ -3006,10 +3007,30 @@ class SessionService : Service() {
             runCatching { acceptedSocket.close() }
             throw err
         }
+        bridgePortForwardStreams(
+            hostId = hostId,
+            forward = forward,
+            socket = acceptedSocket,
+            channelInput = directConnection.inputStream,
+            channelOutput = directConnection.outputStream,
+            closeChannel = { directConnection.close() }
+        )
+    }
+
+    /** Copies both ways between a socket on this phone and an SSH channel until either side ends. */
+    private suspend fun bridgePortForwardStreams(
+        hostId: String,
+        forward: PortForward,
+        socket: Socket,
+        channelInput: InputStream,
+        channelOutput: OutputStream,
+        closeChannel: () -> Unit
+    ) {
+        val acceptedSocket = socket
         val acceptedInput = acceptedSocket.getInputStream()
         val acceptedOutput = acceptedSocket.getOutputStream()
-        val remoteInput = directConnection.inputStream
-        val remoteOutput = directConnection.outputStream
+        val remoteInput = channelInput
+        val remoteOutput = channelOutput
         val upstreamJob = serviceScope.launch(Dispatchers.IO) {
             runCatching {
                 copyPortForwardStream(
@@ -3052,8 +3073,205 @@ class SessionService : Service() {
         } finally {
             upstreamJob.cancel()
             downstreamJob.cancel()
+            runCatching { closeChannel() }
+            runCatching { acceptedSocket.close() }
+        }
+    }
+
+    /**
+     * Remote forward (ssh -R): the server listens on the forward's source address, and each connection it
+     * accepts comes back over SSH and is connected, from this phone, to the destination.
+     */
+    private fun startRemotePortForward(
+        hostId: String,
+        client: SSHClient,
+        forward: PortForward
+    ): PortForwardBinding {
+        val bindHost = normalizeBindHost(forward.sourceHost)
+        val bindPort = requireValidPort(forward.sourcePort, "source")
+        val destinationHost = forward.inferredDestinationHost()
+        val destinationPort = requireValidPort(forward.destinationPort, "destination")
+        val connectionJobs = Collections.synchronizedSet(mutableSetOf<Job>())
+        val closed = AtomicBoolean(false)
+        val listener = ConnectListener { channel ->
+            if (closed.get()) {
+                runCatching { channel.reject(OpenFailException.Reason.ADMINISTRATIVELY_PROHIBITED, "forward closed") }
+                return@ConnectListener
+            }
+            val socket = Socket()
+            try {
+                socket.tcpNoDelay = true
+                socket.connect(InetSocketAddress(destinationHost, destinationPort), PORT_FORWARD_CONNECT_TIMEOUT_MS)
+            } catch (err: IOException) {
+                runCatching { socket.close() }
+                runCatching { channel.reject(OpenFailException.Reason.CONNECT_FAILED, "connection failed") }
+                emitPortForwardConnectionWarning(hostId, forward, err)
+                return@ConnectListener
+            }
+            try {
+                channel.confirm()
+            } catch (err: IOException) {
+                runCatching { socket.close() }
+                return@ConnectListener
+            }
+            val connectionJob = serviceScope.launch(Dispatchers.IO) {
+                runCatching {
+                    bridgePortForwardStreams(
+                        hostId = hostId,
+                        forward = forward,
+                        socket = socket,
+                        channelInput = channel.inputStream,
+                        channelOutput = channel.outputStream,
+                        closeChannel = { channel.close() }
+                    )
+                }.onFailure { err ->
+                    if (!isExpectedForwardStreamException(err)) {
+                        emitPortForwardConnectionWarning(hostId, forward, err)
+                    }
+                }
+            }
+            connectionJobs += connectionJob
+            connectionJob.invokeOnCompletion {
+                connectionJobs.remove(connectionJob)
+                runCatching { socket.close() }
+                runCatching { channel.close() }
+            }
+        }
+        val bound = client.remotePortForwarder.bind(RemotePortForwarder.Forward(bindHost, bindPort), listener)
+        return PortForwardBinding(
+            forwardId = forward.id,
+            summary = "Remote forward active: server $bindHost:${bound.port} -> $destinationHost:$destinationPort",
+            close = {
+                closed.set(true)
+                // Ask the server to stop listening, without holding up the caller: on a dying connection the
+                // request waits for an answer that never comes, and the server drops the listener anyway.
+                if (client.isConnected) {
+                    serviceScope.launch(Dispatchers.IO) { runCatching { client.remotePortForwarder.cancel(bound) } }
+                }
+                synchronized(connectionJobs) { connectionJobs.toList() }.forEach { it.cancel() }
+            }
+        )
+    }
+
+    /**
+     * Dynamic forward (ssh -D): a SOCKS proxy on this phone. Each client names a destination, which is
+     * opened from the server.
+     */
+    private fun startDynamicPortForward(
+        hostId: String,
+        client: SSHClient,
+        forward: PortForward
+    ): PortForwardBinding {
+        val bindHost = normalizeBindHost(forward.sourceHost)
+        val bindPort = requireValidPort(forward.sourcePort, "source")
+        val serverSocket = ServerSocket()
+        serverSocket.reuseAddress = true
+        serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        val connectionJobs = Collections.synchronizedSet(mutableSetOf<Job>())
+        val serverRefusalReported = AtomicBoolean(false)
+        val acceptThread = Thread({
+            while (!serverSocket.isClosed && !Thread.currentThread().isInterrupted) {
+                val socket = try {
+                    serverSocket.accept()
+                } catch (err: IOException) {
+                    if (!isExpectedForwardCloseException(serverSocket, err)) {
+                        emitPortForwardWarning(hostId, forward, err)
+                    }
+                    break
+                }
+                socket.tcpNoDelay = true
+                val connectionJob = serviceScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        bridgeDynamicPortForwardConnection(hostId, client, forward, socket, serverRefusalReported)
+                    }.onFailure { err ->
+                        // A client that speaks something else, or gives up mid-handshake, is not worth a warning.
+                        if (err !is SocksException && !isExpectedForwardStreamException(err)) {
+                            emitPortForwardConnectionWarning(hostId, forward, err)
+                        }
+                    }
+                }
+                connectionJobs += connectionJob
+                connectionJob.invokeOnCompletion {
+                    connectionJobs.remove(connectionJob)
+                    runCatching { socket.close() }
+                }
+            }
+        }, "sshpeaches-socks-forward-$bindPort").apply {
+            isDaemon = true
+            start()
+        }
+        return PortForwardBinding(
+            forwardId = forward.id,
+            summary = "Dynamic forward active: SOCKS proxy on $bindHost:$bindPort",
+            close = {
+                runCatching { serverSocket.close() }
+                acceptThread.interrupt()
+                synchronized(connectionJobs) { connectionJobs.toList() }.forEach { it.cancel() }
+            }
+        )
+    }
+
+    private suspend fun bridgeDynamicPortForwardConnection(
+        hostId: String,
+        client: SSHClient,
+        forward: PortForward,
+        acceptedSocket: Socket,
+        serverRefusalReported: AtomicBoolean
+    ) {
+        // The handshake is a few bytes: a client that stalls must not hold a thread.
+        acceptedSocket.soTimeout = SOCKS_HANDSHAKE_TIMEOUT_MS
+        val request = try {
+            SocksHandshake.readRequest(acceptedSocket.getInputStream(), acceptedSocket.getOutputStream())
+        } catch (err: IOException) {
+            runCatching { acceptedSocket.close() }
+            throw err
+        }
+        val directConnection = try {
+            client.newDirectConnection(request.host, request.port)
+        } catch (err: IOException) {
+            val outcome = when ((err as? OpenFailException)?.reason) {
+                OpenFailException.Reason.ADMINISTRATIVELY_PROHIBITED -> SocksOutcome.NOT_ALLOWED
+                OpenFailException.Reason.CONNECT_FAILED -> SocksOutcome.REFUSED
+                else -> SocksOutcome.FAILED
+            }
+            runCatching { request.reply(outcome) }
+            runCatching { acceptedSocket.close() }
+            // The destination being down is the client's business, like any proxy. A refusal by the server
+            // means the forward cannot work at all: say so once, not for every connection of a browser.
+            if (outcome == SocksOutcome.NOT_ALLOWED && serverRefusalReported.compareAndSet(false, true)) {
+                emitPortForwardConnectionWarning(
+                    hostId,
+                    forward,
+                    IOException("the server does not allow forwarding (AllowTcpForwarding in its sshd_config)")
+                )
+            }
+            return
+        }
+        try {
+            request.reply(SocksOutcome.CONNECTED)
+            acceptedSocket.soTimeout = 0
+        } catch (err: IOException) {
             runCatching { directConnection.close() }
             runCatching { acceptedSocket.close() }
+            throw err
+        }
+        bridgePortForwardStreams(
+            hostId = hostId,
+            forward = forward,
+            socket = acceptedSocket,
+            channelInput = directConnection.inputStream,
+            channelOutput = directConnection.outputStream,
+            closeChannel = { directConnection.close() }
+        )
+    }
+
+    /** Why a forward did not start, with what to check when the server refused a remote forward. */
+    private fun portForwardStartFailure(forward: PortForward, err: Throwable): String {
+        val reason = err.message ?: "unknown error"
+        return if (forward.type == PortForwardType.REMOTE && err is ConnectionException) {
+            "$reason. $REMOTE_FORWARD_REFUSED_HINT"
+        } else {
+            reason
         }
     }
 
@@ -3078,7 +3296,7 @@ class SessionService : Service() {
             SessionLogBus.Entry(
                 hostId = hostId,
                 level = SessionLogBus.LogLevel.WARN,
-                message = "Local forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
+                message = "${forward.type.displayName()} forward ${forward.label} stopped: ${err.message ?: "unknown error"}"
             )
         )
     }
@@ -3089,7 +3307,7 @@ class SessionService : Service() {
             SessionLogBus.Entry(
                 hostId = hostId,
                 level = SessionLogBus.LogLevel.WARN,
-                message = "Local forward ${forward.label} connection failed: ${err.message ?: "unknown error"}"
+                message = "${forward.type.displayName()} forward ${forward.label} connection failed: ${err.message ?: "unknown error"}"
             )
         )
     }
@@ -5053,6 +5271,8 @@ class SessionService : Service() {
         private const val MAX_EDITABLE_FILE_BYTES = 1024L * 1024L
         /** How long to keep reading a background command's output after it ran (or timed out). */
         private const val REMOTE_OUTPUT_DRAIN_MS = 2_000L
+        private const val PORT_FORWARD_CONNECT_TIMEOUT_MS = 10_000
+        private const val SOCKS_HANDSHAKE_TIMEOUT_MS = 10_000
         private const val MAX_OS_VERSION_LABEL_LENGTH = 32
         private const val PARTIAL_DOWNLOAD_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         // Attach to (or create) tmux session "sshpeaches"; without tmux, fall back to the login shell.

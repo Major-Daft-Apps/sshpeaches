@@ -81,7 +81,9 @@ fun decodeForwardFromQr(contents: String): PortForward? = runCatching {
         createdEpochMillis = json.optNullableLong("createdEpochMillis"),
         updatedEpochMillis = json.optNullableLong("updatedEpochMillis"),
         lastUsedEpochMillis = json.optNullableLong("lastUsedEpochMillis"),
-        type = PortForwardType.LOCAL,
+        type = runCatching {
+            PortForwardType.valueOf(json.optString("type", PortForwardType.LOCAL.name).trim().uppercase())
+        }.getOrDefault(PortForwardType.LOCAL),
         sourceHost = json.optString("bind", "127.0.0.1"),
         sourcePort = json.optInt("srcPort", 0),
         destinationHost = json.optString("dstHost", ""),

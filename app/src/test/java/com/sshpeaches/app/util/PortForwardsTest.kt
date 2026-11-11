@@ -11,6 +11,20 @@ import org.junit.Test
 class PortForwardsTest {
 
     @Test
+    fun summary_saysWhereEachTypeListensAndLeads() {
+        val local = sampleForward(destinationHost = "db.internal", associatedHosts = emptyList())
+        assertEquals("127.0.0.1:8080 \u2192 db.internal:443", local.summary())
+        assertEquals(
+            "Server 127.0.0.1:8080 \u2192 db.internal:443",
+            local.copy(type = PortForwardType.REMOTE).summary()
+        )
+        assertEquals(
+            "SOCKS proxy on 127.0.0.1:8080",
+            local.copy(type = PortForwardType.DYNAMIC, destinationHost = "", destinationPort = 0).summary()
+        )
+    }
+
+    @Test
     fun normalizeAssociatedHostIds_keepsOnlyFirstDistinctHost() {
         val normalized = normalizeAssociatedHostIds(listOf("", "host-1", "host-1", "host-2"))
 

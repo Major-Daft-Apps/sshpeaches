@@ -33,6 +33,7 @@ import com.majordaftapps.sshpeaches.app.util.SshKeyGenerator
 import com.majordaftapps.sshpeaches.app.util.computeSshPublicKeyFingerprint
 import com.majordaftapps.sshpeaches.app.util.importedKeyMatchesFingerprint
 import com.majordaftapps.sshpeaches.app.util.snippetReference
+import com.majordaftapps.sshpeaches.app.util.summary
 import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -1159,10 +1160,7 @@ class AppViewModel(
             logResult("addPortForward", false, "validation-failed-no-host")
             return
         }
-        if (type != PortForwardType.LOCAL) {
-            logAction("addPortForward.localOnly", "requestedType=$type")
-        }
-        val normalizedType = PortForwardType.LOCAL
+        val normalizedType = type
         val now = System.currentTimeMillis()
         val forward = PortForward(
             id = UUID.randomUUID().toString(),
@@ -1174,8 +1172,9 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = sourcePort,
-            destinationHost = destinationHost.trim().ifBlank { "127.0.0.1" },
-            destinationPort = destPort,
+            // A dynamic forward has no destination of its own.
+            destinationHost = if (type == PortForwardType.DYNAMIC) "" else destinationHost.trim().ifBlank { "127.0.0.1" },
+            destinationPort = if (type == PortForwardType.DYNAMIC) 0 else destPort,
             associatedHosts = normalizedAssociatedHosts,
             favorite = false,
             enabled = enabled
@@ -1187,7 +1186,8 @@ class AppViewModel(
 
     fun importPortForward(forward: PortForward) {
         logAction("importPortForward", "forwardId=${forward.id}, favorite=${forward.favorite}, enabled=${forward.enabled}")
-        if (forward.label.isBlank() || forward.destinationHost.isBlank()) {
+        val dynamic = forward.type == PortForwardType.DYNAMIC
+        if (forward.label.isBlank() || (!dynamic && forward.destinationHost.isBlank())) {
             logResult("importPortForward", false, "validation-failed")
             return
         }
@@ -1196,11 +1196,10 @@ class AppViewModel(
             group = forward.group?.trim()?.takeIf { it.isNotEmpty() },
             createdEpochMillis = forward.createdEpochMillis ?: System.currentTimeMillis(),
             updatedEpochMillis = forward.updatedEpochMillis ?: forward.createdEpochMillis ?: System.currentTimeMillis(),
-            type = PortForwardType.LOCAL,
             sourceHost = forward.sourceHost.ifBlank { "127.0.0.1" },
             sourcePort = forward.sourcePort.coerceIn(1, 65_535),
-            destinationHost = forward.destinationHost.trim(),
-            destinationPort = forward.destinationPort.coerceIn(1, 65_535)
+            destinationHost = if (dynamic) "" else forward.destinationHost.trim(),
+            destinationPort = if (dynamic) 0 else forward.destinationPort.coerceIn(1, 65_535)
         )
         launchLogged("importPortForward", "forwardId=${normalized.id}") {
             repository.addPortForward(normalized)
@@ -1233,10 +1232,7 @@ class AppViewModel(
             logResult("updatePortForward", false, "validation-failed-no-host")
             return
         }
-        if (type != PortForwardType.LOCAL) {
-            logAction("updatePortForward.localOnly", "requestedType=$type")
-        }
-        val normalizedType = PortForwardType.LOCAL
+        val normalizedType = type
         val now = System.currentTimeMillis()
         val updated = existing.copy(
             label = label.ifBlank { existing.label },
@@ -1246,8 +1242,8 @@ class AppViewModel(
             type = normalizedType,
             sourceHost = sourceHost.ifBlank { existing.sourceHost },
             sourcePort = sourcePort,
-            destinationHost = destinationHost.trim().ifBlank { "127.0.0.1" },
-            destinationPort = destPort,
+            destinationHost = if (type == PortForwardType.DYNAMIC) "" else destinationHost.trim().ifBlank { "127.0.0.1" },
+            destinationPort = if (type == PortForwardType.DYNAMIC) 0 else destPort,
             enabled = enabled,
             associatedHosts = normalizedAssociatedHosts
         )
@@ -1986,7 +1982,7 @@ private fun buildHomeRecents(
                         entityId = forward.id,
                         type = HomeRecentType.PORT_FORWARD,
                         title = forward.label,
-                        subtitle = "${forward.sourceHost}:${forward.sourcePort} -> ${forward.destinationHost}:${forward.destinationPort}",
+                        subtitle = forward.summary(),
                         sortEpochMillis = epoch,
                         favorite = forward.favorite
                     )

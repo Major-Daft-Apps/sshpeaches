@@ -1,5 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import com.majordaftapps.sshpeaches.app.util.summary
+import com.majordaftapps.sshpeaches.app.util.displayName
 import android.text.format.DateUtils
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
@@ -339,7 +341,7 @@ fun HomeScreen(
                                 onOverflowDismiss = { overflowFavoriteKey.value = null },
                                 overflowButtonTag = UiTestTags.homeFavoriteOverflowButton("forward_${forward.id}"),
                                 title = forward.label,
-                                subtitle = "${forward.sourceHost}:${forward.sourcePort} -> ${forward.destinationHost}:${forward.destinationPort}",
+                                subtitle = forward.summary(),
                                 icon = Icons.Default.Bolt,
                                 onToggleFavorite = { onToggleFavorite(forward.id) }
                             ) {

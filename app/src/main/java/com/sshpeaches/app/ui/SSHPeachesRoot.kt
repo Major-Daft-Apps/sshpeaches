@@ -1379,9 +1379,14 @@ fun SSHPeachesRoot(
                 val label = item.optString("label").trim().ifBlank { "Imported Forward" }
                 val sourceHost = "127.0.0.1"
                 val sourcePort = item.optInt("sourcePort", 1).coerceIn(1, 65_535)
-                val destinationHost = item.optString("destinationHost").trim()
-                val destinationPort = item.optInt("destinationPort", 1).coerceIn(1, 65_535)
-                if (destinationHost.isBlank()) continue
+                val forwardType = runCatching {
+                    PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
+                }.getOrDefault(PortForwardType.LOCAL)
+                // A dynamic forward (SOCKS proxy) has no destination; the others need one.
+                val dynamicForward = forwardType == PortForwardType.DYNAMIC
+                val destinationHost = if (dynamicForward) "" else item.optString("destinationHost").trim()
+                val destinationPort = if (dynamicForward) 0 else item.optInt("destinationPort", 1).coerceIn(1, 65_535)
+                if (!dynamicForward && destinationHost.isBlank()) continue
 
                 val exportedId = item.optString("id").trim().ifBlank { UUID.randomUUID().toString() }
                 val key = forwardTransferKey(
@@ -1408,9 +1413,7 @@ fun SSHPeachesRoot(
                             ?: optNullableLong(item, "createdEpochMillis")
                             ?: System.currentTimeMillis(),
                         lastUsedEpochMillis = optNullableLong(item, "lastUsedEpochMillis"),
-                        type = runCatching {
-                            PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
-                        }.getOrDefault(PortForwardType.LOCAL),
+                        type = forwardType,
                         sourceHost = sourceHost,
                         sourcePort = sourcePort,
                         destinationHost = destinationHost,

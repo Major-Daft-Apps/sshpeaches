@@ -83,6 +83,45 @@ class PortForwardCrudTest {
     }
 
     @Test
+    fun addDynamicAndRemoteForwards_showTheirTypeAndFields() {
+        val host = sampleHost(id = "host-forward-types", name = "QA Host", address = "qa.internal")
+        AppStateSeeder.seedHost(host)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.navigateDrawer(Routes.FORWARDS)
+
+        // Dynamic: a SOCKS proxy has no destination to fill in.
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.FORWARDS)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).performTextInput("Proxy")
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).assertExists()
+        composeRule.onNodeWithTag(UiTestTags.forwardTypeOption("DYNAMIC")).performScrollTo().performClick()
+        composeRule.onAllNodesWithTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).assertCountEquals(0)
+        composeRule.onNodeWithText("Local SOCKS port").assertExists()
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT).performTextReplacement("1080")
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("SOCKS proxy on 127.0.0.1:1080").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Dynamic").assertIsDisplayed()
+
+        // Remote: the listening side is the server.
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.FORWARDS)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_LABEL_INPUT).performTextInput("Reverse")
+        composeRule.onNodeWithTag(UiTestTags.forwardTypeOption("REMOTE")).performScrollTo().performClick()
+        composeRule.onNodeWithText("Server port").assertExists()
+        composeRule.onNodeWithText("Server bind address").assertExists()
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT).performTextReplacement("9000")
+        composeRule.onNodeWithTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT).performScrollTo().performTextReplacement("8080")
+        composeRule.dismissSoftKeyboard()
+        composeRule.clickNodeWithTag(UiTestTags.FORWARD_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("Server 127.0.0.1:9000 \u2192 127.0.0.1:8080").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Remote").assertIsDisplayed()
+    }
+
+    @Test
     fun editAndDeleteSeededPortForward() {
         val host = sampleHost(id = "host-forward-edit", name = "Seed Host", address = "seed.internal")
         AppStateSeeder.seedHost(host)

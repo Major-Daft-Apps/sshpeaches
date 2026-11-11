@@ -91,7 +91,14 @@ enum class TerminalEmulation(val ptyName: String, val label: String) {
     VT100("vt100", "vt100")
 }
 
-enum class PortForwardType { LOCAL }
+/**
+ * LOCAL (ssh -L): a port on this phone leads to the destination, reached from the server.
+ * REMOTE (ssh -R): a port on the server leads to the destination, reached from this phone; the source
+ * host and port are the server's.
+ * DYNAMIC (ssh -D): a SOCKS proxy on this phone; each connection names its own destination, so the
+ * forward has none.
+ */
+enum class PortForwardType { LOCAL, REMOTE, DYNAMIC }
 
 enum class BackgroundBehavior { INHERIT, ALWAYS_ALLOW, ALWAYS_STOP }
 

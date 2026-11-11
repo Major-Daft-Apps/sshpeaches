@@ -99,32 +99,45 @@ object OpenSshConfigImporter {
                 identityFiles = identityFiles
             )
 
-            options.all("localforward").forEachIndexed { index, value ->
-                val parsedForward = parseLocalForward(value)
-                if (parsedForward == null) {
-                    warnings += "Skipped LocalForward for $alias: $value"
-                    return@forEachIndexed
+            // LocalForward, RemoteForward and DynamicForward. All are imported bound to loopback (this phone's
+            // for Local and Dynamic, the server's for Remote) and switched off.
+            val forwardKinds = listOf(
+                Triple("localforward", "LocalForward", PortForwardType.LOCAL),
+                Triple("remoteforward", "RemoteForward", PortForwardType.REMOTE),
+                Triple("dynamicforward", "DynamicForward", PortForwardType.DYNAMIC)
+            )
+            forwardKinds.forEach { (keyword, directive, type) ->
+                options.all(keyword).forEachIndexed { index, value ->
+                    val parsedForward = if (type == PortForwardType.DYNAMIC) {
+                        parseDynamicForward(value)
+                    } else {
+                        parseLocalForward(value)
+                    }
+                    if (parsedForward == null) {
+                        warnings += "Skipped $directive for $alias: $value"
+                        return@forEachIndexed
+                    }
+                    val forward = PortForward(
+                        id = idProvider(),
+                        label = "$alias ${type.name.lowercase()} ${parsedForward.sourcePort}",
+                        group = "OpenSSH",
+                        type = type,
+                        sourceHost = parsedForward.sourceHost,
+                        sourcePort = parsedForward.sourcePort,
+                        destinationHost = parsedForward.destinationHost,
+                        destinationPort = parsedForward.destinationPort,
+                        associatedHosts = listOf(hostId),
+                        enabled = false,
+                        createdEpochMillis = now,
+                        updatedEpochMillis = now
+                    )
+                    val key = forward.forwardKey()
+                    if (!seenForwardKeys.add(key)) {
+                        warnings += "Skipped duplicate $directive for $alias: ${index + 1}."
+                        return@forEachIndexed
+                    }
+                    importedForwards += OpenSshImportedForward(forward = forward, hostAlias = alias)
                 }
-                val forward = PortForward(
-                    id = idProvider(),
-                    label = "$alias local ${parsedForward.sourcePort}",
-                    group = "OpenSSH",
-                    type = PortForwardType.LOCAL,
-                    sourceHost = parsedForward.sourceHost,
-                    sourcePort = parsedForward.sourcePort,
-                    destinationHost = parsedForward.destinationHost,
-                    destinationPort = parsedForward.destinationPort,
-                    associatedHosts = listOf(hostId),
-                    enabled = false,
-                    createdEpochMillis = now,
-                    updatedEpochMillis = now
-                )
-                val key = forward.forwardKey()
-                if (!seenForwardKeys.add(key)) {
-                    warnings += "Skipped duplicate LocalForward for $alias: ${index + 1}."
-                    return@forEachIndexed
-                }
-                importedForwards += OpenSshImportedForward(forward = forward, hostAlias = alias)
             }
         }
 
@@ -343,6 +356,19 @@ object OpenSshConfigImporter {
             sourcePort = source.second,
             destinationHost = destination.first,
             destinationPort = destination.second
+        )
+    }
+
+    /** `DynamicForward [bind_address:]port`: a SOCKS proxy, so no destination. */
+    private fun parseDynamicForward(value: String): ParsedLocalForward? {
+        val words = splitWords(value)
+        if (words.size != 1) return null
+        val source = parseSourceEndpoint(words[0]) ?: return null
+        return ParsedLocalForward(
+            sourceHost = source.first,
+            sourcePort = source.second,
+            destinationHost = "",
+            destinationPort = 0
         )
     }
 

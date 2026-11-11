@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +80,9 @@ import com.majordaftapps.sshpeaches.app.util.isLoopbackBindAddress
 import com.majordaftapps.sshpeaches.app.ui.qr.buildQrScanOptions
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 import com.majordaftapps.sshpeaches.app.ui.util.rememberDialogBodyMaxHeight
+import com.majordaftapps.sshpeaches.app.util.displayName
 import com.majordaftapps.sshpeaches.app.util.inferredDestinationHost
+import com.majordaftapps.sshpeaches.app.util.summary
 import com.majordaftapps.sshpeaches.app.util.isValidHostAddress
 import com.majordaftapps.sshpeaches.app.util.parsePort
 import com.majordaftapps.sshpeaches.app.util.selectedHostId
@@ -108,6 +111,7 @@ fun PortForwardScreen(
     val editingId = rememberSaveable { mutableStateOf<String?>(null) }
     val labelState = rememberSaveable { mutableStateOf("") }
     val groupState = rememberSaveable { mutableStateOf("") }
+    val typeState = rememberSaveable { mutableStateOf(PortForwardType.LOCAL) }
     val bindState = rememberSaveable { mutableStateOf("127.0.0.1") }
     val srcPortState = rememberSaveable { mutableStateOf("22") }
     val dstHostState = rememberSaveable { mutableStateOf("127.0.0.1") }
@@ -132,6 +136,7 @@ fun PortForwardScreen(
         editingId.value = if (asEdit) forward?.id else null
         labelState.value = forward?.label ?: ""
         groupState.value = forward?.group ?: ""
+        typeState.value = forward?.type ?: PortForwardType.LOCAL
         bindState.value = forward?.sourceHost ?: "127.0.0.1"
         srcPortState.value = forward?.sourcePort?.toString() ?: "8080"
         dstHostState.value = forward?.inferredDestinationHost() ?: "127.0.0.1"
@@ -160,9 +165,16 @@ fun PortForwardScreen(
             dialogError.value = "Enter a valid source port (1-65535)."
             return false
         }
-        val dstPort = parsePort(dstPortState.value) ?: run {
-            dialogError.value = "Enter a valid destination port."
-            return false
+        val type = typeState.value
+        // A dynamic forward is a SOCKS proxy: each connection names its own destination.
+        val hasDestination = type != PortForwardType.DYNAMIC
+        val dstPort = if (hasDestination) {
+            parsePort(dstPortState.value) ?: run {
+                dialogError.value = "Enter a valid destination port."
+                return false
+            }
+        } else {
+            0
         }
         val chosenHost = hosts.firstOrNull { it.id == selectedHostIdState.value } ?: run {
             dialogError.value = "Select a host."
@@ -180,8 +192,8 @@ fun PortForwardScreen(
             dialogError.value = "Selected host has an invalid address."
             return false
         }
-        val destinationHost = dstHostState.value.trim().ifBlank { "127.0.0.1" }
-        if (!isValidHostAddress(destinationHost)) {
+        val destinationHost = if (hasDestination) dstHostState.value.trim().ifBlank { "127.0.0.1" } else ""
+        if (hasDestination && !isValidHostAddress(destinationHost)) {
             dialogError.value = "Enter a valid destination host."
             return false
         }
@@ -194,7 +206,7 @@ fun PortForwardScreen(
                 editingId.value!!,
                 label,
                 groupState.value.trim().ifBlank { null },
-                PortForwardType.LOCAL,
+                type,
                 bind,
                 srcPort,
                 destinationHost,
@@ -206,7 +218,7 @@ fun PortForwardScreen(
             onAdd(
                 label,
                 groupState.value.trim().ifBlank { null },
-                PortForwardType.LOCAL,
+                type,
                 bind,
                 srcPort,
                 destinationHost,
@@ -227,10 +239,6 @@ fun PortForwardScreen(
             }
             is PortForwardQrImportResult.Ready -> {
                 val imported = processed.forward
-                if (imported.type != PortForwardType.LOCAL) {
-                    Toast.makeText(context, "Only Local forwarding is supported.", Toast.LENGTH_SHORT).show()
-                    return@rememberLauncherForActivityResult
-                }
                 openDialog(imported, asEdit = false)
                 onImportFromQr()
                 Toast.makeText(context, "Select a host to finish importing", Toast.LENGTH_SHORT).show()
@@ -344,11 +352,33 @@ fun PortForwardScreen(
                     keyboardType = KeyboardType.Text
                 )
             )
-            Text("Type: Local (SSH -L)", style = MaterialTheme.typography.bodySmall)
+            val type = typeState.value
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PortForwardType.entries.forEach { option ->
+                    FilterChip(
+                        selected = type == option,
+                        onClick = { typeState.value = option },
+                        label = { Text(option.displayName()) },
+                        modifier = Modifier.testTag(UiTestTags.forwardTypeOption(option.name))
+                    )
+                }
+            }
+            Text(
+                text = when (type) {
+                    PortForwardType.LOCAL ->
+                        "Local (ssh -L): a port on this phone leads to a destination reached from the SSH host."
+                    PortForwardType.REMOTE ->
+                        "Remote (ssh -R): a port on the SSH host leads to a destination reached from this phone."
+                    PortForwardType.DYNAMIC ->
+                        "Dynamic (ssh -D): a SOCKS proxy on this phone. Apps set to use it reach the network " +
+                            "through the SSH host. Android has no system-wide SOCKS setting, so set it in each app."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
             OutlinedTextField(
                 value = bindState.value,
                 onValueChange = { bindState.value = it },
-                label = { Text("Local bind address") },
+                label = { Text(if (type == PortForwardType.REMOTE) "Server bind address" else "Local bind address") },
                 singleLine = true,
                 modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_BIND_INPUT),
                 keyboardOptions = KeyboardOptions(
@@ -359,7 +389,13 @@ fun PortForwardScreen(
             )
             if (!isLoopbackBindAddress(bindState.value)) {
                 Text(
-                    "Other devices on the same network can connect to this port.",
+                    when (type) {
+                        PortForwardType.LOCAL -> "Other devices on the same network can connect to this port."
+                        PortForwardType.REMOTE ->
+                            "Anyone who can reach the SSH host can connect to this port, if the host allows it (GatewayPorts)."
+                        PortForwardType.DYNAMIC ->
+                            "Other devices on the same network can use this proxy to reach anything the SSH host can."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -367,7 +403,15 @@ fun PortForwardScreen(
             OutlinedTextField(
                 value = srcPortState.value,
                 onValueChange = { srcPortState.value = it.filter { ch -> ch.isDigit() } },
-                label = { Text("Local port") },
+                label = {
+                    Text(
+                        when (type) {
+                            PortForwardType.LOCAL -> "Local port"
+                            PortForwardType.REMOTE -> "Server port"
+                            PortForwardType.DYNAMIC -> "Local SOCKS port"
+                        }
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_SOURCE_PORT_INPUT),
                 keyboardOptions = KeyboardOptions(
@@ -421,38 +465,42 @@ fun PortForwardScreen(
                     modifier = Modifier.testTag(UiTestTags.FORWARD_HOST_BACKGROUND_ERROR)
                 )
             }
-            Text(
-                text = if (selectedHost == null) {
-                    "Destination traffic is opened through the selected SSH host."
-                } else {
-                    "Use 127.0.0.1 to reach a service listening on the SSH host itself."
-                },
-                style = MaterialTheme.typography.bodySmall
-            )
-            OutlinedTextField(
-                value = dstHostState.value,
-                onValueChange = { dstHostState.value = it },
-                label = { Text("Destination host") },
-                singleLine = true,
-                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
-                keyboardOptions = KeyboardOptions(
-                    autoCorrect = false,
-                    capitalization = KeyboardCapitalization.None,
-                    keyboardType = KeyboardType.Ascii
+            if (type != PortForwardType.DYNAMIC) {
+                Text(
+                    text = if (type == PortForwardType.REMOTE) {
+                        "The destination is reached from this phone. Use 127.0.0.1 for a service on the phone itself."
+                    } else if (selectedHost == null) {
+                        "Destination traffic is opened through the selected SSH host."
+                    } else {
+                        "Use 127.0.0.1 to reach a service listening on the SSH host itself."
+                    },
+                    style = MaterialTheme.typography.bodySmall
                 )
-            )
-            OutlinedTextField(
-                value = dstPortState.value,
-                onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
-                label = { Text("Destination port") },
-                singleLine = true,
-                modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT),
-                keyboardOptions = KeyboardOptions(
-                    autoCorrect = false,
-                    capitalization = KeyboardCapitalization.None,
-                    keyboardType = KeyboardType.Number
+                OutlinedTextField(
+                    value = dstHostState.value,
+                    onValueChange = { dstHostState.value = it },
+                    label = { Text("Destination host") },
+                    singleLine = true,
+                    modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_HOST_INPUT),
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrect = false,
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = KeyboardType.Ascii
+                    )
                 )
-            )
+                OutlinedTextField(
+                    value = dstPortState.value,
+                    onValueChange = { dstPortState.value = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Destination port") },
+                    singleLine = true,
+                    modifier = Modifier.testTag(UiTestTags.FORWARD_DIALOG_DEST_PORT_INPUT),
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrect = false,
+                        capitalization = KeyboardCapitalization.None,
+                        keyboardType = KeyboardType.Number
+                    )
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Switch(checked = enabledState.value, onCheckedChange = { enabledState.value = it })
                 Text("Enable now")
@@ -561,7 +609,12 @@ fun PortForwardScreen(
                                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                                 Text(forward.label, style = MaterialTheme.typography.titleMedium)
                                                 Text(
-                                                    text = localForwardSummary(forward),
+                                                    text = forward.type.displayName(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    modifier = Modifier.testTag(UiTestTags.forwardTypeLabel(forward.id))
+                                                )
+                                                Text(
+                                                    text = forward.summary(),
                                                     style = MaterialTheme.typography.bodyMedium
                                                 )
                                                 if (selectedHost != null) {
@@ -581,7 +634,7 @@ fun PortForwardScreen(
                                                                 forward.id,
                                                                 forward.label,
                                                                 forward.group,
-                                                                PortForwardType.LOCAL,
+                                                                forward.type,
                                                                 forward.sourceHost,
                                                                 forward.sourcePort,
                                                                 forward.destinationHost,
@@ -685,7 +738,8 @@ fun PortForwardScreen(
                                     Text("Close")
                                 }
                             }
-                            Text(localForwardSummary(detailForward), style = MaterialTheme.typography.bodyMedium)
+                            Text("${detailForward.type.displayName()} forward", style = MaterialTheme.typography.labelMedium)
+                            Text(detailForward.summary(), style = MaterialTheme.typography.bodyMedium)
                             selectedHost?.let {
                                 Text(
                                     text = "Host: ${it.name.ifBlank { it.host }}",
@@ -776,7 +830,7 @@ fun PortForwardScreen(
                         )
                     } ?: Text("Unable to generate QR")
                     Text(
-                        localForwardSummary(forward),
+                        forward.summary(),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -784,6 +838,3 @@ fun PortForwardScreen(
         )
     }
 }
-
-private fun localForwardSummary(forward: PortForward): String =
-    "${forward.sourceHost}:${forward.sourcePort} \u2192 ${forward.inferredDestinationHost()}:${forward.destinationPort}"

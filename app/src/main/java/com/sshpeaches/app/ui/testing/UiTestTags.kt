@@ -111,6 +111,8 @@ object UiTestTags {
     fun forwardHostOption(hostId: String): String = "forward_host_option_$hostId"
     const val FORWARD_DIALOG_DEST_HOST_INPUT = "forward_dialog_dest_host_input"
     const val FORWARD_DIALOG_DEST_PORT_INPUT = "forward_dialog_dest_port_input"
+    fun forwardTypeOption(type: String): String = "forward_dialog_type_${type.lowercase()}"
+    fun forwardTypeLabel(id: String): String = "forward_type_label_$id"
     fun forwardFavorite(id: String): String = "forward_${id}_favorite"
     fun forwardShare(id: String): String = "forward_${id}_share"
     fun forwardOverflowButton(id: String): String = "forward_${id}_overflow_button"

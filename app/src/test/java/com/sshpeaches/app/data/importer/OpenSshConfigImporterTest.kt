@@ -104,6 +104,39 @@ class OpenSshConfigImporterTest {
     }
 
     @Test
+    fun parse_importsRemoteAndDynamicForwardsOnLoopbackAndSwitchedOff() {
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host prod
+                  HostName prod.example.com
+                  User root
+                  RemoteForward *:9000 192.168.1.10:80
+                  DynamicForward 0.0.0.0:1080
+                  DynamicForward 1081 extra
+                  RemoteForward 9001
+            """.trimIndent(),
+            nowProvider = { 200L },
+            idProvider = sequentialIds()
+        )
+
+        val forwards = result.localForwards.map { it.forward }
+        assertEquals(2, forwards.size)
+        val remote = forwards.single { it.type == PortForwardType.REMOTE }
+        assertEquals("127.0.0.1", remote.sourceHost)
+        assertEquals(9000, remote.sourcePort)
+        assertEquals("192.168.1.10", remote.destinationHost)
+        assertEquals(80, remote.destinationPort)
+        val dynamic = forwards.single { it.type == PortForwardType.DYNAMIC }
+        assertEquals("127.0.0.1", dynamic.sourceHost)
+        assertEquals(1080, dynamic.sourcePort)
+        assertEquals("", dynamic.destinationHost)
+        assertEquals(0, dynamic.destinationPort)
+        assertTrue(forwards.none { it.enabled })
+        assertTrue(result.warnings.any { it.contains("Skipped DynamicForward") })
+        assertTrue(result.warnings.any { it.contains("Skipped RemoteForward") })
+    }
+
+    @Test
     fun parse_skipsExistingDuplicates() {
         val existingHost = HostConnection(
             id = "existing-host",

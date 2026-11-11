@@ -7,13 +7,16 @@ import org.junit.Test
 class ConvertersTest {
 
     @Test
-    fun toPortType_mapsLegacyRemoteToLocal() {
-        assertEquals(PortForwardType.LOCAL, Converters.toPortType("REMOTE"))
+    fun toPortType_readsEveryType() {
+        for (type in PortForwardType.entries) {
+            assertEquals(type, Converters.toPortType(Converters.fromPortType(type)))
+        }
     }
 
     @Test
-    fun toPortType_mapsLegacyDynamicToLocal() {
-        assertEquals(PortForwardType.LOCAL, Converters.toPortType("DYNAMIC"))
+    fun toPortType_mapsUnknownTypesToLocal() {
+        assertEquals(PortForwardType.LOCAL, Converters.toPortType("TUNNEL"))
+        assertEquals(PortForwardType.LOCAL, Converters.toPortType(""))
     }
 
     @Test

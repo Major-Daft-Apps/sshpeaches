@@ -152,6 +152,33 @@ val helpTopics: List<HelpTopic> = listOf(
         keywords = listOf("tunnel", "port forwarding", "local forward", "web ui", "dashboard", "postgres", "mysql")
     ),
     HelpTopic(
+        id = "port-forward-socks",
+        question = "How do I browse through my server (SOCKS proxy)?",
+        steps = listOf(
+            "Port Forwards → +, choose Dynamic, and pick a Local SOCKS port such as 1080. Set Associated host.",
+            "Connect to that host. The proxy runs on this phone at 127.0.0.1 and that port while the session is open.",
+            "In the app you want to send through the server, set a SOCKS5 proxy with host 127.0.0.1 and the port. " +
+                "Android has no system-wide SOCKS setting, so only apps with their own proxy setting can use it " +
+                "(Firefox, for example)."
+        ),
+        destination = HelpDestination.FORWARDS,
+        keywords = listOf("socks", "socks5", "proxy", "dynamic forward", "ssh -D", "tunnel", "browse", "vpn")
+    ),
+    HelpTopic(
+        id = "port-forward-remote",
+        question = "How do I let my server reach something on this phone or its network?",
+        steps = listOf(
+            "Port Forwards → +, choose Remote. Server port is the port the server listens on. Destination host " +
+                "and Destination port are as this phone sees them, for example 127.0.0.1 for an app on the phone.",
+            "Set Associated host and connect. On the server, connecting to localhost and the Server port now " +
+                "reaches the destination, for as long as the session is open.",
+            "If it doesn't start, the server refused: check AllowTcpForwarding in its sshd_config, and use a " +
+                "port above 1023. Listening on other than the server's localhost also needs GatewayPorts."
+        ),
+        destination = HelpDestination.FORWARDS,
+        keywords = listOf("remote forward", "reverse tunnel", "ssh -R", "expose", "gatewayports", "tunnel")
+    ),
+    HelpTopic(
         id = "transfer",
         question = "How do I move my hosts and keys to a new phone?",
         steps = listOf(
@@ -168,7 +195,7 @@ val helpTopics: List<HelpTopic> = listOf(
         steps = listOf(
             "Copy the config file to this phone.",
             "Hosts → Import hosts (top bar) → OpenSSH config, then pick the file and review the import.",
-            "Hosts and LocalForward entries are imported. IdentityFile keys aren't, so add them in Identities."
+            "Hosts and LocalForward, RemoteForward and DynamicForward entries are imported. IdentityFile keys aren't, so add them in Identities."
         ),
         destination = HelpDestination.HOSTS,
         keywords = listOf("openssh", "config", "import", "ssh_config")

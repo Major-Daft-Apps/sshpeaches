@@ -198,7 +198,43 @@ class QrImportHandlersTest {
         val result = processPortForwardQrImport(payload)
 
         assertTrue(result is PortForwardQrImportResult.Error)
-        assertEquals("Only Local forwarding is supported.", (result as PortForwardQrImportResult.Error).message)
+        assertEquals(
+            "Remote forwards can't be imported from a QR code. Add it by hand.",
+            (result as PortForwardQrImportResult.Error).message
+        )
+    }
+
+    @Test
+    fun forwardImport_dynamicIsASocksProxyOnThisPhoneOnly() {
+        val payload = Base64.getEncoder().encodeToString(
+            JSONObject()
+                .put("id", "pf-3")
+                .put("label", "Proxy")
+                .put("type", "DYNAMIC")
+                .put("bind", "0.0.0.0")
+                .put("srcPort", 1080)
+                .put("dstHost", "evil.example")
+                .put("dstPort", 25)
+                .toString()
+                .toByteArray(Charsets.UTF_8)
+        )
+
+        val forward = (processPortForwardQrImport(payload) as PortForwardQrImportResult.Ready).forward
+
+        assertEquals(PortForwardType.DYNAMIC, forward.type)
+        assertEquals("127.0.0.1", forward.sourceHost)
+        assertEquals(1080, forward.sourcePort)
+        assertEquals("", forward.destinationHost)
+        assertEquals(0, forward.destinationPort)
+    }
+
+    @Test
+    fun forwardImport_unknownTypeIsRefused() {
+        val payload = Base64.getEncoder().encodeToString(
+            JSONObject().put("label", "X").put("type", "TUN").put("srcPort", 1).toString().toByteArray(Charsets.UTF_8)
+        )
+
+        assertTrue(processPortForwardQrImport(payload) is PortForwardQrImportResult.Error)
     }
 
     @Test

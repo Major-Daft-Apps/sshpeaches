@@ -51,8 +51,15 @@ class OpenSshConfigImporterFuzzTest {
             val f = forward.forward
             val ctx = "input=${Fuzz.describe(contents)} forward=$f"
             assertTrue("bad src port: $ctx", f.sourcePort in 1..65_535)
-            assertTrue("bad dst port: $ctx", f.destinationPort in 1..65_535)
-            assertTrue("blank dst host: $ctx", f.destinationHost.isNotBlank())
+            if (f.type == com.majordaftapps.sshpeaches.app.data.model.PortForwardType.DYNAMIC) {
+                // A SOCKS proxy has no destination of its own.
+                assertTrue("dynamic forward with a destination: $ctx", f.destinationPort == 0 && f.destinationHost.isEmpty())
+            } else {
+                assertTrue("bad dst port: $ctx", f.destinationPort in 1..65_535)
+                assertTrue("blank dst host: $ctx", f.destinationHost.isNotBlank())
+            }
+            assertTrue("imported forward not on loopback: $ctx", f.sourceHost == "127.0.0.1")
+            assertTrue("imported forward switched on: $ctx", !f.enabled)
             assertTrue("dangling host id: $ctx", f.associatedHosts.all { it in hostIds })
         }
     }

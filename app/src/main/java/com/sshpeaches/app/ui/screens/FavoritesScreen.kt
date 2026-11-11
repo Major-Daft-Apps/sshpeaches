@@ -1,5 +1,7 @@
 package com.majordaftapps.sshpeaches.app.ui.screens
 
+import com.majordaftapps.sshpeaches.app.util.summary
+import com.majordaftapps.sshpeaches.app.util.displayName
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -174,9 +176,9 @@ fun FavoritesScreen(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(forward.label, style = MaterialTheme.typography.titleMedium)
-                            Text("${forward.type}", style = MaterialTheme.typography.bodySmall)
+                            Text(forward.type.displayName(), style = MaterialTheme.typography.bodySmall)
                             Text(
-                                "${forward.sourceHost}:${forward.sourcePort} -> ${forward.destinationHost}:${forward.destinationPort}",
+                                forward.summary(),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }

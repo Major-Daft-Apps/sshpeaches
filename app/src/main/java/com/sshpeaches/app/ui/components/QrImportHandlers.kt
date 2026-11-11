@@ -126,15 +126,26 @@ sealed interface PortForwardQrImportResult {
 
 fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
     val incomingType = decodeForwardTypeFromQr(contents) ?: return PortForwardQrImportResult.Error("Invalid port forward QR")
-    if (incomingType.isNotBlank() && incomingType != PortForwardType.LOCAL.name) {
-        return PortForwardQrImportResult.Error("Only Local forwarding is supported.")
+    val type = runCatching { PortForwardType.valueOf(incomingType.ifBlank { PortForwardType.LOCAL.name }) }.getOrNull()
+        ?: return PortForwardQrImportResult.Error("This kind of port forward isn't supported.")
+    // A remote forward opens something this phone can reach to the server: too much to take from a scanned code.
+    if (type == PortForwardType.REMOTE) {
+        return PortForwardQrImportResult.Error("Remote forwards can't be imported from a QR code. Add it by hand.")
     }
     val imported = decodeForwardFromQr(contents)
     return if (imported == null) {
         PortForwardQrImportResult.Error("Invalid port forward QR")
     } else {
         // Like every import, a scanned forward only listens on this phone; the user can widen it when saving.
-        PortForwardQrImportResult.Ready(imported.copy(sourceHost = "127.0.0.1"))
+        val dynamic = type == PortForwardType.DYNAMIC
+        PortForwardQrImportResult.Ready(
+            imported.copy(
+                type = type,
+                sourceHost = "127.0.0.1",
+                destinationHost = if (dynamic) "" else imported.destinationHost,
+                destinationPort = if (dynamic) 0 else imported.destinationPort
+            )
+        )
     }
 }
 

@@ -2,6 +2,16 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 0.15.0 (1500)
+
+Not released yet.
+
+- **Remote port forwards** (`ssh -R`): a port on the server leads to a destination reached from this phone, for example an app on the phone or a device on its Wi-Fi. The server listens on its own localhost unless you enter another bind address (which also needs `GatewayPorts` on the server). If the server refuses, the session log says what to check.
+- **Dynamic port forwards** (`ssh -D`): a SOCKS proxy on this phone (SOCKS5, SOCKS4 and SOCKS4a, CONNECT only, no authentication, like OpenSSH). Apps set to use it reach the network through the server; host names are resolved by the server. Android has no system-wide SOCKS setting, so each app needs its own proxy setting.
+- The forward editor has a Local / Remote / Dynamic choice, and lists show each forward's type. Both new types restart with the session after a reconnect, like local forwards.
+- The connection latency badge keeps one width from the moment a session opens, so the title next to it no longer changes size when the first reading arrives. Without a reading (before the first check, or when the last one got no answer) it is blank with a grey dot instead of "…" or "No answer"; tapping it still says what happened.
+- Imports: an OpenSSH config's `RemoteForward` and `DynamicForward` lines are imported next to `LocalForward`; exports and file imports carry all three types. Every imported forward is switched off and bound to loopback (the server's for a remote forward). A scanned QR code can bring a local or dynamic forward but never a remote one.
+
 ## 0.14.2 (1402)
 
 Sent to Google Play open testing on 2026-11-10.
