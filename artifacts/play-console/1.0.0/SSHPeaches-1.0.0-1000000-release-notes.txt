@@ -1,0 +1,9 @@
+Welcome to SSHPeaches 1.0, a free and open-source SSH client for Android.
+
+- SSH terminal with extra keys (Ctrl, Esc, Tab, arrows, F1-F12) and snippets
+- SFTP file browser: upload, download and edit files on your server
+- Mosh and Boost keep sessions alive on bad or changing networks
+- Password and SSH key login, with keys generated on your phone
+- Port forwarding, QR sharing between phones, and an app lock
+
+No ads, no subscriptions.

@@ -17,7 +17,7 @@ Binaries: https://github.com/Major-Daft-Apps/sshpeaches/releases/download/v%v/SS
 
 Builds:
   - versionName: 1.0.0
-    versionCode: 10000
+    versionCode: 1000000
     commit: v1.0.0
     subdir: app
     sudo:
@@ -54,4 +54,4 @@ AllowedAPKSigningKeys: ec0c8db94a9faf482d876ff71914c6b7e6ff3d83a8677c663c0bdb53c
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
 CurrentVersion: 1.0.0
-CurrentVersionCode: 10000
+CurrentVersionCode: 1000000
