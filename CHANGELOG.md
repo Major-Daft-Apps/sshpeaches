@@ -4,7 +4,7 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.15.0 (1500)
 
-Not released yet.
+Sent to Google Play open testing on 2026-11-11.
 
 - **Remote port forwards** (`ssh -R`): a port on the server leads to a destination reached from this phone, for example an app on the phone or a device on its Wi-Fi. The server listens on its own localhost unless you enter another bind address (which also needs `GatewayPorts` on the server). If the server refuses, the session log says what to check.
 - **Dynamic port forwards** (`ssh -D`): a SOCKS proxy on this phone (SOCKS5, SOCKS4 and SOCKS4a, CONNECT only, no authentication, like OpenSSH). Apps set to use it reach the network through the server; host names are resolved by the server. Android has no system-wide SOCKS setting, so each app needs its own proxy setting.

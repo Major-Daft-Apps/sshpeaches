@@ -1,0 +1,6 @@
+What's new in 0.15.0
+
+- Remote port forwards (ssh -R): a port on the server leads back to this phone or a device on its network.
+- Dynamic port forwards (ssh -D): a SOCKS proxy on this phone that sends apps' traffic through the server.
+- OpenSSH config imports bring RemoteForward and DynamicForward lines too.
+- The connection latency badge keeps one width, so the session title no longer changes size.
