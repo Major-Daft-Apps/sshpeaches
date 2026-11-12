@@ -1,0 +1,3 @@
+What's new in 0.15.1
+
+- Fixed: on a very slow or busy connection, the terminal could fail to open and the server dropped the connection ("you already have a pty").
