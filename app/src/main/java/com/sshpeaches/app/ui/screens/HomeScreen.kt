@@ -341,15 +341,17 @@ fun HomeScreen(
                                 onOverflowDismiss = { overflowFavoriteKey.value = null },
                                 overflowButtonTag = UiTestTags.homeFavoriteOverflowButton("forward_${forward.id}"),
                                 title = forward.label,
-                                subtitle = forward.summary(),
+                                subtitle = if (forward.needsReview) "Imported, off: review it before turning it on" else forward.summary(),
                                 icon = Icons.Default.Bolt,
                                 onToggleFavorite = { onToggleFavorite(forward.id) }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text(if (forward.enabled) "Disable" else "Enable") },
+                                    text = { Text(forward.homeToggleLabel()) },
                                     onClick = {
                                         overflowFavoriteKey.value = null
-                                        onTogglePortForwardEnabled(forward, !forward.enabled)
+                                        // An imported remote forward is turned on where its review note is shown.
+                                        if (forward.needsReview) onEditPortForward(forward.id)
+                                        else onTogglePortForwardEnabled(forward, !forward.enabled)
                                     },
                                     modifier = Modifier.testTag(
                                         UiTestTags.homeFavoriteOverflowAction("forward_${forward.id}", "toggle_enabled")
@@ -590,10 +592,11 @@ fun HomeScreen(
                                 }
                                 HomeRecentType.PORT_FORWARD -> forward?.let { recentForward ->
                                     DropdownMenuItem(
-                                        text = { Text(if (recentForward.enabled) "Disable" else "Enable") },
+                                        text = { Text(recentForward.homeToggleLabel()) },
                                         onClick = {
                                             overflowRecentKey.value = null
-                                            onTogglePortForwardEnabled(recentForward, !recentForward.enabled)
+                                            if (recentForward.needsReview) onEditPortForward(recentForward.id)
+                                            else onTogglePortForwardEnabled(recentForward, !recentForward.enabled)
                                         },
                                         modifier = Modifier.testTag(
                                             UiTestTags.homeRecentOverflowAction(item.key, "toggle_enabled")
@@ -1279,4 +1282,11 @@ private fun HomeRecentType.label(): String = when (this) {
     HomeRecentType.IDENTITY -> "Identity"
     HomeRecentType.PORT_FORWARD -> "Port Forward"
     HomeRecentType.SNIPPET -> "Snippet"
+}
+
+/** Home's on/off menu item for a forward; one that still needs review is opened instead of turned on. */
+internal fun PortForward.homeToggleLabel(): String = when {
+    needsReview -> "Review (imported, off)"
+    enabled -> "Disable"
+    else -> "Enable"
 }

@@ -2908,6 +2908,8 @@ class SessionService : Service() {
      * route (SSH, Boost, Mosh), the phone's network (Wi-Fi, mobile data) and its recent round trip.
      */
     private fun reportNetworkIssue(kind: String, hostId: String, error: Throwable?, context: Map<String, String> = emptyMap()) {
+        // A jump host route's message names the jump hosts, which the scrubbing wouldn't catch (see reportUnexpected).
+        if (generateSequence(error) { it.cause }.take(8).any { it is SshRouteException }) return
         val root = error?.let { generateSequence(it) { cause -> cause.cause }.take(16).last() }
         if (!networkIssueLimiter.allow("$kind|${root?.javaClass?.simpleName.orEmpty()}")) return
         val connection = activeConnections[hostId]
@@ -4597,7 +4599,9 @@ class SessionService : Service() {
                     val identities = runBlocking {
                         (application as SSHPeachesApplication).container.repository.identities.first()
                     }
-                    identities.filter { it.hasPrivateKey }.mapNotNull { identity ->
+                    val withKeys = identities.filter { it.hasPrivateKey }
+                    var failed = 0
+                    val keys = withKeys.mapNotNull { identity ->
                         runCatching {
                             val privateKey = SecurityManager.getIdentityKey(identity.id)?.takeIf { it.isNotBlank() }
                                 ?: return@runCatching null
@@ -4606,8 +4610,12 @@ class SessionService : Service() {
                             val provider = Ed25519IdentityKeyProvider.load(client, privateKey, publicKey, passphrase)
                                 ?: client.loadPrivateKeyFromMemory(privateKey, passphrase)
                             ForwardedAgent.Key(identity.label, provider.public, provider.private)
-                        }.getOrNull()
+                        }.onFailure { failed++ }.getOrNull()
                     }
+                    // None could be read (the app is locked, say): a failed load, which is tried again on the next
+                    // request, rather than "no keys" for the rest of the connection.
+                    check(keys.isNotEmpty() || failed == 0) { "no identity key could be read" }
+                    keys
                 },
                 onSigned = { label ->
                     SessionLogBus.emit(

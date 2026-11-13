@@ -258,6 +258,32 @@ class OpenSshConfigImporterTest {
     }
 
     @Test
+    fun parse_twoProxyJumpChainsThatLoopBetweenTheirHopsLeaveNoHostWithARouteThatLoops() {
+        val saved = HostConnection(id = "saved-c", name = "c", host = "c.example", username = "g", preferredAuth = AuthMethod.PASSWORD)
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host a
+                  User u
+                Host b
+                  User u
+                Host y
+                  User u
+                  ProxyJump b,a
+                Host x
+                  User u
+                  ProxyJump a,b,c
+            """.trimIndent(),
+            existingHosts = listOf(saved),
+            idProvider = sequentialIds()
+        )
+        val all = result.hosts.map { it.host } + saved
+        result.hosts.forEach { imported ->
+            com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(imported.host) { id -> all.firstOrNull { it.id == id } }
+        }
+        assertTrue(result.warnings.toString(), result.warnings.any { it.contains("was imported without a jump host") })
+    }
+
+    @Test
     fun parse_proxyJumpFindsASavedHostByName() {
         val saved = HostConnection(id = "saved-1", name = "Bastion", host = "b.example", username = "g", preferredAuth = AuthMethod.PASSWORD)
         val result = OpenSshConfigImporter.parse(

@@ -96,8 +96,8 @@ android {
         targetSdk = 36
         // Version-code convention for 0.x releases: MMpp.
         // Examples: 0.10.10 -> 1010, 0.11.0 -> 1100.
-        versionCode = 1600
-        versionName = "0.16.0"
+        versionCode = 1601
+        versionName = "0.16.1"
         buildConfigField("String", "DIAGNOSTICS_ENDPOINT", "\"$diagnosticsEndpoint\"")
         // Crash, usage and problem reports go through Firebase and App Check (Play Integrity): Google Play edition only.
         buildConfigField("boolean", "REPORTS_AVAILABLE", (!fdroidEdition).toString())

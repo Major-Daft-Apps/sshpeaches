@@ -2,6 +2,17 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 0.16.1 (1601)
+
+Not released yet.
+
+Fixes from a second review of 0.16.0's fixes:
+
+- **Fixed: the Home screen could turn on an imported Remote forward without showing that it needs a review.** Its menu under Favorites and Recents offered a plain "Enable", which also removed the mark. Home now says "Review (imported, off)" and opens the forward instead; it is turned on from the Port Forwards screen, next to its note.
+- Fixed: when a session through a jump host dropped and couldn't reconnect, the error, which names the jump host, could be sent with crash reporting on. Jump host route errors are now left out there too.
+- Fixed: agent forwarding answered "no keys" for the rest of the connection when a server asked for keys while the app was locked. A load in which no key could be read is now tried again on the next request.
+- OpenSSH config import: two `ProxyJump` chains that each look fine but loop between their hops no longer import hosts with a route that can't work; such a host is imported without a jump host and the import says so.
+
 ## 0.16.0 (1600)
 
 Sent to Google Play open testing on 2026-11-13.

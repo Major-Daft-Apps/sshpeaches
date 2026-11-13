@@ -215,6 +215,17 @@ object OpenSshConfigImporter {
                 warnings += "ProxyJump $value for $alias was not imported: it leads back to $alias or is too long."
             }
         }
+        // Two lines can each be fine and still make a loop between hops neither of them ends at. No host is imported
+        // with a route that can't be worked out.
+        for (index in imported.indices) {
+            val host = imported[index].host
+            if (host.jumpHostId == null) continue
+            if (runCatching { com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(host, ::find) }.isFailure) {
+                imported[index] = imported[index].copy(host = host.copy(jumpHostId = null))
+                warnings += "${imported[index].alias} was imported without a jump host: the ProxyJump lines in this file " +
+                    "lead back to a host already on the way, or through too many. Choose it under Jump through."
+            }
+        }
         // A hop that is already saved, or has a route of its own, keeps it. Once every line is in, say so where the
         // route that results isn't the one a line asks for, rather than leave out part of a chain without a word.
         for (line in applied) {
