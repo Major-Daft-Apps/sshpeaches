@@ -4,7 +4,7 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.16.0 (1600)
 
-Not released yet.
+Sent to Google Play open testing on 2026-11-13.
 
 - **Jump hosts** (OpenSSH's ProxyJump, `ssh -J`): a host can be reached through another saved host, chosen under "Jump through" in the host's settings; that host can have a jump host of its own (up to 5 in a row). Each host's key is checked under its own name and each one logs in with its own saved key or password, or is asked for by name. The terminal, the file browser with its parallel transfers, port forwards, system info and "copy key to host" all go through the route. Mosh and Boost need to reach the server directly, so through a jump host the session uses plain SSH. Deleting a jump host makes the hosts behind it connect directly again.
 - OpenSSH config import turns `ProxyJump` into "Jump through" when it names a host in the file or a saved host (chains too); anything else is left out with a note. File export and import carry the jump host when both hosts are in the file.

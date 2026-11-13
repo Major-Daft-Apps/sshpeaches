@@ -1,0 +1,7 @@
+What's new in 0.16.0
+
+- Jump hosts (ProxyJump): reach a host through another saved host.
+- Agent forwarding, off by default: sign in from a server with keys that stay on your phone.
+- Boost's helper is sent to a server about twice as fast on slow connections, and a cut-off copy carries on where it stopped.
+- An imported Remote forward stays off and marked for review until you turn it on.
+- Fixed: many connections through a port forward could stall the app.
