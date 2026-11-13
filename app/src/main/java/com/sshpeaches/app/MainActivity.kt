@@ -1024,6 +1024,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // A stopped activity can't read the clipboard, and isn't always told it lost the focus first.
+        com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.onWindowFocusChanged(false)
         sessionServiceState.value?.cancelBackgroundSessionStop()
         if (isChangingConfigurations || !appUiBootstrapped) {
             UiDebugLog.action("MainActivity.onStop", "persistSessions=true (config-change-or-not-ready)")

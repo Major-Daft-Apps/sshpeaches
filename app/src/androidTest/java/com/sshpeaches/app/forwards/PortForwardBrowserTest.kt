@@ -86,6 +86,47 @@ class PortForwardBrowserTest {
         composeRule.onNodeWithText("Docs Tunnel").assertIsDisplayed()
     }
 
+    /** An imported remote forward says it needs a look until the user turns it on; other forwards never say so. */
+    @Test
+    fun anImportedRemoteForwardIsMarkedForReviewUntilItIsTurnedOn() {
+        val host = com.majordaftapps.sshpeaches.app.data.model.HostConnection(
+            id = "review-host", name = "review host", host = "192.0.2.50", username = "bob",
+            preferredAuth = com.majordaftapps.sshpeaches.app.data.model.AuthMethod.PASSWORD
+        )
+        val imported = PortForward(
+            id = "review-remote", label = "Imported Remote", type = PortForwardType.REMOTE, sourceHost = "127.0.0.1",
+            sourcePort = 8080, destinationHost = "192.168.1.10", destinationPort = 80,
+            associatedHosts = listOf(host.id), enabled = false, needsReview = true
+        )
+        val own = PortForward(
+            id = "review-local", label = "Own Local", type = PortForwardType.LOCAL, sourceHost = "127.0.0.1",
+            sourcePort = 9090, destinationHost = "127.0.0.1", destinationPort = 90,
+            associatedHosts = listOf(host.id), enabled = false
+        )
+        AppStateSeeder.seedHost(host)
+        AppStateSeeder.seedPortForward(imported)
+        AppStateSeeder.seedPortForward(own)
+        composeRule.activityRule.scenario.recreate()
+        composeRule.navigateDrawer(Routes.FORWARDS)
+        waitForForward("Imported Remote")
+        waitForForward("Own Local")
+
+        composeRule.onNodeWithTag(UiTestTags.forwardNeedsReview(imported.id), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag(UiTestTags.forwardNeedsReview(own.id)), useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        composeRule.onNodeWithTag(UiTestTags.forwardEnabledSwitch(imported.id)).performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag(UiTestTags.forwardNeedsReview(imported.id)), useUnmergedTree = true)
+                .fetchSemanticsNodes().isEmpty()
+        }
+        val dao = com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase
+            .get(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext).portForwardDao()
+        val saved = kotlinx.coroutines.runBlocking { dao.getById(imported.id) }!!
+        org.junit.Assert.assertTrue(saved.enabled)
+        org.junit.Assert.assertFalse(saved.needsReview)
+    }
+
     private fun waitForForward(label: String) {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()

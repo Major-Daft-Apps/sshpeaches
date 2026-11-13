@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.Session
@@ -362,7 +363,13 @@ internal class BoostHelper private constructor(
             for (own in listOf(".cache/sshpeaches", REMOTE_DIR, dir)) {
                 runCatching { sftp.chmod(own, 0b111_000_000) }
             }
-            val zipped = !plainCopyForTests && runCommand(ssh, "command -v gzip >/dev/null 2>&1 && echo yes")?.trim() == "yes"
+            // Gzipped only when the server can also check what it unpacked: without a hash tool the whole gzipped
+            // copy would be sent, thrown away, and the plain one sent after it.
+            val zipped = !plainCopyForTests && runCommand(
+                ssh,
+                "command -v gzip >/dev/null 2>&1 && { command -v sha256sum || command -v shasum || command -v openssl; } " +
+                    ">/dev/null 2>&1 && echo yes"
+            )?.trim() == "yes"
             if (zipped) {
                 val packed = runCatching { packedHelper(context, helper) }.getOrNull()
                 val unpacked = packed != null && runCatching {
@@ -398,6 +405,10 @@ internal class BoostHelper private constructor(
         }
 
         private fun finish(ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper) {
+            // What a cut-off copy of the other kind (gzipped or plain) left behind.
+            for (leftover in listOf("${helper.path}.part", "${helper.path}.gz.part", "${helper.path}.new")) {
+                runCatching { sftp.rm(leftover) }
+            }
             sftp.chmod(helper.path, 0b111_000_000)
             val sum = remoteSha256(ssh, helper.path)
             if (sum != null && sum != helper.sha256) {
@@ -411,19 +422,32 @@ internal class BoostHelper private constructor(
          * This version's helper, gzipped once into the app's cache: the same bytes every time, so a copy that was cut
          * off can be picked up where it stopped.
          */
-        private fun packedHelper(context: Context, helper: RemoteHelper): File {
+        private fun packedHelper(context: Context, helper: RemoteHelper): File = synchronized(packLock) {
+            // One at a time: copies to two servers at once share this folder, and each would otherwise delete or
+            // rename the file the other was still writing.
             val folder = File(context.cacheDir, "boost").apply { mkdirs() }
-            val name = "helper-${helper.sha256.take(16)}-${helper.arch}.gz"
+            val version = "helper-${helper.sha256.take(16)}-"
+            val name = "$version${helper.arch}.gz"
             val packed = File(folder, name)
-            if (packed.length() > 0) return packed
-            folder.listFiles()?.filter { it.name != name }?.forEach { it.delete() }
+            if (packed.length() > 0) {
+                // The cache can be cut short or damaged (storage full, the app killed): check before trusting it.
+                val sound = runCatching {
+                    GZIPInputStream(packed.inputStream()).use { sha256Of(it, helper.size) } == helper.sha256
+                }.getOrDefault(false)
+                if (sound) return packed
+                packed.delete()
+            }
+            // Other versions' files go; this version's file for the other kind of server stays.
+            folder.listFiles()?.filter { !it.name.startsWith(version) || it.name.endsWith(".tmp") }?.forEach { it.delete() }
             val making = File(folder, "$name.tmp")
             context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-${helper.arch}").use { input ->
                 GZIPOutputStream(making.outputStream()).use { input.copyTo(it) }
             }
             if (!making.renameTo(packed)) throw IOException("couldn't keep the packed helper")
-            return packed
+            packed
         }
+
+        private val packLock = Any()
 
         /**
          * Writes [length] bytes of [source] to [temp] on the server, after whatever a cut-off copy already left there

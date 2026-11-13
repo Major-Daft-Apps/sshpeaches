@@ -152,4 +152,22 @@ class ConnectionFailureKindTest {
             TransportException(DisconnectReason.PROTOCOL_ERROR, "bad packet").connectionFailureKind()
         )
     }
+
+    @Test
+    fun aJumpHostThatCantOpenTheConnectionOnwardsIsANetworkFailureWorthRetrying() {
+        val refused = net.schmizz.sshj.connection.channel.OpenFailException(
+            "direct-tcpip", net.schmizz.sshj.connection.channel.OpenFailException.Reason.CONNECT_FAILED, "Connection refused"
+        )
+        val kind = com.majordaftapps.sshpeaches.app.data.ssh.SshRouteException(
+            "The jump host Gate couldn't open a connection to 10.0.0.5:22: Connection refused", refused
+        ).connectionFailureKind()
+        assertEquals(ConnectionFailureKind.REFUSED, kind)
+        assertEquals(true, kind?.isNetwork)
+        // A jump host that forbids forwarding is a setting to change, not something to retry.
+        assertNull(
+            net.schmizz.sshj.connection.channel.OpenFailException(
+                "direct-tcpip", net.schmizz.sshj.connection.channel.OpenFailException.Reason.ADMINISTRATIVELY_PROHIBITED, "no"
+            ).connectionFailureKind()
+        )
+    }
 }

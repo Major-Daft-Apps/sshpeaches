@@ -218,6 +218,7 @@ abstract class SshPeachesDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE hosts ADD COLUMN `jumpHostId` TEXT")
                 db.execSQL("ALTER TABLE hosts ADD COLUMN `forwardAgent` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE port_forwards ADD COLUMN `needsReview` INTEGER NOT NULL DEFAULT 0")
             }
         }
 

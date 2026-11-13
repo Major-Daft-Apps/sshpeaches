@@ -8,6 +8,7 @@ import java.net.UnknownHostException
 import java.nio.channels.UnresolvedAddressException
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.common.SSHException
+import net.schmizz.sshj.connection.channel.OpenFailException
 import net.schmizz.sshj.transport.TransportException
 import net.schmizz.sshj.userauth.UserAuthException
 
@@ -53,6 +54,12 @@ internal fun Throwable.connectionFailureKind(): ConnectionFailureKind? {
         // sshj's negotiation: "Unable to reach a settlement of <what>: [ours] and [theirs]".
         if (cause is TransportException && cause.message.orEmpty().startsWith("Unable to reach a settlement")) {
             return ConnectionFailureKind.NO_COMMON_ALGORITHMS
+        }
+        // A jump host that couldn't open the connection onwards: the next host is down or not answering, the same
+        // as a refused or failed connection made directly. Unclassified, a reconnect through a jump host gave up
+        // after one try while the target was only restarting.
+        if (cause is OpenFailException && cause.reason == OpenFailException.Reason.CONNECT_FAILED) {
+            return ConnectionFailureKind.REFUSED
         }
         if (cause is SSHException) {
             when (cause.disconnectReason) {

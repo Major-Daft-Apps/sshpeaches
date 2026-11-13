@@ -66,6 +66,7 @@ import com.majordaftapps.sshpeaches.app.data.model.BackgroundBehavior
 import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfileDefaults
@@ -356,7 +357,15 @@ fun HostsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("${importResult.hosts.size} host(s) and ${importResult.localForwards.size} local forward(s) ready.")
+                    Text("${importResult.hosts.size} host(s) and ${importResult.localForwards.size} forward(s) ready.")
+                    val remoteForwards = importResult.localForwards.count { it.forward.type == PortForwardType.REMOTE }
+                    if (remoteForwards > 0) {
+                        Text(
+                            "$remoteForwards of the forwards are remote forwards, which let a server reach things from " +
+                                "this phone. They come in switched off and marked for review: check each under Port " +
+                                "Forwards before turning it on."
+                        )
+                    }
                     importResult.hosts.take(8).forEach { imported ->
                         Text(
                             text = "${imported.host.name}: ${imported.host.username}@${imported.host.host}:${imported.host.port}",

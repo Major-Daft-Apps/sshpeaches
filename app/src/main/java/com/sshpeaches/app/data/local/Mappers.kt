@@ -113,7 +113,8 @@ fun PortForwardEntity.asModel(): PortForward = PortForward(
     destinationPort = destinationPort,
     associatedHosts = associatedHosts,
     favorite = favorite,
-    enabled = enabled
+    enabled = enabled,
+    needsReview = needsReview
 )
 
 fun PortForward.asEntity(): PortForwardEntity = PortForwardEntity(
@@ -130,7 +131,8 @@ fun PortForward.asEntity(): PortForwardEntity = PortForwardEntity(
     destinationPort = destinationPort,
     associatedHosts = associatedHosts,
     favorite = favorite,
-    enabled = enabled
+    enabled = enabled,
+    needsReview = needsReview
 )
 
 fun SnippetEntity.asModel(): Snippet = Snippet(

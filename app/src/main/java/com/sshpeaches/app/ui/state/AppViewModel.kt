@@ -15,6 +15,8 @@ import com.majordaftapps.sshpeaches.app.data.model.Identity
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.asImported
+import com.majordaftapps.sshpeaches.app.data.model.stillNeedsReviewWhen
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
 import com.majordaftapps.sshpeaches.app.data.model.TerminalEmulation
 import com.majordaftapps.sshpeaches.app.data.model.TerminalProfile
@@ -1199,7 +1201,8 @@ class AppViewModel(
             logResult("importPortForward", false, "validation-failed")
             return
         }
-        val normalized = forward.copy(
+        // Every import path saves through here: a remote forward comes in switched off and marked for review.
+        val normalized = forward.asImported().copy(
             label = forward.label.trim(),
             group = forward.group?.trim()?.takeIf { it.isNotEmpty() },
             createdEpochMillis = forward.createdEpochMillis ?: System.currentTimeMillis(),
@@ -1253,7 +1256,8 @@ class AppViewModel(
             destinationHost = if (type == PortForwardType.DYNAMIC) "" else destinationHost.trim().ifBlank { "127.0.0.1" },
             destinationPort = if (type == PortForwardType.DYNAMIC) 0 else destPort,
             enabled = enabled,
-            associatedHosts = normalizedAssociatedHosts
+            associatedHosts = normalizedAssociatedHosts,
+            needsReview = existing.stillNeedsReviewWhen(enabled)
         )
         launchLogged("updatePortForward", "forwardId=$id") {
             repository.updatePortForward(updated)

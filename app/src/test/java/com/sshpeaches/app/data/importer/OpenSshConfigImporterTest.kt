@@ -218,6 +218,46 @@ class OpenSshConfigImporterTest {
     }
 
     @Test
+    fun parse_proxyJumpChainWhoseHopHasTheSameRouteOfItsOwnGivesNoWarning() {
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host inside
+                  User c
+                  ProxyJump outer,middle
+                Host middle
+                  User b
+                  ProxyJump outer
+                Host outer
+                  User a
+            """.trimIndent(),
+            idProvider = sequentialIds()
+        )
+        val byName = result.hosts.associate { it.alias to it.host }
+        assertEquals(byName.getValue("middle").id, byName.getValue("inside").jumpHostId)
+        assertEquals(byName.getValue("outer").id, byName.getValue("middle").jumpHostId)
+        assertTrue(result.warnings.toString(), result.warnings.none { it.contains("ProxyJump") })
+    }
+
+    @Test
+    fun parse_proxyJumpChainThroughASavedHostSaysThatTheChainDiffers() {
+        val saved = HostConnection(id = "saved-mid", name = "middle", host = "m.example", username = "g", preferredAuth = AuthMethod.PASSWORD)
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host outer
+                  User a
+                Host inside
+                  User c
+                  ProxyJump outer,middle
+            """.trimIndent(),
+            existingHosts = listOf(saved),
+            idProvider = sequentialIds()
+        )
+        val byName = result.hosts.associate { it.alias to it.host }
+        assertEquals("saved-mid", byName.getValue("inside").jumpHostId)
+        assertTrue(result.warnings.toString(), result.warnings.any { it.contains("ProxyJump outer,middle for inside") && it.contains("differs") })
+    }
+
+    @Test
     fun parse_proxyJumpFindsASavedHostByName() {
         val saved = HostConnection(id = "saved-1", name = "Bastion", host = "b.example", username = "g", preferredAuth = AuthMethod.PASSWORD)
         val result = OpenSshConfigImporter.parse(

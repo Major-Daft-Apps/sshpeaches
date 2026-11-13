@@ -2,6 +2,10 @@ package com.majordaftapps.sshpeaches.app.ui.components
 
 import com.majordaftapps.sshpeaches.app.data.model.AuthMethod
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
+import com.majordaftapps.sshpeaches.app.data.model.PortForward
+import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
+import com.majordaftapps.sshpeaches.app.data.model.asImported
+import com.majordaftapps.sshpeaches.app.data.model.stillNeedsReviewWhen
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,5 +73,40 @@ class TransferImportPolicyTest {
         assertFalse(bare.hasSettings)
         assertFalse(bare.hasKeyboardLayout)
         assertFalse(bare.hasProtectedSecrets)
+    }
+
+    @Test
+    fun summaryCountsTheRemoteForwardsApart() {
+        val summary = summarizeTransferPayload(
+            JSONObject(
+                """{"v":2,"portForwards":[{"type":"LOCAL"},{"type":"REMOTE"},{"type":"DYNAMIC"},{"type":"REMOTE"},{}]}"""
+            )
+        )
+        assertEquals(5, summary.portForwards)
+        assertEquals(2, summary.remoteForwards)
+    }
+
+    @Test
+    fun anImportedRemoteForwardIsSwitchedOffAndMarkedForReviewWhateverTheImportSaid() {
+        fun forward(type: PortForwardType, enabled: Boolean) = PortForward(
+            id = "f", label = "f", type = type, sourcePort = 8080, destinationHost = "10.0.0.5", destinationPort = 80,
+            enabled = enabled, needsReview = false
+        )
+        val remote = forward(PortForwardType.REMOTE, enabled = true).asImported()
+        assertFalse(remote.enabled)
+        assertTrue(remote.needsReview)
+        // The others keep what they came with, and never carry the mark (not even when the import claims it).
+        val local = forward(PortForwardType.LOCAL, enabled = true).copy(needsReview = true).asImported()
+        assertTrue(local.enabled)
+        assertFalse(local.needsReview)
+        assertFalse(forward(PortForwardType.DYNAMIC, enabled = false).asImported().needsReview)
+    }
+
+    @Test
+    fun theMarkStaysUntilTheUserTurnsTheForwardOn() {
+        val marked = PortForward(id = "f", label = "f", type = PortForwardType.REMOTE, sourcePort = 1, needsReview = true)
+        assertTrue(marked.stillNeedsReviewWhen(enabled = false))
+        assertFalse(marked.stillNeedsReviewWhen(enabled = true))
+        assertFalse(marked.copy(needsReview = false).stillNeedsReviewWhen(enabled = false))
     }
 }

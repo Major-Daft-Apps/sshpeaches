@@ -62,7 +62,8 @@ PREFIX_MAPS="-ffile-prefix-map=$WORK=/build -ffile-prefix-map=$NDK=/ndk -ffile-p
 
 # --- Host tools: protoc (same protobuf version as the target library) and tic -----------------------------------
 HOST=$WORK/host
-if [ ! -x "$HOST/bin/protoc" ]; then
+# Rebuilt when it is another version's: a protoc left by an older build doesn't fit this protobuf's headers.
+if [ ! -x "$HOST/bin/protoc" ] || ! "$HOST/bin/protoc" --version 2>/dev/null | grep -qF " $PROTOBUF_VERSION"; then
     unpack abseil-cpp-$ABSEIL_VERSION.tar.gz "$WORK/host-abseil"
     cmake -S "$WORK/host-abseil" -B "$WORK/host-abseil/out" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
         -DABSL_PROPAGATE_CXX_STD=ON -DABSL_BUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF \

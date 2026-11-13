@@ -179,6 +179,8 @@ object OpenSshConfigImporter {
         fun setJump(index: Int, jumpId: String) {
             imported[index] = imported[index].copy(host = imported[index].host.copy(jumpHostId = jumpId))
         }
+        class Applied(val alias: String, val value: String, val lastName: String, val ids: List<String>)
+        val applied = ArrayList<Applied>()
         for ((alias, value) in proxyJumps) {
             val index = indexOfAlias(alias)
             if (index < 0) continue
@@ -191,19 +193,39 @@ object OpenSshConfigImporter {
                 continue
             }
             val before = imported[index].host
+            val hopsBefore = HashMap<Int, HostConnection>()
             setJump(index, ids.last()!!)
             // The hops of a chain go through each other, unless a hop says otherwise itself.
             for (hop in names.size - 1 downTo 1) {
                 val hopIndex = indexOfAlias(names[hop])
                 if (hopIndex < 0 || proxyJumps.keys.any { it.equals(names[hop], ignoreCase = true) }) continue
-                if (imported[hopIndex].host.jumpHostId == null) setJump(hopIndex, ids[hop - 1]!!)
+                if (imported[hopIndex].host.jumpHostId == null) {
+                    hopsBefore[hopIndex] = imported[hopIndex].host
+                    setJump(hopIndex, ids[hop - 1]!!)
+                }
             }
-            val loops = runCatching {
+            val route = runCatching {
                 com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(imported[index].host, ::find)
-            }.isFailure
+            }
+            val loops = route.isFailure
+            if (!loops) applied += Applied(alias, value, names.last(), ids.map { it!! })
             if (loops) {
+                hopsBefore.forEach { (hopIndex, host) -> imported[hopIndex] = imported[hopIndex].copy(host = host) }
                 imported[index] = imported[index].copy(host = before)
                 warnings += "ProxyJump $value for $alias was not imported: it leads back to $alias or is too long."
+            }
+        }
+        // A hop that is already saved, or has a route of its own, keeps it. Once every line is in, say so where the
+        // route that results isn't the one a line asks for, rather than leave out part of a chain without a word.
+        for (line in applied) {
+            val index = indexOfAlias(line.alias)
+            val route = runCatching {
+                com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(imported[index].host, ::find).map { it.id }
+            }.getOrNull()
+            if (route != line.ids) {
+                warnings += "ProxyJump ${line.value} for ${line.alias}: ${line.alias} goes through ${line.lastName}, but " +
+                    "the rest of the chain differs, because a host on the way already has a route of its own or is a " +
+                    "saved host. Check Jump through on each of them."
             }
         }
     }

@@ -164,7 +164,7 @@ fun SettingsScreen(
     onSetPin: (String) -> Unit,
     onClearPin: () -> Unit,
     onGenerateExportPayload: (String?) -> String?,
-    onImportFromQrPayload: (String, String?, Boolean) -> String = { _, _, _ -> "Invalid export payload." },
+    onImportFromQrPayload: (String, String?, Boolean, Boolean) -> String = { _, _, _, _ -> "Invalid export payload." },
     onDescribeTransferPayload: (String) -> TransferImportSummary? = { null },
     onShowMessage: (String) -> Unit = {},
     corePermissions: List<CorePermissionStatus> = emptyList(),
@@ -215,11 +215,11 @@ fun SettingsScreen(
     val transferWorking = remember { mutableStateOf(false) }
 
     // Import runs PBKDF2 per protected item (about 1-2 s each), so keep it off the main thread.
-    fun runImport(contents: String, passphrase: String?, includeKeyboardLayout: Boolean) {
+    fun runImport(contents: String, passphrase: String?, includeKeyboardLayout: Boolean, scanned: Boolean) {
         transferWorking.value = true
         scope.launch {
                 val message = withContext(Dispatchers.Default) {
-                    runCatching { onImportFromQrPayload(contents, passphrase, includeKeyboardLayout) }
+                    runCatching { onImportFromQrPayload(contents, passphrase, includeKeyboardLayout, scanned) }
                         .getOrElse {
                             TelemetryInitializer.recordNonFatal("import", it)
                             "Import failed: ${it.message ?: it.javaClass.simpleName}"
@@ -251,6 +251,7 @@ fun SettingsScreen(
         val exportPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
         val pendingImportPayload = remember { mutableStateOf<String?>(null) }
         val pendingImportKeyboardLayout = remember { mutableStateOf(false) }
+        val pendingImportScanned = remember { mutableStateOf(false) }
         val importPassphraseState = rememberSaveable { mutableStateOf(ExportPassphraseCache.transfer.orEmpty()) }
         val importPassphraseRevealIndex = remember { mutableIntStateOf(-1) }
         val importPassphraseError = rememberSaveable { mutableStateOf<String?>(null) }
@@ -258,7 +259,8 @@ fun SettingsScreen(
 
         // Every import (QR code, Wi-Fi, file, shared file) is shown for review first: a QR code or file can come
         // from anyone, and used to be applied the moment it was scanned.
-        fun handleReceivedPayload(contents: String, source: String) {
+        // [scanned]: the payload itself was read from a QR code, which must never bring a remote forward.
+        fun handleReceivedPayload(contents: String, source: String, scanned: Boolean = false) {
             scope.launch {
                 val summary = withContext(Dispatchers.Default) {
                     runCatching { onDescribeTransferPayload(contents) }.getOrNull()
@@ -268,7 +270,7 @@ fun SettingsScreen(
                     return@launch
                 }
                 importKeyboardLayout.value = false
-                importReview.value = ImportReview(source = source, contents = contents, summary = summary)
+                importReview.value = ImportReview(source = source, contents = contents, summary = summary, scanned = scanned)
             }
         }
 
@@ -276,10 +278,11 @@ fun SettingsScreen(
             if (review.summary.hasProtectedSecrets) {
                 pendingImportPayload.value = review.contents
                 pendingImportKeyboardLayout.value = includeKeyboardLayout
+                pendingImportScanned.value = review.scanned
                 importPassphraseState.value = ExportPassphraseCache.transfer.orEmpty()
                 importPassphraseError.value = null
             } else {
-                runImport(review.contents, null, includeKeyboardLayout)
+                runImport(review.contents, null, includeKeyboardLayout, review.scanned)
             }
         }
 
@@ -421,7 +424,7 @@ fun SettingsScreen(
             } else if (contents.isBlank()) {
                 onShowMessage("QR scan cancelled.")
             } else {
-                handleReceivedPayload(contents, "the scanned QR code")
+                handleReceivedPayload(contents, "the scanned QR code", scanned = true)
             }
         }
         val createExportFileLauncher = rememberLauncherForActivityResult(
@@ -1441,7 +1444,7 @@ fun SettingsScreen(
                         return@TextButton
                     }
                     ExportPassphraseCache.transfer = passphrase
-                    runImport(payload, passphrase, pendingImportKeyboardLayout.value)
+                    runImport(payload, passphrase, pendingImportKeyboardLayout.value, pendingImportScanned.value)
                     pendingImportPayload.value = null
                     importPassphraseError.value = null
                 }) { Text("Import") }
@@ -1761,7 +1764,12 @@ private fun readImportFile(input: java.io.InputStream): String {
     return buffer.toString(Charsets.UTF_8.name())
 }
 
-private data class ImportReview(val source: String, val contents: String, val summary: TransferImportSummary)
+private data class ImportReview(
+    val source: String,
+    val contents: String,
+    val summary: TransferImportSummary,
+    val scanned: Boolean = false
+)
 
 @Composable
 private fun ImportReviewDialog(
@@ -1779,6 +1787,14 @@ private fun ImportReviewDialog(
         if (summary.snippets > 0) add(count(summary.snippets, "snippet", "snippets"))
         if (summary.portForwards > 0) {
             add(count(summary.portForwards, "port forward", "port forwards") + " (off until you turn them on)")
+        }
+        if (summary.remoteForwards > 0) {
+            add(
+                count(summary.remoteForwards, "of them is a remote forward", "of them are remote forwards") +
+                    ", which let a server reach things from this phone: " +
+                    if (review.scanned) "left out, because a QR code can't bring one"
+                    else "marked for review, to check before you turn one on"
+            )
         }
         if (summary.terminalProfiles > 0) add(count(summary.terminalProfiles, "terminal theme", "terminal themes"))
         if (summary.hasSettings) add("Appearance, terminal and transfer settings")

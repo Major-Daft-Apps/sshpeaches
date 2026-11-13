@@ -623,12 +623,22 @@ fun PortForwardScreen(
                                                         style = MaterialTheme.typography.bodySmall
                                                     )
                                                 }
+                                                if (forward.needsReview) {
+                                                    Text(
+                                                        text = "Imported, off: it lets the server reach ${forward.destinationHost}:${forward.destinationPort} " +
+                                                            "from this phone. Review it before turning it on.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.testTag(UiTestTags.forwardNeedsReview(forward.id))
+                                                    )
+                                                }
                                                 Row(
                                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Switch(
                                                         checked = forward.enabled,
+                                                        modifier = Modifier.testTag(UiTestTags.forwardEnabledSwitch(forward.id)),
                                                         onCheckedChange = {
                                                             onUpdate(
                                                                 forward.id,
@@ -750,6 +760,13 @@ fun PortForwardScreen(
                                 text = if (detailForward.enabled) "Forward is enabled." else "Forward is disabled.",
                                 style = MaterialTheme.typography.bodySmall
                             )
+                            if (detailForward.needsReview) {
+                                Text(
+                                    text = "Imported and not reviewed yet. Check where it leads before turning it on.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = {
                                     detailForwardId.value = null

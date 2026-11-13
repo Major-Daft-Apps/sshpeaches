@@ -118,6 +118,8 @@ object UiTestTags {
     fun forwardTypeOption(type: String): String = "forward_dialog_type_${type.lowercase()}"
     fun forwardTypeLabel(id: String): String = "forward_type_label_$id"
     fun forwardFavorite(id: String): String = "forward_${id}_favorite"
+    fun forwardNeedsReview(id: String): String = "forward_${id}_needs_review"
+    fun forwardEnabledSwitch(id: String): String = "forward_${id}_enabled_switch"
     fun forwardShare(id: String): String = "forward_${id}_share"
     fun forwardOverflowButton(id: String): String = "forward_${id}_overflow_button"
     fun forwardOverflowAction(id: String, action: String): String = "forward_${id}_overflow_$action"

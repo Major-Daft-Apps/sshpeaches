@@ -7,6 +7,7 @@ import java.io.EOFException
 import java.io.IOException
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.util.concurrent.atomic.AtomicInteger
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
@@ -14,6 +15,7 @@ import net.schmizz.sshj.common.Message
 import net.schmizz.sshj.common.SSHPacket
 import net.schmizz.sshj.connection.Connection
 import net.schmizz.sshj.connection.channel.Channel
+import net.schmizz.sshj.connection.channel.OpenFailException
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.connection.channel.forwarded.AbstractForwardedChannel
 import net.schmizz.sshj.connection.channel.forwarded.AbstractForwardedChannelOpener
@@ -37,15 +39,37 @@ class ForwardedAgent(
     private val onSigned: (String) -> Unit = {}
 ) {
     class Key(val label: String, val publicKey: PublicKey, val privateKey: PrivateKey) {
-        val blob: ByteArray by lazy { Buffer.PlainBuffer().putPublicKey(publicKey).compactData }
+        /** Worked out here, so that a key this can't encode fails while loading and is left out on its own. */
+        val blob: ByteArray = Buffer.PlainBuffer().putPublicKey(publicKey).compactData
     }
 
-    private val keys: List<Key> by lazy { runCatching(loadKeys).getOrDefault(emptyList()) }
+    @Volatile
+    private var loadedKeys: List<Key>? = null
+
+    /** Loaded on first use and kept; a load that failed is tried again on the next request. */
+    private val keys: List<Key>
+        get() = loadedKeys ?: synchronized(this) {
+            loadedKeys ?: runCatching(loadKeys).getOrNull()?.also { loadedKeys = it } ?: emptyList()
+        }
+
+    private val openChannels = AtomicInteger(0)
 
     private val opener = object : AbstractForwardedChannelOpener(CHANNEL_TYPE, client.connection) {
         override fun handleOpen(buf: SSHPacket) {
-            val channel = AgentChannel(conn, buf.readUInt32AsInt(), buf.readUInt32(), buf.readUInt32())
-            callListener(ConnectListener { opened -> serve(opened) }, channel)
+            val recipient = buf.readUInt32AsInt()
+            // Each channel gets a thread and a buffer: a server opening them without end must not get that many.
+            if (openChannels.incrementAndGet() > MAX_CHANNELS) {
+                openChannels.decrementAndGet()
+                conn.sendOpenFailure(recipient, OpenFailException.Reason.RESOURCE_SHORTAGE, "too many agent channels")
+                return
+            }
+            try {
+                val channel = AgentChannel(conn, recipient, buf.readUInt32(), buf.readUInt32())
+                callListener(ConnectListener { opened -> serve(opened) }, channel)
+            } catch (err: Throwable) {
+                openChannels.decrementAndGet()
+                throw err
+            }
         }
     }
 
@@ -57,8 +81,10 @@ class ForwardedAgent(
         client.connection.attach(opener)
     }
 
+    /** Stops accepting agent channels and lets go of the keys. */
     fun detach() {
         runCatching { client.connection.forget(opener) }
+        loadedKeys = null
     }
 
     /**
@@ -94,6 +120,7 @@ class ForwardedAgent(
         } catch (_: IOException) {
             // The program on the server went away, or the connection did.
         } finally {
+            openChannels.decrementAndGet()
             runCatching { channel.close() }
         }
     }
@@ -156,6 +183,8 @@ class ForwardedAgent(
         const val CHANNEL_TYPE = "auth-agent@openssh.com"
         const val REQUEST_TYPE = "auth-agent-req@openssh.com"
         private const val MAX_MESSAGE_BYTES = 256 * 1024
+        /** Agent channels open at once; ssh opens one per login or `ssh-add`, briefly. */
+        internal const val MAX_CHANNELS = 8
         private const val REQUEST_IDENTITIES = 11
         private const val IDENTITIES_ANSWER = 12
         private const val SIGN_REQUEST = 13

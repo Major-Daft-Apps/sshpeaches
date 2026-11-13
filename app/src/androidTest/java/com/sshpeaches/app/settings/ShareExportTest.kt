@@ -78,6 +78,52 @@ class ShareExportTest {
         assertEquals("192.0.2.44", imported!!.host)
     }
 
+    /**
+     * A remote forward lets the server reach something from this phone. An import may bring one, but never live:
+     * whatever the file says, it is saved switched off and marked for review, and the dialogs say so. (The mark on
+     * the Port Forwards screen is PortForwardBrowserTest's.)
+     */
+    @Test
+    fun anImportedRemoteForwardComesInSwitchedOffAndMarkedForReview() {
+        val directory = File(context.cacheDir, "exports").apply { mkdirs() }
+        val file = File(directory, "forwards-export.json")
+        file.writeText(
+            """{"v":2,"hosts":[{"id":"fwd-host","name":"with forwards","host":"192.0.2.45","port":22,"username":"bob",
+            "auth":"PASSWORD","attachedForwards":["remote-1","local-1"]}],
+            "portForwards":[
+            {"id":"remote-1","label":"phone web to server","type":"REMOTE","sourceHost":"0.0.0.0","sourcePort":8080,
+             "destinationHost":"192.168.1.10","destinationPort":80,"enabled":true,"needsReview":false,"associatedHosts":["fwd-host"]},
+            {"id":"local-1","label":"db","type":"LOCAL","sourceHost":"127.0.0.1","sourcePort":15432,
+             "destinationHost":"127.0.0.1","destinationPort":5432,"enabled":true}]}"""
+        )
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.exports", file)
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/json")
+            .setClass(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        ActivityScenario.launch<MainActivity>(intent).use {
+            waitForTag(UiTestTags.SETTINGS_INCOMING_IMPORT_DIALOG, 20_000)
+            assertTrue(
+                "the review dialog says a remote forward is in the file",
+                composeRule.onAllNodesWithText("remote forward", substring = true).fetchSemanticsNodes().isNotEmpty()
+            )
+            composeRule.onNodeWithTag(UiTestTags.SETTINGS_INCOMING_IMPORT_CONFIRM).performClick()
+            composeRule.waitUntil(30_000) {
+                composeRule.onAllNodesWithText("marked for review", substring = true).fetchSemanticsNodes().isNotEmpty()
+            }
+            val dao = SshPeachesDatabase.get(context).portForwardDao()
+            composeRule.waitUntil(10_000) { runBlocking { dao.getAll() }.size == 2 }
+            val remote = runBlocking { dao.getAll() }.single { it.label == "phone web to server" }
+            assertEquals(false, remote.enabled)
+            assertEquals(true, remote.needsReview)
+            assertEquals("the server's loopback only", "127.0.0.1", remote.sourceHost)
+            val local = runBlocking { dao.getAll() }.single { it.label == "db" }
+            assertEquals(false, local.needsReview)
+
+        }
+    }
+
     private fun waitForTag(tag: String, timeoutMs: Long) {
         composeRule.waitUntil(timeoutMs) {
             composeRule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()

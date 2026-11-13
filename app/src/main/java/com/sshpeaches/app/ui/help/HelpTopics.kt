@@ -175,10 +175,12 @@ val helpTopics: List<HelpTopic> = listOf(
             "Set Associated host and connect. On the server, connecting to localhost and the Server port now " +
                 "reaches the destination, for as long as the session is open.",
             "If it doesn't start, the server refused: check AllowTcpForwarding in its sshd_config, and use a " +
-                "port above 1023. Listening on other than the server's localhost also needs GatewayPorts."
+                "port above 1023. Listening on other than the server's localhost also needs GatewayPorts.",
+            "A remote forward that came with an import (a file, Wi-Fi transfer, an OpenSSH config) is saved switched " +
+                "off and marked for review: check where it leads, then turn it on. A QR code never brings one."
         ),
         destination = HelpDestination.FORWARDS,
-        keywords = listOf("remote forward", "reverse tunnel", "ssh -R", "expose", "gatewayports", "tunnel")
+        keywords = listOf("remote forward", "review", "imported", "reverse tunnel", "ssh -R", "expose", "gatewayports", "tunnel")
     ),
     HelpTopic(
         id = "jump-host",

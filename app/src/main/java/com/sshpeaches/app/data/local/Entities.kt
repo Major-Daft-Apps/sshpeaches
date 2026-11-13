@@ -73,7 +73,8 @@ data class PortForwardEntity(
     val destinationPort: Int,
     val associatedHosts: List<String>,
     val favorite: Boolean,
-    val enabled: Boolean
+    val enabled: Boolean,
+    @ColumnInfo(defaultValue = "0") val needsReview: Boolean = false
 )
 
 @Entity(tableName = "snippets")

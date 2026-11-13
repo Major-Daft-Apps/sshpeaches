@@ -183,6 +183,46 @@ class LivePortForwardTest {
         socket.banner()
     }
 
+    /**
+     * Each forwarded connection holds threads. They used to come from the pool everything else in the service runs
+     * on, so enough open connections (a browser's, or clients that connect and say nothing) left none to answer the
+     * terminal or even to close the session.
+     */
+    @Test
+    fun manyIdleClientsNeitherStallTheSessionNorStayForever() {
+        assumeTrue("Needs -e liveMoshHost", sshHost != null)
+        val socksPort = 19086
+        val sessionId = "fwd-many"
+        withSession(sessionId, listOf(forward(PortForwardType.DYNAMIC, socksPort))) { service, log ->
+            // More than the limit, none of them saying a word.
+            val idle = (1..140).map {
+                Socket().apply { connect(InetSocketAddress("127.0.0.1", socksPort), 5_000) }
+            }
+            try {
+                service.sendShellInput(sessionId, "echo MANY-\$((40+2))\n")
+                val answered = System.currentTimeMillis() + 15_000
+                while (!service.shellOutputFlow().value[sessionId].orEmpty().contains("MANY-42")) {
+                    check(System.currentTimeMillis() < answered) { "The terminal didn't answer with 140 idle clients on the proxy" }
+                    Thread.sleep(50)
+                }
+                check(log.any { it.contains("forwarded connections are open at once") }) { "Nothing said the limit was reached: $log" }
+                // Those over the limit were closed at once, the others when the handshake's time ran out.
+                idle.forEach { socket ->
+                    socket.soTimeout = 40_000
+                    val read = runCatching { socket.getInputStream().read() }.getOrElse { err ->
+                        check(err !is java.net.SocketTimeoutException) { "An idle client was kept for over 40 seconds" }
+                        -1
+                    }
+                    check(read == -1) { "An idle client was sent data: $read" }
+                }
+                // With them gone the proxy serves again.
+                check(socks5Connect(socksPort, addressType = 1, host = "127.0.0.1", port = sshPort).banner().startsWith("SSH-2.0-"))
+            } finally {
+                idle.forEach { runCatching { it.close() } }
+            }
+        }
+    }
+
     private fun Socket.banner(): String = use {
         soTimeout = 20_000
         getInputStream().bufferedReader().readLine().orEmpty()

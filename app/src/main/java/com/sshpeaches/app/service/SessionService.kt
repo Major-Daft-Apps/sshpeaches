@@ -98,6 +98,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel as CoroutineChannel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -137,6 +138,7 @@ import com.majordaftapps.sshpeaches.app.data.ssh.LoginChallenge
 import com.majordaftapps.sshpeaches.app.data.ssh.ForwardedAgent
 import com.majordaftapps.sshpeaches.app.data.ssh.RoutedSSHClient
 import com.majordaftapps.sshpeaches.app.data.ssh.SshRoute
+import com.majordaftapps.sshpeaches.app.data.ssh.SshRouteException
 import com.majordaftapps.sshpeaches.app.data.ssh.authPasswordOrInteractive
 import kotlin.math.min
 
@@ -152,6 +154,14 @@ class SessionService : Service() {
     // kept every destroyed service instance alive. (serviceScope is not cancelled so that
     // disconnect work launched by stopAllSessions in onDestroy can still finish.)
     private val collectorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Forwarded connections block two threads each for as long as they live. On Dispatchers.IO (64 threads, shared
+    // with everything else here) a browser on a SOCKS forward could hold them all, and then no session could
+    // start, reconnect or even be stopped. They get threads of their own, and a limit ([forwardSlots]).
+    private val forwardIo = java.util.concurrent.Executors.newCachedThreadPool { task ->
+        Thread(task, "sshpeaches-forward-io").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private val forwardSlots = java.util.concurrent.Semaphore(MAX_FORWARD_CONNECTIONS)
+    private val forwardLimitLastReported = java.util.concurrent.atomic.AtomicLong(0)
     private val binder = SessionBinder()
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val activeConnections = ConcurrentHashMap<String, ActiveConnection>()
@@ -2879,6 +2889,9 @@ class SessionService : Service() {
         if (error is CancellationException || error is FileTransferCancelledException) return
         // A host key or password prompt nobody answered in time: nothing went wrong in the app.
         if (error is ConnectionTimeoutException) return
+        // A route through jump hosts that can't be worked out or opened is about the user's hosts or their servers,
+        // and its message names the jump hosts, which the scrubbing below (the target's name only) wouldn't catch.
+        if (generateSequence(error) { it.cause }.take(8).any { it is SshRouteException }) return
         // A network failure is investigated like a crash: reported as a network issue, with what the connection was.
         error.connectionFailureKind()?.let { kind ->
             if (kind.isNetwork) reportNetworkIssue(action, hostId, error, context)
@@ -3054,10 +3067,9 @@ class SessionService : Service() {
         val destinationHost = forward.inferredDestinationHost()
         val destinationPort = requireValidPort(forward.destinationPort, "destination")
         val legacyDestinationHost = forward.legacyLoopbackDestinationHost(sessionHost)
-        val serverSocket = ServerSocket()
-        serverSocket.reuseAddress = true
-        serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        val serverSocket = boundForwardSocket(bindHost, bindPort)
         val connectionJobs = Collections.synchronizedSet(mutableSetOf<Job>())
+        val openSockets = Collections.synchronizedSet(mutableSetOf<Socket>())
         val acceptThread = Thread({
             while (!serverSocket.isClosed && !Thread.currentThread().isInterrupted) {
                 val socket = try {
@@ -3068,8 +3080,13 @@ class SessionService : Service() {
                     }
                     break
                 }
-                socket.tcpNoDelay = true
-                val connectionJob = serviceScope.launch(Dispatchers.IO) {
+                if (!takeForwardSlot(hostId, forward)) {
+                    runCatching { socket.close() }
+                    continue
+                }
+                runCatching { socket.tcpNoDelay = true }
+                openSockets += socket
+                val connectionJob = serviceScope.launch(forwardIo) {
                     runCatching {
                         bridgeLocalPortForwardConnection(
                             hostId = hostId,
@@ -3089,7 +3106,9 @@ class SessionService : Service() {
                 connectionJobs += connectionJob
                 connectionJob.invokeOnCompletion {
                     connectionJobs.remove(connectionJob)
+                    openSockets.remove(socket)
                     runCatching { socket.close() }
+                    forwardSlots.release()
                 }
             }
         }, "sshpeaches-port-forward-$bindPort").apply {
@@ -3103,6 +3122,8 @@ class SessionService : Service() {
                 runCatching { serverSocket.close() }
                 acceptThread.interrupt()
                 synchronized(connectionJobs) { connectionJobs.toList() }.forEach { it.cancel() }
+                // Cancelling doesn't wake a thread blocked in a read; closing its socket does.
+                synchronized(openSockets) { openSockets.toList() }.forEach { runCatching { it.close() } }
             }
         )
     }
@@ -3156,7 +3177,7 @@ class SessionService : Service() {
         val acceptedOutput = acceptedSocket.getOutputStream()
         val remoteInput = channelInput
         val remoteOutput = channelOutput
-        val upstreamJob = serviceScope.launch(Dispatchers.IO) {
+        val upstreamJob = serviceScope.launch(forwardIo) {
             runCatching {
                 copyPortForwardStream(
                     input = acceptedInput,
@@ -3170,7 +3191,7 @@ class SessionService : Service() {
                 runCatching { remoteOutput.close() }
             }
         }
-        val downstreamJob = serviceScope.launch(Dispatchers.IO) {
+        val downstreamJob = serviceScope.launch(forwardIo) {
             runCatching {
                 copyPortForwardStream(
                     input = remoteInput,
@@ -3223,11 +3244,16 @@ class SessionService : Service() {
                 runCatching { channel.reject(OpenFailException.Reason.ADMINISTRATIVELY_PROHIBITED, "forward closed") }
                 return@ConnectListener
             }
+            if (!takeForwardSlot(hostId, forward)) {
+                runCatching { channel.reject(OpenFailException.Reason.RESOURCE_SHORTAGE, "too many connections") }
+                return@ConnectListener
+            }
             val socket = Socket()
             try {
                 socket.tcpNoDelay = true
                 socket.connect(InetSocketAddress(destinationHost, destinationPort), PORT_FORWARD_CONNECT_TIMEOUT_MS)
             } catch (err: IOException) {
+                forwardSlots.release()
                 runCatching { socket.close() }
                 runCatching { channel.reject(OpenFailException.Reason.CONNECT_FAILED, "connection failed") }
                 emitPortForwardConnectionWarning(hostId, forward, err)
@@ -3236,10 +3262,11 @@ class SessionService : Service() {
             try {
                 channel.confirm()
             } catch (err: IOException) {
+                forwardSlots.release()
                 runCatching { socket.close() }
                 return@ConnectListener
             }
-            val connectionJob = serviceScope.launch(Dispatchers.IO) {
+            val connectionJob = serviceScope.launch(forwardIo) {
                 runCatching {
                     bridgePortForwardStreams(
                         hostId = hostId,
@@ -3260,6 +3287,7 @@ class SessionService : Service() {
                 connectionJobs.remove(connectionJob)
                 runCatching { socket.close() }
                 runCatching { channel.close() }
+                forwardSlots.release()
             }
         }
         val bound = client.remotePortForwarder.bind(RemotePortForwarder.Forward(bindHost, bindPort), listener)
@@ -3289,10 +3317,9 @@ class SessionService : Service() {
     ): PortForwardBinding {
         val bindHost = normalizeBindHost(forward.sourceHost)
         val bindPort = requireValidPort(forward.sourcePort, "source")
-        val serverSocket = ServerSocket()
-        serverSocket.reuseAddress = true
-        serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        val serverSocket = boundForwardSocket(bindHost, bindPort)
         val connectionJobs = Collections.synchronizedSet(mutableSetOf<Job>())
+        val openSockets = Collections.synchronizedSet(mutableSetOf<Socket>())
         val serverRefusalReported = AtomicBoolean(false)
         val acceptThread = Thread({
             while (!serverSocket.isClosed && !Thread.currentThread().isInterrupted) {
@@ -3304,8 +3331,13 @@ class SessionService : Service() {
                     }
                     break
                 }
-                socket.tcpNoDelay = true
-                val connectionJob = serviceScope.launch(Dispatchers.IO) {
+                if (!takeForwardSlot(hostId, forward)) {
+                    runCatching { socket.close() }
+                    continue
+                }
+                runCatching { socket.tcpNoDelay = true }
+                openSockets += socket
+                val connectionJob = serviceScope.launch(forwardIo) {
                     runCatching {
                         bridgeDynamicPortForwardConnection(hostId, client, forward, socket, serverRefusalReported)
                     }.onFailure { err ->
@@ -3318,7 +3350,9 @@ class SessionService : Service() {
                 connectionJobs += connectionJob
                 connectionJob.invokeOnCompletion {
                     connectionJobs.remove(connectionJob)
+                    openSockets.remove(socket)
                     runCatching { socket.close() }
+                    forwardSlots.release()
                 }
             }
         }, "sshpeaches-socks-forward-$bindPort").apply {
@@ -3332,6 +3366,8 @@ class SessionService : Service() {
                 runCatching { serverSocket.close() }
                 acceptThread.interrupt()
                 synchronized(connectionJobs) { connectionJobs.toList() }.forEach { it.cancel() }
+                // Cancelling doesn't wake a thread blocked in a read; closing its socket does.
+                synchronized(openSockets) { openSockets.toList() }.forEach { runCatching { it.close() } }
             }
         )
     }
@@ -3343,13 +3379,21 @@ class SessionService : Service() {
         acceptedSocket: Socket,
         serverRefusalReported: AtomicBoolean
     ) {
-        // The handshake is a few bytes: a client that stalls must not hold a thread.
+        // The handshake is a few bytes: a client that stalls must not hold a thread. The socket's timeout is per
+        // read, so a client dripping a byte at a time could still take many minutes: the whole handshake also has
+        // a deadline, after which the socket is closed under it.
         acceptedSocket.soTimeout = SOCKS_HANDSHAKE_TIMEOUT_MS
+        val handshakeDeadline = serviceScope.launch(Dispatchers.Default) {
+            delay(SOCKS_HANDSHAKE_DEADLINE_MS)
+            runCatching { acceptedSocket.close() }
+        }
         val request = try {
             SocksHandshake.readRequest(acceptedSocket.getInputStream(), acceptedSocket.getOutputStream())
         } catch (err: IOException) {
             runCatching { acceptedSocket.close() }
             throw err
+        } finally {
+            handshakeDeadline.cancel()
         }
         val directConnection = try {
             client.newDirectConnection(request.host, request.port)
@@ -3388,6 +3432,37 @@ class SessionService : Service() {
             channelOutput = directConnection.outputStream,
             closeChannel = { directConnection.close() }
         )
+    }
+
+    /** A listening socket for a forward on this phone; closed again when the address can't be had. */
+    private fun boundForwardSocket(bindHost: String, bindPort: Int): ServerSocket {
+        val serverSocket = ServerSocket()
+        try {
+            serverSocket.reuseAddress = true
+            serverSocket.bind(InetSocketAddress(bindHost, bindPort))
+        } catch (err: IOException) {
+            runCatching { serverSocket.close() }
+            throw err
+        }
+        return serverSocket
+    }
+
+    /**
+     * Takes one of the [MAX_FORWARD_CONNECTIONS] places for a forwarded connection, to be given back with
+     * [forwardSlots] when it ends. False when all are taken, which the session log says at most once a minute.
+     */
+    private fun takeForwardSlot(hostId: String, forward: PortForward): Boolean {
+        if (forwardSlots.tryAcquire()) return true
+        val now = SystemClock.elapsedRealtime()
+        val last = forwardLimitLastReported.get()
+        if ((last == 0L || now - last > 60_000) && forwardLimitLastReported.compareAndSet(last, now)) {
+            emitPortForwardConnectionWarning(
+                hostId,
+                forward,
+                IOException("$MAX_FORWARD_CONNECTIONS forwarded connections are open at once; more are refused until some close")
+            )
+        }
+        return false
     }
 
     /** Why a forward did not start, with what to check when the server refused a remote forward. */
@@ -3511,7 +3586,9 @@ class SessionService : Service() {
         reason: String,
         deadlineMillis: Long,
         allowSave: Boolean,
-        challenge: LoginChallenge? = null
+        challenge: LoginChallenge? = null,
+        // The host the session is for, when [host] is a jump host on the way: the session keeps showing as that one.
+        snapshotHost: HostConnection = host
     ): PasswordResponse? {
         val promptId = UUID.randomUUID().toString()
         val waiter = CompletableFuture<PasswordResponse>()
@@ -3530,7 +3607,7 @@ class SessionService : Service() {
         )
         passwordPromptWaiters[promptId] = waiter
         passwordPrompts.update { prompts -> prompts + prompt }
-        updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, reason)
+        updateSessionSnapshot(sessionId, snapshotHost, mode, SessionStatus.CONNECTING, reason)
         val remainingMillis = millisUntilDeadline(deadlineMillis)
         if (remainingMillis <= 0L) {
             throw ConnectionTimeoutException(TIMEOUT_WAITING_FOR_INPUT_MESSAGE)
@@ -3623,7 +3700,8 @@ class SessionService : Service() {
                     mode = mode,
                     reason = reason,
                     deadlineMillis = deadlineMillis,
-                    allowSave = allowPasswordSave
+                    allowSave = allowPasswordSave,
+                    snapshotHost = snapshotHost
                 )
                 password = response?.password
                 savePassword = response?.savePassword == true && allowPasswordSave
@@ -3650,7 +3728,8 @@ class SessionService : Service() {
                         // A person may need to fetch a code; give each question its own window.
                         deadlineMillis = System.currentTimeMillis() + INTERACTIVE_LOGIN_TIMEOUT_MS,
                         allowSave = false,
-                        challenge = challenge
+                        challenge = challenge,
+                        snapshotHost = snapshotHost
                     )?.password
                 }
                 if (savePassword) {
@@ -4502,15 +4581,16 @@ class SessionService : Service() {
         return bindShell(hostId, SshTerminalChannel(session, shell), reuseTerminalEngine)
     }
 
-    /** The agent each connection offers to its server, for hosts with agent forwarding on. */
-    private val forwardedAgents = Collections.synchronizedMap(WeakHashMap<SSHClient, ForwardedAgent>())
-
     /**
      * The agent for [client], accepting the server's agent channels from now on. It offers every identity whose
      * private key this phone can open without asking, and the session log says each time one is used.
      */
-    private fun forwardedAgentFor(sessionId: String, client: SSHClient): ForwardedAgent =
-        forwardedAgents.getOrPut(client) {
+    private fun forwardedAgentFor(sessionId: String, client: SSHClient): ForwardedAgent {
+        // One per connection, kept by the connection itself so that it goes when the connection does (a map here
+        // kept every closed connection, and the keys it had opened, for as long as the service lived).
+        val routed = client as? RoutedSSHClient
+        routed?.forwardedAgent?.let { return it }
+        return run {
             ForwardedAgent(
                 client = client,
                 loadKeys = {
@@ -4547,8 +4627,10 @@ class SessionService : Service() {
                         message = "Agent forwarding is on: programs on this server can use your keys while this terminal is open."
                     )
                 )
+                routed?.forwardedAgent = agent
             }
         }
+    }
 
     /**
      * Copies the Boost helper to the server over [client] while the session is used over SSH; one copy per server at
@@ -5466,6 +5548,9 @@ class SessionService : Service() {
         private const val REMOTE_OUTPUT_DRAIN_MS = 2_000L
         private const val PORT_FORWARD_CONNECT_TIMEOUT_MS = 10_000
         private const val SOCKS_HANDSHAKE_TIMEOUT_MS = 10_000
+        private const val SOCKS_HANDSHAKE_DEADLINE_MS = 20_000L
+        // Two threads each. A browser on a SOCKS forward opens a few dozen at once.
+        internal const val MAX_FORWARD_CONNECTIONS = 128
         private const val MAX_OS_VERSION_LABEL_LENGTH = 32
         private const val PARTIAL_DOWNLOAD_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         // Attach to (or create) tmux session "sshpeaches"; without tmux, fall back to the login shell.

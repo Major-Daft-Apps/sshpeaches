@@ -17,11 +17,17 @@ class RoutedSSHClient(config: Config) : SSHClient(config) {
     var carriers: List<SSHClient> = emptyList()
         internal set
 
+    /** The agent this connection offers its server, when the host has agent forwarding on; let go on disconnect. */
+    @Volatile
+    var forwardedAgent: ForwardedAgent? = null
+
     /** Whether this connection goes through at least one jump host. */
     val viaJumpHost: Boolean get() = carriers.isNotEmpty()
 
     override fun disconnect() {
         try {
+            forwardedAgent?.detach()
+            forwardedAgent = null
             super.disconnect()
         } finally {
             closeCarriers()

@@ -124,12 +124,17 @@ sealed interface PortForwardQrImportResult {
     data class Error(val message: String) : PortForwardQrImportResult
 }
 
+/**
+ * Whether a forward of this [type] may come in from a scanned QR code, be it a single forward's code or a whole
+ * export's. A remote forward opens something this phone can reach to the server: too much to take from a scan.
+ */
+fun scannedCodeMayBringForward(type: PortForwardType): Boolean = type != PortForwardType.REMOTE
+
 fun processPortForwardQrImport(contents: String): PortForwardQrImportResult {
     val incomingType = decodeForwardTypeFromQr(contents) ?: return PortForwardQrImportResult.Error("Invalid port forward QR")
     val type = runCatching { PortForwardType.valueOf(incomingType.ifBlank { PortForwardType.LOCAL.name }) }.getOrNull()
         ?: return PortForwardQrImportResult.Error("This kind of port forward isn't supported.")
-    // A remote forward opens something this phone can reach to the server: too much to take from a scanned code.
-    if (type == PortForwardType.REMOTE) {
+    if (!scannedCodeMayBringForward(type)) {
         return PortForwardQrImportResult.Error("Remote forwards can't be imported from a QR code. Add it by hand.")
     }
     val imported = decodeForwardFromQr(contents)

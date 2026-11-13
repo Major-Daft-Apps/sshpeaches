@@ -56,6 +56,16 @@ class DatabaseMigrationTest {
             // The new column takes a value and gives it back.
             runBlocking { room.hostDao().upsert(host.copy(jumpHostId = "bastion")) }
             assertEquals("bastion", runBlocking { room.hostDao().getById("h1") }!!.jumpHostId)
+            // Forwards got the "imported, review before turning on" mark, off for what was there.
+            val forward = com.majordaftapps.sshpeaches.app.data.local.PortForwardEntity(
+                id = "f1", label = "f", group = null, createdEpochMillis = null, updatedEpochMillis = null,
+                lastUsedEpochMillis = null, type = com.majordaftapps.sshpeaches.app.data.model.PortForwardType.REMOTE,
+                sourceHost = "127.0.0.1", sourcePort = 8080, destinationHost = "127.0.0.1", destinationPort = 80,
+                associatedHosts = emptyList(), favorite = false, enabled = false, needsReview = true
+            )
+            runBlocking { room.portForwardDao().upsert(forward) }
+            assertEquals(true, runBlocking { room.portForwardDao().getById("f1") }!!.needsReview)
+            assertEquals(false, runBlocking { room.portForwardDao().getAll() }.filter { it.id != "f1" }.any { it.needsReview })
         } finally {
             room.close()
         }

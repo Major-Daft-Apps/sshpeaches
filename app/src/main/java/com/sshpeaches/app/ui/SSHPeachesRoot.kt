@@ -1219,13 +1219,16 @@ fun SSHPeachesRoot(
     fun importTransferPayloadFromQr(
         encodedPayload: String,
         passphrase: String?,
-        includeKeyboardLayout: Boolean
+        includeKeyboardLayout: Boolean,
+        scanned: Boolean = false
     ): String {
         val root = decodeTransferPayload(encodedPayload) ?: return "Invalid export payload."
 
         var importedHosts = 0
         var importedIdentities = 0
         var importedForwards = 0
+        var remoteForwardsLeftOut = 0
+        var remoteForwardsToReview = 0
         var importedSnippets = 0
         var importedTerminalProfiles = 0
         var importedPasswords = 0
@@ -1382,6 +1385,12 @@ fun SSHPeachesRoot(
                 val forwardType = runCatching {
                     PortForwardType.valueOf(item.optString("type", PortForwardType.LOCAL.name))
                 }.getOrDefault(PortForwardType.LOCAL)
+                // A remote forward opens something this phone can reach to the server: too much to take from a
+                // scanned code, here as on the Port Forwards screen. Hosts naming it simply lose the reference.
+                if (scanned && !com.majordaftapps.sshpeaches.app.ui.components.scannedCodeMayBringForward(forwardType)) {
+                    remoteForwardsLeftOut += 1
+                    continue
+                }
                 // A dynamic forward (SOCKS proxy) has no destination; the others need one.
                 val dynamicForward = forwardType == PortForwardType.DYNAMIC
                 val destinationHost = if (dynamicForward) "" else item.optString("destinationHost").trim()
@@ -1425,6 +1434,7 @@ fun SSHPeachesRoot(
                     onImportPortForward(importedForward)
                     existingForwardByKey[key] = importedForward
                     importedForwards += 1
+                    if (forwardType == PortForwardType.REMOTE) remoteForwardsToReview += 1
                 } else if (item.optBoolean("favorite", false) && !existing.favorite) {
                     onToggleFavorite(existing.id)
                 }
@@ -1677,6 +1687,17 @@ fun SSHPeachesRoot(
         val summary = "Import complete: ${parts.joinToString(", ")}."
         return buildString {
             append(summary)
+            if (remoteForwardsToReview > 0) {
+                append(' ')
+                append(
+                    "$remoteForwardsToReview remote forwards came in switched off and marked for review: " +
+                        "check each under Port Forwards before turning it on."
+                )
+            }
+            if (remoteForwardsLeftOut > 0) {
+                append(' ')
+                append("$remoteForwardsLeftOut remote forwards were left out: they can't be imported from a QR code. Add them by hand.")
+            }
             if (protectedImportFailures > 0) {
                 append(' ')
                 append("$protectedImportFailures protected items could not be imported. Check the export passphrase and unlock state.")

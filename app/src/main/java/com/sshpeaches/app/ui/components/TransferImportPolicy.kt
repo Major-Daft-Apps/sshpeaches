@@ -10,6 +10,8 @@ data class TransferImportSummary(
     val identities: Int,
     val snippets: Int,
     val portForwards: Int,
+    /** How many of [portForwards] are remote forwards (`ssh -R`). */
+    val remoteForwards: Int = 0,
     val terminalProfiles: Int,
     val hasSettings: Boolean,
     val hasKeyboardLayout: Boolean,
@@ -27,6 +29,7 @@ fun summarizeTransferPayload(root: JSONObject): TransferImportSummary {
         identities = identities.size,
         snippets = root.optJSONArray("snippets").objects().size,
         portForwards = root.optJSONArray("portForwards").objects().size,
+        remoteForwards = root.optJSONArray("portForwards").objects().count { it.optString("type") == "REMOTE" },
         terminalProfiles = settings?.optJSONArray("terminalProfiles").objects().size,
         hasSettings = settings != null,
         hasKeyboardLayout = settings?.optJSONArray("keyboardLayout") != null,

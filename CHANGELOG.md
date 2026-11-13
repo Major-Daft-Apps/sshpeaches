@@ -15,6 +15,19 @@ Not released yet.
 - mosh-client is built with protobuf 36.2 (was 3.21.12, which no longer gets fixes) and the Abseil 20250512.1 it needs; the binary is about 0.5 MB larger per processor type and still loads only Android's own libraries.
 - The terminal request has a test against an SSH server that answers late or refuses (`PtyRequestSshdTest`), for the 0.15.1 fix.
 
+Fixes from a review of everything added since 0.14.2:
+
+- **Fixed: many connections through a port forward could stall the whole app.** Each forwarded connection used two threads of the pool that everything else runs on (64 in all), so a browser on a Dynamic (SOCKS) forward, or clients that connected and said nothing, could leave none to open, reconnect or even close a session. Forwards now have threads of their own, at most 128 connections at once (more are refused, and the session log says so), a 20-second limit on the whole SOCKS handshake, and their sockets are closed as soon as the forward stops.
+- **Fixed: a whole-app export scanned as a QR code under Settings could bring a Remote forward.** Remote forwards were already refused from a forward's own QR code; a scanned export now leaves them out too and says how many. Files and Wi-Fi transfer keep them.
+- **An imported Remote forward is never live until you turn it on.** Whatever brings one in (an export file, Wi-Fi transfer, an OpenSSH config), it is saved switched off and marked "review it before turning it on" on the Port Forwards screen; the import's review dialog and its result both say how many there are. The mark goes when you turn the forward on.
+- Fixed: a session through a jump host gave up after one reconnect attempt when the jump host answered but the host behind it didn't yet (it was restarting, say). It now keeps trying like a direct connection.
+- Fixed: agent forwarding kept each closed connection, and the keys it had opened, in memory for as long as the app's service ran. They are let go when the connection closes. A server can have at most 8 agent channels open at once, a key that can't be read no longer hides the others, and a failed load of the keys is tried again.
+- Fixed: errors about a jump host route (its name is in the message) are no longer sent to crash reporting.
+- Fixed: while a jump host asked for its password, the session was briefly listed under the jump host.
+- OpenSSH config import: when part of a `ProxyJump a,b` chain can't be set because a host on the way is already saved or has its own route, the import now says so instead of shortening the chain silently; a chain that turns out to loop is undone completely.
+- Boost helper copy: the gzipped copy kept on the phone is checked before use and is safe when two servers are set up at once; gzip is only used when the server can also verify the result; leftover partial files on the server are removed after a successful copy.
+- Text copied from the terminal could stay on the clipboard if the app's screen went away without being told it lost focus. Fixed.
+
 ## 0.15.1 (1501)
 
 Sent to Google Play open testing on 2026-11-12.

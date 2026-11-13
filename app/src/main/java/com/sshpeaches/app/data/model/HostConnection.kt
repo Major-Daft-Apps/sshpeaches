@@ -74,8 +74,24 @@ data class PortForward(
     val enabled: Boolean = false,
     val createdEpochMillis: Long? = null,
     val updatedEpochMillis: Long? = null,
-    val lastUsedEpochMillis: Long? = null
+    val lastUsedEpochMillis: Long? = null,
+    /**
+     * An imported remote forward nobody has looked at yet: shown as such until the user turns it on. Set by
+     * [asImported] only.
+     */
+    val needsReview: Boolean = false
 )
+
+/**
+ * This forward as any import saves it (a file, Wi-Fi transfer, an OpenSSH config, a QR code). A remote forward opens
+ * something this phone can reach to the server, so whatever the import said it comes in switched off and marked for
+ * review: nothing of it is live until the user turns it on.
+ */
+fun PortForward.asImported(): PortForward =
+    if (type == PortForwardType.REMOTE) copy(enabled = false, needsReview = true) else copy(needsReview = false)
+
+/** Whether the mark stays after the user saved this forward with [enabled]: turning it on is the review. */
+fun PortForward.stillNeedsReviewWhen(enabled: Boolean): Boolean = needsReview && !enabled
 
 data class Snippet(
     val id: String,
