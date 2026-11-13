@@ -1,0 +1,7 @@
+What's new in 0.16.1
+
+- Fixed: the Home screen could turn on an imported Remote forward without showing that it needs a review. Home now opens it for review instead.
+- Fixed: agent forwarding offered no keys for the rest of a connection if a server asked while the app was locked.
+- Fixed: an OpenSSH config with crossing ProxyJump chains could import hosts whose route loops.
+
+0.16.0 added jump hosts, agent forwarding and a faster, resumable Boost helper copy.

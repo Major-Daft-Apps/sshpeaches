@@ -4,7 +4,7 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.16.1 (1601)
 
-Not released yet.
+Sent to Google Play open testing on 2026-11-13.
 
 Fixes from a second review of 0.16.0's fixes:
 
