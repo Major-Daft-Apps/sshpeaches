@@ -25,7 +25,7 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun version10HostsGainAttachTmuxAndLegacyAlgorithmsOffAndKeepTheirData() {
+    fun version10HostsGainAttachTmuxLegacyAlgorithmsAndJumpHostAndKeepTheirData() {
         context.deleteDatabase(name)
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
             V10_TABLES.forEach(db::execSQL)
@@ -39,7 +39,9 @@ class DatabaseMigrationTest {
         }
 
         val room = Room.databaseBuilder(context, SshPeachesDatabase::class.java, name)
-            .addMigrations(SshPeachesDatabase.MIGRATION_10_11, SshPeachesDatabase.MIGRATION_11_12)
+            .addMigrations(
+                SshPeachesDatabase.MIGRATION_10_11, SshPeachesDatabase.MIGRATION_11_12, SshPeachesDatabase.MIGRATION_12_13
+            )
             .build()
         try {
             val host = runBlocking { room.hostDao().getById("h1") }!!
@@ -48,7 +50,12 @@ class DatabaseMigrationTest {
             assertEquals("uptime", host.startupScript)
             assertFalse(host.attachTmux)
             assertFalse(host.allowLegacyAlgorithms)
-            assertEquals(12, room.openHelper.readableDatabase.version)
+            assertEquals(null, host.jumpHostId)
+            assertFalse(host.forwardAgent)
+            assertEquals(13, room.openHelper.readableDatabase.version)
+            // The new column takes a value and gives it back.
+            runBlocking { room.hostDao().upsert(host.copy(jumpHostId = "bastion")) }
+            assertEquals("bastion", runBlocking { room.hostDao().getById("h1") }!!.jumpHostId)
         } finally {
             room.close()
         }

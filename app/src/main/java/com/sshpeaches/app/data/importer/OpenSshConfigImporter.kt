@@ -49,6 +49,8 @@ object OpenSshConfigImporter {
         val now = nowProvider()
 
         val blockIndex = HostBlockIndex(parsed.hostBlocks)
+        // ProxyJump per imported alias, resolved once every host has its id.
+        val proxyJumps = LinkedHashMap<String, String>()
         for (alias in aliases) {
             val options = optionsFor(alias, parsed, blockIndex)
             val hostName = options.first("hostname")
@@ -98,6 +100,8 @@ object OpenSshConfigImporter {
                 alias = alias,
                 identityFiles = identityFiles
             )
+            options.first("proxyjump")?.trim()?.takeIf { it.isNotEmpty() && !it.equals("none", ignoreCase = true) }
+                ?.let { proxyJumps[alias] = it }
 
             // LocalForward, RemoteForward and DynamicForward. All are imported bound to loopback (this phone's
             // for Local and Dynamic, the server's for Remote) and switched off.
@@ -141,6 +145,8 @@ object OpenSshConfigImporter {
             }
         }
 
+        applyProxyJumps(proxyJumps, importedHosts, existingHosts, warnings)
+
         if (parsed.hostBlocks.isEmpty()) {
             warnings += "No Host sections found."
         }
@@ -150,6 +156,56 @@ object OpenSshConfigImporter {
             localForwards = importedForwards,
             warnings = warnings.distinct()
         )
+    }
+
+    /**
+     * Turns ProxyJump into "Jump through": each name must be a host in this file or one already saved (by its name).
+     * In a chain (`ProxyJump a,b`) the host goes through b and b through a. A jump given as an address
+     * (`user@host:port`) isn't a saved host, so it is left out with a note.
+     */
+    private fun applyProxyJumps(
+        proxyJumps: Map<String, String>,
+        imported: MutableList<OpenSshImportedHost>,
+        existingHosts: List<HostConnection>,
+        warnings: MutableList<String>
+    ) {
+        if (proxyJumps.isEmpty()) return
+        fun indexOfAlias(name: String) = imported.indexOfFirst { it.alias.equals(name, ignoreCase = true) }
+        fun idFor(name: String): String? =
+            indexOfAlias(name).takeIf { it >= 0 }?.let { imported[it].host.id }
+                ?: existingHosts.firstOrNull { it.name.equals(name, ignoreCase = true) }?.id
+        fun find(id: String): HostConnection? =
+            imported.firstOrNull { it.host.id == id }?.host ?: existingHosts.firstOrNull { it.id == id }
+        fun setJump(index: Int, jumpId: String) {
+            imported[index] = imported[index].copy(host = imported[index].host.copy(jumpHostId = jumpId))
+        }
+        for ((alias, value) in proxyJumps) {
+            val index = indexOfAlias(alias)
+            if (index < 0) continue
+            val names = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            val ids = names.map { idFor(it) }
+            val missing = names.filterIndexed { i, _ -> ids[i] == null }
+            if (names.isEmpty() || missing.isNotEmpty()) {
+                warnings += "ProxyJump $value for $alias was not imported: ${missing.joinToString()} is not a host in this " +
+                    "file or a saved host. Add it as a host, then choose it under Jump through."
+                continue
+            }
+            val before = imported[index].host
+            setJump(index, ids.last()!!)
+            // The hops of a chain go through each other, unless a hop says otherwise itself.
+            for (hop in names.size - 1 downTo 1) {
+                val hopIndex = indexOfAlias(names[hop])
+                if (hopIndex < 0 || proxyJumps.keys.any { it.equals(names[hop], ignoreCase = true) }) continue
+                if (imported[hopIndex].host.jumpHostId == null) setJump(hopIndex, ids[hop - 1]!!)
+            }
+            val loops = runCatching {
+                com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(imported[index].host, ::find)
+            }.isFailure
+            if (loops) {
+                imported[index] = imported[index].copy(host = before)
+                warnings += "ProxyJump $value for $alias was not imported: it leads back to $alias or is too long."
+            }
+        }
     }
 
     private fun parseBlocks(contents: String): ParsedConfig {

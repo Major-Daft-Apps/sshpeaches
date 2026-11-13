@@ -251,7 +251,7 @@ object SshClientProvider {
         }
         knownHostsFile.parentFile?.mkdirs()
         if (!knownHostsFile.exists()) knownHostsFile.createNewFile()
-        return SSHClient(config).apply {
+        return RoutedSSHClient(config).apply {
             // A larger receive window keeps file transfers from becoming
             // round-trip-bound on fast, higher-latency connections. The packet
             // allowance stays safely below SSHJ's transport packet ceiling.

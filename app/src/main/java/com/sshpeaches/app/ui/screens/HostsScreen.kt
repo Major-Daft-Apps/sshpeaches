@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
@@ -115,6 +117,8 @@ private data class HostEditorSnapshot(
     val useMosh: Boolean,
     val attachTmux: Boolean = false,
     val allowLegacyAlgorithms: Boolean = false,
+    val jumpHostId: String? = null,
+    val forwardAgent: Boolean = false,
     val terminalProfileId: String?,
     val preferredForwardId: String?,
     val startupScript: String,
@@ -140,14 +144,14 @@ fun HostsScreen(
     editRequestId: String? = null,
     importRequestKey: Int = 0,
     canStoreCredentials: Boolean,
-    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onImportHost: (HostConnection) -> Unit = {},
     onImportPortForward: (PortForward) -> Unit = {},
     onImportPasswordPayload: (String, String, String) -> Boolean = { _, _, _ -> false },
     onImportFromQr: () -> Unit = {},
     onToggleFavorite: (String) -> Unit = {},
     onDeleteHost: (String) -> Unit = {},
-    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean, String?, Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onStartSession: (HostConnection, ConnectionMode, String?, FileTransferEntryMode?) -> Unit = { _, _, _, _ -> },
     activeSshSessionHostIds: Set<String> = emptySet(),
     onFetchHostSystemInfo: (HostConnection, (com.majordaftapps.sshpeaches.app.data.ssh.HostSystemInfo) -> Unit) -> Unit = { _, _ -> },
@@ -178,6 +182,8 @@ fun HostsScreen(
     val useMoshState = rememberSaveable { mutableStateOf(false) }
     val attachTmuxState = rememberSaveable { mutableStateOf(false) }
     val allowLegacyAlgorithmsState = rememberSaveable { mutableStateOf(false) }
+    val jumpHostIdState = rememberSaveable { mutableStateOf<String?>(null) }
+    val forwardAgentState = rememberSaveable { mutableStateOf(false) }
     val terminalProfileIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val terminalProfileExpanded = remember { mutableStateOf(false) }
     val preferredForwardIdState = rememberSaveable { mutableStateOf<String?>(null) }
@@ -246,7 +252,11 @@ fun HostsScreen(
                     null,
                     processed.data.targetId,
                     imported.attachTmux,
-                    imported.allowLegacyAlgorithms
+                    imported.allowLegacyAlgorithms,
+                    // A code names no jump host and never switches agent forwarding on: a host you already have
+                    // keeps what you chose.
+                    hosts.firstOrNull { it.id == processed.data.targetId }?.jumpHostId,
+                    hosts.firstOrNull { it.id == processed.data.targetId }?.forwardAgent ?: false
                 )
                 if (processed.data.encryptedPasswordPayload != null) {
                     pendingEncryptedImport.value = processed.data.encryptedPasswordPayload to processed.data.targetId
@@ -468,6 +478,8 @@ fun HostsScreen(
         useMosh = useMoshState.value,
         attachTmux = attachTmuxState.value,
         allowLegacyAlgorithms = allowLegacyAlgorithmsState.value,
+        jumpHostId = jumpHostIdState.value,
+        forwardAgent = forwardAgentState.value,
         terminalProfileId = terminalProfileIdState.value,
         preferredForwardId = preferredForwardIdState.value,
         startupScript = startupScriptState.value,
@@ -514,6 +526,8 @@ fun HostsScreen(
         useMoshState.value = host?.useMosh ?: false
         attachTmuxState.value = host?.attachTmux ?: false
         allowLegacyAlgorithmsState.value = host?.allowLegacyAlgorithms ?: false
+        jumpHostIdState.value = host?.jumpHostId
+        forwardAgentState.value = host?.forwardAgent ?: false
         terminalProfileIdState.value = host?.terminalProfileId
         terminalProfileExpanded.value = false
         preferredForwardIdState.value = host?.preferredForwardId
@@ -690,7 +704,9 @@ fun HostsScreen(
                 passwordValue,
                 null,
                 attachTmuxState.value,
-                allowLegacyAlgorithmsState.value
+                allowLegacyAlgorithmsState.value,
+                jumpHostIdState.value,
+                forwardAgentState.value
             )
         } else {
             onUpdate(
@@ -711,7 +727,9 @@ fun HostsScreen(
                 terminalProfileIdState.value,
                 passwordValue,
                 attachTmuxState.value,
-                allowLegacyAlgorithmsState.value
+                allowLegacyAlgorithmsState.value,
+                jumpHostIdState.value,
+                forwardAgentState.value
             )
         }
         closeDialog()
@@ -1016,6 +1034,14 @@ fun HostsScreen(
                 AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
             }
             LegacyAlgorithmsRow(checked = allowLegacyAlgorithmsState.value, onCheckedChange = { allowLegacyAlgorithmsState.value = it })
+            JumpHostRow(
+                hosts = hosts,
+                editingHostId = editingHostId.value,
+                selectedId = jumpHostIdState.value,
+                useMosh = useMoshState.value,
+                onSelect = { jumpHostIdState.value = it }
+            )
+            ForwardAgentRow(checked = forwardAgentState.value, onCheckedChange = { forwardAgentState.value = it })
             ExposedDropdownMenuBox(
                 expanded = terminalProfileExpanded.value,
                 onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
@@ -1845,6 +1871,14 @@ fun HostsScreen(
                         AttachTmuxRow(checked = attachTmuxState.value, onCheckedChange = { attachTmuxState.value = it })
                     }
                     LegacyAlgorithmsRow(checked = allowLegacyAlgorithmsState.value, onCheckedChange = { allowLegacyAlgorithmsState.value = it })
+                    JumpHostRow(
+                        hosts = hosts,
+                        editingHostId = editingHostId.value,
+                        selectedId = jumpHostIdState.value,
+                        useMosh = useMoshState.value,
+                        onSelect = { jumpHostIdState.value = it }
+                    )
+                    ForwardAgentRow(checked = forwardAgentState.value, onCheckedChange = { forwardAgentState.value = it })
                     ExposedDropdownMenuBox(
                         expanded = terminalProfileExpanded.value,
                         onExpandedChange = { terminalProfileExpanded.value = !terminalProfileExpanded.value }
@@ -2111,7 +2145,9 @@ fun HostsScreen(
                             passwordValue,
                             null,
                             attachTmuxState.value,
-                            allowLegacyAlgorithmsState.value
+                            allowLegacyAlgorithmsState.value,
+                            jumpHostIdState.value,
+                            forwardAgentState.value
                         )
                     } else {
                         onUpdate(
@@ -2132,7 +2168,9 @@ fun HostsScreen(
                             terminalProfileIdState.value,
                             passwordValue,
                             attachTmuxState.value,
-                            allowLegacyAlgorithmsState.value
+                            allowLegacyAlgorithmsState.value,
+                            jumpHostIdState.value,
+                            forwardAgentState.value
                         )
                     }
                     closeDialog()
@@ -2279,6 +2317,99 @@ private fun LegacyAlgorithmsRow(checked: Boolean, onCheckedChange: (Boolean) -> 
             Text(
                 "Only for servers too old for anything else: also offers SHA-1 signatures (ssh-rsa), DSA host " +
                     "keys, SHA-1 key exchange and CBC ciphers, which OpenSSH no longer uses by default.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+/**
+ * "Jump through": the saved host this one is reached through, or none. Hosts that would make a loop (this host, and
+ * hosts already reached through it) aren't offered.
+ */
+@Composable
+private fun JumpHostRow(
+    hosts: List<HostConnection>,
+    editingHostId: String?,
+    selectedId: String?,
+    useMosh: Boolean,
+    onSelect: (String?) -> Unit
+) {
+    val expanded = remember { mutableStateOf(false) }
+    val self = hosts.firstOrNull { it.id == editingHostId }
+    val find = { id: String -> hosts.firstOrNull { it.id == id } }
+    val choices = hosts.filter { candidate ->
+        if (self == null) true else !com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.wouldLoop(self, candidate, find)
+    }
+    val selected = hosts.firstOrNull { it.id == selectedId }
+    Column {
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.DropdownList) { expanded.value = true }
+                    .padding(vertical = 8.dp)
+                    .testTag(UiTestTags.HOST_DIALOG_JUMP_HOST),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Jump through")
+                    Text(
+                        selected?.let { "${it.name} (${it.username}@${it.host})" } ?: "None: connect directly",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded.value, onDismissRequest = { expanded.value = false }) {
+                DropdownMenuItem(
+                    text = { Text("None: connect directly") },
+                    onClick = {
+                        onSelect(null)
+                        expanded.value = false
+                    },
+                    modifier = Modifier.testTag(UiTestTags.HOST_DIALOG_JUMP_HOST_NONE)
+                )
+                choices.forEach { candidate ->
+                    DropdownMenuItem(
+                        text = { Text("${candidate.name} (${candidate.username}@${candidate.host})") },
+                        onClick = {
+                            onSelect(candidate.id)
+                            expanded.value = false
+                        },
+                        modifier = Modifier.testTag(UiTestTags.hostDialogJumpHostOption(candidate.id))
+                    )
+                }
+            }
+        }
+        if (selected != null) {
+            Text(
+                "SSHPeaches logs in to ${selected.name} first and reaches this host from there (like ssh -J). " +
+                    (if (useMosh) "Mosh can't go through a jump host, so this host will use SSH. " else "") +
+                    "Boost isn't used through a jump host.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun ForwardAgentRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .testTag(UiTestTags.HOST_DIALOG_FORWARD_AGENT),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text("Agent forwarding")
+            Text(
+                "Lets programs on this server sign in to other servers with the keys in Identities while a " +
+                    "terminal is open (like ssh -A). The keys stay on this phone, but anyone with root on the " +
+                    "server can use them during the session: only for servers you trust. Needs an SSH terminal " +
+                    "(not Mosh or Boost).",
                 style = MaterialTheme.typography.bodySmall
             )
         }

@@ -13,6 +13,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.settings.SettingsStore
 import com.majordaftapps.sshpeaches.app.data.ssh.SshClientProvider
+import com.majordaftapps.sshpeaches.app.service.BoostHelper
 import com.majordaftapps.sshpeaches.app.service.SessionLogBus
 import com.majordaftapps.sshpeaches.app.service.SessionService
 import com.majordaftapps.sshpeaches.app.service.SessionService.SessionStatus
@@ -116,17 +117,25 @@ class LiveSlowLinkFirstConnectTest {
         return secondsSince(start)
     }
 
-    /** Whether this version's helper is on the server, asked over the server's real port. */
-    private fun helperOnServer(): Boolean = SshClientProvider.createClient(context, host("side", "boostPort")).use { ssh ->
+    /** What [command] prints on the server, asked over the server's real port. */
+    private fun onServer(command: String): String = SshClientProvider.createClient(context, host("side", "boostPort")).use { ssh ->
         ssh.connect(args.getString("boostHost")!!, args.getString("boostPort")!!.toInt())
         ssh.authPassword(args.getString("boostUser")!!, args.getString("boostPassword"))
         ssh.startSession().use { session ->
-            val command = session.exec("ls .cache/sshpeaches/boost/*/sshpeaches-boost 2>/dev/null | wc -l")
-            val text = command.inputStream.bufferedReader().readText().trim()
-            command.join(10, TimeUnit.SECONDS)
-            text == "1"
+            val running = session.exec(command)
+            val text = running.inputStream.bufferedReader().readText().trim()
+            running.join(10, TimeUnit.SECONDS)
+            text
         }
     }
+
+    /** Whether this version's helper is on the server. */
+    private fun helperOnServer(): Boolean =
+        onServer("ls .cache/sshpeaches/boost/*/sshpeaches-boost 2>/dev/null | wc -l") == "1"
+
+    /** Bytes of a helper copy that hasn't finished, 0 without one. */
+    private fun partOnServer(): Long =
+        onServer("cat .cache/sshpeaches/boost/*/*.part 2>/dev/null | wc -c").toLongOrNull() ?: 0L
 
     /** What must never show up in the session's log, or as its state, while the helper is copied. */
     private fun assertNeverDropped(service: SessionService, id: String) {
@@ -224,6 +233,71 @@ class LiveSlowLinkFirstConnectTest {
             } finally {
                 service.stopSession(id)
                 Log.i("NetScenario", "== slow-link files\n" + results.joinToString("\n"))
+            }
+        }
+    }
+
+    @Test
+    fun aCutOffHelperCopyCarriesOnWhereItStopped() {
+        check(!helperOnServer()) { "the runner should have removed the helper" }
+        withSessionService { service ->
+            val first = "slow-cut"
+            try {
+                open(service, first, ConnectionMode.SCP)
+                check(waitFor(120_000) { partOnServer() > 400_000 }) { "the copy never got going; log: $logs" }
+            } finally {
+                service.stopSession(first)
+            }
+            check(BoostHelper.lastCopyForTests?.startsWith("gzip from 0 of ") == true) {
+                "the first copy went as: ${BoostHelper.lastCopyForTests}"
+            }
+            Thread.sleep(3_000)
+            val left = partOnServer()
+            check(left > 400_000 && !helperOnServer()) { "what the cut-off copy left: $left bytes" }
+            note("the copy was cut off with $left bytes on the server")
+
+            val second = "slow-cut-2"
+            // Closing the first session on purpose left its goodbye in the log.
+            logs.clear()
+            try {
+                open(service, second, ConnectionMode.SCP)
+                val begin = System.nanoTime()
+                check(waitFor(MAX_COPY_SECONDS.toLong() * 1000) { logs.any { it.startsWith("Boost on") } }) {
+                    "Boost never came on; log: $logs"
+                }
+                val copy = BoostHelper.lastCopyForTests.orEmpty()
+                note("second copy: $copy; Boost on after %.0f s".format(secondsSince(begin)))
+                val startedAt = Regex("gzip from (\\d+) of \\d+").find(copy)?.groupValues?.get(1)?.toLong()
+                check(startedAt != null && startedAt >= left) { "the second copy didn't carry on from $left: $copy" }
+                check(helperOnServer() && partOnServer() == 0L) { "the helper isn't in place" }
+                assertNeverDropped(service, second)
+            } finally {
+                service.stopSession(second)
+                Log.i("NetScenario", "== slow-link resume\n" + results.joinToString("\n"))
+            }
+        }
+    }
+
+    @Test
+    fun aServerWithoutGzipGetsTheHelperAsItIs() {
+        check(!helperOnServer()) { "the runner should have removed the helper" }
+        BoostHelper.plainCopyForTests = true
+        val id = "slow-plain"
+        withSessionService { service ->
+            try {
+                open(service, id, ConnectionMode.SCP)
+                val begin = System.nanoTime()
+                check(waitFor(MAX_COPY_SECONDS.toLong() * 1000) { logs.any { it.startsWith("Boost on") } }) {
+                    "Boost never came on; log: $logs"
+                }
+                note("copy: ${BoostHelper.lastCopyForTests}; Boost on after %.0f s".format(secondsSince(begin)))
+                check(BoostHelper.lastCopyForTests?.startsWith("plain from 0 of ") == true) { "sent as: ${BoostHelper.lastCopyForTests}" }
+                check(helperOnServer()) { "the helper isn't in place" }
+                assertNeverDropped(service, id)
+            } finally {
+                service.stopSession(id)
+                BoostHelper.plainCopyForTests = false
+                Log.i("NetScenario", "== slow-link plain\n" + results.joinToString("\n"))
             }
         }
     }

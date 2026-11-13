@@ -69,6 +69,10 @@ class RoomAppRepository(
     override suspend fun deleteHost(host: HostConnection) {
         database.withTransaction {
             hostDao.delete(host.asEntity())
+            // Hosts that went through this one connect directly again, rather than fail on a host that's gone.
+            hostDao.getAll()
+                .filter { it.jumpHostId == host.id }
+                .forEach { hostDao.upsert(it.copy(jumpHostId = null)) }
             snippetDao.getAll()
                 .filter { host.id in it.autoRunHostIds }
                 .forEach { snippetDao.upsert(it.copy(autoRunHostIds = it.autoRunHostIds - host.id)) }
@@ -96,6 +100,10 @@ class RoomAppRepository(
                 host.copy(
                     startupScript = existing.startupScript,
                     hasPassword = existing.hasPassword || host.hasPassword,
+                    // An import that names no jump host (a QR code) leaves the one chosen here.
+                    jumpHostId = host.jumpHostId ?: existing.jumpHostId,
+                    // An import never turns agent forwarding on or off for a host you already have.
+                    forwardAgent = existing.forwardAgent,
                     // QR codes and OpenSSH configs carry no OS: keep the one detected here.
                     osMetadata = host.osMetadata.takeUnless { it == OsMetadata.Undetected } ?: existing.osMetadata
                 )

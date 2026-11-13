@@ -172,6 +172,91 @@ class OpenSshConfigImporterTest {
         assertTrue(result.warnings.any { it.contains("duplicate LocalForward") })
     }
 
+    @Test
+    fun parse_proxyJumpBecomesTheJumpHost() {
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host bastion
+                  HostName bastion.example.com
+                  User gate
+                Host db
+                  HostName 10.0.0.5
+                  User postgres
+                  ProxyJump bastion
+                Host direct
+                  HostName direct.example.com
+                  User me
+                  ProxyJump none
+            """.trimIndent(),
+            idProvider = sequentialIds()
+        )
+        val byName = result.hosts.associate { it.alias to it.host }
+        assertEquals(byName.getValue("bastion").id, byName.getValue("db").jumpHostId)
+        assertEquals(null, byName.getValue("bastion").jumpHostId)
+        assertEquals(null, byName.getValue("direct").jumpHostId)
+        assertTrue(result.warnings.none { it.contains("ProxyJump") })
+    }
+
+    @Test
+    fun parse_proxyJumpChainGoesThroughEachHop() {
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host outer
+                  User a
+                Host middle
+                  User b
+                Host inside
+                  User c
+                  ProxyJump outer,middle
+            """.trimIndent(),
+            idProvider = sequentialIds()
+        )
+        val byName = result.hosts.associate { it.alias to it.host }
+        assertEquals(byName.getValue("middle").id, byName.getValue("inside").jumpHostId)
+        assertEquals(byName.getValue("outer").id, byName.getValue("middle").jumpHostId)
+        assertEquals(null, byName.getValue("outer").jumpHostId)
+    }
+
+    @Test
+    fun parse_proxyJumpFindsASavedHostByName() {
+        val saved = HostConnection(id = "saved-1", name = "Bastion", host = "b.example", username = "g", preferredAuth = AuthMethod.PASSWORD)
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host db
+                  User postgres
+                  ProxyJump bastion
+            """.trimIndent(),
+            existingHosts = listOf(saved),
+            idProvider = sequentialIds()
+        )
+        assertEquals("saved-1", result.hosts.single().host.jumpHostId)
+    }
+
+    @Test
+    fun parse_proxyJumpToAnAddressOrALoopIsLeftOutWithANote() {
+        val result = OpenSshConfigImporter.parse(
+            contents = """
+                Host db
+                  User postgres
+                  ProxyJump gate@203.0.113.9:2222
+                Host a
+                  User x
+                  ProxyJump b
+                Host b
+                  User y
+                  ProxyJump a
+            """.trimIndent(),
+            idProvider = sequentialIds()
+        )
+        val byName = result.hosts.associate { it.alias to it.host }
+        assertEquals(null, byName.getValue("db").jumpHostId)
+        assertTrue(result.warnings.any { it.contains("ProxyJump gate@203.0.113.9:2222 for db was not imported") })
+        // a -> b is taken; b -> a would close the loop and is refused.
+        assertEquals(byName.getValue("b").id, byName.getValue("a").jumpHostId)
+        assertEquals(null, byName.getValue("b").jumpHostId)
+        assertTrue(result.warnings.any { it.contains("for b was not imported") })
+    }
+
     private fun sequentialIds(): () -> String {
         var next = 1
         return { "id-${next++}" }

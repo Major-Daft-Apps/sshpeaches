@@ -2,6 +2,19 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 0.16.0 (1600)
+
+Not released yet.
+
+- **Jump hosts** (OpenSSH's ProxyJump, `ssh -J`): a host can be reached through another saved host, chosen under "Jump through" in the host's settings; that host can have a jump host of its own (up to 5 in a row). Each host's key is checked under its own name and each one logs in with its own saved key or password, or is asked for by name. The terminal, the file browser with its parallel transfers, port forwards, system info and "copy key to host" all go through the route. Mosh and Boost need to reach the server directly, so through a jump host the session uses plain SSH. Deleting a jump host makes the hosts behind it connect directly again.
+- OpenSSH config import turns `ProxyJump` into "Jump through" when it names a host in the file or a saved host (chains too); anything else is left out with a note. File export and import carry the jump host when both hosts are in the file.
+- **Agent forwarding** (`ssh -A`), off by default, per host: programs on the server can sign in to other servers and Git hosts with the keys in Identities while an SSH terminal is open. The keys stay on the phone; the server only gets signatures, the session log says each time a key is used, and only listing keys and signing are answered (RSA only with SHA-2). An import or a QR code never turns it on.
+- **Boost's helper reaches a server in about half the time on a slow connection**: it is sent gzipped when the server has gzip (and as before when it hasn't).
+- **A helper copy that was cut off carries on where it stopped** (the connection dropped, or the session was closed) instead of starting again, once the server confirms what it already has.
+- Text copied from the terminal: the check that clears it no longer runs every 5 seconds while the clipboard can't be read or is empty; it waits for the app's window to come back. Help's copy and paste topic now says when a copy is cleared.
+- mosh-client is built with protobuf 36.2 (was 3.21.12, which no longer gets fixes) and the Abseil 20250512.1 it needs; the binary is about 0.5 MB larger per processor type and still loads only Android's own libraries.
+- The terminal request has a test against an SSH server that answers late or refuses (`PtyRequestSshdTest`), for the 0.15.1 fix.
+
 ## 0.15.1 (1501)
 
 Sent to Google Play open testing on 2026-11-12.

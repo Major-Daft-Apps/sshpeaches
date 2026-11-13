@@ -77,6 +77,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
 import java.util.Collections
+import java.util.WeakHashMap
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -105,6 +106,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
@@ -132,6 +134,9 @@ import net.schmizz.sshj.userauth.UserAuthException
 import com.majordaftapps.sshpeaches.app.data.ssh.INTERACTIVE_LOGIN_TIMEOUT_MS
 import com.majordaftapps.sshpeaches.app.data.ssh.LoginCanceledException
 import com.majordaftapps.sshpeaches.app.data.ssh.LoginChallenge
+import com.majordaftapps.sshpeaches.app.data.ssh.ForwardedAgent
+import com.majordaftapps.sshpeaches.app.data.ssh.RoutedSSHClient
+import com.majordaftapps.sshpeaches.app.data.ssh.SshRoute
 import com.majordaftapps.sshpeaches.app.data.ssh.authPasswordOrInteractive
 import kotlin.math.min
 
@@ -536,7 +541,27 @@ class SessionService : Service() {
         if (useRuntimePasswordCache && !passwordOverride.isNullOrBlank()) {
             runtimeSessionPasswords[sessionId] = passwordOverride
         }
-        val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH
+        // Mosh talks to the server over UDP from this phone, which a jump host can't carry.
+        val viaJumpHost = !host.jumpHostId.isNullOrBlank()
+        val useMoshTransport = host.useMosh && mode == ConnectionMode.SSH && !viaJumpHost
+        if (useMoshTransport && host.forwardAgent) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Agent forwarding isn't available with Mosh: switch this host to SSH to use it."
+                )
+            )
+        }
+        if (host.useMosh && mode == ConnectionMode.SSH && viaJumpHost) {
+            SessionLogBus.emit(
+                SessionLogBus.Entry(
+                    hostId = sessionId,
+                    level = SessionLogBus.LogLevel.INFO,
+                    message = "Mosh can't go through a jump host: this session uses SSH."
+                )
+            )
+        }
         val needsPassword = host.preferredAuth != AuthMethod.IDENTITY
         val initialPassword = if (needsPassword) {
             when {
@@ -566,6 +591,8 @@ class SessionService : Service() {
             // A login that needed answers only a person can give (a 2FA code) can't be repeated for transfer connections.
             val sawLoginChallenge = AtomicBoolean(false)
             var transferPool: SftpTransferPool? = null
+            // Passwords typed for jump hosts, kept for this session's reconnects only.
+            val jumpPasswords = HashMap<String, String>()
             val osKnownAtStart = host.osMetadata is OsMetadata.Known
             while (true) {
             val attemptDeadlineMillis = System.currentTimeMillis() + CONNECTION_ATTEMPT_TIMEOUT_MS
@@ -604,7 +631,45 @@ class SessionService : Service() {
                     }
                 )
                 throwIfAttemptTimedOut(attemptDeadlineMillis)
-                client!!.connect(host.host, host.port)
+                val jumps = jumpHostsFor(host)
+                SshRoute.connect(
+                    client = client!!,
+                    host = host,
+                    jumps = jumps,
+                    newClient = { jump ->
+                        updateSessionSnapshot(
+                            sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Connecting to jump host ${jump.name}..."
+                        )
+                        SshClientProvider.createClient(
+                            this@SessionService,
+                            jump,
+                            SessionLoggerFactory(
+                                hostId = sessionId,
+                                connectionTranscriptEnabled = connectionTranscriptEnabled::get,
+                                diagnosticsEnabled = { diagnosticsEnabled }
+                            ),
+                            autoTrustUnknownHostKey = autoTrustUnknownHostKey,
+                            onHostKeyPrompt = if (hostKeyPromptEnabled) {
+                                { prompt -> awaitHostKeyDecision(sessionId, prompt, attemptDeadlineMillis) }
+                            } else {
+                                null
+                            }
+                        )
+                    },
+                    logIn = { hop, jump ->
+                        logInToJumpHost(hop, jump, sessionId, sessionHost, mode, attemptDeadlineMillis, allowPasswordSave, jumpPasswords)
+                    }
+                )
+                if (jumps.isNotEmpty()) {
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = sessionId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Connected through ${jumps.joinToString(" → ") { it.name }}."
+                        )
+                    )
+                    updateSessionSnapshot(sessionId, sessionHost, mode, SessionStatus.CONNECTING, "Opening SSH connection...")
+                }
                 throwIfAttemptTimedOut(attemptDeadlineMillis)
                 when (host.preferredAuth) {
                     AuthMethod.PASSWORD -> {
@@ -696,7 +761,8 @@ class SessionService : Service() {
                                         client!!,
                                         terminalEmulation,
                                         reusableTerminalEngine,
-                                        attachTmux = sessionHost.attachTmux
+                                        attachTmux = sessionHost.attachTmux,
+                                        forwardAgent = sessionHost.forwardAgent
                                     )
                             }
                             // An SSH shell's reader notices SSH dying; a Boost terminal's never does, so listen for it
@@ -937,7 +1003,7 @@ class SessionService : Service() {
                 runCatching { sftpBinding?.client?.close() }
                 stopFileBoost(sessionId)
                 runCatching { activeForwardBindings.forEach { closePortForwardBinding(it) } }
-                runCatching { client?.socket?.close() }
+                runCatching { cutConnection(client) }
                 runCatching { client?.disconnect() }
                 client = null
                 shellBinding = null
@@ -1233,7 +1299,57 @@ class SessionService : Service() {
     }
 
     private fun dropDeadConnection(client: SSHClient) {
-        runCatching { client.socket?.close() }
+        runCatching { cutConnection(client) }
+    }
+
+    /** Closes the socket under [client], or under the first jump host it goes through, without a goodbye. */
+    private fun cutConnection(client: SSHClient?) {
+        (client as? RoutedSSHClient)?.cut() ?: client?.socket?.close()
+    }
+
+    /** The saved hosts [host] is reached through, first hop first; empty for a direct connection. */
+    private suspend fun jumpHostsFor(host: HostConnection): List<HostConnection> {
+        if (host.jumpHostId.isNullOrBlank()) return emptyList()
+        val saved = (application as SSHPeachesApplication).container.repository.hosts.first()
+        return SshRoute.jumpsFor(host) { id -> saved.firstOrNull { it.id == id } }
+    }
+
+    /**
+     * Logs in to [jump] on the way to [target], the way that host is set up to log in: its saved key, its saved
+     * password, or by asking (the prompt names the jump host). What was typed is kept in [typed] for reconnects.
+     */
+    private fun logInToJumpHost(
+        hop: SSHClient,
+        jump: HostConnection,
+        sessionId: String,
+        target: HostConnection,
+        mode: ConnectionMode,
+        deadlineMillis: Long,
+        allowPasswordSave: Boolean,
+        typed: MutableMap<String, String>
+    ) {
+        fun withPassword() {
+            val known = typed[jump.id] ?: runCatching { SecurityManager.getHostPassword(jump.id) }.getOrNull()
+            typed[jump.id] = authenticateWithPassword(
+                client = hop,
+                host = jump,
+                sessionId = sessionId,
+                mode = mode,
+                initialPassword = known,
+                deadlineMillis = deadlineMillis,
+                allowPasswordSave = allowPasswordSave,
+                useRuntimePasswordCache = false,
+                snapshotHost = target
+            )
+        }
+        when (jump.preferredAuth) {
+            AuthMethod.PASSWORD -> withPassword()
+            AuthMethod.IDENTITY -> authenticateWithIdentity(hop, jump, sessionId, mode, required = true, snapshotHost = target)
+            AuthMethod.PASSWORD_AND_IDENTITY -> {
+                authenticateWithIdentity(hop, jump, sessionId, mode, required = false, snapshotHost = target)
+                if (!hop.isAuthenticated) withPassword()
+            }
+        }
     }
 
     fun stopAllSessions() {
@@ -1542,6 +1658,8 @@ class SessionService : Service() {
         val connection = activeConnections[sessionId] ?: return
         if (connection.mode == ConnectionMode.SSH) return
         val ssh = connection.client ?: return
+        // Boost reaches the server straight from this phone (UDP or TCP), which a jump host is there to prevent.
+        if ((ssh as? RoutedSSHClient)?.viaJumpHost == true) return
         if (fileBoostStarts[sessionId]?.isActive == true) return
         val now = SystemClock.elapsedRealtime()
         if (!force && now - (fileBoostLastStart[sessionId] ?: Long.MIN_VALUE / 2) < FILE_BOOST_RETRY_MS) return
@@ -2411,7 +2529,7 @@ class SessionService : Service() {
             if (!canLogInAgain()) {
                 throw IOException("logging in needed answers to the server's questions")
             }
-            openTransferConnection(host, password())
+            openTransferConnection(host, password(), sessionClient())
         },
         sessionClient = { sessionClient()?.takeIf { it.isConnected } },
         schedule = { delayMs, action ->
@@ -2435,7 +2553,7 @@ class SessionService : Service() {
      * Opens and logs in another connection for transfers, with the credentials that just worked and only a host key
      * already trusted: it never asks the user anything.
      */
-    private fun openTransferConnection(host: HostConnection, password: String?): SSHClient {
+    private fun openTransferConnection(host: HostConnection, password: String?, sessionClient: SSHClient? = null): SSHClient {
         val client = SshClientProvider.createClient(
             context = this,
             host = host,
@@ -2446,7 +2564,14 @@ class SessionService : Service() {
         // of missed replies. The transfer's own stall watchdog notices a dead link sooner.
         (client.connection.keepAlive as? KeepAliveRunner)?.maxAliveCount = TRANSFER_KEEPALIVE_MAX_UNANSWERED
         try {
-            client.connect(host.host, host.port)
+            // Through a jump host, an extra connection rides on the session's last hop: no second login there.
+            val lastHop = if (host.jumpHostId.isNullOrBlank()) {
+                null
+            } else {
+                (sessionClient as? RoutedSSHClient)?.carriers?.lastOrNull()?.takeIf { it.isConnected }
+                    ?: throw IOException("the session's jump host connection isn't open")
+            }
+            SshRoute.connectThrough(client, host, lastHop)
             if (host.preferredAuth != AuthMethod.PASSWORD) {
                 runCatching { authenticatePublicKeyQuietly(client, host) }
             }
@@ -3477,7 +3602,9 @@ class SessionService : Service() {
         deadlineMillis: Long,
         allowPasswordSave: Boolean,
         useRuntimePasswordCache: Boolean,
-        onChallenge: () -> Unit = {}
+        onChallenge: () -> Unit = {},
+        /** The session's own host, when [host] is a jump host on the way to it. */
+        snapshotHost: HostConnection = host
     ): String {
         var password = initialPassword
         var savePassword = false
@@ -3509,7 +3636,10 @@ class SessionService : Service() {
             }
             try {
                 val currentPassword = password
-                updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, "Authenticating as ${host.username}...")
+                updateSessionSnapshot(
+                    sessionId, snapshotHost, mode, SessionStatus.CONNECTING,
+                    if (snapshotHost === host) "Authenticating as ${host.username}..." else "Logging in to jump host ${host.name}..."
+                )
                 client.authPasswordOrInteractive(host.username, currentPassword) { challenge ->
                     onChallenge()
                     awaitPasswordDecision(
@@ -3566,9 +3696,13 @@ class SessionService : Service() {
         host: HostConnection,
         sessionId: String,
         mode: ConnectionMode,
-        required: Boolean
+        required: Boolean,
+        snapshotHost: HostConnection = host
     ): Boolean {
-        updateSessionSnapshot(sessionId, host, mode, SessionStatus.CONNECTING, "Authenticating with identity...")
+        updateSessionSnapshot(
+            sessionId, snapshotHost, mode, SessionStatus.CONNECTING,
+            if (snapshotHost === host) "Authenticating with identity..." else "Logging in to jump host ${host.name}..."
+        )
         val identityId = host.preferredIdentityId?.takeIf { it.isNotBlank() }
         if (identityId == null) {
             if (required) {
@@ -4176,7 +4310,15 @@ class SessionService : Service() {
                 autoTrustUnknownHostKey = autoTrust,
                 onHostKeyPrompt = null
             )
-            client.connect(host.host, host.port)
+            SshRoute.connect(
+                client = client,
+                host = host,
+                jumps = jumpHostsFor(host),
+                newClient = { jump ->
+                    SshClientProvider.createClient(context = this, host = jump, autoTrustUnknownHostKey = autoTrust, onHostKeyPrompt = null)
+                },
+                logIn = SshRoute::logInWithSavedCredentials
+            )
             val authenticated = authenticateForSystemInfo(client, host)
             if (!authenticated) {
                 return HostSystemInfo(
@@ -4335,36 +4477,78 @@ class SessionService : Service() {
         client: SSHClient,
         terminalEmulation: TerminalEmulation,
         reuseTerminalEngine: TermuxTerminalEngine? = null,
-        attachTmux: Boolean = false
+        attachTmux: Boolean = false,
+        forwardAgent: Boolean = false
     ): ShellBinding {
         val session = client.startSession()
         // A reconnect opens the new shell at the screen's size. The screen only reports a size when it changes,
         // so a shell left at the default thought it had more rows than the screen: tmux then drew its status
         // line below the bottom and scrolled the screen up a line on every redraw.
         val (columns, rows) = shellSizes[hostId] ?: (DEFAULT_SHELL_COLUMNS to DEFAULT_SHELL_ROWS)
-        try {
-            session.allocatePTY(
-                terminalEmulation.ptyName,
-                columns,
-                rows,
-                0,
-                0,
-                mutableMapOf<PTYMode, Int>()
-            )
-        } catch (error: Exception) {
-            // Only a server that said no gets the plain request. After a timeout the first request is still on its
-            // way (a slow or busy link), and OpenSSH drops the whole connection on a second one: "Protocol error:
-            // you already have a pty."
-            if (!mayAskForPtyAgain(error, session.isOpen)) {
-                runCatching { session.close() }
-                throw error
+        requestPty(session, terminalEmulation.ptyName, columns, rows)
+        if (forwardAgent) {
+            runCatching { forwardedAgentFor(hostId, client).requestOn(session) }.onFailure { error ->
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = hostId,
+                        level = SessionLogBus.LogLevel.WARN,
+                        message = "Agent forwarding couldn't be set up: ${error.message ?: error.javaClass.simpleName}."
+                    )
+                )
             }
-            session.allocateDefaultPTY()
         }
         // sshj's session channel is both a Command and a Shell, so an exec'd tmux behaves like a shell.
         val shell = if (attachTmux) session.exec(TMUX_ATTACH_COMMAND) as Session.Shell else session.startShell()
         return bindShell(hostId, SshTerminalChannel(session, shell), reuseTerminalEngine)
     }
+
+    /** The agent each connection offers to its server, for hosts with agent forwarding on. */
+    private val forwardedAgents = Collections.synchronizedMap(WeakHashMap<SSHClient, ForwardedAgent>())
+
+    /**
+     * The agent for [client], accepting the server's agent channels from now on. It offers every identity whose
+     * private key this phone can open without asking, and the session log says each time one is used.
+     */
+    private fun forwardedAgentFor(sessionId: String, client: SSHClient): ForwardedAgent =
+        forwardedAgents.getOrPut(client) {
+            ForwardedAgent(
+                client = client,
+                loadKeys = {
+                    val identities = runBlocking {
+                        (application as SSHPeachesApplication).container.repository.identities.first()
+                    }
+                    identities.filter { it.hasPrivateKey }.mapNotNull { identity ->
+                        runCatching {
+                            val privateKey = SecurityManager.getIdentityKey(identity.id)?.takeIf { it.isNotBlank() }
+                                ?: return@runCatching null
+                            val passphrase = runCatching { SecurityManager.getIdentityKeyPassphrase(identity.id) }.getOrNull()
+                            val publicKey = runCatching { SecurityManager.getIdentityPublicKey(identity.id) }.getOrNull()
+                            val provider = Ed25519IdentityKeyProvider.load(client, privateKey, publicKey, passphrase)
+                                ?: client.loadPrivateKeyFromMemory(privateKey, passphrase)
+                            ForwardedAgent.Key(identity.label, provider.public, provider.private)
+                        }.getOrNull()
+                    }
+                },
+                onSigned = { label ->
+                    SessionLogBus.emit(
+                        SessionLogBus.Entry(
+                            hostId = sessionId,
+                            level = SessionLogBus.LogLevel.INFO,
+                            message = "Agent forwarding: the server signed in somewhere with your key \"$label\"."
+                        )
+                    )
+                }
+            ).also { agent ->
+                agent.attach()
+                SessionLogBus.emit(
+                    SessionLogBus.Entry(
+                        hostId = sessionId,
+                        level = SessionLogBus.LogLevel.INFO,
+                        message = "Agent forwarding is on: programs on this server can use your keys while this terminal is open."
+                    )
+                )
+            }
+        }
 
     /**
      * Copies the Boost helper to the server over [client] while the session is used over SSH; one copy per server at
@@ -4416,6 +4600,9 @@ class SessionService : Service() {
     ): ShellBinding? {
         val settings = sftpTransferSettings
         if (!settings.boost || !settings.boostTerminal || host.attachTmux || !BoostHelper.clientAvailable) return null
+        if ((client as? RoutedSSHClient)?.viaJumpHost == true) return null
+        // The agent is offered by sshd to the shell it starts; a Boost terminal's shell isn't one of those.
+        if (host.forwardAgent) return null
         val hostKey = "${host.username}@${host.host}:${host.port}"
         if ((boostTerminalUnavailableUntil[hostKey] ?: 0L) > SystemClock.elapsedRealtime()) return null
         fun unavailable(reason: String, error: Throwable?) {
@@ -5534,3 +5721,21 @@ internal fun isGlobalRequestRefusal(error: Throwable): Boolean {
 internal fun mayAskForPtyAgain(error: Throwable, sessionOpen: Boolean): Boolean =
     sessionOpen && error is ConnectionException &&
         generateSequence<Throwable>(error) { it.cause }.take(8).none { it is TimeoutException || it is InterruptedException }
+
+/**
+ * Asks the server for a terminal on [session]: [term] at the screen's size, or sshj's plain default when the server
+ * refuses that. Only a server that said no gets the second request. After a timeout the first request is still on
+ * its way (a slow or busy link), and OpenSSH drops the whole connection on a second one: "Protocol error: you
+ * already have a pty." Then the session is closed and the error thrown.
+ */
+internal fun requestPty(session: Session, term: String, columns: Int, rows: Int) {
+    try {
+        session.allocatePTY(term, columns, rows, 0, 0, mutableMapOf<PTYMode, Int>())
+    } catch (error: Exception) {
+        if (!mayAskForPtyAgain(error, session.isOpen)) {
+            runCatching { session.close() }
+            throw error
+        }
+        session.allocateDefaultPTY()
+    }
+}

@@ -277,8 +277,8 @@ data class SSHPeachesRootActions(
     val onUnlockWithPin: suspend (String) -> String?,
     val onBiometricUnlock: () -> Unit,
     val onSecurityNoticeShown: () -> Unit,
-    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean) -> Unit,
-    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean) -> Unit,
+    val onHostAdd: (String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, String?, Boolean, Boolean, String?, Boolean) -> Unit,
+    val onHostUpdate: (String, String, String, Int, String, AuthMethod, String?, String, ConnectionMode, Boolean, String?, String?, String, BackgroundBehavior, String?, String?, Boolean, Boolean, String?, Boolean) -> Unit,
     val onHostDelete: (String) -> Unit,
     val onImportHost: (HostConnection) -> Unit,
     val onHostOsMetadataImported: (String, OsMetadata) -> Unit,
@@ -1432,6 +1432,22 @@ fun SSHPeachesRoot(
         }
 
         root.optJSONArray("hosts")?.let { hosts ->
+            // Where each host in the file lands, worked out first: a host may jump through one further down.
+            val hostIdMap = HashMap<String, String>()
+            for (index in 0 until hosts.length()) {
+                val item = hosts.optJSONObject(index) ?: continue
+                val exportedId = item.optString("id").trim()
+                val address = item.optString("host").trim()
+                val user = item.optString("username").trim()
+                if (exportedId.isBlank() || item.optString("name").isBlank() || address.isBlank() || user.isBlank()) continue
+                hostIdMap[exportedId] = importHostId(
+                    exportedId = exportedId,
+                    host = address,
+                    port = item.optInt("port", 22).coerceIn(1, 65_535),
+                    username = user,
+                    localHosts = uiState.hosts
+                ) { UUID.randomUUID().toString() }
+            }
             for (index in 0 until hosts.length()) {
                 val item = hosts.optJSONObject(index) ?: continue
                 val name = item.optString("name").trim()
@@ -1445,7 +1461,7 @@ fun SSHPeachesRoot(
                 val defaultMode = runCatching {
                     ConnectionMode.valueOf(item.optString("defaultMode", ConnectionMode.SSH.name))
                 }.getOrDefault(ConnectionMode.SSH)
-                val targetId = importHostId(
+                val targetId = hostIdMap[item.optString("id").trim()] ?: importHostId(
                     exportedId = item.optString("id"),
                     host = host,
                     port = port,
@@ -1506,7 +1522,14 @@ fun SSHPeachesRoot(
                             uiState.hosts.first { it.id == targetId }.allowLegacyAlgorithms
                         } else {
                             item.optBoolean("allowLegacyAlgorithms", false)
-                        }
+                        },
+                        // A jump host must come in the same file; a host you already have keeps the one chosen here.
+                        jumpHostId = item.optString("jumpHostId").trim().ifBlank { null }
+                            ?.let { hostIdMap[it] }
+                            ?.takeIf { it != targetId }
+                            ?: uiState.hosts.firstOrNull { it.id == targetId }?.jumpHostId,
+                        // Never switched on by an import: it hands the server the use of your keys.
+                        forwardAgent = uiState.hosts.firstOrNull { it.id == targetId }?.forwardAgent ?: false
                     )
                 )
                 encryptedPasswordPayload?.let { pendingHostPasswordImports += targetId to it }
@@ -2842,6 +2865,8 @@ fun SSHPeachesRoot(
                         password,
                         pinnedId,
                         false,
+                        false,
+                        null,
                         false
                     )
                 }
@@ -3960,6 +3985,7 @@ private fun buildExportPayloadWithCachedKey(state: AppUiState, passphrase: Strin
                     put("useMosh", host.useMosh)
                     put("attachTmux", host.attachTmux)
                     put("allowLegacyAlgorithms", host.allowLegacyAlgorithms)
+                    put("jumpHostId", host.jumpHostId ?: JSONObject.NULL)
                     put("preferredIdentityId", host.preferredIdentityId)
                     put("preferredForwardId", host.preferredForwardId)
                     put("startupScript", host.startupScript)

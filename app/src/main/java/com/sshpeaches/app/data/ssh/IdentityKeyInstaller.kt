@@ -26,7 +26,9 @@ object IdentityKeyInstaller {
         host: HostConnection,
         identityId: String,
         hostPasswordOverride: String?,
-        identityPassphraseOverride: String?
+        identityPassphraseOverride: String?,
+        /** The jump hosts [host] is reached through, first hop first; they log in with what is saved for them. */
+        jumps: List<HostConnection> = emptyList()
     ): Result = withContext(Dispatchers.IO) {
         debug(
             "START hostId=${host.id} identityId=${identityId.safeId()} auth=${host.preferredAuth} " +
@@ -57,7 +59,15 @@ object IdentityKeyInstaller {
 
         runCatching {
             debug("CONNECT_START hostId=${host.id} port=${host.port}")
-            client.connect(host.host, host.port)
+            SshRoute.connect(
+                client = client,
+                host = host,
+                jumps = jumps,
+                newClient = { jump ->
+                    SshClientProvider.createClient(context = context, host = jump, autoTrustUnknownHostKey = false, onHostKeyPrompt = null)
+                },
+                logIn = SshRoute::logInWithSavedCredentials
+            )
             debug("CONNECT_OK hostId=${host.id}")
             authenticate(
                 client = client,

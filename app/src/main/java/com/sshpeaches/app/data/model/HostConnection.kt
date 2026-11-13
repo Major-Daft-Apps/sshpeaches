@@ -31,7 +31,17 @@ data class HostConnection(
      * Also offer what OpenSSH's client no longer does by default: SHA-1 signatures (ssh-rsa) and DSA host keys, SHA-1
      * key exchange, CBC ciphers. Only for servers too old to offer anything else.
      */
-    val allowLegacyAlgorithms: Boolean = false
+    val allowLegacyAlgorithms: Boolean = false,
+    /**
+     * The saved host this one is reached through (OpenSSH's ProxyJump): the app logs in there first and opens the
+     * connection to this host from it. That host can have a jump host of its own.
+     */
+    val jumpHostId: String? = null,
+    /**
+     * SSH agent forwarding (`ssh -A`): programs on this server may have the phone sign with the user's keys while a
+     * terminal is open, to log in elsewhere from there. Off unless the user turns it on for a server they trust.
+     */
+    val forwardAgent: Boolean = false
 )
 
 data class Identity(

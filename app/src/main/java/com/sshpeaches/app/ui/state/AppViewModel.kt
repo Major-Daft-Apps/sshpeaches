@@ -934,7 +934,9 @@ class AppViewModel(
         password: String?,
         suppliedId: String? = null,
         attachTmux: Boolean = false,
-        allowLegacyAlgorithms: Boolean = false
+        allowLegacyAlgorithms: Boolean = false,
+        jumpHostId: String? = null,
+        forwardAgent: Boolean = false
     ) {
         logAction(
             "addHost",
@@ -969,6 +971,8 @@ class AppViewModel(
             useMosh = useMosh,
             attachTmux = attachTmux,
             allowLegacyAlgorithms = allowLegacyAlgorithms,
+            jumpHostId = jumpHostId?.takeIf { it.isNotBlank() && it != id },
+            forwardAgent = forwardAgent,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,
@@ -998,7 +1002,9 @@ class AppViewModel(
         terminalProfileId: String?,
         password: String?,
         attachTmux: Boolean = false,
-        allowLegacyAlgorithms: Boolean = false
+        allowLegacyAlgorithms: Boolean = false,
+        jumpHostId: String? = null,
+        forwardAgent: Boolean = false
     ) {
         logAction(
             "updateHost",
@@ -1036,6 +1042,8 @@ class AppViewModel(
             useMosh = useMosh,
             attachTmux = attachTmux,
             allowLegacyAlgorithms = allowLegacyAlgorithms,
+            jumpHostId = jumpHostId?.takeIf { it.isNotBlank() && it != id },
+            forwardAgent = forwardAgent,
             preferredIdentityId = preferredIdentityId,
             preferredForwardId = preferredForwardId,
             startupScript = startupScript,

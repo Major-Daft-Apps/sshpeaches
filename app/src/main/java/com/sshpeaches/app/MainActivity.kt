@@ -735,7 +735,7 @@ class MainActivity : FragmentActivity() {
                             viewModel.reportBiometricUnavailable()
                         }
                         },
-                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId, attachTmux, allowLegacyAlgorithms ->
+                        onHostAdd = { name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, suppliedId, attachTmux, allowLegacyAlgorithms, jumpHostId, forwardAgent ->
                         viewModel.addHost(
                             name,
                             host,
@@ -754,10 +754,12 @@ class MainActivity : FragmentActivity() {
                             password,
                             suppliedId,
                             attachTmux,
-                            allowLegacyAlgorithms
+                            allowLegacyAlgorithms,
+                            jumpHostId,
+                            forwardAgent
                         )
                         },
-                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, attachTmux, allowLegacyAlgorithms ->
+                        onHostUpdate = { id, name, host, port, user, auth, group, notes, mode, useMosh, preferredIdentityId, forwardId, script, backgroundBehavior, terminalProfileId, password, attachTmux, allowLegacyAlgorithms, jumpHostId, forwardAgent ->
                         viewModel.updateHost(
                             id,
                             name,
@@ -776,7 +778,9 @@ class MainActivity : FragmentActivity() {
                             terminalProfileId,
                             password,
                             attachTmux,
-                            allowLegacyAlgorithms
+                            allowLegacyAlgorithms,
+                            jumpHostId,
+                            forwardAgent
                         )
                         },
                         onHostDelete = viewModel::deleteHost,
@@ -808,13 +812,23 @@ class MainActivity : FragmentActivity() {
                         } else {
                             // Pass the installer's reason (untrusted host key, missing public key,
                             // remote error) through instead of a generic failure.
-                            IdentityKeyInstaller.install(
-                                context = this@MainActivity,
-                                host = host,
-                                identityId = identityId,
-                                hostPasswordOverride = hostPassword,
-                                identityPassphraseOverride = identityPassphrase
-                            ).let { result -> if (result.success) null else result.message }
+                            runCatching {
+                                com.majordaftapps.sshpeaches.app.data.ssh.SshRoute.jumpsFor(host) { id ->
+                                    uiState.hosts.firstOrNull { it.id == id }
+                                }
+                            }.fold(
+                                onSuccess = { jumps ->
+                                    IdentityKeyInstaller.install(
+                                        context = this@MainActivity,
+                                        host = host,
+                                        identityId = identityId,
+                                        hostPasswordOverride = hostPassword,
+                                        identityPassphraseOverride = identityPassphrase,
+                                        jumps = jumps
+                                    ).let { result -> if (result.success) null else result.message }
+                                },
+                                onFailure = { it.message ?: "The route to this host can't be worked out." }
+                            )
                         }
                         },
                         onRemoveIdentityKey = viewModel::removeIdentityKey,
@@ -1005,7 +1019,7 @@ class MainActivity : FragmentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // The clipboard is readable again only with focus: clear a terminal copy whose time ran out meanwhile.
-        if (hasFocus) com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.onAppResumed()
+        com.majordaftapps.sshpeaches.app.ui.terminal.TerminalClipboard.onWindowFocusChanged(hasFocus)
     }
 
     override fun onStop() {

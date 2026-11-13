@@ -60,4 +60,14 @@ class TerminalClipboardTest {
         Thread.sleep(2_500)
         check(clipText() == "copied later") { "The later copy became: ${clipText()}" }
     }
+
+    @Test
+    fun anEmptiedClipboardIsNotPolled() {
+        onMain { TerminalClipboard.copy(composeRule.activity, "token=abc123") }
+        check(TerminalClipboard.checkScheduledForTests) { "No check was scheduled after the copy" }
+        onMain { clipboard.clearPrimaryClip() }
+        Thread.sleep(2_500)
+        // The check came due, found nothing readable and stopped: it used to come back every 5 seconds.
+        check(!TerminalClipboard.checkScheduledForTests) { "Still checking an empty clipboard" }
+    }
 }

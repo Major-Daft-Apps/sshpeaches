@@ -42,3 +42,8 @@
 -keep class com.majordaftapps.sshpeaches.boost.** { *; }
 -keep class * implements com.majordaftapps.sshpeaches.boost.boostclient.Progress { *; }
 -keep class * implements com.majordaftapps.sshpeaches.boost.boostclient.ShellListener { *; }
+
+# sshj's GSSAPI (Kerberos) login refers to classes Android doesn't have. The app never calls it; since SSHClient has
+# a subclass here (RoutedSSHClient, for jump hosts) R8 keeps the method that mentions them and wants them resolved.
+-dontwarn org.ietf.jgss.**
+-dontwarn javax.security.auth.login.**

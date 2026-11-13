@@ -12,12 +12,12 @@ import android.os.SystemClock
 /**
  * Copies from the terminal: marked sensitive (Android hides the preview) and cleared from the clipboard after
  * [CLEAR_AFTER_MS], as long as it's still our copy. Only a clip we can see is ours gets cleared: Android 10 and later
- * hide the clipboard from apps in the background, so a check that falls due then is retried, and made again when the
- * app is back in front ([onAppResumed]), rather than risk wiping something copied elsewhere since.
+ * hide the clipboard from apps in the background, so a check that falls due then waits until the app's window has
+ * focus again ([onWindowFocusChanged]), rather than risk wiping something copied elsewhere since. Nothing polls
+ * meanwhile.
  */
 object TerminalClipboard {
     const val CLEAR_AFTER_MS = 60_000L
-    private const val RETRY_MS = 5_000L
     internal const val LABEL = "SSHPeaches terminal"
     private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
     // AOSP SystemUI honors this only on emulators, where the clipboard overlay otherwise covers instrumentation.
@@ -29,6 +29,21 @@ object TerminalClipboard {
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Pending? = null
     private var appContext: Context? = null
+    private var windowFocused = false
+
+    /** Whether a check is waiting on the timer; false while idle or waiting for the window's focus. */
+    @Volatile
+    internal var checkScheduledForTests = false
+        private set
+
+    private fun checkIn(delayMs: Long) {
+        handler.removeCallbacksAndMessages(null)
+        checkScheduledForTests = true
+        handler.postDelayed({
+            checkScheduledForTests = false
+            clearIfStillOurs()
+        }, delayMs)
+    }
 
     /** Shortens the wait for tests. */
     @Volatile
@@ -50,12 +65,13 @@ object TerminalClipboard {
         val timestamp = clipboard.primaryClipDescription?.takeIf { it.label == LABEL }?.timestamp
         appContext = context.applicationContext
         pending = Pending(timestamp, SystemClock.elapsedRealtime())
-        handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({ clearIfStillOurs() }, clearAfterMs)
+        checkIn(clearAfterMs)
     }
 
-    fun onAppResumed() {
-        clearIfStillOurs()
+    /** From the activity: the clipboard is readable only while the app's window has focus. */
+    fun onWindowFocusChanged(hasFocus: Boolean) {
+        windowFocused = hasFocus
+        if (hasFocus) clearIfStillOurs()
     }
 
     private fun clearIfStillOurs() {
@@ -63,16 +79,14 @@ object TerminalClipboard {
         val context = appContext ?: return
         val left = clearAfterMs - (SystemClock.elapsedRealtime() - due.copiedAtMs)
         if (left > 0) {
-            handler.removeCallbacksAndMessages(null)
-            handler.postDelayed({ clearIfStillOurs() }, left)
+            checkIn(left)
             return
         }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        // Null while the app can't see the clipboard (Android 10+, in the background or not yet focused): try again
-        // shortly, and when the app's window gets focus back.
+        // Null while the app can't see the clipboard (Android 10+, without window focus): the check is made again
+        // when the focus comes back. Null with focus means the clipboard is empty: nothing left to clear.
         val description = clipboard.primaryClipDescription ?: run {
-            handler.removeCallbacksAndMessages(null)
-            handler.postDelayed({ clearIfStillOurs() }, RETRY_MS)
+            if (windowFocused) pending = null
             return
         }
         pending = null

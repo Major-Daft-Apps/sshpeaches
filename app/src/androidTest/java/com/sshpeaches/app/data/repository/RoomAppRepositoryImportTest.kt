@@ -42,6 +42,30 @@ class RoomAppRepositoryImportTest {
     )
 
     @Test
+    fun deletingAJumpHostLetsTheHostsBehindItConnectDirectly() = runBlocking {
+        val bastion = host(1, OsMetadata.Undetected, "bastion").copy(id = "bastion")
+        repository.addHost(bastion)
+        repository.addHost(host(1, OsMetadata.Undetected, "inside").copy(id = "inside", jumpHostId = "bastion"))
+        repository.addHost(host(1, OsMetadata.Undetected, "other").copy(id = "other", jumpHostId = "elsewhere"))
+
+        repository.deleteHost(bastion)
+
+        val left = repository.hosts.first().associateBy { it.id }
+        assertEquals(setOf("inside", "other"), left.keys)
+        assertEquals(null, left.getValue("inside").jumpHostId)
+        assertEquals("elsewhere", left.getValue("other").jumpHostId)
+    }
+
+    @Test
+    fun anImportWithoutAJumpHostKeepsTheOneChosenHere() = runBlocking {
+        repository.addHost(host(1, OsMetadata.Undetected).copy(jumpHostId = "bastion"))
+        repository.importHost(host(2, OsMetadata.Undetected, name = "renamed"))
+        val merged = repository.hosts.first().single()
+        assertEquals("renamed", merged.name)
+        assertEquals("bastion", merged.jumpHostId)
+    }
+
+    @Test
     fun aNewerImportWithoutAnOsKeepsTheDetectedOne() = runBlocking {
         val ubuntu = OsMetadata.Known(OsFamily.UBUNTU, "24.04")
         repository.addHost(host(updated = 1, os = ubuntu))

@@ -72,9 +72,11 @@ val helpTopics: List<HelpTopic> = listOf(
         question = "How do I copy and paste in the terminal?",
         steps = listOf(
             "Long-press the terminal to select text, drag the handles, then tap Copy.",
-            "Long-press again and tap Paste to paste."
+            "Long-press again and tap Paste to paste.",
+            "Text copied from the terminal is removed from the clipboard after a minute, unless you have copied something else since.",
+            "Android only lets an app touch the clipboard while it is on screen. If you switch to another app, the copy stays until you come back to SSHPeaches (Android 13 and later clear it themselves after about an hour)."
         ),
-        keywords = listOf("clipboard", "select", "selection")
+        keywords = listOf("clipboard", "select", "selection", "clear", "password")
     ),
     HelpTopic(
         id = "scroll-find-zoom",
@@ -179,6 +181,36 @@ val helpTopics: List<HelpTopic> = listOf(
         keywords = listOf("remote forward", "reverse tunnel", "ssh -R", "expose", "gatewayports", "tunnel")
     ),
     HelpTopic(
+        id = "jump-host",
+        question = "How do I reach a server that is behind another one (a jump host or bastion)?",
+        steps = listOf(
+            "Save the jump host as a host of its own, with its password or key.",
+            "Edit the server behind it and choose that host under Jump through. Connecting now logs in to the jump " +
+                "host first and reaches the server from there, like ssh -J. A jump host can have a jump host too.",
+            "Each host is checked and logged in separately: the app asks about each one's host key and password, " +
+                "and says which host it is asking for. Your key never leaves the phone.",
+            "Mosh and Boost need to reach the server directly, so through a jump host the session uses plain SSH. " +
+                "Files and port forwards work as usual."
+        ),
+        destination = HelpDestination.HOSTS,
+        keywords = listOf("jump host", "bastion", "proxyjump", "ssh -J", "gateway", "behind", "proxy")
+    ),
+    HelpTopic(
+        id = "agent-forwarding",
+        question = "How do I use my keys from a server (git pull, ssh to another server) without copying them there?",
+        steps = listOf(
+            "Edit the host and turn on Agent forwarding, then open a terminal on it over SSH (not Mosh; Boost steps " +
+                "aside for this host).",
+            "On the server, ssh, git and scp can now sign in with the keys in Identities. Run ssh-add -L there to " +
+                "see them. The keys never leave this phone: the server asks, the phone signs.",
+            "The session log says each time a key is used. It works for as long as the terminal is open.",
+            "Turn it on only for servers you trust: while you are connected, anyone with root there can sign in to " +
+                "other places as you. Keys protected by a passphrase the app hasn't saved aren't offered."
+        ),
+        destination = HelpDestination.HOSTS,
+        keywords = listOf("agent", "ssh -A", "forward agent", "ssh-add", "git", "keys on server", "forwardagent")
+    ),
+    HelpTopic(
         id = "transfer",
         question = "How do I move my hosts and keys to a new phone?",
         steps = listOf(
@@ -195,7 +227,7 @@ val helpTopics: List<HelpTopic> = listOf(
         steps = listOf(
             "Copy the config file to this phone.",
             "Hosts → Import hosts (top bar) → OpenSSH config, then pick the file and review the import.",
-            "Hosts and LocalForward, RemoteForward and DynamicForward entries are imported. IdentityFile keys aren't, so add them in Identities."
+            "Hosts and LocalForward, RemoteForward and DynamicForward entries are imported, and ProxyJump becomes Jump through when it names a host in the file or one you have saved. IdentityFile keys aren't, so add them in Identities."
         ),
         destination = HelpDestination.HOSTS,
         keywords = listOf("openssh", "config", "import", "ssh_config")

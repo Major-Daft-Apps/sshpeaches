@@ -2,6 +2,7 @@ package com.majordaftapps.sshpeaches.app.ui
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -146,6 +147,53 @@ class HostsCrudTest {
         composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_LEGACY_ALGORITHMS)
         composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
         composeRule.waitUntil(5_000) { savedOldBox()?.allowLegacyAlgorithms == false }
+    }
+
+    @Test
+    fun aJumpHostIsChosenInTheEditorAndSaved() {
+        val app = composeRule.activity.application as com.majordaftapps.sshpeaches.app.SSHPeachesApplication
+        kotlinx.coroutines.runBlocking {
+            app.container.repository.addHost(
+                com.majordaftapps.sshpeaches.app.data.model.HostConnection(
+                    id = "bastion-1", name = "Bastion", host = "bastion.example", username = "gate",
+                    preferredAuth = com.majordaftapps.sshpeaches.app.data.model.AuthMethod.PASSWORD
+                )
+            )
+        }
+        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("Bastion").fetchSemanticsNodes().isNotEmpty() }
+
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("Inside")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.0.5")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT).performTextInput("tester")
+        selectPasswordAuth()
+        composeRule.dismissSoftKeyboard()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_JUMP_HOST).performScrollTo()
+        composeRule.onNodeWithText("None: connect directly").assertIsDisplayed()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_JUMP_HOST)
+        composeRule.onNodeWithTag(UiTestTags.hostDialogJumpHostOption("bastion-1"), useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("Bastion (gate@bastion.example)").assertIsDisplayed()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) { savedHost("Inside")?.jumpHostId == "bastion-1" }
+    }
+
+    @Test
+    fun agentForwardingIsOffUntilTurnedOnAndIsSaved() {
+        composeRule.onNodeWithTag(UiTestTags.topBarAdd(Routes.HOSTS)).performClick()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_NAME_INPUT).performTextInput("Trusted Box")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_HOST_INPUT).performTextInput("10.0.2.2")
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_USERNAME_INPUT).performTextInput("tester")
+        selectPasswordAuth()
+        composeRule.dismissSoftKeyboard()
+        composeRule.onNodeWithTag(UiTestTags.HOST_DIALOG_FORWARD_AGENT).performScrollTo().assertIsOff()
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_FORWARD_AGENT)
+        composeRule.clickNodeWithTag(UiTestTags.HOST_DIALOG_CONFIRM_BUTTON)
+        composeRule.waitUntil(5_000) { savedHost("Trusted Box")?.forwardAgent == true }
+    }
+
+    private fun savedHost(name: String) = kotlinx.coroutines.runBlocking {
+        com.majordaftapps.sshpeaches.app.data.local.SshPeachesDatabase.get(composeRule.activity).hostDao().getAll()
+            .firstOrNull { it.name == name }
     }
 
     private fun savedOldBox() = kotlinx.coroutines.runBlocking {

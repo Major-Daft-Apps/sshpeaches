@@ -1,6 +1,7 @@
 package com.majordaftapps.sshpeaches.app.service
 
 import android.content.Context
+import android.util.Log
 import com.majordaftapps.sshpeaches.app.util.posixShellQuote
 import com.majordaftapps.sshpeaches.boost.boostclient.Boostclient
 import com.majordaftapps.sshpeaches.boost.boostclient.Progress
@@ -8,7 +9,9 @@ import com.majordaftapps.sshpeaches.boost.boostclient.Session as BoostSession
 import com.majordaftapps.sshpeaches.boost.boostclient.Shell as BoostShell
 import com.majordaftapps.sshpeaches.boost.boostclient.ShellListener
 import java.io.BufferedReader
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -19,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPOutputStream
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.sftp.FileAttributes
@@ -169,6 +173,7 @@ internal class BoostHelper private constructor(
         /** The helper's copy to the server: bytes per write, and writes the server hasn't confirmed yet. */
         private const val INSTALL_PIECE_BYTES = 16 * 1024
         private const val INSTALL_WRITES_IN_FLIGHT = 2
+        private const val TAG = "BoostHelper"
         private const val ASSET_DIR = "boost"
         private const val REMOTE_DIR = ".cache/sshpeaches/boost"
         private const val UNANSWERED_UDP_PORT = 9L
@@ -187,6 +192,14 @@ internal class BoostHelper private constructor(
 
         @Volatile
         internal var dialHostForTests: String? = null
+
+        /** Tests set this to send the helper as it is, as to a server without gzip. */
+        @Volatile
+        internal var plainCopyForTests = false
+
+        /** How the last copy went: "gzip from 0 of 3400000" (how it was sent, and the byte it started at). */
+        @Volatile
+        internal var lastCopyForTests: String? = null
 
         /** Requests in flight per transfer, for test devices whose network can't take the usual number. */
         @Volatile
@@ -338,48 +351,129 @@ internal class BoostHelper private constructor(
             }
         }
 
+        /**
+         * Copies the helper to the server. Two things keep that short on a slow uplink: the copy is sent gzipped when
+         * the server has gzip (about half the bytes), and a copy that was cut off (the connection dropped, the session
+         * was closed) carries on from where it stopped instead of starting again.
+         */
         private fun upload(context: Context, ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper) {
             val (dir, path, sha256) = Triple(helper.dir, helper.path, helper.sha256)
             sftp.mkdirs(dir)
             for (own in listOf(".cache/sshpeaches", REMOTE_DIR, dir)) {
                 runCatching { sftp.chmod(own, 0b111_000_000) }
             }
+            val zipped = !plainCopyForTests && runCommand(ssh, "command -v gzip >/dev/null 2>&1 && echo yes")?.trim() == "yes"
+            if (zipped) {
+                val packed = runCatching { packedHelper(context, helper) }.getOrNull()
+                val unpacked = packed != null && runCatching {
+                    val temp = "$path.gz.part"
+                    send(ssh, sftp, temp, packed.length()) { packed.inputStream() }
+                    val fresh = "$path.new"
+                    runCommand(ssh, "gzip -dc < ${posixShellQuote(temp)} > ${posixShellQuote(fresh)}")
+                    val ok = remoteSha256(ssh, fresh) == sha256
+                    runCatching { sftp.rm(temp) }
+                    if (ok) {
+                        runCatching { sftp.rm(path) }
+                        sftp.rename(fresh, path)
+                    } else {
+                        runCatching { sftp.rm(fresh) }
+                    }
+                    ok
+                }.getOrElse { error ->
+                    // A dropped connection ends the copy here; the part that arrived stays for the next attempt.
+                    if (!ssh.isConnected) throw error
+                    false
+                }
+                if (unpacked) {
+                    finish(ssh, sftp, helper)
+                    return
+                }
+                Log.i(TAG, "Boost helper: the gzipped copy didn't unpack on the server; sending it as it is")
+            }
             val temp = "$path.part"
-            val digest = MessageDigest.getInstance("SHA-256")
-            sftp.open(
-                temp,
-                EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC),
-                FileAttributes.Builder().withPermissions(0b111_000_000).build()
-            ).use { remote ->
+            send(ssh, sftp, temp, helper.size) { context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-${helper.arch}") }
+            runCatching { sftp.rm(path) }
+            sftp.rename(temp, path)
+            finish(ssh, sftp, helper)
+        }
+
+        private fun finish(ssh: SSHClient, sftp: SFTPClient, helper: RemoteHelper) {
+            sftp.chmod(helper.path, 0b111_000_000)
+            val sum = remoteSha256(ssh, helper.path)
+            if (sum != null && sum != helper.sha256) {
+                runCatching { sftp.rm(helper.path) }
+                throw BoostUnavailable("the helper was damaged on its way to the server")
+            }
+            removeOlderHelpers(sftp, helper.dir.substringAfterLast('/'))
+        }
+
+        /**
+         * This version's helper, gzipped once into the app's cache: the same bytes every time, so a copy that was cut
+         * off can be picked up where it stopped.
+         */
+        private fun packedHelper(context: Context, helper: RemoteHelper): File {
+            val folder = File(context.cacheDir, "boost").apply { mkdirs() }
+            val name = "helper-${helper.sha256.take(16)}-${helper.arch}.gz"
+            val packed = File(folder, name)
+            if (packed.length() > 0) return packed
+            folder.listFiles()?.filter { it.name != name }?.forEach { it.delete() }
+            val making = File(folder, "$name.tmp")
+            context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-${helper.arch}").use { input ->
+                GZIPOutputStream(making.outputStream()).use { input.copyTo(it) }
+            }
+            if (!making.renameTo(packed)) throw IOException("couldn't keep the packed helper")
+            return packed
+        }
+
+        /**
+         * Writes [length] bytes of [source] to [temp] on the server, after whatever a cut-off copy already left there
+         * (when the server can prove it's the same bytes; anything else is written over).
+         */
+        private fun send(ssh: SSHClient, sftp: SFTPClient, temp: String, length: Long, source: () -> InputStream) {
+            val there = runCatching { sftp.stat(temp).size }.getOrDefault(0L)
+            val resumeAt = if (there in 1..length && remoteSha256(ssh, temp) == source().use { sha256Of(it, there) }) there else 0L
+            lastCopyForTests = "${if (temp.endsWith(".gz.part")) "gzip" else "plain"} from $resumeAt of $length"
+            Log.i(TAG, "Boost helper: copying ${temp.substringAfterLast('/')} from $resumeAt of $length bytes")
+            if (resumeAt == length) return
+            val mode = if (resumeAt > 0) EnumSet.of(OpenMode.WRITE) else EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)
+            sftp.open(temp, mode, FileAttributes.Builder().withPermissions(0b111_000_000).build()).use { remote ->
                 // The copy shares the session's connection, and whatever is in flight is ahead of every key press,
                 // folder listing and keepalive on it. At most INSTALL_WRITES_IN_FLIGHT pieces of INSTALL_PIECE_BYTES
                 // wait for the server, a fraction of a second's worth on a slow phone uplink. It was a megabyte
                 // (17 writes of 64 KiB): on such an uplink a terminal took over a minute to open, nothing typed was
                 // answered for many seconds, and the "is the server there?" check dropped the connection, after
                 // which the copy began again from nothing.
-                remote.RemoteFileOutputStream(0, INSTALL_WRITES_IN_FLIGHT - 1).use { out ->
-                    context.assets.open("$ASSET_DIR/sshpeaches-boost-linux-${helper.arch}").use { input ->
+                remote.RemoteFileOutputStream(resumeAt, INSTALL_WRITES_IN_FLIGHT - 1).use { out ->
+                    source().use { input ->
+                        var skip = resumeAt
+                        while (skip > 0) {
+                            val skipped = input.skip(skip)
+                            if (skipped <= 0) throw IOException("couldn't find the place to carry on from")
+                            skip -= skipped
+                        }
                         val buffer = ByteArray(INSTALL_PIECE_BYTES)
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
-                            digest.update(buffer, 0, read)
                             out.write(buffer, 0, read)
                         }
                     }
                 }
             }
-            val written = digest.digest().joinToString("") { "%02x".format(it) }
-            if (written != sha256) {
-                runCatching { sftp.rm(temp) }
-                throw BoostUnavailable("the helper in this app is damaged")
+        }
+
+        /** The SHA-256 of the first [length] bytes of [input], or null when it's shorter. */
+        private fun sha256Of(input: InputStream, length: Long): String? {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(64 * 1024)
+            var left = length
+            while (left > 0) {
+                val read = input.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
+                if (read < 0) return null
+                digest.update(buffer, 0, read)
+                left -= read
             }
-            runCatching { sftp.rm(path) }
-            sftp.rename(temp, path)
-            sftp.chmod(path, 0b111_000_000)
-            val sum = remoteSha256(ssh, path)
-            if (sum != null && sum != sha256) throw BoostUnavailable("the helper was damaged on its way to the server")
-            removeOlderHelpers(sftp, dir.substringAfterLast('/'))
+            return digest.digest().joinToString("") { "%02x".format(it) }
         }
 
         /** Deletes other versions' helper folders (a helper still running from one keeps working without its file). */

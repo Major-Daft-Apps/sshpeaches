@@ -1,5 +1,6 @@
 #!/bin/bash
-# Builds the app's mosh-client from source for Android: mosh 1.4.0's client with protobuf-lite 3.21, OpenSSL 3.5's
+# Builds the app's mosh-client from source for Android: mosh 1.4.0's client with protobuf-lite 36 (and the Abseil it
+# is built on), OpenSSL 3.5's
 # libcrypto, ncurses 6.5 and libc++ linked in statically, so it loads only Android's own libc, libm, libdl and libz.
 # The app runs it through /system/bin/linker64, which is why it stays a dynamically linked PIE rather than a fully
 # static binary. Also compiles the terminfo entries the app ships (xterm, xterm-256color, vt100) with ncurses' tic.
@@ -19,7 +20,9 @@ ASSETS=$ROOT/app/src/main/assets/mosh
 export SOURCE_DATE_EPOCH=1700000000 LC_ALL=C TZ=UTC ZERO_AR_DATE=1
 
 MOSH_VERSION=1.4.0
-PROTOBUF_VERSION=3.21.12
+PROTOBUF_VERSION=36.2
+# The Abseil release protobuf $PROTOBUF_VERSION pins (cmake/dependencies.cmake in its sources).
+ABSEIL_VERSION=20250512.1
 OPENSSL_VERSION=3.5.9
 NCURSES_VERSION=6.5
 
@@ -35,9 +38,12 @@ fetch() { # name url sha256
 fetch mosh-$MOSH_VERSION.tar.gz \
     https://github.com/mobile-shell/mosh/releases/download/mosh-$MOSH_VERSION/mosh-$MOSH_VERSION.tar.gz \
     872e4b134e5df29c8933dff12350785054d2fd2839b5ae6b5587b14db1465ddd
-fetch protobuf-cpp-$PROTOBUF_VERSION.tar.gz \
-    https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-$PROTOBUF_VERSION.tar.gz \
-    4eab9b524aa5913c6fffb20b2a8abf5ef7f95a80bc0701f3a6dbb4c607f73460
+fetch protobuf-$PROTOBUF_VERSION.tar.gz \
+    https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-$PROTOBUF_VERSION.tar.gz \
+    3d9642a662d10e68ebae5e53f14dcce5105684212d5078f8e0d47d1ab3ae6b64
+fetch abseil-cpp-$ABSEIL_VERSION.tar.gz \
+    https://github.com/abseil/abseil-cpp/releases/download/$ABSEIL_VERSION/abseil-cpp-$ABSEIL_VERSION.tar.gz \
+    9b7a064305e9fd94d124ffa6cc358592eb42b5da588fb4e07d09254aa40086db
 fetch openssl-$OPENSSL_VERSION.tar.gz \
     https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz \
     603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
@@ -57,9 +63,15 @@ PREFIX_MAPS="-ffile-prefix-map=$WORK=/build -ffile-prefix-map=$NDK=/ndk -ffile-p
 # --- Host tools: protoc (same protobuf version as the target library) and tic -----------------------------------
 HOST=$WORK/host
 if [ ! -x "$HOST/bin/protoc" ]; then
-    unpack protobuf-cpp-$PROTOBUF_VERSION.tar.gz "$WORK/host-protobuf"
-    cmake -S "$WORK/host-protobuf" -B "$WORK/host-protobuf/out" -DCMAKE_BUILD_TYPE=Release \
-        -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX="$HOST" >/dev/null
+    unpack abseil-cpp-$ABSEIL_VERSION.tar.gz "$WORK/host-abseil"
+    cmake -S "$WORK/host-abseil" -B "$WORK/host-abseil/out" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+        -DABSL_PROPAGATE_CXX_STD=ON -DABSL_BUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_INSTALL_PREFIX="$HOST" -DCMAKE_INSTALL_LIBDIR=lib >/dev/null
+    cmake --build "$WORK/host-abseil/out" -j "$JOBS" --target install >/dev/null
+    unpack protobuf-$PROTOBUF_VERSION.tar.gz "$WORK/host-protobuf"
+    cmake -S "$WORK/host-protobuf" -B "$WORK/host-protobuf/out" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+        -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_LIBUPB=OFF -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_WITH_ZLIB=OFF \
+        -Dprotobuf_LOCAL_DEPENDENCIES_ONLY=ON -DCMAKE_PREFIX_PATH="$HOST" -DCMAKE_INSTALL_PREFIX="$HOST" >/dev/null
     cmake --build "$WORK/host-protobuf/out" -j "$JOBS" --target protoc >/dev/null
     mkdir -p "$HOST/bin" && cp "$WORK/host-protobuf/out/protoc" "$HOST/bin/protoc"
 fi
@@ -69,6 +81,12 @@ if [ ! -x "$HOST/bin/tic" ]; then
         --without-cxx-binding --without-manpages --without-tests --enable-widec >/dev/null && \
         make -j "$JOBS" >/dev/null && make install.progs >/dev/null)
 fi
+
+mosh_configure_failed() { # in mosh's source directory: show why, from config.log
+    echo "--- mosh configure failed; its protoc check in config.log:" >&2
+    grep -n -A60 'checking whether protoc' config.log | grep -vE '^[0-9]+-\| ' | tail -70 >&2
+    exit 1
+}
 
 build_abi() { # abi target openssl-target
     local abi=$1 target=$2 sslTarget=$3
@@ -89,18 +107,38 @@ build_abi() { # abi target openssl-target
         -D__ANDROID_API__=$API no-shared no-tests no-module no-engine --prefix="$inst" --libdir=lib >/dev/null && \
         make -j "$JOBS" build_libs >/dev/null && make install_dev DESTDIR="$root" >/dev/null)
 
-    # protobuf-lite (mosh's messages are LITE_RUNTIME).
-    unpack protobuf-cpp-$PROTOBUF_VERSION.tar.gz "$WORK/$abi-protobuf"
-    cmake -S "$WORK/$abi-protobuf" -B "$WORK/$abi-protobuf/out" -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" -DANDROID_ABI="$abi" \
-        -DANDROID_PLATFORM=android-$API -DANDROID_STL=c++_static -Dprotobuf_BUILD_TESTS=OFF \
-        -Dprotobuf_BUILD_PROTOC_BINARIES=OFF -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_WITH_ZLIB=OFF \
+    # Abseil, which protobuf has been built on since version 22, then protobuf-lite (mosh's messages are
+    # LITE_RUNTIME) with the UTF-8 checker it uses. They install under $WORK/$abi-pb, away from the fixed prefix:
+    # only headers and static libraries come out of it, and no path of theirs ends up in the binary.
+    local pb=$WORK/$abi-pb
+    local android="-DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=$abi \
+        -DANDROID_PLATFORM=android-$API -DANDROID_STL=c++_static -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17"
+    rm -rf "$pb"
+    unpack abseil-cpp-$ABSEIL_VERSION.tar.gz "$WORK/$abi-abseil"
+    # shellcheck disable=SC2086
+    cmake -S "$WORK/$abi-abseil" -B "$WORK/$abi-abseil/out" $android \
+        -DABSL_PROPAGATE_CXX_STD=ON -DABSL_BUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" \
-        -DCMAKE_INSTALL_PREFIX="$prefix" >/dev/null
-    cmake --build "$WORK/$abi-protobuf/out" -j "$JOBS" --target libprotobuf-lite >/dev/null
-    mkdir -p "$prefix/lib" "$prefix/include"
-    cp "$WORK/$abi-protobuf/out/libprotobuf-lite.a" "$prefix/lib/"
-    cp -r "$WORK/$abi-protobuf/src/google" "$prefix/include/"
+        -DCMAKE_INSTALL_PREFIX="$pb" -DCMAKE_INSTALL_LIBDIR=lib >/dev/null
+    cmake --build "$WORK/$abi-abseil/out" -j "$JOBS" --target install >/dev/null
+    unpack protobuf-$PROTOBUF_VERSION.tar.gz "$WORK/$abi-protobuf"
+    # shellcheck disable=SC2086
+    cmake -S "$WORK/$abi-protobuf" -B "$WORK/$abi-protobuf/out" $android \
+        -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_PROTOC_BINARIES=OFF -Dprotobuf_BUILD_LIBUPB=OFF \
+        -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_WITH_ZLIB=OFF -Dprotobuf_LOCAL_DEPENDENCIES_ONLY=ON \
+        -Dabsl_DIR="$pb/lib/cmake/absl" -DCMAKE_FIND_ROOT_PATH="$pb" \
+        -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" \
+        -DCMAKE_INSTALL_PREFIX="$pb" -DCMAKE_INSTALL_LIBDIR=lib >/dev/null
+    cmake --build "$WORK/$abi-protobuf/out" -j "$JOBS" --target libprotobuf-lite utf8_validity >/dev/null
+    cp "$(find "$WORK/$abi-protobuf/out" -name libprotobuf-lite.a | head -1)" \
+        "$(find "$WORK/$abi-protobuf/out" -name libutf8_validity.a | head -1)" "$pb/lib/"
+    mkdir -p "$pb/include"
+    cp -r "$WORK/$abi-protobuf/src/google" "$pb/include/"
+    cp "$WORK/$abi-protobuf/third_party/utf8_range/utf8_validity.h" "$WORK/$abi-protobuf/third_party/utf8_range/utf8_range.h" \
+        "$pb/include/"
+    # Every Abseil library, in a fixed order; the linker takes only the objects protobuf-lite needs.
+    local absl
+    absl=$(find "$pb/lib" -name 'libabsl_*.a' | sort | tr '\n' ' ')
 
     # ncurses: the terminfo reader mosh-client uses (setupterm, tigetstr); the database comes from $TERMINFO.
     unpack ncurses-$NCURSES_VERSION.tar.gz "$WORK/$abi-ncurses"
@@ -114,17 +152,18 @@ build_abi() { # abi target openssl-target
     unpack mosh-$MOSH_VERSION.tar.gz "$WORK/$abi-mosh"
     (cd "$WORK/$abi-mosh" && \
         CC=$cc CXX=$cxx AR=llvm-ar RANLIB=llvm-ranlib \
-        CPPFLAGS="-I$prefix/include -I$prefix/include/ncursesw" \
+        CPPFLAGS="-I$prefix/include -I$prefix/include/ncursesw -I$pb/include" \
         CFLAGS="$cflags" CXXFLAGS="$cflags -std=c++17" \
         LDFLAGS="-L$prefix/lib -static-libstdc++ -Wl,--build-id=none -Wl,-z,max-page-size=16384" \
         LIBS="-lz -llog" \
         PROTOC="$HOST/bin/protoc" \
-        protobuf_CFLAGS="-I$prefix/include" protobuf_LIBS="$prefix/lib/libprotobuf-lite.a" \
+        protobuf_CFLAGS="-I$pb/include" \
+        protobuf_LIBS="$pb/lib/libprotobuf-lite.a $pb/lib/libutf8_validity.a -Wl,--start-group $absl -Wl,--end-group" \
         OpenSSL_CFLAGS="-I$prefix/include" OpenSSL_LIBS="-L$prefix/lib" \
         TINFO_CFLAGS="-I$prefix/include/ncursesw" TINFO_LIBS="$prefix/lib/libncursesw.a" \
         PKG_CONFIG_LIBDIR=/nonexistent \
         ./configure --host="$target" --prefix="$inst" --disable-server --enable-client \
-            --with-crypto-library=openssl --disable-completion >/dev/null && \
+            --with-crypto-library=openssl --disable-completion >/dev/null || mosh_configure_failed && \
         make -j "$JOBS" >/dev/null)
 
     local out=$ASSETS/$abi
@@ -152,6 +191,7 @@ cat > "$ASSETS/NOTICE.txt" <<EOF
 The bundled mosh-client is built from source by tools/mosh-client/build.sh:
 - mosh $MOSH_VERSION (GPL-3.0-or-later, with an OpenSSL linking exception) https://mosh.org
 - protobuf $PROTOBUF_VERSION, lite runtime (BSD-3-Clause) https://github.com/protocolbuffers/protobuf
+- Abseil $ABSEIL_VERSION, the parts protobuf uses (Apache-2.0) https://abseil.io
 - OpenSSL $OPENSSL_VERSION, libcrypto (Apache-2.0) https://www.openssl.org
 - ncurses $NCURSES_VERSION and its terminfo entries (MIT-style X11 license) https://invisible-island.net/ncurses/
 - libc++ from the Android NDK (Apache-2.0 with LLVM exceptions)
