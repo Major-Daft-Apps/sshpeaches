@@ -1,0 +1,6 @@
+What's new in 0.16.2
+
+- Fixed: a host's system logo (Ubuntu, Debian, Fedora and others) could turn into the plain Linux logo after connecting over a slow link. The saved logo is now kept.
+- The latency badge shows a grey circle and "..." when there is no reading yet, instead of an empty space.
+
+0.16.0 added jump hosts, agent forwarding and a faster, resumable Boost helper copy.

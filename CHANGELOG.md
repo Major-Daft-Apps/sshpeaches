@@ -4,7 +4,7 @@ All notable SSHPeaches release notes should be tracked here.
 
 ## 0.16.2 (1602)
 
-Not released yet.
+Sent to Google Play open testing on 2026-11-14.
 
 - **Fixed: a host could lose its distribution logo and turn into the plain Linux one.** Each new session to a host whose system is already known looks again, by reading the server's os-release file with a 3-second limit. When that read didn't finish in time (a slow or busy connection), the app fell back to `uname`, which only says "Linux", and saved that over the Ubuntu, Debian, Fedora... it already had. A distribution that is known is now kept unless the server's os-release says otherwise; `uname` is still believed for a host not known yet, and when it names a Mac, a BSD or Windows.
 - A host's logo is saved with the host (its system, in the host's own record), and stays through restarts, edits, export files and imports; adding a host whose record already exists no longer clears it. The logos themselves are part of the app.
