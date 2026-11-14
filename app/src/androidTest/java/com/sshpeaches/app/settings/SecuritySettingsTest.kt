@@ -85,19 +85,7 @@ class SecuritySettingsTest {
         }
     }
 
-    @Test
-    fun lockedAppShowsOverlayAndUnlocksWithPin() {
-        AppStateSeeder.configurePin(pin = "2468", locked = true)
-        composeRule.activityRule.scenario.recreate()
-
-        composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_OVERLAY).assertIsDisplayed()
-        composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_PIN_INPUT).performTextInput("2468")
-        composeRule.onNodeWithTag(UiTestTags.LOCK_SCREEN_UNLOCK_BUTTON).performClick()
-
-        composeRule.waitUntil(30_000) {
-            composeRule.onAllNodesWithTag(UiTestTags.LOCK_SCREEN_OVERLAY).fetchSemanticsNodes().isEmpty()
-        }
-    }
+    // The lock screen after a recreate is in LockScreenRecreateTest, through the real windows.
 
     @Test
     fun biometricPreferenceDisplaysWhenPinConfigured() {

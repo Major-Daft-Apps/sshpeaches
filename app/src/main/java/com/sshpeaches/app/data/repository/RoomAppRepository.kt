@@ -52,7 +52,8 @@ class RoomAppRepository(
     }
 
     override suspend fun addHost(host: HostConnection) {
-        hostDao.upsert(host.asEntity())
+        // A host is added without an OS; should its id already be saved, the OS found for it stays.
+        updateHost(host)
     }
 
     override suspend fun updateHost(host: HostConnection) {

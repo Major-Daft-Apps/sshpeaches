@@ -134,6 +134,21 @@ sealed class OsMetadata {
     data class Custom(val label: String) : OsMetadata()
 }
 
+/**
+ * What to save after a session could only ask the server `uname` ([fromUname]), because its os-release file couldn't
+ * be read in time: null (keep what is saved) when that would turn a Linux distribution already known into plain
+ * "Linux". A slow or busy connection used to lose a host's logo that way. Anything else `uname` says is taken: it
+ * tells a Mac, a BSD or Windows apart for certain, and it is better than nothing for a host not known yet.
+ */
+fun OsMetadata.afterUnameOnly(fromUname: OsMetadata?): OsMetadata? {
+    val saved = this as? OsMetadata.Known ?: return fromUname
+    val crude = fromUname as? OsMetadata.Known ?: return fromUname
+    val savedIsALinuxDistribution = saved.family !in setOf(
+        OsFamily.MAC, OsFamily.WINDOWS, OsFamily.BSD, OsFamily.GENERIC, OsFamily.UNKNOWN
+    )
+    return if (crude.family == OsFamily.GENERIC && savedIsALinuxDistribution) null else crude
+}
+
 enum class OsFamily(val displayName: String, val colorHex: String) {
     UBUNTU("Ubuntu", "#E95420"),
     DEBIAN("Debian", "#A80030"),

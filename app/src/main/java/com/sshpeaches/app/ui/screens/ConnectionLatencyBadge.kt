@@ -33,9 +33,12 @@ import androidx.compose.ui.unit.dp
 import com.majordaftapps.sshpeaches.app.service.ConnectionLatency
 import com.majordaftapps.sshpeaches.app.ui.testing.UiTestTags
 
-/** What the latency badge reads: "42 ms", or nothing while there is no reading (before the first, or no answer). */
+/** Shown in place of a reading while there is none (before the first check, or no answer to the last one). */
+internal const val LATENCY_BADGE_NO_READING = "..."
+
+/** What the latency badge reads: "42 ms", or "..." while there is no reading. */
 internal fun latencyBadgeText(latency: ConnectionLatency?): String =
-    latency?.lastMs?.takeUnless { latency.lost }?.let { "$it ms" }.orEmpty()
+    latency?.lastMs?.takeUnless { latency.lost }?.let { "$it ms" } ?: LATENCY_BADGE_NO_READING
 
 /** The badge keeps room for a reading this wide from the start, so the title next to it never changes size. */
 private const val LATENCY_BADGE_WIDEST = "000 ms"
@@ -43,21 +46,22 @@ private const val LATENCY_BADGE_WIDEST = "000 ms"
 /**
  * The session's round trip to its server, for Advanced settings → Show connection latency: green under 100 ms,
  * amber under 300 ms, red above. Without a reading (before the first check, or no answer to the last one) the
- * dot is grey and the text is blank, at the same width. Tapping it shows the last minute's figures.
+ * dot is grey and the text is "...", at the same width. Tapping it shows the last minute's figures.
  */
 @Composable
 fun ConnectionLatencyBadge(latency: ConnectionLatency?, modifier: Modifier = Modifier) {
     var showDetails by remember { mutableStateOf(false) }
     val text = latencyBadgeText(latency)
-    val dot = when (latency?.quality.takeIf { text.isNotEmpty() }) {
+    val hasReading = text != LATENCY_BADGE_NO_READING
+    val dot = when (latency?.quality.takeIf { hasReading }) {
         ConnectionLatency.Quality.GOOD -> Color(0xFF43A047)
         ConnectionLatency.Quality.FAIR -> Color(0xFFFFB300)
         ConnectionLatency.Quality.POOR -> Color(0xFFE53935)
-        null -> MaterialTheme.colorScheme.onSurfaceVariant
+        null -> Color(0xFF9E9E9E)
     }
     val spoken = when {
         latency == null -> "not measured yet"
-        text.isEmpty() -> "no answer"
+        !hasReading -> "no answer"
         else -> text
     }
     val style = MaterialTheme.typography.labelMedium

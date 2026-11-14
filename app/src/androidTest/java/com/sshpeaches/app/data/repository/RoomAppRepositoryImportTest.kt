@@ -89,6 +89,16 @@ class RoomAppRepositoryImportTest {
     }
 
     @Test
+    fun addingAHostWhoseIdIsAlreadySavedKeepsTheOs() = runBlocking {
+        val ubuntu = OsMetadata.Known(OsFamily.UBUNTU, "24.04")
+        repository.addHost(host(1, ubuntu))
+        repository.addHost(host(2, OsMetadata.Undetected, name = "renamed"))
+        val saved = repository.hosts.first().single()
+        assertEquals("renamed", saved.name)
+        assertEquals(ubuntu, saved.osMetadata)
+    }
+
+    @Test
     fun anUpdateFromASnapshotTakenBeforeDetectionKeepsTheOs() = runBlocking {
         val stale = host(updated = 1, os = OsMetadata.Undetected)
         repository.addHost(stale)

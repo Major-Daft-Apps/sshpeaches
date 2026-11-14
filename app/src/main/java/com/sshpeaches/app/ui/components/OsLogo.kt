@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -26,6 +25,7 @@ import com.caverock.androidsvg.SVG
 import com.majordaftapps.sshpeaches.app.R
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.telemetry.TelemetryInitializer
 
 /**
  * A host's OS logo in [tint], or a desktop icon when the OS isn't known. The bundled SVGs are drawn here, at once,
@@ -43,7 +43,9 @@ fun OsLogo(
     val iconRes = osMetadata.logoResOrNull()
     val sizePx = with(LocalDensity.current) { size.roundToPx() }
     val resources = LocalContext.current.resources
-    val logo = remember(iconRes, sizePx) { iconRes?.let { OsLogoCache.get(resources, it, sizePx) } }
+    // Not remembered here: the cache keeps a logo once drawn, and a draw that failed is tried again next time
+    // instead of leaving the desktop icon in place for as long as the card is on screen.
+    val logo = iconRes?.let { OsLogoCache.get(resources, it, sizePx) }
     if (logo != null) {
         Image(
             bitmap = logo,
@@ -81,13 +83,16 @@ internal fun OsMetadata.logoResOrNull(): Int? = when (this) {
 /** OS logos rendered from their SVGs, kept per size for the life of the process. */
 internal object OsLogoCache {
     private val logos = LruCache<String, ImageBitmap>(32)
+    private val reported = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /** The logo [sizePx] square, or null if its SVG couldn't be drawn. */
     fun get(resources: Resources, @RawRes iconRes: Int, sizePx: Int): ImageBitmap? {
         if (sizePx <= 0) return null
         val key = "$iconRes@$sizePx"
         logos.get(key)?.let { return it }
-        val logo = runCatching { render(resources, iconRes, sizePx) }.getOrNull() ?: return null
+        val logo = runCatching { render(resources, iconRes, sizePx) }
+            .onFailure { if (reported.add(key)) TelemetryInitializer.recordNonFatal("os_logo_draw", it) }
+            .getOrNull() ?: return null
         logos.put(key, logo)
         return logo
     }

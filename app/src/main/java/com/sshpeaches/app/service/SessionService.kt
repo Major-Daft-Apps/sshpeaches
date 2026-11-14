@@ -29,6 +29,7 @@ import com.majordaftapps.sshpeaches.app.data.model.ConnectionMode
 import com.majordaftapps.sshpeaches.app.data.model.HostConnection
 import com.majordaftapps.sshpeaches.app.data.model.OsFamily
 import com.majordaftapps.sshpeaches.app.data.model.OsMetadata
+import com.majordaftapps.sshpeaches.app.data.model.afterUnameOnly
 import com.majordaftapps.sshpeaches.app.data.model.PortForward
 import com.majordaftapps.sshpeaches.app.data.model.PortForwardType
 import com.majordaftapps.sshpeaches.app.data.model.Snippet
@@ -731,7 +732,7 @@ class SessionService : Service() {
                 connectionTranscriptEnabled.set(false)
                 // A known OS is refreshed after the session is ready instead of delaying the shell.
                 if (mode == ConnectionMode.SSH && !osKnownAtStart) {
-                    detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
+                    detectRemoteOsMetadata(sessionId, client!!, sessionHost.osMetadata)?.let { detected ->
                         if (sessionHost.osMetadata != detected) {
                             sessionHost = sessionHost.copy(osMetadata = detected)
                             SessionLogBus.emit(
@@ -950,7 +951,7 @@ class SessionService : Service() {
                 }
                 val refreshOs = if (mode == ConnectionMode.SSH) osKnownAtStart else !osKnownAtStart
                 if (refreshOs && currentCoroutineContext().isActive) {
-                    detectRemoteOsMetadata(sessionId, client!!)?.let { detected ->
+                    detectRemoteOsMetadata(sessionId, client!!, sessionHost.osMetadata)?.let { detected ->
                         val activeConnection = activeConnections[sessionId]
                         if (
                             sessionHost.osMetadata != detected &&
@@ -4295,7 +4296,8 @@ class SessionService : Service() {
         if (length > MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS) delete(0, length - MAX_MOSH_BOOTSTRAP_OUTPUT_CHARS)
     }
 
-    private fun detectRemoteOsMetadata(hostId: String, client: SSHClient): OsMetadata? {
+    /** What the server says it runs, or null when it couldn't be found out or [known] should stay as it is. */
+    private fun detectRemoteOsMetadata(hostId: String, client: SSHClient, known: OsMetadata): OsMetadata? {
         return runCatching {
             val osRelease = runRemoteCommand(
                 client = client,
@@ -4303,6 +4305,17 @@ class SessionService : Service() {
                 timeoutSeconds = 3
             )
             parseOsRelease(osRelease)?.let { return@runCatching it }
+            return@runCatching known.afterUnameOnly(detectOsFromUname(client))
+        }.onFailure { err ->
+            UiDebugLog.action(
+                "detectRemoteOsMetadata",
+                "hostId=$hostId, failed=${err::class.java.simpleName}: ${err.message ?: "unknown"}"
+            )
+        }.getOrNull()
+    }
+
+    private fun detectOsFromUname(client: SSHClient): OsMetadata? {
+        return run {
             val uname = runRemoteCommand(client, "uname -s 2>/dev/null", timeoutSeconds = 2)
                 ?.lineSequence()
                 ?.firstOrNull()
@@ -4337,12 +4350,7 @@ class SessionService : Service() {
                     }
                 }
             }
-        }.onFailure { err ->
-            UiDebugLog.action(
-                "detectRemoteOsMetadata",
-                "hostId=$hostId, failed=${err::class.java.simpleName}: ${err.message ?: "unknown"}"
-            )
-        }.getOrNull()
+        }
     }
 
     fun fetchHostSystemInfo(

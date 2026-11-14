@@ -39,6 +39,7 @@ class ConnectionLatencyBadgeTest {
         val lost = ConnectionLatency(lastMs = null, minMs = 40, avgMs = 40, maxMs = 40, jitterMs = 0, via = "Boost UDP", samples = 1, lost = true)
         composeRule.setContent { ConnectionLatencyBadge(lost) }
         composeRule.onNodeWithContentDescription("Connection latency no answer").assertIsDisplayed()
+        composeRule.onNodeWithText("...").assertIsDisplayed()
         composeRule.onNodeWithText("No answer").assertDoesNotExist()
         composeRule.onNodeWithTag(UiTestTags.CONNECTION_LATENCY_BADGE).performClick()
         composeRule.onNodeWithText("The last check got no answer within 5 seconds.").assertIsDisplayed()
@@ -48,6 +49,8 @@ class ConnectionLatencyBadgeTest {
     fun waitsForTheFirstCheck() {
         composeRule.setContent { ConnectionLatencyBadge(null) }
         composeRule.onNodeWithContentDescription("Connection latency not measured yet").assertIsDisplayed()
+        // Three dots next to the grey circle, not an empty space.
+        composeRule.onNodeWithText("...").assertIsDisplayed()
     }
 
     @Test

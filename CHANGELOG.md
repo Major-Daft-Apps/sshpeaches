@@ -2,6 +2,16 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 0.16.2 (1602)
+
+Not released yet.
+
+- **Fixed: a host could lose its distribution logo and turn into the plain Linux one.** Each new session to a host whose system is already known looks again, by reading the server's os-release file with a 3-second limit. When that read didn't finish in time (a slow or busy connection), the app fell back to `uname`, which only says "Linux", and saved that over the Ubuntu, Debian, Fedora... it already had. A distribution that is known is now kept unless the server's os-release says otherwise; `uname` is still believed for a host not known yet, and when it names a Mac, a BSD or Windows.
+- A host's logo is saved with the host (its system, in the host's own record), and stays through restarts, edits, export files and imports; adding a host whose record already exists no longer clears it. The logos themselves are part of the app.
+- A logo that couldn't be drawn once is tried again the next time the list is shown, instead of leaving the desktop icon in its place until the host changed; such a failure is reported with crash reports on.
+- **Connection latency badge: without a reading it shows a grey circle and "..."** (before the first check, or when the last one got no answer) instead of a dark circle and an empty space. Its width is unchanged.
+- The lock screen test that recreates the screen now goes through the real windows (`LockScreenRecreateTest`); under the Compose test rule it failed about one run in three on a busy emulator although the app unlocked correctly.
+
 ## 0.16.1 (1601)
 
 Sent to Google Play open testing on 2026-11-13.
