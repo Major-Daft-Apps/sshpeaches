@@ -2,6 +2,14 @@
 
 All notable SSHPeaches release notes should be tracked here.
 
+## 1.0.0 (1000000)
+
+Not released yet.
+
+Initial version: the first production release on Google Play and the first release on F-Droid (`com.majordaftapps.sshpeaches.fdroid`, built without any Google libraries). The app is the same as 0.16.2; only the version changed.
+
+Version codes from here on are XYYZZWW: X.YY.ZZ, with WW counting open-testing betas and 00 for a production release.
+
 ## 0.16.2 (1602)
 
 Sent to Google Play open testing on 2026-11-14.
